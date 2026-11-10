@@ -1,11 +1,13 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.ScheduleSessionResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.SessionHorseResponse;
@@ -46,9 +48,6 @@ import java.util.stream.Collectors;
 @Service
 public class SessionScheduleServiceImpl implements SessionScheduleService {
 
-    /** Tối đa số ngày một lần đọc, để một khoảng gõ nhầm không kéo cả bảng. (Most days one read may span, so a mistyped range cannot pull the whole table.) */
-    private static final int MAX_RANGE_DAYS = 93;
-
     private final TrainingSessionRepository sessionRepository;
     private final TrainingWorkoutRepository workoutRepository;
     private final CourseRunRepository courseRunRepository;
@@ -86,8 +85,8 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
         if (from == null || to == null || to.isBefore(from)) {
             throw new IllegalArgumentException("A valid date range is required!");
         }
-        if (from.plusDays(MAX_RANGE_DAYS).isBefore(to)) {
-            throw new IllegalArgumentException("The date range cannot be longer than " + MAX_RANGE_DAYS + " days!");
+        if (from.plusDays(TrainingLimits.MAX_SCHEDULE_RANGE_DAYS).isBefore(to)) {
+            throw new IllegalArgumentException("The date range cannot be longer than " + TrainingLimits.MAX_SCHEDULE_RANGE_DAYS + " days!");
         }
         settlement.settle();
 
@@ -117,8 +116,8 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
         List<TrainingWorkout> workouts = workoutRepository.findBySessionId(sessionId);
         Predicate<TrainingWorkout> visible = visibleWorkouts(currentUser, List.of(workouts));
         boolean allowed = switch (currentUser.getRole()) {
-            case "HEAD_TRAINER" -> session.getTrainerId().equals(currentUser.getUserId());
-            case "CLUB_MANAGER" -> true;
+            case Roles.HEAD_TRAINER -> session.getTrainerId().equals(currentUser.getUserId());
+            case Roles.CLUB_MANAGER -> true;
             default -> workouts.stream().anyMatch(visible);
         };
         if (!allowed) {
@@ -149,11 +148,11 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
 
     private List<TrainingSession> visibleSessions(LocalDate from, LocalDate to, AuthenticatedUser user) {
         return switch (user.getRole()) {
-            case "HEAD_TRAINER" -> sessionRepository
+            case Roles.HEAD_TRAINER -> sessionRepository
                     .findByTrainerIdAndSessionDateBetweenOrderBySessionDateAscStartTimeAsc(user.getUserId(), from, to);
-            case "GROOM" -> sessionRepository.findOfGroom(user.getUserId(), from, to);
-            case "HORSE_OWNER" -> sessionRepository.findOfOwner(user.getUserId(), from, to);
-            case "CLUB_MANAGER" -> sessionRepository.findBySessionDateBetweenOrderBySessionDateAscStartTimeAsc(from, to);
+            case Roles.GROOM -> sessionRepository.findOfGroom(user.getUserId(), from, to);
+            case Roles.HORSE_OWNER -> sessionRepository.findOfOwner(user.getUserId(), from, to);
+            case Roles.CLUB_MANAGER -> sessionRepository.findBySessionDateBetweenOrderBySessionDateAscStartTimeAsc(from, to);
             default -> List.of();
         };
     }
@@ -161,8 +160,8 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
     /** Workout người xem được phép thấy: Groom chỉ ngựa mình dắt, Owner chỉ ngựa của mình, Trainer và Quản lý tất cả. */
     private Predicate<TrainingWorkout> visibleWorkouts(AuthenticatedUser user, Collection<List<TrainingWorkout>> all) {
         return switch (user.getRole()) {
-            case "GROOM" -> workout -> user.getUserId().equals(workout.getAssignedToId());
-            case "HORSE_OWNER" -> {
+            case Roles.GROOM -> workout -> user.getUserId().equals(workout.getAssignedToId());
+            case Roles.HORSE_OWNER -> {
                 Set<Long> mine = horseRepository
                         .findAllById(all.stream().flatMap(List::stream).map(TrainingWorkout::getHorseId).collect(Collectors.toSet()))
                         .stream().filter(horse -> user.getUserId().equals(horse.getOwnerId()))

@@ -6,6 +6,7 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
@@ -51,7 +52,7 @@ public class TrainingFixtures {
 
     /** Trainer mới phụ trách khu A. (A new Trainer in charge of area A.) */
     public User trainer() {
-        User trainer = user("HEAD_TRAINER", "trainer");
+        User trainer = user(Roles.HEAD_TRAINER, "trainer");
         area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
         area.setTrainerId(trainer.getId());
         areas.saveAndFlush(area);
@@ -74,8 +75,8 @@ public class TrainingFixtures {
 
     /** Ngựa trong khu A với chuồng riêng và một Groom mới. (A horse in area A with its own stall and a new Groom.) */
     public Horse horse(String name) {
-        User groom = user("GROOM", "groom");
-        User owner = user("HORSE_OWNER", "owner");
+        User groom = user(Roles.GROOM, "groom");
+        User owner = user(Roles.HORSE_OWNER, "owner");
         StableStall stall = new StableStall();
         stall.setAreaId(area.getId());
         stall.setGroomId(groom.getId());

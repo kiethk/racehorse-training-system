@@ -3,6 +3,7 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
@@ -274,7 +275,7 @@ class TrainingSessionServiceIntegrationTest {
 
     @Test
     void anotherTrainerCannotCancelTheCourseRun() {
-        AuthenticatedUser other = fixtures.principal(fixtures.user("HEAD_TRAINER", "other"));
+        AuthenticatedUser other = fixtures.principal(fixtures.user(Roles.HEAD_TRAINER, "other"));
 
         ApiException error = assertThrows(ApiException.class, () -> courseRunService.cancelCourseRun(courseRun.courseRun().id(), other));
         assertEquals("COURSE_RUN_NOT_FOUND", error.getErrorCode());

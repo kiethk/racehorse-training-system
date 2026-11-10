@@ -31,8 +31,6 @@ import java.util.Objects;
 @Service
 public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
 
-    private static final List<CourseRunStatus> UNFINISHED = List.of(CourseRunStatus.UPCOMING, CourseRunStatus.ACTIVE);
-
     private final CourseRunRepository courseRunRepository;
     private final TrainingSessionRepository sessionRepository;
     private final TrainingWorkoutRepository workoutRepository;
@@ -155,7 +153,7 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     // =================================================================
 
     private List<Long> unfinishedCourseRunIds(Long groupId) {
-        return courseRunRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED).stream().map(CourseRun::getId).toList();
+        return courseRunRepository.findByGroupIdAndStatusIn(groupId, CourseRunStatus.UNFINISHED).stream().map(CourseRun::getId).toList();
     }
 
     private List<TrainingSession> notStartedSessions(List<Long> courseRunIds) {

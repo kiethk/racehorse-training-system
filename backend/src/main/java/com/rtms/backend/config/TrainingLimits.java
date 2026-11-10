@@ -47,6 +47,24 @@ public final class TrainingLimits {
     /** Ngày bắt đầu kế hoạch không được xa hơn số ngày này kể từ hôm nay. (A plan may not start further than this from today.) */
     public static final int MAX_START_HORIZON_DAYS = 365;
 
+    /** Thời lượng mặc định của một bài khi request không nêu. (Default exercise length when the request gives none.) */
+    public static final int DEFAULT_EXERCISE_DURATION_MINUTES = 60;
+
+    /** Số ngày tối đa một lần đọc lịch, để một khoảng gõ nhầm không kéo cả bảng. (Most days one schedule read may span, so a mistyped range cannot pull the whole table.) */
+    public static final int MAX_SCHEDULE_RANGE_DAYS = 93;
+
+    /** Khoảng nhịp tim (bpm) chấp nhận khi ghi kết quả. (Heart rate range, in bpm, accepted when recording a result.) */
+    public static final int MIN_HEART_RATE_BPM = 30;
+    public static final int MAX_HEART_RATE_BPM = 240;
+
+    /** Độ dài tối đa của nhận xét của Trainer. (Longest trainer feedback.) */
+    public static final int MAX_TRAINER_FEEDBACK_LENGTH = 2000;
+
+    /** Ngưỡng nhịp tim an toàn của hệ thống: vượt ngưỡng thì buổi tập bị coi là quá sức. (Safe heart-rate thresholds: above them a workout counts as over-exertion.) */
+    public static final int MAX_HEART_RATE_LIMIT = 220;
+    public static final int AVERAGE_HEART_RATE_LIMIT = 180;
+    public static final int RECOVERY_HEART_RATE_LIMIT = 100;
+
     /** Độ dài tối đa của tên nhóm huấn luyện. (Longest name of a training group.) */
     public static final int GROUP_NAME_MAX_LENGTH = 100;
 

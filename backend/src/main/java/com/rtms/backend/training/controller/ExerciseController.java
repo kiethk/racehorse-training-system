@@ -1,5 +1,6 @@
 package com.rtms.backend.training.controller;
 
+import com.rtms.backend.training.dto.ExerciseResponse;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateExerciseRequest;
@@ -25,26 +26,26 @@ public class ExerciseController {
 
     @PreAuthorize("hasAuthority('EXERCISE_VIEW')")
     @GetMapping
-    public ApiResponse<List<Exercise>> getAllExercises(
+    public ApiResponse<List<ExerciseResponse>> getAllExercises(
             @RequestParam(required = false) Long trainerId,
             @RequestParam(required = false) ExerciseCategory category,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(exerciseService.getAllExercises(trainerId, category, currentUser));
+        return ApiResponse.success(exerciseService.getAllExercises(trainerId, category, currentUser).stream().map(ExerciseResponse::of).toList());
     }
 
     @PreAuthorize("hasAuthority('EXERCISE_VIEW')")
     @GetMapping("/{id}")
-    public ApiResponse<Exercise> getExerciseById(
+    public ApiResponse<ExerciseResponse> getExerciseById(
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(exerciseService.getExerciseById(id, currentUser));
+        return ApiResponse.success(ExerciseResponse.of(exerciseService.getExerciseById(id, currentUser)));
     }
 
     @PreAuthorize("hasAuthority('EXERCISE_MANAGE')")
     @PostMapping
-    public ApiResponse<Exercise> createExercise(
+    public ApiResponse<ExerciseResponse> createExercise(
             @Valid @RequestBody CreateExerciseRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(exerciseService.createExercise(request, currentUser));
+        return ApiResponse.success(ExerciseResponse.of(exerciseService.createExercise(request, currentUser)));
     }
 }

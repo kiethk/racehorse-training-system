@@ -1,5 +1,6 @@
 package com.rtms.backend.training.repository;
 
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
@@ -77,7 +78,7 @@ class TrainingGroupSchemaIntegrationTest {
 
     @BeforeEach
     void buildFixture() {
-        trainer = user("HEAD_TRAINER", "trainer");
+        trainer = user(Roles.HEAD_TRAINER, "trainer");
         area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
 
         exercise = new Exercise();
@@ -108,17 +109,17 @@ class TrainingGroupSchemaIntegrationTest {
     @Test
     void sixHorsesFitInAGroupAndTheSeventhIsRefused() {
         for (int i = 0; i < 6; i++) {
-            addMember(group, horse(), user("GROOM", "groom"));
+            addMember(group, horse(), user(Roles.GROOM, "groom"));
         }
 
         assertEquals(6, members.countByGroupIdAndLeftAtIsNull(group.getId()));
         assertThrows(DataIntegrityViolationException.class,
-                () -> addMember(group, horse(), user("GROOM", "groom")));
+                () -> addMember(group, horse(), user(Roles.GROOM, "groom")));
     }
 
     @Test
     void twoHorsesOfTheSameGroomCanShareAGroup() {
-        User groom = user("GROOM", "shared-groom");
+        User groom = user(Roles.GROOM, "shared-groom");
         addMember(group, horse(), groom);
 
         assertDoesNotThrow(() -> addMember(group, horse(), groom));
@@ -126,7 +127,7 @@ class TrainingGroupSchemaIntegrationTest {
 
     @Test
     void theSameGroomCanLeadHorsesInDifferentGroups() {
-        User groom = user("GROOM", "shared-groom");
+        User groom = user(Roles.GROOM, "shared-groom");
         TrainingGroup other = group("Nhóm 2");
         addMember(group, horse(), groom);
 
@@ -137,9 +138,9 @@ class TrainingGroupSchemaIntegrationTest {
     void aHorseCannotBeInTwoGroups() {
         Horse horse = horse();
         TrainingGroup other = group("Nhóm 2");
-        addMember(group, horse, user("GROOM", "groom"));
+        addMember(group, horse, user(Roles.GROOM, "groom"));
 
-        assertThrows(DataIntegrityViolationException.class, () -> addMember(other, horse, user("GROOM", "groom")));
+        assertThrows(DataIntegrityViolationException.class, () -> addMember(other, horse, user(Roles.GROOM, "groom")));
     }
 
     @Test
@@ -335,7 +336,7 @@ class TrainingGroupSchemaIntegrationTest {
     }
 
     private Horse horse() {
-        User owner = user("HORSE_OWNER", "owner");
+        User owner = user(Roles.HORSE_OWNER, "owner");
         StableStall stall = new StableStall();
         stall.setAreaId(area.getId());
         stall.setStallNumber(stallNumber);

@@ -1,8 +1,11 @@
 package com.rtms.backend.training.service;
 
+import org.springframework.http.HttpStatus;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateExerciseRequest;
 import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.ExerciseCategory;
@@ -17,16 +20,11 @@ public class ExerciseService {
 
     public static final int MIN_DURATION_MINUTES = TrainingLimits.MIN_EXERCISE_DURATION_MINUTES;
     public static final int MAX_DURATION_MINUTES = TrainingLimits.MAX_EXERCISE_DURATION_MINUTES;
-    private static final int DEFAULT_DURATION_MINUTES = 60;
 
     private final ExerciseRepository exerciseRepository;
 
     public ExerciseService(ExerciseRepository exerciseRepository) {
         this.exerciseRepository = exerciseRepository;
-    }
-
-    public List<Exercise> getAllExercises(ExerciseCategory category) {
-        return getAllExercises(null, category, null);
     }
 
     public List<Exercise> getAllExercises(Long trainerId, ExerciseCategory category, AuthenticatedUser currentUser) {
@@ -43,31 +41,23 @@ public class ExerciseService {
         return exerciseRepository.findAll();
     }
 
-    public Exercise getExerciseById(Long id) {
-        return getExerciseById(id, null);
-    }
-
     public Exercise getExerciseById(Long id, AuthenticatedUser currentUser) {
         Exercise exercise = exerciseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Exercise not found with id: " + id));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "EXERCISE_NOT_FOUND", "Exercise not found!"));
 
-        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())
+        if (currentUser != null && Roles.HEAD_TRAINER.equals(currentUser.getRole())
                 && exercise.getTrainerId() != null && !exercise.getTrainerId().equals(currentUser.getUserId())) {
-            throw new RuntimeException("Exercise not found with id: " + id);
+            throw new ApiException(HttpStatus.NOT_FOUND, "EXERCISE_NOT_FOUND", "Exercise not found!");
         }
 
         return exercise;
     }
 
     private Long resolveTrainerId(Long trainerId, AuthenticatedUser currentUser) {
-        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())) {
+        if (currentUser != null && Roles.HEAD_TRAINER.equals(currentUser.getRole())) {
             return currentUser.getUserId();
         }
         return trainerId;
-    }
-
-    public Exercise createExercise(CreateExerciseRequest request) {
-        return createExercise(request, null);
     }
 
     /**
@@ -99,7 +89,7 @@ public class ExerciseService {
         exercise.setTargetDistanceMeters(request.getTargetDistanceMeters());
         exercise.setIntensityLevel(request.getIntensityLevel());
         exercise.setDurationMinutes(
-                request.getDurationMinutes() != null ? request.getDurationMinutes() : DEFAULT_DURATION_MINUTES);
+                request.getDurationMinutes() != null ? request.getDurationMinutes() : TrainingLimits.DEFAULT_EXERCISE_DURATION_MINUTES);
 
         validateDuration(exercise.getDurationMinutes());
         return exerciseRepository.save(exercise);

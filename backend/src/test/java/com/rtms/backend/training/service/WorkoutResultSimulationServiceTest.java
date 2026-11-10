@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
 import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.IntensityLevel;
@@ -38,7 +39,7 @@ class WorkoutResultSimulationServiceTest {
     void recoveryHeartRateIsMostlyUnderTheSafeLimitWithOccasionalPoorRecovery() {
         Exercise exercise = new Exercise();
         exercise.setIntensityLevel(IntensityLevel.LOW);
-        int limit = HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT;
+        int limit = TrainingLimits.RECOVERY_HEART_RATE_LIMIT;
 
         int overLimit = 0;
         for (int i = 0; i < 1_000; i++) {

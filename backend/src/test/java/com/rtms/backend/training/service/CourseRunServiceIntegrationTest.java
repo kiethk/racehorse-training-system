@@ -7,6 +7,7 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
@@ -87,8 +88,8 @@ class CourseRunServiceIntegrationTest {
 
     @BeforeEach
     void buildFixture() {
-        trainer = user("HEAD_TRAINER", "trainer");
-        trainerPrincipal = new AuthenticatedUser(trainer.getId(), trainer.getEmail(), "HEAD_TRAINER");
+        trainer = user(Roles.HEAD_TRAINER, "trainer");
+        trainerPrincipal = new AuthenticatedUser(trainer.getId(), trainer.getEmail(), Roles.HEAD_TRAINER);
         area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
         area.setTrainerId(trainer.getId());
         areas.saveAndFlush(area);
@@ -261,8 +262,8 @@ class CourseRunServiceIntegrationTest {
     void anotherTrainersGroupIsNotFound() {
         TrainingGroupResponse group = groupOf("Nhom 1", 1);
         Course course = course("Sprint", 2, exercise("S1", 30));
-        User other = user("HEAD_TRAINER", "other");
-        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), "HEAD_TRAINER");
+        User other = user(Roles.HEAD_TRAINER, "other");
+        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), Roles.HEAD_TRAINER);
 
         ApiException error = assertThrows(ApiException.class, () -> service.createCourseRun(
                 new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), otherPrincipal));
@@ -277,8 +278,8 @@ class CourseRunServiceIntegrationTest {
         Course course = course("Sprint", 3, exercise("S1", 30));
         CourseRunDetailResponse created = service.createCourseRun(
                 new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainerPrincipal);
-        User other = user("HEAD_TRAINER", "other");
-        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), "HEAD_TRAINER");
+        User other = user(Roles.HEAD_TRAINER, "other");
+        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), Roles.HEAD_TRAINER);
 
         List<CourseRunSummaryResponse> own = service.getCourseRuns(group.id(), null, trainerPrincipal);
 
@@ -303,7 +304,7 @@ class CourseRunServiceIntegrationTest {
     private TrainingGroupResponse groupOf(String name, int horseCount) {
         List<Long> horseIds = new java.util.ArrayList<>();
         for (int i = 0; i < horseCount; i++) {
-            horseIds.add(horse("H" + System.nanoTime(), user("GROOM", "groom")).getId());
+            horseIds.add(horse("H" + System.nanoTime(), user(Roles.GROOM, "groom")).getId());
         }
         return groupService.createGroup(new CreateTrainingGroupRequest(name, horseIds), trainerPrincipal);
     }
@@ -349,7 +350,7 @@ class CourseRunServiceIntegrationTest {
     }
 
     private Horse horse(String name, User groom) {
-        User owner = user("HORSE_OWNER", "owner");
+        User owner = user(Roles.HORSE_OWNER, "owner");
         StableStall stall = new StableStall();
         stall.setAreaId(area.getId());
         stall.setGroomId(groom.getId());

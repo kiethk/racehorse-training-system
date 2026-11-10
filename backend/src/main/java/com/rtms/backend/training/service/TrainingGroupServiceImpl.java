@@ -7,6 +7,7 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.GroupCandidateResponse;
 import com.rtms.backend.training.dto.GroupMemberResponse;
@@ -50,9 +51,6 @@ import java.util.stream.Collectors;
 @Service
 public class TrainingGroupServiceImpl implements TrainingGroupService {
 
-    private static final List<CourseRunStatus> UNFINISHED =
-            List.of(CourseRunStatus.UPCOMING, CourseRunStatus.ACTIVE);
-
     private final TrainingGroupRepository groupRepository;
     private final TrainingGroupMemberRepository memberRepository;
     private final CourseRunRepository courseRunRepository;
@@ -93,7 +91,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Override
     @Transactional(readOnly = true)
     public List<TrainingGroupResponse> getGroups(AuthenticatedUser currentUser) {
-        List<TrainingGroup> found = "HEAD_TRAINER".equals(currentUser.getRole())
+        List<TrainingGroup> found = Roles.HEAD_TRAINER.equals(currentUser.getRole())
                 ? groupRepository.findByTrainerIdAndDisbandedAtIsNullOrderByCreatedAtDesc(currentUser.getUserId())
                 : groupRepository.findByDisbandedAtIsNullOrderByCreatedAtDesc();
         return toResponses(found);
@@ -102,14 +100,10 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Override
     @Transactional(readOnly = true)
     public List<TrainingGroupResponse> getDisbandedGroups(AuthenticatedUser currentUser) {
-        List<TrainingGroup> found = "HEAD_TRAINER".equals(currentUser.getRole())
+        List<TrainingGroup> found = Roles.HEAD_TRAINER.equals(currentUser.getRole())
                 ? groupRepository.findByTrainerIdAndDisbandedAtIsNotNullOrderByCreatedAtDesc(currentUser.getUserId())
                 : groupRepository.findByDisbandedAtIsNotNullOrderByCreatedAtDesc();
         return toResponses(found);
-    }
-
-    private List<TrainingGroup> sortedByName(List<TrainingGroup> groups) {
-        return groups.stream().sorted(Comparator.comparing(TrainingGroup::getName, String.CASE_INSENSITIVE_ORDER)).toList();
     }
 
     @Override
@@ -178,7 +172,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Transactional
     public void disbandGroup(Long groupId, AuthenticatedUser currentUser) {
         findLiveOwnGroup(groupId, currentUser);
-        for (CourseRun courseRun : courseRunRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED)) {
+        for (CourseRun courseRun : courseRunRepository.findByGroupIdAndStatusIn(groupId, CourseRunStatus.UNFINISHED)) {
             courseRunService.cancelCourseRun(courseRun.getId(), currentUser);
         }
         // Cancelling course runs runs bulk updates that clear the persistence context, so the rows are read again.
@@ -421,7 +415,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
 
     /** Khóa đang chạy của mỗi nhóm, hoặc khóa sắp chạy sớm nhất nếu chưa có khóa nào chạy. (The running course of each group, else the earliest upcoming one.) */
     private Map<Long, CourseRun> currentCourseRuns(Collection<Long> groupIds) {
-        return courseRunRepository.findByGroupIdInAndStatusIn(groupIds, UNFINISHED).stream()
+        return courseRunRepository.findByGroupIdInAndStatusIn(groupIds, CourseRunStatus.UNFINISHED).stream()
                 .collect(Collectors.toMap(CourseRun::getGroupId, Function.identity(), (a, b) -> {
                     if (a.getStatus() != b.getStatus()) {
                         return a.getStatus() == CourseRunStatus.ACTIVE ? a : b;

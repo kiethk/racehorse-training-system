@@ -60,7 +60,7 @@ public class SessionSettlementServiceImpl implements SessionSettlementService {
 
         // 3. Kế hoạch không còn buổi nào chờ chạy thì đóng. (Course runs with no Session left to run close.)
         List<CourseRun> finished = courseRunRepository.findWithoutScheduledSessions(
-                List.of(CourseRunStatus.UPCOMING, CourseRunStatus.ACTIVE), SessionStatus.SCHEDULED);
+                CourseRunStatus.UNFINISHED, SessionStatus.SCHEDULED);
         for (CourseRun courseRun : finished) {
             boolean anyHeld = sessionRepository.countByCourseRunIdAndStatus(courseRun.getId(), SessionStatus.HELD) > 0;
             courseRun.setStatus(anyHeld ? CourseRunStatus.COMPLETED : CourseRunStatus.CANCELLED);

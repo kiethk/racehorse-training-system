@@ -1,6 +1,10 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.training.dto.CourseResponse;
+import org.springframework.http.HttpStatus;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CourseDetailResponse;
 import com.rtms.backend.training.dto.CourseExerciseItemRequest;
 import com.rtms.backend.training.dto.CreateCourseRequest;
@@ -39,10 +43,6 @@ public class CourseService {
         this.exerciseRepository = exerciseRepository;
     }
 
-    public List<Course> getAllCourses() {
-        return courseRepository.findAll();
-    }
-
     public List<Course> getAllCourses(Long trainerId, AuthenticatedUser currentUser) {
         Long effectiveTrainerId = resolveTrainerId(trainerId, currentUser);
         if (effectiveTrainerId != null) {
@@ -51,19 +51,15 @@ public class CourseService {
         return courseRepository.findAll();
     }
 
-    public CourseDetailResponse getCourseById(Long id) {
-        return getCourseById(id, null);
-    }
-
     public CourseDetailResponse getCourseById(Long id, AuthenticatedUser currentUser) {
         Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with id: " + id));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "Course not found!"));
         assertCanSee(course, currentUser);
-        return new CourseDetailResponse(course, courseExerciseRepository.findCourseExerciseResponses(id));
+        return new CourseDetailResponse(CourseResponse.of(course), courseExerciseRepository.findCourseExerciseResponses(id));
     }
 
     private Long resolveTrainerId(Long trainerId, AuthenticatedUser currentUser) {
-        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())) {
+        if (currentUser != null && Roles.HEAD_TRAINER.equals(currentUser.getRole())) {
             return currentUser.getUserId();
         }
         return trainerId;
@@ -71,9 +67,9 @@ public class CourseService {
 
     /** Một Trainer chỉ thấy khóa của mình; khóa của người khác báo "không tìm thấy". (A trainer only sees their own courses; another trainer course is "not found".) */
     private void assertCanSee(Course course, AuthenticatedUser currentUser) {
-        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())
+        if (currentUser != null && Roles.HEAD_TRAINER.equals(currentUser.getRole())
                 && course.getTrainerId() != null && !course.getTrainerId().equals(currentUser.getUserId())) {
-            throw new RuntimeException("Course not found with id: " + course.getId());
+            throw new ApiException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "Course not found!");
         }
     }
 
@@ -107,7 +103,7 @@ public class CourseService {
         Course savedCourse = courseRepository.save(course);
         addExercises(savedCourse.getId(), request.getExercises(), rotation, trainerId);
 
-        return new CourseDetailResponse(savedCourse,
+        return new CourseDetailResponse(CourseResponse.of(savedCourse),
                 courseExerciseRepository.findCourseExerciseResponses(savedCourse.getId()));
     }
 

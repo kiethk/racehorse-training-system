@@ -3,6 +3,7 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
@@ -306,7 +307,7 @@ class SessionWorkoutServiceIntegrationTest {
     void anotherTrainerDoesNotFindTheWorkout() {
         clock.set(monday.atTime(12, 0));
         Long workoutId = firstWorkoutOfSession(0).getId();
-        User other = fixtures.user("HEAD_TRAINER", "other");
+        User other = fixtures.user(Roles.HEAD_TRAINER, "other");
         AuthenticatedUser otherPrincipal = fixtures.principal(other);
 
         ApiException error = assertThrows(ApiException.class,

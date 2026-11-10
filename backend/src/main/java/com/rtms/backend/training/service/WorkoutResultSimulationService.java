@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
 import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.IntensityLevel;
@@ -14,7 +15,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class WorkoutResultSimulationService {
 
     private static final BigDecimal DEFAULT_DISTANCE_METERS = BigDecimal.valueOf(1_000);
-    private static final int DEFAULT_DURATION_MINUTES = 60;
     private static final double POOR_RECOVERY_CHANCE = 0.1;
 
     public WorkoutResultPreviewResponse generate(Exercise exercise) {
@@ -27,7 +27,7 @@ public class WorkoutResultSimulationService {
                 ? DEFAULT_DISTANCE_METERS
                 : exercise.getTargetDistanceMeters();
         int targetDuration = exercise.getDurationMinutes() == null
-                ? DEFAULT_DURATION_MINUTES
+                ? TrainingLimits.DEFAULT_EXERCISE_DURATION_MINUTES
                 : exercise.getDurationMinutes();
 
         BigDecimal actualDistance = scaled(targetDistance.doubleValue()
@@ -48,7 +48,7 @@ public class WorkoutResultSimulationService {
             case MEDIUM -> random.nextInt(145, 176);
             case HIGH -> random.nextInt(170, 196);
         };
-        int maxHeartRate = Math.min(220, averageHeartRate + random.nextInt(15, 31));
+        int maxHeartRate = Math.min(TrainingLimits.MAX_HEART_RATE_LIMIT, averageHeartRate + random.nextInt(15, 31));
         int recoveryHeartRate = recoveryHeartRate(random, averageHeartRate);
 
         return new WorkoutResultPreviewResponse(
@@ -67,7 +67,7 @@ public class WorkoutResultSimulationService {
      * lowest average is 115).
      */
     private int recoveryHeartRate(ThreadLocalRandom random, int averageHeartRate) {
-        int limit = HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT;
+        int limit = TrainingLimits.RECOVERY_HEART_RATE_LIMIT;
         if (random.nextDouble() < POOR_RECOVERY_CHANCE) {
             return random.nextInt(limit + 1, Math.min(limit + 21, averageHeartRate - 8));
         }

@@ -4,6 +4,7 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
@@ -116,7 +117,7 @@ class SessionScheduleServiceIntegrationTest {
 
     @Test
     void anotherTrainerSeesNothing() {
-        AuthenticatedUser other = fixtures.principal(fixtures.user("HEAD_TRAINER", "other"));
+        AuthenticatedUser other = fixtures.principal(fixtures.user(Roles.HEAD_TRAINER, "other"));
 
         assertTrue(schedule.getSessions(monday, monday.plusDays(6), null, false, other).isEmpty());
         ApiException error = assertThrows(ApiException.class,
@@ -166,7 +167,7 @@ class SessionScheduleServiceIntegrationTest {
     @Test
     void aGroomSeesOnlySessionsWithAHorseTheyLeadAndOnlyThatHorse() {
         Long thunderGroomId = stalls.findById(thunder.getCurrentStallId()).orElseThrow().getGroomId();
-        AuthenticatedUser groom = new AuthenticatedUser(thunderGroomId, "g@test.invalid", "GROOM");
+        AuthenticatedUser groom = new AuthenticatedUser(thunderGroomId, "g@test.invalid", Roles.GROOM);
 
         List<ScheduleSessionResponse> mine = schedule.getSessions(monday, monday.plusDays(6), null, false, groom);
         SessionDetailResponse detail = schedule.getSession(mine.get(0).id(), groom);
@@ -179,7 +180,7 @@ class SessionScheduleServiceIntegrationTest {
 
     @Test
     void anOwnerSeesOnlyTheirOwnHorse() {
-        AuthenticatedUser owner = new AuthenticatedUser(blaze.getOwnerId(), "o@test.invalid", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(blaze.getOwnerId(), "o@test.invalid", Roles.HORSE_OWNER);
 
         SessionDetailResponse detail = schedule.getSession(courseRun.sessions().get(0).id(), owner);
 
@@ -189,7 +190,7 @@ class SessionScheduleServiceIntegrationTest {
 
     @Test
     void aGroomWithNoHorseInTheSessionDoesNotFindIt() {
-        AuthenticatedUser stranger = new AuthenticatedUser(fixtures.user("GROOM", "stranger").getId(), "s@test.invalid", "GROOM");
+        AuthenticatedUser stranger = new AuthenticatedUser(fixtures.user(Roles.GROOM, "stranger").getId(), "s@test.invalid", Roles.GROOM);
 
         assertTrue(schedule.getSessions(monday, monday.plusDays(6), null, false, stranger).isEmpty());
         assertThrows(ApiException.class, () -> schedule.getSession(courseRun.sessions().get(0).id(), stranger));

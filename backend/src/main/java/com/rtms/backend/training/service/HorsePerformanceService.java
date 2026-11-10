@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
@@ -40,9 +41,6 @@ public class HorsePerformanceService {
 
     private static final int RECENT_WORKOUT_DAYS = 30;
     private static final int TREND_WEEKS = 12;
-    public static final int MAX_HEART_RATE_LIMIT = 220;
-    public static final int AVERAGE_HEART_RATE_LIMIT = 180;
-    public static final int RECOVERY_HEART_RATE_LIMIT = 100;
     private static final LocalTime DEFAULT_END_TIME = LocalTime.of(10, 0);
 
     private final TrainingWorkoutRepository workoutRepository;
@@ -141,49 +139,49 @@ public class HorsePerformanceService {
     /** Luật 1: nhịp tim tối đa vượt ngưỡng; chỉ báo mốc gần nhất. (Rule 1: max heart rate over the limit; newest only.) */
     private Optional<HorseAlertResponse> maxHeartRateAlert(List<RecentWorkoutRow> recent) {
         return recent.stream()
-                .filter(r -> r.maxHeartRate() != null && r.maxHeartRate() > MAX_HEART_RATE_LIMIT)
+                .filter(r -> r.maxHeartRate() != null && r.maxHeartRate() > TrainingLimits.MAX_HEART_RATE_LIMIT)
                 .findFirst()
                 .map(r -> new HorseAlertResponse(
                         "MAX_HEART_RATE_EXCEEDED",
                         "Maximum heart rate above safe limit",
                         String.format("Recorded a maximum heart rate of %d bpm (safe limit <= %d bpm) on %s.",
-                                r.maxHeartRate(), MAX_HEART_RATE_LIMIT, r.sessionDate()),
+                                r.maxHeartRate(), TrainingLimits.MAX_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.maxHeartRate().doubleValue(),
-                        (double) MAX_HEART_RATE_LIMIT));
+                        (double) TrainingLimits.MAX_HEART_RATE_LIMIT));
     }
 
     /** Luật 2: hồi phục tim kém. (Rule 2: poor heart-rate recovery.) */
     private Optional<HorseAlertResponse> recoveryHeartRateAlert(List<RecentWorkoutRow> recent) {
         return recent.stream()
-                .filter(r -> r.recoveryHeartRate() != null && r.recoveryHeartRate() > RECOVERY_HEART_RATE_LIMIT)
+                .filter(r -> r.recoveryHeartRate() != null && r.recoveryHeartRate() > TrainingLimits.RECOVERY_HEART_RATE_LIMIT)
                 .findFirst()
                 .map(r -> new HorseAlertResponse(
                         "POOR_RECOVERY_HEART_RATE",
                         "Poor heart-rate recovery",
                         String.format("Post-workout recovery heart rate is abnormally high (%d bpm, safe limit <= %d bpm) on %s.",
-                                r.recoveryHeartRate(), RECOVERY_HEART_RATE_LIMIT, r.sessionDate()),
+                                r.recoveryHeartRate(), TrainingLimits.RECOVERY_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.recoveryHeartRate().doubleValue(),
-                        (double) RECOVERY_HEART_RATE_LIMIT));
+                        (double) TrainingLimits.RECOVERY_HEART_RATE_LIMIT));
     }
 
     /** Luật 3: nhịp tim trung bình vượt ngưỡng; chỉ báo mốc gần nhất. (Rule 3: average heart rate over the limit; newest only.) */
     private Optional<HorseAlertResponse> averageHeartRateAlert(List<RecentWorkoutRow> recent) {
         return recent.stream()
-                .filter(r -> r.averageHeartRate() != null && r.averageHeartRate() > AVERAGE_HEART_RATE_LIMIT)
+                .filter(r -> r.averageHeartRate() != null && r.averageHeartRate() > TrainingLimits.AVERAGE_HEART_RATE_LIMIT)
                 .findFirst()
                 .map(r -> new HorseAlertResponse(
                         "AVERAGE_HEART_RATE_EXCEEDED",
                         "Elevated average heart rate",
                         String.format("Recorded an average heart rate of %d bpm (safe limit <= %d bpm) on %s.",
-                                r.averageHeartRate(), AVERAGE_HEART_RATE_LIMIT, r.sessionDate()),
+                                r.averageHeartRate(), TrainingLimits.AVERAGE_HEART_RATE_LIMIT, r.sessionDate()),
                         "WARNING",
                         triggeredAt(r),
                         r.averageHeartRate().doubleValue(),
-                        (double) AVERAGE_HEART_RATE_LIMIT));
+                        (double) TrainingLimits.AVERAGE_HEART_RATE_LIMIT));
     }
 
     private LocalDateTime triggeredAt(RecentWorkoutRow row) {

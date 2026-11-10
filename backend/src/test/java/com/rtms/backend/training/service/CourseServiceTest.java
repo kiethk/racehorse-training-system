@@ -1,6 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CourseDetailResponse;
 import com.rtms.backend.training.dto.CourseExerciseItemRequest;
 import com.rtms.backend.training.dto.CourseExerciseResponse;
@@ -43,7 +44,7 @@ class CourseServiceTest {
 
     private CourseService courseService;
 
-    private final AuthenticatedUser trainerUser = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+    private final AuthenticatedUser trainerUser = new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
 
     @BeforeEach
     void setUp() {
@@ -69,7 +70,7 @@ class CourseServiceTest {
 
         when(courseRepository.findAll()).thenReturn(List.of(c1, c2));
 
-        List<Course> result = courseService.getAllCourses();
+        List<Course> result = courseService.getAllCourses(null, null);
 
         assertEquals(2, result.size());
         assertEquals("Beginner course", result.get(0).getName());
@@ -87,10 +88,10 @@ class CourseServiceTest {
         when(courseExerciseRepository.findCourseExerciseResponses(courseId))
                 .thenReturn(List.of(row(101L, 50L, "Slow run 20 min", 1, 30)));
 
-        CourseDetailResponse response = courseService.getCourseById(courseId);
+        CourseDetailResponse response = courseService.getCourseById(courseId, null);
 
         assertNotNull(response);
-        assertEquals("Endurance course", response.getCourse().getName());
+        assertEquals("Endurance course", response.getCourse().name());
         assertEquals(1, response.getExercises().size());
         assertEquals("Slow run 20 min", response.getExercises().get(0).getExerciseName());
         assertEquals(1, response.getExercises().get(0).getOrderIndex());
@@ -103,7 +104,7 @@ class CourseServiceTest {
     void testGetCourseById_NotFound_ThrowsException() {
         when(courseRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> courseService.getCourseById(99L));
+        assertThrows(RuntimeException.class, () -> courseService.getCourseById(99L, null));
     }
 
     @Test
@@ -144,8 +145,8 @@ class CourseServiceTest {
         CourseDetailResponse res = courseService.createCourse(req, trainerUser);
 
         assertNotNull(res);
-        assertEquals(100L, res.getCourse().getId());
-        assertEquals("Sprint 1200m course", res.getCourse().getName());
+        assertEquals(100L, res.getCourse().id());
+        assertEquals("Sprint 1200m course", res.getCourse().name());
         assertEquals(2, res.getExercises().size());
         verify(courseRepository).save(any(Course.class));
         verify(courseExerciseRepository, times(2)).save(any(CourseExercise.class));
@@ -373,7 +374,7 @@ class CourseServiceTest {
         when(courseExerciseRepository.findCourseExerciseResponses(courseId))
                 .thenReturn(List.of(row(101L, 50L, "Warm-up and steady run", 1, 90)));
 
-        CourseDetailResponse response = courseService.getCourseById(courseId);
+        CourseDetailResponse response = courseService.getCourseById(courseId, null);
 
         // Thiếu trường này thì màn chọn khóa chỉ hiện chữ "phút" trơ trọi, Trainer không biết khóa ngốn bao
         // nhiêu khung giờ vàng.

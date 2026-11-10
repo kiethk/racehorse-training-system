@@ -36,12 +36,6 @@ public class TrainingDecisionService {
     private final CareScheduleRepository careScheduleRepository;
     private final GroupWorkoutSyncService groupSync;
 
-    /**
-     * @param workoutService hủy buổi tập tương lai khi chặn tập. TrainingWorkoutService không phụ thuộc ngược lại
-     *                       service nào, nên không có vòng phụ thuộc và không cần @Lazy.
-     *                       (cancels future workouts when blocking. TrainingWorkoutService never depends back on
-     *                       any service, so there is no dependency cycle and no @Lazy is needed.)
-     */
     public TrainingDecisionService(HorseRepository horseRepository,
                                    CareScheduleRepository careScheduleRepository,
                                    GroupWorkoutSyncService groupSync) {

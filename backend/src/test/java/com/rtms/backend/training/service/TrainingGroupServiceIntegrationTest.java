@@ -7,6 +7,7 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
@@ -74,8 +75,8 @@ class TrainingGroupServiceIntegrationTest {
 
     @BeforeEach
     void buildFixture() {
-        trainer = user("HEAD_TRAINER", "trainer");
-        trainerPrincipal = new AuthenticatedUser(trainer.getId(), trainer.getEmail(), "HEAD_TRAINER");
+        trainer = user(Roles.HEAD_TRAINER, "trainer");
+        trainerPrincipal = new AuthenticatedUser(trainer.getId(), trainer.getEmail(), Roles.HEAD_TRAINER);
         area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
         area.setTrainerId(trainer.getId());
         areas.saveAndFlush(area);
@@ -159,7 +160,7 @@ class TrainingGroupServiceIntegrationTest {
 
     @Test
     void aHorseOutsideTheTrainersAreaIsRefused() {
-        User otherTrainer = user("HEAD_TRAINER", "other-trainer");
+        User otherTrainer = user(Roles.HEAD_TRAINER, "other-trainer");
         Area otherArea = areas.findAll().stream().filter(a -> !"A".equals(a.getCode())).findFirst().orElseThrow();
         otherArea.setTrainerId(otherTrainer.getId());
         areas.saveAndFlush(otherArea);
@@ -241,8 +242,8 @@ class TrainingGroupServiceIntegrationTest {
     @Test
     void anotherTrainerDoesNotSeeOrChangeTheGroup() {
         TrainingGroupResponse group = service.createGroup(new CreateTrainingGroupRequest("Nhom 1", List.of()), trainerPrincipal);
-        User other = user("HEAD_TRAINER", "other");
-        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), "HEAD_TRAINER");
+        User other = user(Roles.HEAD_TRAINER, "other");
+        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), Roles.HEAD_TRAINER);
 
         assertTrue(service.getGroups(otherPrincipal).isEmpty());
         ApiException error = assertThrows(ApiException.class,
@@ -300,7 +301,7 @@ class TrainingGroupServiceIntegrationTest {
     }
 
     private User groom(String name) {
-        return user("GROOM", name);
+        return user(Roles.GROOM, name);
     }
 
     private Horse horse(String name, User groom) {
@@ -308,7 +309,7 @@ class TrainingGroupServiceIntegrationTest {
     }
 
     private Horse horseIn(Area targetArea, String name, User groom) {
-        User owner = user("HORSE_OWNER", "owner");
+        User owner = user(Roles.HORSE_OWNER, "owner");
         StableStall stall = new StableStall();
         stall.setAreaId(targetArea.getId());
         stall.setGroomId(groom == null ? null : groom.getId());

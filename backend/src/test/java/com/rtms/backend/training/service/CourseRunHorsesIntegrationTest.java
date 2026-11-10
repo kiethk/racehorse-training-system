@@ -4,6 +4,7 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
@@ -165,7 +166,7 @@ class CourseRunHorsesIntegrationTest {
 
     @Test
     void anotherTrainerDoesNotFindTheCourseRunOrItsSessions() {
-        AuthenticatedUser other = fixtures.principal(fixtures.user("HEAD_TRAINER", "other"));
+        AuthenticatedUser other = fixtures.principal(fixtures.user(Roles.HEAD_TRAINER, "other"));
 
         assertEquals("COURSE_RUN_NOT_FOUND", assertThrows(ApiException.class,
                 () -> courseRunService.getCourseRunHorses(courseRun.courseRun().id(), other)).getErrorCode());

@@ -33,8 +33,8 @@ public class TrainingRulesController {
                 TrainingLimits.MAX_HORSES_PER_COURSE_RUN,
                 ExerciseService.MIN_DURATION_MINUTES,
                 ExerciseService.MAX_DURATION_MINUTES,
-                HorsePerformanceService.MAX_HEART_RATE_LIMIT,
-                HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT,
-                HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT));
+                TrainingLimits.MAX_HEART_RATE_LIMIT,
+                TrainingLimits.AVERAGE_HEART_RATE_LIMIT,
+                TrainingLimits.RECOVERY_HEART_RATE_LIMIT));
     }
 }

@@ -4,6 +4,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardCourseRunRow;
@@ -57,7 +58,7 @@ class HorsePerformanceServiceTest {
 
     private HorsePerformanceService service;
 
-    private final AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@example.com", "CLUB_MANAGER");
+    private final AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@example.com", Roles.CLUB_MANAGER);
 
     @BeforeEach
     void setUp() {
@@ -114,7 +115,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("Performance trend: the last 12 weeks up to today, one value per horse per week")
     void testGetPerformanceTrend_Last12Weeks() {
-        AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
         LocalDate today = LocalDate.now();
         LocalDate firstWeek = PerformanceTrendCalculator.weekStartOf(today).minusWeeks(11);
         LocalDate monday = PerformanceTrendCalculator.weekStartOf(today);
@@ -136,7 +137,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("A role with no horses gets an empty performance chart and no query")
     void testGetPerformanceTrend_NoHorses() {
-        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of());
 
         assertTrue(service.getPerformanceTrend(owner).weeks().isEmpty());
@@ -146,7 +147,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("An owner cannot read the fitness trend of someone else's horse")
     void testGetFitnessTrend_OtherOwner_Denied() {
-        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 99L)));
 
         assertThrows(AccessDeniedException.class, () -> service.getFitnessTrend(1L, null, null, owner));
@@ -156,7 +157,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("An owner can read the fitness trend of their own horse")
     void testGetFitnessTrend_OwnHorse_Allowed() {
-        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 5L)));
         when(workoutRepository.findFitnessTrend(eq(1L), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
 
@@ -166,7 +167,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("A head trainer can only read horses in the areas they manage")
     void testGetFitnessTrend_TrainerOutsideArea_Denied() {
-        AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 5L)));
         when(courseRunRepository.existsHorseInTrainerArea(1L, 9L)).thenReturn(false);
 
@@ -201,7 +202,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("An owner cannot read the schedule of someone else's horse")
     void testGetHorseSchedule_OtherOwner_Denied() {
-        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 99L)));
 
         assertThrows(AccessDeniedException.class,
@@ -286,7 +287,7 @@ class HorsePerformanceServiceTest {
     @DisplayName("7.3: trainer dashboard with course run progress, ratings and alerts, loaded with a constant number of queries")
     void testGetTrainerDashboard_Success() {
         Long trainerId = 9L;
-        AuthenticatedUser trainer = new AuthenticatedUser(trainerId, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer = new AuthenticatedUser(trainerId, "trainer@example.com", Roles.HEAD_TRAINER);
         LocalDate today = LocalDate.now();
 
         when(courseRunRepository.findDashboardHorses(trainerId)).thenReturn(List.of(
@@ -373,16 +374,16 @@ class HorsePerformanceServiceTest {
         when(courseRunRepository.findAllDashboardHorses()).thenReturn(List.of(own, area, farm));
         HorseScopeService scope = new HorseScopeService(courseRunRepository);
 
-        assertEquals(List.of(own), scope.horsesOf(new AuthenticatedUser(5L, "o@example.com", "HORSE_OWNER")));
-        assertEquals(List.of(area), scope.horsesOf(new AuthenticatedUser(9L, "t@example.com", "HEAD_TRAINER")));
-        assertEquals(List.of(1L, 2L, 3L), scope.horseIdsOf(new AuthenticatedUser(1L, "m@example.com", "CLUB_MANAGER")));
-        assertEquals(List.of(1L, 2L, 3L), scope.horseIdsOf(new AuthenticatedUser(2L, "v@example.com", "VETERINARIAN")));
+        assertEquals(List.of(own), scope.horsesOf(new AuthenticatedUser(5L, "o@example.com", Roles.HORSE_OWNER)));
+        assertEquals(List.of(area), scope.horsesOf(new AuthenticatedUser(9L, "t@example.com", Roles.HEAD_TRAINER)));
+        assertEquals(List.of(1L, 2L, 3L), scope.horseIdsOf(new AuthenticatedUser(1L, "m@example.com", Roles.CLUB_MANAGER)));
+        assertEquals(List.of(1L, 2L, 3L), scope.horseIdsOf(new AuthenticatedUser(2L, "v@example.com", Roles.VETERINARIAN)));
     }
 
     @Test
     @DisplayName("An owner dashboard is built from the owner's horses only")
     void testGetDashboard_OwnerScope() {
-        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
                 new DashboardHorseRow(60L, "Mine", "Arabian", null)));
         when(courseRunRepository.findDashboardCourseRuns(List.of(60L))).thenReturn(List.of());
@@ -400,7 +401,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("Dashboard progress leaves cancelled sessions out, like the Course run page")
     void testDashboardProgressIgnoresCancelledSessions() {
-        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         LocalDate today = LocalDate.now();
         when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
                 new DashboardHorseRow(60L, "Mine", "Arabian", null)));
@@ -421,7 +422,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("A course run cancelled part-way keeps its cancelled sessions in the progress: 3 held of 6 is 50%")
     void testDashboardProgressOfCancelledCourseRun() {
-        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         LocalDate today = LocalDate.now();
         when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
                 new DashboardHorseRow(60L, "Mine", "Arabian", null)));
@@ -437,7 +438,7 @@ class HorsePerformanceServiceTest {
     @Test
     @DisplayName("A trainer with no horses gets an empty dashboard and no further queries")
     void testGetTrainerDashboard_NoHorses() {
-        AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
         when(courseRunRepository.findDashboardHorses(9L)).thenReturn(List.of());
 
         assertTrue(service.getDashboard(trainer).isEmpty());

@@ -1,5 +1,6 @@
 package com.rtms.backend.training.repository;
 
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.stable.repository.StableStallRepository;
@@ -189,7 +190,7 @@ class TrainingSessionQueriesIntegrationTest {
     @Test
     void aWorkoutIsFoundOnlyByItsOwnTrainer() {
         TrainingWorkout any = workouts.findBySessionId(held.getId()).get(0);
-        User other = fixtures.user("HEAD_TRAINER", "other");
+        User other = fixtures.user(Roles.HEAD_TRAINER, "other");
 
         assertTrue(workouts.findByIdAndTrainerId(any.getId(), trainer.getId()).isPresent());
         assertFalse(workouts.findByIdAndTrainerId(any.getId(), other.getId()).isPresent());
@@ -244,7 +245,7 @@ class TrainingSessionQueriesIntegrationTest {
     @Test
     void aTrainersDashboardHorsesAndAreaCheck() {
         List<DashboardHorseRow> horses = courseRuns.findDashboardHorses(trainer.getId());
-        User other = fixtures.user("HEAD_TRAINER", "other");
+        User other = fixtures.user(Roles.HEAD_TRAINER, "other");
 
         // Area A of the shared database already houses other horses, so only check that ours are in the Trainer's scope.
         assertTrue(horses.stream().map(DashboardHorseRow::horseId).toList().containsAll(List.of(thunder.getId(), blaze.getId())));
@@ -276,7 +277,7 @@ class TrainingSessionQueriesIntegrationTest {
     @Test
     void anOwnerSeesOnlySessionsWithAHorseOfTheirs() {
         List<SessionRow> rows = sessions.findOwnerSessionRows(thunder.getOwnerId(), today.minusDays(10), today.plusDays(10));
-        List<SessionRow> none = sessions.findOwnerSessionRows(fixtures.user("HORSE_OWNER", "stranger").getId(), today.minusDays(10), today.plusDays(10));
+        List<SessionRow> none = sessions.findOwnerSessionRows(fixtures.user(Roles.HORSE_OWNER, "stranger").getId(), today.minusDays(10), today.plusDays(10));
 
         assertEquals(3, rows.size());
         assertTrue(none.isEmpty());

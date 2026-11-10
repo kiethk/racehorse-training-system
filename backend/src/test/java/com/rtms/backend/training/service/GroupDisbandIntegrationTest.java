@@ -3,6 +3,7 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.GroupMemberResponse;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
@@ -176,7 +177,7 @@ class GroupDisbandIntegrationTest {
     @Test
     void anotherTrainerCannotDisbandTheGroup() {
         TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder");
-        AuthenticatedUser other = fixtures.principal(fixtures.user("HEAD_TRAINER", "other"));
+        AuthenticatedUser other = fixtures.principal(fixtures.user(Roles.HEAD_TRAINER, "other"));
 
         assertEquals("GROUP_NOT_FOUND", assertThrows(ApiException.class,
                 () -> groupService.disbandGroup(group.id(), other)).getErrorCode());

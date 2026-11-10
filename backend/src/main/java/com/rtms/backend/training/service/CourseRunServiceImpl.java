@@ -6,6 +6,7 @@ import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunPreviewResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
@@ -65,7 +66,6 @@ import java.util.stream.Collectors;
 @Service
 public class CourseRunServiceImpl implements CourseRunService {
 
-    private static final List<CourseRunStatus> UNFINISHED = List.of(CourseRunStatus.UPCOMING, CourseRunStatus.ACTIVE);
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final CourseRunRepository courseRunRepository;
@@ -128,7 +128,7 @@ public class CourseRunServiceImpl implements CourseRunService {
         List<CourseRun> overlapping = overlappingCourseRuns(context.group().getId(), schedule);
         Map<Long, String> courseNames = courseNames(overlapping.stream().map(CourseRun::getCourseId).toList());
 
-        List<RunningCourseRunRow> busy = courseRunRepository.findByGroupIdAndStatusIn(context.group().getId(), UNFINISHED).stream()
+        List<RunningCourseRunRow> busy = courseRunRepository.findByGroupIdAndStatusIn(context.group().getId(), CourseRunStatus.UNFINISHED).stream()
                 .map(courseRun -> new RunningCourseRunRow(courseRun.getId(), null, courseNames.getOrDefault(courseRun.getCourseId(), ""),
                         courseRun.getStartDate(), courseRun.getEndDate(), courseRun.getStatus()))
                 .toList();
@@ -240,7 +240,7 @@ public class CourseRunServiceImpl implements CourseRunService {
     @Transactional
     public List<CourseRunSummaryResponse> getCourseRuns(Long groupId, Long horseId, AuthenticatedUser currentUser) {
         settlement.settle();
-        List<CourseRun> courseRuns = "HEAD_TRAINER".equals(currentUser.getRole())
+        List<CourseRun> courseRuns = Roles.HEAD_TRAINER.equals(currentUser.getRole())
                 ? courseRunRepository.findByTrainerIdOrderByStartDateDesc(currentUser.getUserId())
                 : courseRunRepository.findAllByOrderByStartDateDesc();
         if (groupId != null) {
@@ -330,7 +330,7 @@ public class CourseRunServiceImpl implements CourseRunService {
         CourseRun courseRun = courseRunRepository.findById(courseRunId)
                 .filter(found -> found.getTrainerId().equals(currentUser.getUserId()))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "COURSE_RUN_NOT_FOUND", "Course run not found!"));
-        if (!UNFINISHED.contains(courseRun.getStatus())) {
+        if (!CourseRunStatus.UNFINISHED.contains(courseRun.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "COURSE_RUN_ALREADY_CLOSED", "This course run is already closed!");
         }
 
@@ -347,8 +347,8 @@ public class CourseRunServiceImpl implements CourseRunService {
     /** Trainer chỉ thấy kế hoạch của mình; Quản lý thấy tất cả; vai khác báo "không tìm thấy". (A Trainer sees own course runs, a Manager all, others "not found".) */
     private boolean canSee(CourseRun courseRun, AuthenticatedUser user) {
         return switch (user.getRole()) {
-            case "HEAD_TRAINER" -> courseRun.getTrainerId().equals(user.getUserId());
-            case "CLUB_MANAGER" -> true;
+            case Roles.HEAD_TRAINER -> courseRun.getTrainerId().equals(user.getUserId());
+            case Roles.CLUB_MANAGER -> true;
             default -> false;
         };
     }
@@ -499,7 +499,7 @@ public class CourseRunServiceImpl implements CourseRunService {
 
     /** Các kế hoạch chưa đóng của nhóm có khoảng ngày giao với lịch mới. (Unfinished course runs of the group whose dates meet the new schedule.) */
     private List<CourseRun> overlappingCourseRuns(Long groupId, Schedule schedule) {
-        return courseRunRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED).stream()
+        return courseRunRepository.findByGroupIdAndStatusIn(groupId, CourseRunStatus.UNFINISHED).stream()
                 .filter(courseRun -> !courseRun.getStartDate().isAfter(schedule.endDate()) && !courseRun.getEndDate().isBefore(schedule.startDate()))
                 .sorted(Comparator.comparing(CourseRun::getStartDate))
                 .toList();

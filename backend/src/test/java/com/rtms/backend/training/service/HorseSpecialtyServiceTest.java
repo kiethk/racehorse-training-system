@@ -1,6 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.DistanceStat;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
@@ -36,7 +37,7 @@ class HorseSpecialtyServiceTest {
 
     private HorseSpecialtyService service;
 
-    private final AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+    private final AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
 
     @BeforeEach
     void setUp() {

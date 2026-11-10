@@ -840,9 +840,9 @@ public class AiToolExecutionService {
      * (Whether any heart-rate reading passes share × the app's safe limit, the same limits the UI alerts on.)
      */
     private static boolean overLimit(int maxHr, int avgHr, int recoveryHr, double share) {
-        return maxHr > share * HorsePerformanceService.MAX_HEART_RATE_LIMIT
-                || avgHr > share * HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT
-                || recoveryHr > share * HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT;
+        return maxHr > share * TrainingLimits.MAX_HEART_RATE_LIMIT
+                || avgHr > share * TrainingLimits.AVERAGE_HEART_RATE_LIMIT
+                || recoveryHr > share * TrainingLimits.RECOVERY_HEART_RATE_LIMIT;
     }
 
     /** Kết cục của một Workout, đúng nhãn trên giao diện. (A Workout's outcome, with the labels the UI uses.) */
@@ -1561,7 +1561,7 @@ public class AiToolExecutionService {
             if (rHr != null && rHr > maxRecoveryHr) {
                 maxRecoveryHr = rHr;
             }
-            if ((mHr != null && mHr >= HIGH_INTENSITY_SHARE * HorsePerformanceService.MAX_HEART_RATE_LIMIT)
+            if ((mHr != null && mHr >= HIGH_INTENSITY_SHARE * TrainingLimits.MAX_HEART_RATE_LIMIT)
                     || (w.getTopSpeedKmh() != null && w.getTopSpeedKmh().doubleValue() >= 55.0)) {
                 highIntensityCount++;
             }
@@ -1686,9 +1686,9 @@ public class AiToolExecutionService {
             if (highHeartRate) {
                 buoiTapGanNhat = "Cự ly " + (latest.getActualDistanceMeters() != null ? latest.getActualDistanceMeters() + "m" : "tiêu chuẩn")
                         + ", nhịp tim tối đa " + latest.getMaxHeartRate() + " bpm, hồi phục " + latest.getRecoveryHeartRate() + " bpm";
-                nhanXetTheLuc = "Nhịp tim vượt ngưỡng an toàn của hệ thống (tối đa " + HorsePerformanceService.MAX_HEART_RATE_LIMIT
-                        + ", trung bình " + HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT + ", hồi phục "
-                        + HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT + " bpm).";
+                nhanXetTheLuc = "Nhịp tim vượt ngưỡng an toàn của hệ thống (tối đa " + TrainingLimits.MAX_HEART_RATE_LIMIT
+                        + ", trung bình " + TrainingLimits.AVERAGE_HEART_RATE_LIMIT + ", hồi phục "
+                        + TrainingLimits.RECOVERY_HEART_RATE_LIMIT + " bpm).";
                 baiTapKeTiepDeXuat = "Giảm tải 30% cự ly, chuyển sang bài tập đi bộ phục hồi nhẹ nhàng trên sân cỏ tự nhiên (Turf Walking).";
                 lyDoDieuChinh = "Tạo thời gian cho cơ tim và cơ bắp giải phóng acid lactic, tránh nguy cơ căng cơ hoặc chấn thương gân.";
             } else {

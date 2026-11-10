@@ -1,8 +1,11 @@
 package com.rtms.backend.training.service;
 
+import org.springframework.http.HttpStatus;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.repository.CourseRunRepository;
 import org.springframework.security.access.AccessDeniedException;
@@ -36,17 +39,17 @@ public class HorseViewAccessService {
      */
     public void assertCanViewHorse(Long horseId, AuthenticatedUser currentUser) {
         Horse horse = horseRepository.findById(horseId)
-                .orElseThrow(() -> new RuntimeException("Horse not found with id: " + horseId));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found!"));
 
-        if ("HORSE_OWNER".equals(currentUser.getRole())
+        if (Roles.HORSE_OWNER.equals(currentUser.getRole())
                 && !currentUser.getUserId().equals(horse.getOwnerId())) {
             throw new AccessDeniedException("You can only view horses you own");
         }
-        if ("HEAD_TRAINER".equals(currentUser.getRole())
+        if (Roles.HEAD_TRAINER.equals(currentUser.getRole())
                 && !courseRunRepository.existsHorseInTrainerArea(horseId, currentUser.getUserId())) {
             throw new AccessDeniedException("You can only view horses in the areas you manage");
         }
-        if ("GROOM".equals(currentUser.getRole())
+        if (Roles.GROOM.equals(currentUser.getRole())
                 && (horse.getCurrentStallId() == null
                     || !stallRepository.existsByIdAndGroomId(horse.getCurrentStallId(), currentUser.getUserId()))) {
             throw new AccessDeniedException("You can only view horses in the stalls you look after");

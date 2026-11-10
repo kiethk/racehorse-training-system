@@ -1,6 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.repository.CourseRunRepository;
 import org.springframework.stereotype.Service;
@@ -28,8 +29,8 @@ public class HorseScopeService {
 
     public List<DashboardHorseRow> horsesOf(AuthenticatedUser currentUser) {
         return switch (currentUser.getRole()) {
-            case "HORSE_OWNER" -> courseRunRepository.findDashboardHorsesOfOwner(currentUser.getUserId());
-            case "HEAD_TRAINER" -> courseRunRepository.findDashboardHorses(currentUser.getUserId());
+            case Roles.HORSE_OWNER -> courseRunRepository.findDashboardHorsesOfOwner(currentUser.getUserId());
+            case Roles.HEAD_TRAINER -> courseRunRepository.findDashboardHorses(currentUser.getUserId());
             default -> courseRunRepository.findAllDashboardHorses();
         };
     }
