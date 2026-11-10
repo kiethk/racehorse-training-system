@@ -1,7 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.IntensityLevel;
 import org.junit.jupiter.api.Test;
 
@@ -15,13 +15,13 @@ class WorkoutResultSimulationServiceTest {
 
     @Test
     void generatedHighIntensityMetricsStayPlausibleAndInternallyConsistent() {
-        Subject subject = new Subject();
-        subject.setTargetDistanceMeters(BigDecimal.valueOf(1_200));
-        subject.setDurationMinutes(45);
-        subject.setIntensityLevel(IntensityLevel.HIGH);
+        Exercise exercise = new Exercise();
+        exercise.setTargetDistanceMeters(BigDecimal.valueOf(1_200));
+        exercise.setDurationMinutes(45);
+        exercise.setIntensityLevel(IntensityLevel.HIGH);
 
         for (int i = 0; i < 100; i++) {
-            WorkoutResultPreviewResponse result = service.generate(subject);
+            WorkoutResultPreviewResponse result = service.generate(exercise);
 
             assertBetween(result.actualDistanceMeters(), 1_140.0, 1_261.2);
             assertBetween(result.actualDurationMinutes(), 41.4, 46.4);
@@ -36,13 +36,13 @@ class WorkoutResultSimulationServiceTest {
 
     @Test
     void recoveryHeartRateIsMostlyUnderTheSafeLimitWithOccasionalPoorRecovery() {
-        Subject subject = new Subject();
-        subject.setIntensityLevel(IntensityLevel.LOW);
+        Exercise exercise = new Exercise();
+        exercise.setIntensityLevel(IntensityLevel.LOW);
         int limit = HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT;
 
         int overLimit = 0;
         for (int i = 0; i < 1_000; i++) {
-            WorkoutResultPreviewResponse result = service.generate(subject);
+            WorkoutResultPreviewResponse result = service.generate(exercise);
             assertTrue(result.recoveryHeartRate() >= 60 && result.recoveryHeartRate() <= limit + 20);
             assertTrue(result.recoveryHeartRate() < result.averageHeartRate());
             if (result.recoveryHeartRate() > limit) {

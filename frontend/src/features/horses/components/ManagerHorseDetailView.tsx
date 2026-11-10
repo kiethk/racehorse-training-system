@@ -25,7 +25,7 @@ interface ManagerHorseDetailViewProps {
 
 /**
  * 360-degree comprehensive horse detail view for Club Manager.
- * Combines Overview & Pedigree, Training schedule, Training plans, Fitness & Trends, Stable & Team,
+ * Combines Overview & Pedigree, Training schedule, Course runs, Fitness & Trends, Stable & Team,
  * Medical & Vet Care, Specialty, and Status History into an executive command view.
  * The training tabs are the same screens the Trainer and Owner see.
  */
@@ -110,8 +110,8 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
             ),
           },
           {
-            id: 'training-plans',
-            label: 'Training plans',
+            id: 'course-runs',
+            label: 'Course runs',
             content: <HorseAttendanceList horseId={horse.id} />,
           },
           {

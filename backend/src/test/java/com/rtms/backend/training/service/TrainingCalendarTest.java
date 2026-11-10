@@ -1,8 +1,8 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.training.dto.RunningPlanRow;
+import com.rtms.backend.training.dto.RunningCourseRunRow;
 import com.rtms.backend.training.enums.TrainingDay;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,8 +17,8 @@ class TrainingCalendarTest {
     private static final Set<TrainingDay> MON_WED_FRI =
             Set.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
-    private RunningPlanRow plan(long id, LocalDate start, LocalDate end) {
-        return new RunningPlanRow(id, 1L, "Course " + id, start, end, TrainingPlanStatus.ACTIVE);
+    private RunningCourseRunRow courseRun(long id, LocalDate start, LocalDate end) {
+        return new RunningCourseRunRow(id, 1L, "Course " + id, start, end, CourseRunStatus.ACTIVE);
     }
 
     @Test
@@ -40,20 +40,20 @@ class TrainingCalendarTest {
     }
 
     @Test
-    @DisplayName("earliestFreeStart: no busy plan keeps the chosen date")
-    void earliestFreeStart_noBusyPlan() {
+    @DisplayName("earliestFreeStart: no busy course run keeps the chosen date")
+    void earliestFreeStart_noBusyCourseRun() {
         assertEquals(LocalDate.of(2026, 11, 2),
                 TrainingCalendar.earliestFreeStart(LocalDate.of(2026, 11, 2), MON_WED_FRI, 12, List.of()));
     }
 
     @Test
-    @DisplayName("earliestFreeStart: skips a gap between two plans that is too short for the course")
+    @DisplayName("earliestFreeStart: skips a gap between two course runs that is too short for the course")
     void earliestFreeStart_skipsShortGap() {
-        // Plan A 26/10-13/11 and plan B 23/11-11/12. Starting right after A (Mon 16/11) the 12 sessions run to
+        // Course run A 26/10-13/11 and course run B 23/11-11/12. Starting right after A (Mon 16/11) the 12 sessions run to
         // 04/12 and hit B, so the earliest free start is the first training day after B: Mon 14/12.
-        List<RunningPlanRow> busy = List.of(
-                plan(1, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 11, 13)),
-                plan(2, LocalDate.of(2026, 11, 23), LocalDate.of(2026, 12, 11)));
+        List<RunningCourseRunRow> busy = List.of(
+                courseRun(1, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 11, 13)),
+                courseRun(2, LocalDate.of(2026, 11, 23), LocalDate.of(2026, 12, 11)));
 
         assertEquals(LocalDate.of(2026, 12, 14),
                 TrainingCalendar.earliestFreeStart(LocalDate.of(2026, 11, 2), MON_WED_FRI, 12, busy));
@@ -63,18 +63,18 @@ class TrainingCalendarTest {
     @DisplayName("earliestFreeStart: fits into a gap that is long enough")
     void earliestFreeStart_fitsLongGap() {
         // 3 sessions after A fit before B: Mon 16/11, Wed 18/11, Fri 20/11
-        List<RunningPlanRow> busy = List.of(
-                plan(1, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 11, 13)),
-                plan(2, LocalDate.of(2026, 11, 23), LocalDate.of(2026, 12, 11)));
+        List<RunningCourseRunRow> busy = List.of(
+                courseRun(1, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 11, 13)),
+                courseRun(2, LocalDate.of(2026, 11, 23), LocalDate.of(2026, 12, 11)));
 
         assertEquals(LocalDate.of(2026, 11, 16),
                 TrainingCalendar.earliestFreeStart(LocalDate.of(2026, 11, 2), MON_WED_FRI, 3, busy));
     }
 
     @Test
-    @DisplayName("earliestFreeStart: a plan ending on the first session day still counts as a conflict")
+    @DisplayName("earliestFreeStart: a course run ending on the first session day still counts as a conflict")
     void earliestFreeStart_sameDayIsConflict() {
-        List<RunningPlanRow> busy = List.of(plan(1, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 11, 2)));
+        List<RunningCourseRunRow> busy = List.of(courseRun(1, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 11, 2)));
 
         assertEquals(LocalDate.of(2026, 11, 4),
                 TrainingCalendar.earliestFreeStart(LocalDate.of(2026, 11, 2), MON_WED_FRI, 3, busy));

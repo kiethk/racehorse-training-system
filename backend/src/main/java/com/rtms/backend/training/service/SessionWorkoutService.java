@@ -9,7 +9,7 @@ import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
  * Xác nhận Workout của buổi đã diễn ra: ghi kết quả chuyển HELD thành RAN (bằng chứng con ngựa đã chạy), "Did not run" chuyển HELD
  * thành CANCELLED. Session và kế hoạch vẫn theo đồng hồ.
  * (Confirming the Workouts of a Session that took place: recording results turns HELD into RAN (the proof the horse took part),
- * "Did not run" turns HELD into CANCELLED. Sessions and plans still follow the clock.)
+ * "Did not run" turns HELD into CANCELLED. Sessions and course runs still follow the clock.)
  */
 public interface SessionWorkoutService {
 

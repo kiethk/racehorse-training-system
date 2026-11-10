@@ -18,7 +18,7 @@ import {
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import { displayError, formatNumber } from '@/lib/display';
-import { PLAN_STATUS } from '@/features/training/lib/status';
+import { COURSE_RUN_STATUS } from '@/features/training/lib/status';
 import { RatingPill } from '@/features/training/components/RatingPill';
 import { StatusPill } from '@/features/training/components/StatusPill';
 import { dashboardService } from '../../services/dashboardService';
@@ -70,7 +70,7 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
       id: 'course',
       header: 'Training course',
       render: (horse) =>
-        horse.planStatus === 'NONE' ? (
+        horse.courseRunStatus === 'NONE' ? (
           <span className="text-[var(--color-text-muted)]">Not enrolled</span>
         ) : (
           <Link
@@ -84,8 +84,8 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
     {
       id: 'status',
       header: 'Status',
-      sortValue: (horse) => PLAN_STATUS[horse.planStatus].label,
-      render: (horse) => <StatusPill status={PLAN_STATUS[horse.planStatus]} />,
+      sortValue: (horse) => COURSE_RUN_STATUS[horse.courseRunStatus].label,
+      render: (horse) => <StatusPill status={COURSE_RUN_STATUS[horse.courseRunStatus]} />,
     },
     {
       id: 'progress',
@@ -190,7 +190,7 @@ export function ManagerDashboardView() {
     loadData();
   }, [loadData]);
 
-  const inTraining = useMemo(() => horses.filter((h) => h.planStatus === 'ACTIVE'), [horses]);
+  const inTraining = useMemo(() => horses.filter((h) => h.courseRunStatus === 'ACTIVE'), [horses]);
   const withAlerts = useMemo(() => horses.filter((h) => h.alertsCount > 0), [horses]);
 
   const visibleHorses = filter === 'ACTIVE' ? inTraining : filter === 'ALERT' ? withAlerts : horses;

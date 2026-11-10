@@ -1,5 +1,5 @@
 /**
- * Display tiers for a performance rating (1-10). One place, so the dashboard, the horse cards, the plan lists and
+ * Display tiers for a performance rating (1-10). One place, so the dashboard, the horse cards, the course run lists and
  * the history table colour the same rating the same way. This is a display convention, not a business rule.
  */
 export type RatingTier = 'excellent' | 'good' | 'needsImprovement';

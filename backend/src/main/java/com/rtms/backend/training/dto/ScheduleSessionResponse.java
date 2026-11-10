@@ -10,12 +10,12 @@ import java.time.LocalTime;
  * needsResultCount is the number of HELD Workouts that still have no result.)
  */
 public record ScheduleSessionResponse(Long id,
-                                      Long planId,
+                                      Long courseRunId,
                                       Long groupId,
                                       String groupName,
                                       boolean groupDisbanded,
                                       String courseName,
-                                      String subjectName,
+                                      String exerciseName,
                                       LocalDate date,
                                       LocalTime startTime,
                                       LocalTime endTime,

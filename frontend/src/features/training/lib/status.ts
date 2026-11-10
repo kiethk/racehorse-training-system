@@ -1,4 +1,4 @@
-import type { PlanStatus, SessionHorseOutcome, SessionStatus, WorkoutStatus } from '../types';
+import type { CourseRunStatus, SessionHorseOutcome, SessionStatus, WorkoutStatus } from '../types';
 
 export type StatusTone = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'neutral';
 
@@ -7,13 +7,13 @@ export interface StatusStyle {
   tone: StatusTone;
 }
 
-/** One status-to-tone map for training plans, so the list, the detail and the dashboard agree. */
-export const PLAN_STATUS: Record<PlanStatus | 'NONE', StatusStyle> = {
+/** One status-to-tone map for training course runs, so the list, the detail and the dashboard agree. */
+export const COURSE_RUN_STATUS: Record<CourseRunStatus | 'NONE', StatusStyle> = {
   UPCOMING: { label: 'Upcoming', tone: 'info' },
   ACTIVE: { label: 'In training', tone: 'primary' },
   COMPLETED: { label: 'Completed', tone: 'success' },
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
-  NONE: { label: 'No plan', tone: 'neutral' },
+  NONE: { label: 'No course run', tone: 'neutral' },
 };
 
 export const WORKOUT_STATUS: Record<WorkoutStatus, StatusStyle> = {
@@ -40,7 +40,7 @@ export const SESSION_STATUS: Record<SessionStatus, StatusStyle> = {
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
 };
 
-/** What became of one horse in one Session of a plan. */
+/** What became of one horse in one Session of a course run. */
 export const SESSION_HORSE_OUTCOME: Record<SessionHorseOutcome, StatusStyle> = {
   TO_RUN: { label: 'To run', tone: 'info' },
   NEEDS_RESULT: { label: 'Needs result', tone: 'warning' },

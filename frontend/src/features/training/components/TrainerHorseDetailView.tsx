@@ -13,7 +13,7 @@ interface TrainerHorseDetailViewProps {
 
 /**
  * Head Trainer's horse detail view.
- * Wraps the shared HorseProfileView and adds "Training schedule", "Training plans", "Fitness & Trends" and "Incident Reports" tabs.
+ * Wraps the shared HorseProfileView and adds "Training schedule", "Course runs", "Fitness & Trends" and "Incident Reports" tabs.
  */
 export function TrainerHorseDetailView({ horseId }: TrainerHorseDetailViewProps) {
   const today = toIsoDate(new Date());
@@ -34,8 +34,8 @@ export function TrainerHorseDetailView({ horseId }: TrainerHorseDetailViewProps)
           ),
         },
         {
-          id: 'training-plans',
-          label: 'Training plans',
+          id: 'course-runs',
+          label: 'Course runs',
           content: <HorseAttendanceList horseId={horse.id} />,
         },
         {

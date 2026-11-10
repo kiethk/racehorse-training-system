@@ -1,6 +1,6 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.training.dto.RunningPlanRow;
+import com.rtms.backend.training.dto.RunningCourseRunRow;
 import com.rtms.backend.training.enums.TrainingDay;
 
 import java.time.LocalDate;
@@ -12,7 +12,7 @@ import java.util.Set;
  * xếp vừa mà không chồng lên các kế hoạch đang có. Toàn hàm thuần, không đụng DB, nên lập kế hoạch và xem trước
  * kế hoạch dùng CHUNG một cách tính, và viết unit test được mà không cần Spring.
  * (Calendar arithmetic of a course: the date of the first session, the date of the last one, and the earliest date a
- * course fits without overlapping existing plans. All pure functions with no DB access, so creating a plan and
+ * course fits without overlapping existing course runs. All pure functions with no DB access, so creating a course run and
  * previewing one share ONE calculation, unit-testable without Spring.)
  */
 public final class TrainingCalendar {
@@ -50,7 +50,7 @@ public final class TrainingCalendar {
      * T2-T4-T6), khi đó kế hoạch thật sự bắt đầu ở Thứ Tư; lưu đúng ngày đó để khoảng ngày của kế hoạch không bị
      * phình ra bằng những ngày không tập.
      * (The first training day on or after {@code date}. The chosen date may not be a training day (a Tuesday for a
-     * Mon-Wed-Fri course); the plan then really starts on Wednesday, and that date is stored so the plan range is not
+     * Mon-Wed-Fri course); the course run then really starts on Wednesday, and that date is stored so the course run range is not
      * stretched by days without training.)
      *
      * @param trainingDays không rỗng, nên vòng lặp chạy tối đa 6 lần (not empty, so the loop runs at most 6 times)
@@ -86,24 +86,24 @@ public final class TrainingCalendar {
 
     /**
      * Ngày bắt đầu sớm nhất (từ {@code from} trở đi) để TRỌN khóa không chồng lên kế hoạch bận nào.
-     * (The earliest start date, on or after {@code from}, at which the WHOLE course overlaps no busy plan.)
+     * (The earliest start date, on or after {@code from}, at which the WHOLE course overlaps no busy course run.)
      *
      * VÌ SAO PHẢI LẶP: ngày kết thúc phụ thuộc ngày bắt đầu. Dời ra sau kế hoạch A thì khóa có thể vừa đủ dài để chạm
      * kế hoạch B, nên mỗi lần dời phải tính lại ngày kết thúc. Mỗi vòng nhảy qua ít nhất một khoảng bận, nên số vòng
      * không vượt quá số khoảng bận. Khoảng trống nào ngắn hơn khóa sẽ tự bị bỏ qua.
-     * (WHY A LOOP: the end date depends on the start date. Moving past plan A can make the course just long enough to
-     * reach plan B, so the end is recomputed after every move. Each round skips at least one busy range, so the number
+     * (WHY A LOOP: the end date depends on the start date. Moving past course run A can make the course just long enough to
+     * reach course run B, so the end is recomputed after every move. Each round skips at least one busy range, so the number
      * of rounds never exceeds the number of busy ranges. Gaps shorter than the course are skipped by themselves.)
      */
     public static LocalDate earliestFreeStart(LocalDate from, Set<TrainingDay> trainingDays, int totalSessions,
-                                              List<RunningPlanRow> busy) {
+                                              List<RunningCourseRunRow> busy) {
         LocalDate start = firstSessionOnOrAfter(from, trainingDays);
         while (true) {
             LocalDate end = endDate(start, trainingDays, totalSessions);
             LocalDate blockedUntil = null;
-            for (RunningPlanRow plan : busy) {
-                if (plan.overlaps(start, end) && (blockedUntil == null || plan.endDate().isAfter(blockedUntil))) {
-                    blockedUntil = plan.endDate();
+            for (RunningCourseRunRow courseRun : busy) {
+                if (courseRun.overlaps(start, end) && (blockedUntil == null || courseRun.endDate().isAfter(blockedUntil))) {
+                    blockedUntil = courseRun.endDate();
                 }
             }
             if (blockedUntil == null) {

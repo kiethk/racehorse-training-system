@@ -4,7 +4,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainingCoursesView } from '@/features/training/components/TrainingCoursesView';
 
 export const metadata: Metadata = {
-  title: 'Courses and subjects | Trainer | RTMS',
+  title: 'Courses and exercises | Trainer | RTMS',
 };
 
 export default function TrainerCoursesPage() {

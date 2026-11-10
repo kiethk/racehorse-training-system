@@ -4,7 +4,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -18,13 +18,13 @@ import org.springframework.stereotype.Service;
 public class HorseViewAccessService {
 
     private final HorseRepository horseRepository;
-    private final GroupPlanRepository planRepository;
+    private final CourseRunRepository courseRunRepository;
     private final StableStallRepository stallRepository;
 
-    public HorseViewAccessService(HorseRepository horseRepository, GroupPlanRepository planRepository,
+    public HorseViewAccessService(HorseRepository horseRepository, CourseRunRepository courseRunRepository,
                                   StableStallRepository stallRepository) {
         this.horseRepository = horseRepository;
-        this.planRepository = planRepository;
+        this.courseRunRepository = courseRunRepository;
         this.stallRepository = stallRepository;
     }
 
@@ -43,7 +43,7 @@ public class HorseViewAccessService {
             throw new AccessDeniedException("You can only view horses you own");
         }
         if ("HEAD_TRAINER".equals(currentUser.getRole())
-                && !planRepository.existsHorseInTrainerArea(horseId, currentUser.getUserId())) {
+                && !courseRunRepository.existsHorseInTrainerArea(horseId, currentUser.getUserId())) {
             throw new AccessDeniedException("You can only view horses in the areas you manage");
         }
         if ("GROOM".equals(currentUser.getRole())

@@ -190,7 +190,7 @@ export function TimelineStrip({
             >
               <p className="truncate font-semibold">{session.groupName}</p>
               <p className="truncate text-[10px] opacity-80">
-                {formatTime(currentStart)}–{formatTime(currentEnd)} · {session.subjectName}
+                {formatTime(currentStart)}–{formatTime(currentEnd)} · {session.exerciseName}
               </p>
             </div>
           );

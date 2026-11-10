@@ -180,7 +180,7 @@ public class HorseEdaAnalyticsService {
                 points.add(new IndividualWorkoutEdaPoint(
                         w.getWorkoutId(),
                         w.getDate() != null ? w.getDate().toString() : "N/A",
-                        w.getSubjectName() != null ? w.getSubjectName() : "Workout",
+                        w.getExerciseName() != null ? w.getExerciseName() : "Workout",
                         spd,
                         rec,
                         maxHr,

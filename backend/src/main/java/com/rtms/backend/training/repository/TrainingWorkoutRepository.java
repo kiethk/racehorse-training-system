@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Truy vấn buổi tập (workout) của mô hình nhóm: Workout thuộc một Session, Session thuộc một Group Plan.
- * (Workout queries of the group model: a Workout belongs to a Session, a Session belongs to a Group Plan.)
+ * Truy vấn buổi tập (workout) của mô hình nhóm: Workout thuộc một Session, Session thuộc một Course Run.
+ * (Workout queries of the group model: a Workout belongs to a Session, a Session belongs to a Course Run.)
  *
  * Các truy vấn đọc dùng JOIN + DTO projection để service không phải gọi DB nhiều lần và không phải ép kiểu Object[]. Dự án không
  * dùng quan hệ JPA, nên JOIN viết dạng "JOIN X ON ...".
@@ -70,8 +70,8 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                       CASE WHEN g.disbandedAt IS NULL THEN false ELSE true END, s.status)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
-           JOIN GroupPlan p ON s.groupPlanId = p.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
+           JOIN CourseRun p ON s.courseRunId = p.id
            LEFT JOIN TrainingGroup g ON p.groupId = g.id
            WHERE w.horseId = :horseId
              AND s.status <> com.rtms.backend.training.enums.SessionStatus.SCHEDULED
@@ -92,7 +92,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                       s.id, s.sessionDate, s.startTime, s.endTime, sub.name, s.status, w.status)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId = :horseId
              AND s.sessionDate BETWEEN :fromDate AND :toDate
            ORDER BY s.sessionDate ASC, s.startTime ASC
@@ -103,7 +103,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
 
     /**
      * Nguồn 2 của màn hình Today Tasks (Groom): buổi tập trong ngày kèm giờ, tên ngựa, tên bài tập.
-     * (Source 2 of the groom Today Tasks screen: the day workouts with times, horse and subject names.)
+     * (Source 2 of the groom Today Tasks screen: the day workouts with times, horse and exercise names.)
      */
     @Query("""
            SELECT new com.rtms.backend.training.dto.GroomWorkoutRow(
@@ -111,7 +111,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN Horse h ON w.horseId = h.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.assignedToId = :groomId
              AND s.sessionDate = :date
              AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
@@ -133,7 +133,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                       w.recoveryHeartRate, w.performanceRating)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId = :horseId
              AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND s.sessionDate BETWEEN :fromDate AND :toDate
@@ -184,7 +184,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * Các buổi tập dùng để suy ra sở trường của NHIỀU ngựa: đã có kết quả, có điểm phong độ, có cự ly (thực tế, hoặc cự ly mục tiêu
      * của bài tập), không thuộc nhóm hồi phục, từ một mốc ngày.
      * (The Workouts used to infer the specialty of MANY horses: with results, with a rating, with a distance (actual, or the
-     * Subject target distance), not in the recovery category, since a date.)
+     * Exercise target distance), not in the recovery category, since a date.)
      */
     @Query("""
            SELECT new com.rtms.backend.training.dto.SpecialtyWorkoutRow(
@@ -192,11 +192,11 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                       sub.surfaceType, w.performanceRating, w.topSpeedKmh)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId IN :horseIds
              AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND w.performanceRating IS NOT NULL
-             AND sub.category <> com.rtms.backend.training.enums.SubjectCategory.RECOVERY
+             AND sub.category <> com.rtms.backend.training.enums.ExerciseCategory.RECOVERY
              AND s.sessionDate >= :since
            """)
     List<SpecialtyWorkoutRow> findSpecialtyWorkouts(@Param("horseIds") Collection<Long> horseIds,

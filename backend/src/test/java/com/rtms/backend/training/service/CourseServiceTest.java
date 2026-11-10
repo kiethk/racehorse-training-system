@@ -2,17 +2,17 @@ package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CourseDetailResponse;
-import com.rtms.backend.training.dto.CourseSubjectItemRequest;
-import com.rtms.backend.training.dto.CourseSubjectResponse;
+import com.rtms.backend.training.dto.CourseExerciseItemRequest;
+import com.rtms.backend.training.dto.CourseExerciseResponse;
 import com.rtms.backend.training.dto.CreateCourseRequest;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.CourseSubject;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.CourseExercise;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.IntensityLevel;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.CourseSubjectRepository;
-import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.repository.CourseExerciseRepository;
+import com.rtms.backend.training.repository.ExerciseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,10 +36,10 @@ class CourseServiceTest {
     private CourseRepository courseRepository;
 
     @Mock
-    private CourseSubjectRepository courseSubjectRepository;
+    private CourseExerciseRepository courseExerciseRepository;
 
     @Mock
-    private SubjectRepository subjectRepository;
+    private ExerciseRepository exerciseRepository;
 
     private CourseService courseService;
 
@@ -47,12 +47,12 @@ class CourseServiceTest {
 
     @BeforeEach
     void setUp() {
-        courseService = new CourseService(courseRepository, courseSubjectRepository, subjectRepository);
+        courseService = new CourseService(courseRepository, courseExerciseRepository, exerciseRepository);
     }
 
-    /** Một dòng bài tập của khóa đã JOIN sẵn. (A course subject row with the join already done.) */
-    private CourseSubjectResponse row(long id, long subjectId, String name, int orderIndex, Integer durationMinutes) {
-        return new CourseSubjectResponse(id, subjectId, name, null, SurfaceType.TURF,
+    /** Một dòng bài tập của khóa đã JOIN sẵn. (A course exercise row with the join already done.) */
+    private CourseExerciseResponse row(long id, long exerciseId, String name, int orderIndex, Integer durationMinutes) {
+        return new CourseExerciseResponse(id, exerciseId, name, null, SurfaceType.TURF,
                 BigDecimal.valueOf(1200), IntensityLevel.MEDIUM, orderIndex, durationMinutes);
     }
 
@@ -76,7 +76,7 @@ class CourseServiceTest {
     }
 
     @Test
-    @DisplayName("2. Course detail returns its subjects in order, loaded with one joined query")
+    @DisplayName("2. Course detail returns its exercises in order, loaded with one joined query")
     void testGetCourseById_Success() {
         Long courseId = 10L;
         Course course = new Course();
@@ -84,18 +84,18 @@ class CourseServiceTest {
         course.setName("Endurance course");
 
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
-        when(courseSubjectRepository.findCourseSubjectResponses(courseId))
+        when(courseExerciseRepository.findCourseExerciseResponses(courseId))
                 .thenReturn(List.of(row(101L, 50L, "Slow run 20 min", 1, 30)));
 
         CourseDetailResponse response = courseService.getCourseById(courseId);
 
         assertNotNull(response);
         assertEquals("Endurance course", response.getCourse().getName());
-        assertEquals(1, response.getSubjects().size());
-        assertEquals("Slow run 20 min", response.getSubjects().get(0).getSubjectName());
-        assertEquals(1, response.getSubjects().get(0).getOrderIndex());
-        // Không còn gọi subjectRepository từng bài (no more per-subject lookups)
-        verifyNoInteractions(subjectRepository);
+        assertEquals(1, response.getExercises().size());
+        assertEquals("Slow run 20 min", response.getExercises().get(0).getExerciseName());
+        assertEquals(1, response.getExercises().get(0).getOrderIndex());
+        // Không còn gọi exerciseRepository từng bài (no more per-exercise lookups)
+        verifyNoInteractions(exerciseRepository);
     }
 
     @Test
@@ -107,37 +107,37 @@ class CourseServiceTest {
     }
 
     @Test
-    @DisplayName("4. Creates a course together with its subjects")
+    @DisplayName("4. Creates a course together with its exercises")
     void testCreateCourse_Success() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Sprint 1200m course");
         req.setTargetGoal("Prepare for the autumn race");
         req.setTotalSessions(12);
 
-        CourseSubjectItemRequest item1 = new CourseSubjectItemRequest();
-        item1.setSubjectId(1L);
+        CourseExerciseItemRequest item1 = new CourseExerciseItemRequest();
+        item1.setExerciseId(1L);
         item1.setOrderIndex(1);
 
-        CourseSubjectItemRequest item2 = new CourseSubjectItemRequest();
-        item2.setSubjectId(2L);
+        CourseExerciseItemRequest item2 = new CourseExerciseItemRequest();
+        item2.setExerciseId(2L);
         item2.setOrderIndex(2);
 
-        req.setSubjects(List.of(item1, item2));
+        req.setExercises(List.of(item1, item2));
 
         when(courseRepository.existsByNameIgnoreCaseAndTrainerId("Sprint 1200m course", 9L)).thenReturn(false);
-        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 9L), subject(2L, 9L)));
+        when(exerciseRepository.findAllById(any())).thenReturn(List.of(exercise(1L, 9L), exercise(2L, 9L)));
 
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
             Course c = inv.getArgument(0);
             c.setId(100L);
             return c;
         });
-        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> {
-            CourseSubject cs = inv.getArgument(0);
-            cs.setId(cs.getSubjectId() + 500L);
+        when(courseExerciseRepository.save(any(CourseExercise.class))).thenAnswer(inv -> {
+            CourseExercise cs = inv.getArgument(0);
+            cs.setId(cs.getExerciseId() + 500L);
             return cs;
         });
-        when(courseSubjectRepository.findCourseSubjectResponses(100L)).thenReturn(List.of(
+        when(courseExerciseRepository.findCourseExerciseResponses(100L)).thenReturn(List.of(
                 row(501L, 1L, "Sprint 400m", 1, 45),
                 row(502L, 2L, "Recovery 15 min", 2, 30)));
 
@@ -146,9 +146,9 @@ class CourseServiceTest {
         assertNotNull(res);
         assertEquals(100L, res.getCourse().getId());
         assertEquals("Sprint 1200m course", res.getCourse().getName());
-        assertEquals(2, res.getSubjects().size());
+        assertEquals(2, res.getExercises().size());
         verify(courseRepository).save(any(Course.class));
-        verify(courseSubjectRepository, times(2)).save(any(CourseSubject.class));
+        verify(courseExerciseRepository, times(2)).save(any(CourseExercise.class));
     }
 
     @Test
@@ -165,13 +165,13 @@ class CourseServiceTest {
     }
 
     @Test
-    @DisplayName("6. Rejects a course that references a subject which does not exist")
-    void testCreateCourse_SubjectNotFound_ThrowsIllegalArgument() {
+    @DisplayName("6. Rejects a course that references an exercise which does not exist")
+    void testCreateCourse_ExerciseNotFound_ThrowsIllegalArgument() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Trial course");
-        CourseSubjectItemRequest item = new CourseSubjectItemRequest();
-        item.setSubjectId(999L);
-        req.setSubjects(List.of(item));
+        CourseExerciseItemRequest item = new CourseExerciseItemRequest();
+        item.setExerciseId(999L);
+        req.setExercises(List.of(item));
 
         when(courseRepository.existsByNameIgnoreCaseAndTrainerId("Trial course", 9L)).thenReturn(false);
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
@@ -179,30 +179,30 @@ class CourseServiceTest {
             c.setId(101L);
             return c;
         });
-        when(subjectRepository.findAllById(any())).thenReturn(List.of());
+        when(exerciseRepository.findAllById(any())).thenReturn(List.of());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
-        assertTrue(ex.getMessage().contains("Subject not found"));
+        assertTrue(ex.getMessage().contains("Exercise not found"));
     }
 
     @Test
-    @DisplayName("6b. Rejects a course that lists the same subject twice")
-    void testCreateCourse_DuplicateSubject_ThrowsIllegalArgument() {
+    @DisplayName("6b. Rejects a course that lists the same exercise twice")
+    void testCreateCourse_DuplicateExercise_ThrowsIllegalArgument() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Trial course");
-        CourseSubjectItemRequest first = new CourseSubjectItemRequest();
-        first.setSubjectId(1L);
-        CourseSubjectItemRequest again = new CourseSubjectItemRequest();
-        again.setSubjectId(1L);
-        req.setSubjects(List.of(first, again));
+        CourseExerciseItemRequest first = new CourseExerciseItemRequest();
+        first.setExerciseId(1L);
+        CourseExerciseItemRequest again = new CourseExerciseItemRequest();
+        again.setExerciseId(1L);
+        req.setExercises(List.of(first, again));
 
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
         assertTrue(ex.getMessage().contains("already in this course"));
-        verify(courseSubjectRepository, never()).save(any(CourseSubject.class));
+        verify(courseExerciseRepository, never()).save(any(CourseExercise.class));
     }
 
     @Test
@@ -211,23 +211,23 @@ class CourseServiceTest {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Renumbered");
         req.setTotalSessions(6);
-        req.setSubjects(List.of(item(11L, 7), item(12L, 7), item(13L, null), item(14L, 2)));
+        req.setExercises(List.of(item(11L, 7), item(12L, 7), item(13L, null), item(14L, 2)));
 
-        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(11L, 9L), subject(12L, 9L), subject(13L, 9L), subject(14L, 9L)));
+        when(exerciseRepository.findAllById(any())).thenReturn(List.of(exercise(11L, 9L), exercise(12L, 9L), exercise(13L, 9L), exercise(14L, 9L)));
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
             Course c = inv.getArgument(0);
             c.setId(102L);
             return c;
         });
-        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseExerciseRepository.save(any(CourseExercise.class))).thenAnswer(inv -> inv.getArgument(0));
 
         courseService.createCourse(req, trainerUser);
 
-        ArgumentCaptor<CourseSubject> saved = ArgumentCaptor.forClass(CourseSubject.class);
-        verify(courseSubjectRepository, times(4)).save(saved.capture());
+        ArgumentCaptor<CourseExercise> saved = ArgumentCaptor.forClass(CourseExercise.class);
+        verify(courseExerciseRepository, times(4)).save(saved.capture());
         // sorted by the number sent (2, 7, 7), the one without a number last, ties kept in the order sent
-        assertEquals(List.of(14L, 11L, 12L, 13L), saved.getAllValues().stream().map(CourseSubject::getSubjectId).toList());
-        assertEquals(List.of(1, 2, 3, 4), saved.getAllValues().stream().map(CourseSubject::getOrderIndex).toList());
+        assertEquals(List.of(14L, 11L, 12L, 13L), saved.getAllValues().stream().map(CourseExercise::getExerciseId).toList());
+        assertEquals(List.of(1, 2, 3, 4), saved.getAllValues().stream().map(CourseExercise::getOrderIndex).toList());
     }
 
     @Test
@@ -236,10 +236,10 @@ class CourseServiceTest {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Mine");
         req.setTotalSessions(6);
-        req.setSubjects(List.of(item(1L, 1)));
-        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 9L)));
+        req.setExercises(List.of(item(1L, 1)));
+        when(exerciseRepository.findAllById(any())).thenReturn(List.of(exercise(1L, 9L)));
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseExerciseRepository.save(any(CourseExercise.class))).thenAnswer(inv -> inv.getArgument(0));
 
         courseService.createCourse(req, trainerUser);
 
@@ -250,13 +250,13 @@ class CourseServiceTest {
     }
 
     @Test
-    @DisplayName("6e. A subject of another trainer cannot be put in the course")
-    void testCreateCourse_SubjectOfAnotherTrainer() {
+    @DisplayName("6e. An exercise of another trainer cannot be put in the course")
+    void testCreateCourse_ExerciseOfAnotherTrainer() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Mixed");
-        req.setSubjects(List.of(item(1L, 1)));
+        req.setExercises(List.of(item(1L, 1)));
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 10L)));
+        when(exerciseRepository.findAllById(any())).thenReturn(List.of(exercise(1L, 10L)));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
@@ -264,105 +264,105 @@ class CourseServiceTest {
     }
 
     @Test
-    @DisplayName("6f. A course cannot have more subjects than sessions")
-    void testCreateCourse_MoreSubjectsThanSessions_Rejected() {
+    @DisplayName("6f. A course cannot have more exercises than sessions")
+    void testCreateCourse_MoreExercisesThanSessions_Rejected() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Too many");
         req.setTotalSessions(2);
-        req.setSubjects(List.of(item(1L, 1), item(2L, 2), item(3L, 3)));
+        req.setExercises(List.of(item(1L, 1), item(2L, 2), item(3L, 3)));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
-        assertTrue(ex.getMessage().contains("more subjects (3) than sessions (2)"));
+        assertTrue(ex.getMessage().contains("more exercises (3) than sessions (2)"));
         verify(courseRepository, never()).save(any(Course.class));
     }
 
     @Test
-    @DisplayName("6g. A course may have as many subjects as sessions")
-    void testCreateCourse_SubjectsEqualSessions_Allowed() {
+    @DisplayName("6g. A course may have as many exercises as sessions")
+    void testCreateCourse_ExercisesEqualSessions_Allowed() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Exact");
         req.setTotalSessions(2);
-        req.setSubjects(List.of(item(1L, 1), item(2L, 2)));
-        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 9L), subject(2L, 9L)));
+        req.setExercises(List.of(item(1L, 1), item(2L, 2)));
+        when(exerciseRepository.findAllById(any())).thenReturn(List.of(exercise(1L, 9L), exercise(2L, 9L)));
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseExerciseRepository.save(any(CourseExercise.class))).thenAnswer(inv -> inv.getArgument(0));
 
         assertDoesNotThrow(() -> courseService.createCourse(req, trainerUser));
     }
 
     @Test
-    @DisplayName("6h. Rejects a course with exactly the same subjects in the same order as one the trainer already has")
+    @DisplayName("6h. Rejects a course with exactly the same exercises in the same order as one the trainer already has")
     void testCreateCourse_SameRotationAsExistingCourse_Rejected() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Copy");
         req.setTotalSessions(6);
         // sent out of order on purpose: the order numbers, not the array position, make the rotation 5, 6, 7
-        req.setSubjects(List.of(item(7L, 3), item(5L, 1), item(6L, 2)));
+        req.setExercises(List.of(item(7L, 3), item(5L, 1), item(6L, 2)));
         existingCourseWithRotation(30L, "Original", 5L, 6L, 7L);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
-        assertTrue(ex.getMessage().contains("'Original' already has exactly these subjects in the same order"));
+        assertTrue(ex.getMessage().contains("'Original' already has exactly these exercises in the same order"));
         verify(courseRepository, never()).save(any(Course.class));
     }
 
     @Test
-    @DisplayName("6i. The same subjects in a different order, or with a different list, are allowed")
+    @DisplayName("6i. The same exercises in a different order, or with a different list, are allowed")
     void testCreateCourse_DifferentOrderOrList_Allowed() {
         existingCourseWithRotation(30L, "Original", 5L, 6L, 7L);
-        when(subjectRepository.findAllById(any())).thenReturn(
-                List.of(subject(5L, 9L), subject(6L, 9L), subject(7L, 9L), subject(8L, 9L)));
+        when(exerciseRepository.findAllById(any())).thenReturn(
+                List.of(exercise(5L, 9L), exercise(6L, 9L), exercise(7L, 9L), exercise(8L, 9L)));
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseExerciseRepository.save(any(CourseExercise.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CreateCourseRequest reordered = new CreateCourseRequest();
         reordered.setName("Reordered");
         reordered.setTotalSessions(6);
-        reordered.setSubjects(List.of(item(7L, 1), item(6L, 2), item(5L, 3)));
+        reordered.setExercises(List.of(item(7L, 1), item(6L, 2), item(5L, 3)));
         assertDoesNotThrow(() -> courseService.createCourse(reordered, trainerUser));
 
         CreateCourseRequest longer = new CreateCourseRequest();
         longer.setName("Longer");
         longer.setTotalSessions(6);
-        longer.setSubjects(List.of(item(5L, 1), item(6L, 2), item(7L, 3), item(8L, 4)));
+        longer.setExercises(List.of(item(5L, 1), item(6L, 2), item(7L, 3), item(8L, 4)));
         assertDoesNotThrow(() -> courseService.createCourse(longer, trainerUser));
     }
 
-    private void existingCourseWithRotation(Long courseId, String name, Long... subjectIds) {
+    private void existingCourseWithRotation(Long courseId, String name, Long... exerciseIds) {
         Course existing = new Course();
         existing.setId(courseId);
         existing.setName(name);
         existing.setTrainerId(9L);
         when(courseRepository.findByTrainerId(9L)).thenReturn(List.of(existing));
-        List<CourseSubject> rows = new java.util.ArrayList<>();
-        for (int i = 0; i < subjectIds.length; i++) {
-            CourseSubject row = new CourseSubject();
+        List<CourseExercise> rows = new java.util.ArrayList<>();
+        for (int i = 0; i < exerciseIds.length; i++) {
+            CourseExercise row = new CourseExercise();
             row.setCourseId(courseId);
-            row.setSubjectId(subjectIds[i]);
+            row.setExerciseId(exerciseIds[i]);
             row.setOrderIndex(i + 1);
             rows.add(row);
         }
-        when(courseSubjectRepository.findByCourseIdInOrderByCourseIdAscOrderIndexAsc(any())).thenReturn(rows);
+        when(courseExerciseRepository.findByCourseIdInOrderByCourseIdAscOrderIndexAsc(any())).thenReturn(rows);
     }
 
-    private static CourseSubjectItemRequest item(Long subjectId, Integer orderIndex) {
-        CourseSubjectItemRequest item = new CourseSubjectItemRequest();
-        item.setSubjectId(subjectId);
+    private static CourseExerciseItemRequest item(Long exerciseId, Integer orderIndex) {
+        CourseExerciseItemRequest item = new CourseExerciseItemRequest();
+        item.setExerciseId(exerciseId);
         item.setOrderIndex(orderIndex);
         return item;
     }
 
-    private static Subject subject(Long id, Long trainerId) {
-        Subject subject = new Subject();
-        subject.setId(id);
-        subject.setName("Subject " + id);
-        subject.setTrainerId(trainerId);
-        return subject;
+    private static Exercise exercise(Long id, Long trainerId) {
+        Exercise exercise = new Exercise();
+        exercise.setId(id);
+        exercise.setName("Exercise " + id);
+        exercise.setTrainerId(trainerId);
+        return exercise;
     }
 
     @Test
-    @DisplayName("Course detail must return durationMinutes of every subject")
+    @DisplayName("Course detail must return durationMinutes of every exercise")
     void testGetCourseById_ReturnsDurationMinutes() {
         Long courseId = 10L;
         Course course = new Course();
@@ -370,7 +370,7 @@ class CourseServiceTest {
         course.setName("Sprint 2YO");
 
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
-        when(courseSubjectRepository.findCourseSubjectResponses(courseId))
+        when(courseExerciseRepository.findCourseExerciseResponses(courseId))
                 .thenReturn(List.of(row(101L, 50L, "Warm-up and steady run", 1, 90)));
 
         CourseDetailResponse response = courseService.getCourseById(courseId);
@@ -379,7 +379,7 @@ class CourseServiceTest {
         // nhiêu khung giờ vàng.
         // (Without this field the course picker shows a bare "minutes" label and the trainer cannot tell how
         // much golden window the course consumes.)
-        assertEquals(90, response.getSubjects().get(0).getDurationMinutes());
+        assertEquals(90, response.getExercises().get(0).getDurationMinutes());
     }
 
     @Test

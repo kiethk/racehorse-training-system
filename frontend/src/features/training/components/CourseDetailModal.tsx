@@ -1,7 +1,7 @@
 import { Button, LinkButton, Modal } from '@/components/ui';
 import type { CourseDetailResponse } from '../types';
 
-/** The ordered subject rotation of one course, with a shortcut to enroll a group in it. */
+/** The ordered exercise rotation of one course, with a shortcut to enroll a group in it. */
 export function CourseDetailModal({ detail, onClose }: { detail: CourseDetailResponse | null; onClose: () => void }) {
   return (
     <Modal
@@ -13,7 +13,7 @@ export function CourseDetailModal({ detail, onClose }: { detail: CourseDetailRes
         detail && (
           <>
             <Button onClick={onClose}>Close</Button>
-            <LinkButton variant="primary" href={`/trainer/plans/new?courseId=${detail.course.id}`}>
+            <LinkButton variant="primary" href={`/trainer/course-runs/new?courseId=${detail.course.id}`}>
               Enroll a group in this course
             </LinkButton>
           </>
@@ -27,17 +27,17 @@ export function CourseDetailModal({ detail, onClose }: { detail: CourseDetailRes
           )}
           <div>
             <h3 className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">
-              Subjects ({detail.subjects.length}), repeated in order up to {detail.course.totalSessions} sessions
+              Exercises ({detail.exercises.length}), repeated in order up to {detail.course.totalSessions} sessions
             </h3>
             <ol className="space-y-1.5">
-              {detail.subjects.map((subject) => (
+              {detail.exercises.map((exercise) => (
                 <li
-                  key={subject.id}
+                  key={exercise.id}
                   className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2 text-xs"
                 >
-                  <span className="font-semibold text-[var(--color-primary)]">Subject {subject.orderIndex}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]">{subject.subjectName}</span>
-                  <span className="text-[var(--color-text-muted)]">{subject.durationMinutes} min</span>
+                  <span className="font-semibold text-[var(--color-primary)]">Exercise {exercise.orderIndex}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]">{exercise.exerciseName}</span>
+                  <span className="text-[var(--color-text-muted)]">{exercise.durationMinutes} min</span>
                 </li>
               ))}
             </ol>

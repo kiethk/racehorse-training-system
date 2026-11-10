@@ -5,14 +5,14 @@ import { EmptyState, ListSkeleton, Panel } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { displayError, formatDate } from '@/lib/display';
 import { attendanceLabel } from '../lib/groupSchedule';
-import { PLAN_STATUS } from '../lib/status';
+import { COURSE_RUN_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type { HorseAttendance } from '../types';
 import { StatusPill } from './StatusPill';
 import { groupLabel } from '../lib/groupLifecycle';
 
 /**
- * Every Group Plan a horse took part in, one line per plan, with how many Sessions it attended out of how many and since when.
+ * Every Course Run a horse took part in, one line per course run, with how many Sessions it attended out of how many and since when.
  * A horse that changed groups shows a line for each, so its history is never lost.
  */
 export function HorseAttendanceList({ horseId }: { horseId: number }) {
@@ -24,7 +24,7 @@ export function HorseAttendanceList({ horseId }: { horseId: number }) {
     trainingService
       .getHorseAttendance(horseId)
       .then((data) => current && setHistory(data))
-      .catch((cause) => current && setError(displayError(cause, 'Unable to load the training plans.')));
+      .catch((cause) => current && setError(displayError(cause, 'Unable to load the training course runs.')));
     return () => {
       current = false;
     };
@@ -32,15 +32,15 @@ export function HorseAttendanceList({ horseId }: { horseId: number }) {
 
   if (error) return <Panel padded><EmptyState icon="alert-triangle" title="Unable to load" description={error} /></Panel>;
   if (!history) return <Panel padded><ListSkeleton rows={3} /></Panel>;
-  if (history.length === 0) return <Panel padded><EmptyState icon="layers" title="No training plans yet" /></Panel>;
+  if (history.length === 0) return <Panel padded><EmptyState icon="layers" title="No training course runs yet" /></Panel>;
 
   return (
     <div className="space-y-3">
       {history.map((line) => {
-        const isCancelled = line.planStatus === 'CANCELLED';
+        const isCancelled = line.courseRunStatus === 'CANCELLED';
         return (
           <Panel
-            key={line.planId}
+            key={line.courseRunId}
             padded
             className={cn(
               'flex flex-wrap items-center justify-between gap-3',
@@ -69,7 +69,7 @@ export function HorseAttendanceList({ horseId }: { horseId: number }) {
               >
                 {attendanceLabel(line.attended, line.total)}
               </span>
-              <StatusPill status={PLAN_STATUS[line.planStatus]} />
+              <StatusPill status={COURSE_RUN_STATUS[line.courseRunStatus]} />
             </div>
           </Panel>
         );

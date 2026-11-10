@@ -11,15 +11,15 @@ import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.SessionHorseResponse;
 import com.rtms.backend.training.dto.SessionWorkoutResponse;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.GroupPlan;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.CourseRun;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.GroupPlanRepository;
-import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
+import com.rtms.backend.training.repository.ExerciseRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -51,29 +51,29 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
 
     private final TrainingSessionRepository sessionRepository;
     private final TrainingWorkoutRepository workoutRepository;
-    private final GroupPlanRepository planRepository;
+    private final CourseRunRepository courseRunRepository;
     private final TrainingGroupRepository groupRepository;
     private final CourseRepository courseRepository;
-    private final SubjectRepository subjectRepository;
+    private final ExerciseRepository exerciseRepository;
     private final HorseRepository horseRepository;
     private final UserRepository userRepository;
     private final SessionSettlementService settlement;
 
     public SessionScheduleServiceImpl(TrainingSessionRepository sessionRepository,
                                       TrainingWorkoutRepository workoutRepository,
-                                      GroupPlanRepository planRepository,
+                                      CourseRunRepository courseRunRepository,
                                       TrainingGroupRepository groupRepository,
                                       CourseRepository courseRepository,
-                                      SubjectRepository subjectRepository,
+                                      ExerciseRepository exerciseRepository,
                                       HorseRepository horseRepository,
                                       UserRepository userRepository,
                                       SessionSettlementService settlement) {
         this.sessionRepository = sessionRepository;
         this.workoutRepository = workoutRepository;
-        this.planRepository = planRepository;
+        this.courseRunRepository = courseRunRepository;
         this.groupRepository = groupRepository;
         this.courseRepository = courseRepository;
-        this.subjectRepository = subjectRepository;
+        this.exerciseRepository = exerciseRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
         this.settlement = settlement;
@@ -102,7 +102,7 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
         Predicate<TrainingWorkout> visible = visibleWorkouts(currentUser, workoutsBySession.values());
 
         return sessions.stream()
-                .filter(session -> groupId == null || groupId.equals(lookups.plans().get(session.getGroupPlanId()).getGroupId()))
+                .filter(session -> groupId == null || groupId.equals(lookups.courseRuns().get(session.getCourseRunId()).getGroupId()))
                 .map(session -> toSummary(session, workoutsBySession.getOrDefault(session.getId(), List.of()), visible, lookups))
                 .filter(summary -> !needsResultOnly || summary.needsResultCount() > 0)
                 .toList();
@@ -177,37 +177,37 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
     // DỰNG PHẢN HỒI (Building responses)
     // =================================================================
 
-    private record Lookups(Map<Long, GroupPlan> plans, Map<Long, TrainingGroup> groups, Map<Long, String> courseNames,
-                           Map<Long, String> subjectNames) {
+    private record Lookups(Map<Long, CourseRun> courseRuns, Map<Long, TrainingGroup> groups, Map<Long, String> courseNames,
+                           Map<Long, String> exerciseNames) {
     }
 
     private Lookups lookups(Collection<TrainingSession> sessions) {
-        Map<Long, GroupPlan> plans = planRepository
-                .findAllById(sessions.stream().map(TrainingSession::getGroupPlanId).collect(Collectors.toSet())).stream()
-                .collect(Collectors.toMap(GroupPlan::getId, Function.identity()));
+        Map<Long, CourseRun> courseRuns = courseRunRepository
+                .findAllById(sessions.stream().map(TrainingSession::getCourseRunId).collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(CourseRun::getId, Function.identity()));
         Map<Long, TrainingGroup> groups = groupRepository
-                .findAllById(plans.values().stream().map(GroupPlan::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .findAllById(courseRuns.values().stream().map(CourseRun::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream().collect(Collectors.toMap(TrainingGroup::getId, Function.identity()));
         Map<Long, String> courseNames = courseRepository
-                .findAllById(plans.values().stream().map(GroupPlan::getCourseId).collect(Collectors.toSet())).stream()
+                .findAllById(courseRuns.values().stream().map(CourseRun::getCourseId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(Course::getId, Course::getName));
-        Map<Long, String> subjectNames = subjectRepository
-                .findAllById(sessions.stream().map(TrainingSession::getSubjectId).collect(Collectors.toSet())).stream()
-                .collect(Collectors.toMap(Subject::getId, Subject::getName));
-        return new Lookups(plans, groups, courseNames, subjectNames);
+        Map<Long, String> exerciseNames = exerciseRepository
+                .findAllById(sessions.stream().map(TrainingSession::getExerciseId).collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(Exercise::getId, Exercise::getName));
+        return new Lookups(courseRuns, groups, courseNames, exerciseNames);
     }
 
     private ScheduleSessionResponse toSummary(TrainingSession session, List<TrainingWorkout> workouts,
                                               Predicate<TrainingWorkout> visible, Lookups lookups) {
-        GroupPlan plan = lookups.plans().get(session.getGroupPlanId());
+        CourseRun courseRun = lookups.courseRuns().get(session.getCourseRunId());
         List<TrainingWorkout> mine = workouts.stream().filter(visible).toList();
         int horseCount = (int) mine.stream().filter(workout -> workout.getStatus() != WorkoutStatus.CANCELLED).count();
         int needsResult = (int) mine.stream()
                 .filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count();
-        return new ScheduleSessionResponse(session.getId(), plan.getId(), plan.getGroupId(),
-                plan.getGroupId() == null ? null : lookups.groups().get(plan.getGroupId()).getName(),
-                plan.getGroupId() != null && lookups.groups().get(plan.getGroupId()).isDisbanded(),
-                lookups.courseNames().get(plan.getCourseId()), lookups.subjectNames().get(session.getSubjectId()),
+        return new ScheduleSessionResponse(session.getId(), courseRun.getId(), courseRun.getGroupId(),
+                courseRun.getGroupId() == null ? null : lookups.groups().get(courseRun.getGroupId()).getName(),
+                courseRun.getGroupId() != null && lookups.groups().get(courseRun.getGroupId()).isDisbanded(),
+                lookups.courseNames().get(courseRun.getCourseId()), lookups.exerciseNames().get(session.getExerciseId()),
                 session.getSessionDate(), session.getStartTime(), session.getEndTime(), session.getStatus().name(),
                 horseCount, needsResult);
     }

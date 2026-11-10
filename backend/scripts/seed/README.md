@@ -73,7 +73,7 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 | `sql/30_admissions.sql` | Luồng nhập học từng đơn |
 | `sql/40_vet_cases.sql` | Ca Thú y sau nhập trại |
 | `sql/45_preventive.sql` | Tiêm phòng tới hôm nay |
-| `sql/50_training.sql` | Bài tập, khóa, nhóm huấn luyện, Group Plan, Session, Workout |
+| `sql/50_training.sql` | Bài tập, khóa, nhóm huấn luyện, Course Run, Session, Workout |
 | `sql/60_groom.sql` | Việc hằng ngày của Groom |
 | `sql/65_vitals.sql` | Chỉ số sinh hiệu Thú y đo khi đi buồng |
 | `sql/99_verify.sql` | Kiểm tra luật nghiệp vụ |
@@ -88,7 +88,7 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
    - Ngày giờ viết tương đối với hôm nay: `pg_temp.at(-3, TIME '14:00')`, `pg_temp.today() + 5`, `pg_temp.clock()`.
      Dữ liệu trong `10_data.sql` viết theo ngày gốc 2026-10-25 và được dời bằng `pg_temp.d()` / `pg_temp.ts()`.
    - Đi qua hàm có sẵn thay vì INSERT tay khi có thể. Ví dụ `pg_temp.book` / `pg_temp.complete_care` cho lịch Thú y,
-     `pg_temp.make_group_plan` cho plan của nhóm, `pg_temp.report_incident` cho sự cố. Các hàm này giữ luật giống service.
+     `pg_temp.make_course_run` cho plan của nhóm, `pg_temp.report_incident` cho sự cố. Các hàm này giữ luật giống service.
 3. **Luật của phần mình**: thêm một dòng vào `99_verify.sql` (tên luật + câu SELECT trả về các dòng vi phạm).
 4. **Bảng danh mục mới do migration nạp** (như `preventive_protocols`): thêm tên bảng vào `v_keep` trong `01_cleanup.sql`,
    nếu không seed sẽ xóa nó.

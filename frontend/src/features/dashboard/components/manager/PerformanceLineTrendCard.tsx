@@ -56,7 +56,7 @@ export function PerformanceLineTrendCard() {
       <Panel padded className="space-y-2">
         <SectionTitle>Performance Trajectory</SectionTitle>
         <p className="text-xs text-[var(--color-text-secondary)]">
-          Weekly equine performance trajectory across active training plans.
+          Weekly equine performance trajectory across active course runs.
         </p>
         <EmptyState icon="activity" title="No completed sessions yet" description="Completed training sessions will plot a performance curve here." />
       </Panel>

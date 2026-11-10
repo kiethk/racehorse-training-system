@@ -41,7 +41,7 @@ import { displayError, formatDate } from '@/lib/display';
 const tabs: TabItem[] = [
   { id: 'overview', label: 'Overview & Pedigree', icon: 'file-text' },
   { id: 'training-schedule', label: 'Training schedule', icon: 'calendar' },
-  { id: 'training-plans', label: 'Training plans', icon: 'clipboard' },
+  { id: 'course-runs', label: 'Course runs', icon: 'clipboard' },
   { id: 'fitness-trends', label: 'Fitness & Trends', icon: 'activity' },
   { id: 'health', label: 'Health & Care', icon: 'heart-pulse' },
 ];
@@ -323,8 +323,8 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         </div>
       )}
 
-      {/* Tab 3: Training plans */}
-      {activeTab === 'training-plans' && (
+      {/* Tab 3: Course runs */}
+      {activeTab === 'course-runs' && (
         <HorseAttendanceList horseId={horse.id} />
       )}
 

@@ -50,7 +50,7 @@ public class AuditLogService {
             "STABLE", List.of("StableStall", "Area", "GroomDailyTask", "Stable"),
             "HORSES", List.of("Horse", "Horses"),
             "STAFF", List.of("User", "Staff", "Account"),
-            "TRAINING", List.of("Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule", "Training")
+            "TRAINING", List.of("Course", "CourseRun", "Exercise", "GroupPlan", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule", "Training")
     );
 
     private final AuditLogRepository auditLogRepository;
@@ -250,6 +250,9 @@ public class AuditLogService {
                             cb.like(cb.lower(root.get("requestPath")), "%/training%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/courses%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/subjects%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/exercises%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/course-runs%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/group-plans%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/lots%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/workouts%")
                     );

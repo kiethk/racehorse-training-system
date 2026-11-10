@@ -10,18 +10,18 @@ import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.GroupPlan;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.CourseRun;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingGroupMember;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.IntensityLevel;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.SubjectCategory;
+import com.rtms.backend.training.enums.ExerciseCategory;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDay;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,11 +58,11 @@ class TrainingGroupSchemaIntegrationTest {
     @Autowired private AreaRepository areas;
     @Autowired private StableStallRepository stalls;
     @Autowired private HorseRepository horses;
-    @Autowired private SubjectRepository subjects;
+    @Autowired private ExerciseRepository exercises;
     @Autowired private CourseRepository courses;
     @Autowired private TrainingGroupRepository groups;
     @Autowired private TrainingGroupMemberRepository members;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private JdbcTemplate jdbc;
@@ -70,7 +70,7 @@ class TrainingGroupSchemaIntegrationTest {
 
     private User trainer;
     private Area area;
-    private Subject subject;
+    private Exercise exercise;
     private Course course;
     private TrainingGroup group;
     private int stallNumber = 800;
@@ -80,15 +80,15 @@ class TrainingGroupSchemaIntegrationTest {
         trainer = user("HEAD_TRAINER", "trainer");
         area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
 
-        subject = new Subject();
-        subject.setTrainerId(trainer.getId());
-        subject.setCategory(SubjectCategory.SPEED);
-        subject.setName("Group IT Sprint " + System.nanoTime());
-        subject.setSurfaceType(SurfaceType.TURF);
-        subject.setTargetDistanceMeters(BigDecimal.valueOf(800));
-        subject.setIntensityLevel(IntensityLevel.HIGH);
-        subject.setDurationMinutes(60);
-        subject = subjects.saveAndFlush(subject);
+        exercise = new Exercise();
+        exercise.setTrainerId(trainer.getId());
+        exercise.setCategory(ExerciseCategory.SPEED);
+        exercise.setName("Group IT Sprint " + System.nanoTime());
+        exercise.setSurfaceType(SurfaceType.TURF);
+        exercise.setTargetDistanceMeters(BigDecimal.valueOf(800));
+        exercise.setIntensityLevel(IntensityLevel.HIGH);
+        exercise.setDurationMinutes(60);
+        exercise = exercises.saveAndFlush(exercise);
 
         course = new Course();
         course.setName("Group IT Course " + System.nanoTime());
@@ -147,47 +147,47 @@ class TrainingGroupSchemaIntegrationTest {
         assertThrows(DataIntegrityViolationException.class, () -> group("Nhóm 1"));
     }
 
-    // ------------------------------------------------------------------- plans
+    // ------------------------------------------------------------------- course runs
 
     @Test
-    void unfinishedPlansOfOneGroupCannotOverlapInDates() {
+    void unfinishedCourseRunsOfOneGroupCannotOverlapInDates() {
         LocalDate start = LocalDate.now().plusDays(10);
-        plan(group, start, start.plus(java.time.Period.ofDays(12)), TrainingPlanStatus.UPCOMING);
+        courseRun(group, start, start.plus(java.time.Period.ofDays(12)), CourseRunStatus.UPCOMING);
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> plan(group, start.plusDays(5), start.plusDays(20), TrainingPlanStatus.UPCOMING));
+                () -> courseRun(group, start.plusDays(5), start.plusDays(20), CourseRunStatus.UPCOMING));
     }
 
     @Test
-    void aPlanQueuedAfterTheRunningOneIsAccepted() {
+    void aCourseRunQueuedAfterTheRunningOneIsAccepted() {
         LocalDate start = LocalDate.now().plusDays(10);
-        plan(group, start, start.plusDays(12), TrainingPlanStatus.ACTIVE);
+        courseRun(group, start, start.plusDays(12), CourseRunStatus.ACTIVE);
 
-        assertDoesNotThrow(() -> plan(group, start.plusDays(13), start.plusDays(25), TrainingPlanStatus.UPCOMING));
+        assertDoesNotThrow(() -> courseRun(group, start.plusDays(13), start.plusDays(25), CourseRunStatus.UPCOMING));
     }
 
     @Test
-    void aClosedPlanReleasesItsDates() {
+    void aClosedCourseRunReleasesItsDates() {
         LocalDate start = LocalDate.now().plusDays(10);
-        plan(group, start, start.plusDays(12), TrainingPlanStatus.CANCELLED);
+        courseRun(group, start, start.plusDays(12), CourseRunStatus.CANCELLED);
 
-        assertDoesNotThrow(() -> plan(group, start.plusDays(2), start.plusDays(9), TrainingPlanStatus.UPCOMING));
+        assertDoesNotThrow(() -> courseRun(group, start.plusDays(2), start.plusDays(9), CourseRunStatus.UPCOMING));
     }
 
     @Test
     void differentGroupsMayRunOnTheSameDays() {
         LocalDate start = LocalDate.now().plusDays(10);
-        plan(group, start, start.plusDays(12), TrainingPlanStatus.UPCOMING);
+        courseRun(group, start, start.plusDays(12), CourseRunStatus.UPCOMING);
 
-        assertDoesNotThrow(() -> plan(group("Nhóm 2"), start, start.plusDays(12), TrainingPlanStatus.UPCOMING));
+        assertDoesNotThrow(() -> courseRun(group("Nhóm 2"), start, start.plusDays(12), CourseRunStatus.UPCOMING));
     }
 
     // ---------------------------------------------------------------- sessions
 
     @Test
     void sessionsOfOneTrainerCannotOverlapInTime() {
-        GroupPlan first = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        GroupPlan second = plan(group("Nhóm 2"), LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
+        CourseRun first = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        CourseRun second = courseRun(group("Nhóm 2"), LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
         LocalDate day = LocalDate.now().plusDays(10);
         session(first, day, LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
 
@@ -197,8 +197,8 @@ class TrainingGroupSchemaIntegrationTest {
 
     @Test
     void backToBackSessionsOfOneTrainerAreAccepted() {
-        GroupPlan first = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        GroupPlan second = plan(group("Nhóm 2"), LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
+        CourseRun first = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        CourseRun second = courseRun(group("Nhóm 2"), LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
         LocalDate day = LocalDate.now().plusDays(10);
         session(first, day, LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
 
@@ -207,8 +207,8 @@ class TrainingGroupSchemaIntegrationTest {
 
     @Test
     void aCancelledSessionFreesItsSlot() {
-        GroupPlan first = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        GroupPlan second = plan(group("Nhóm 2"), LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
+        CourseRun first = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        CourseRun second = courseRun(group("Nhóm 2"), LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
         LocalDate day = LocalDate.now().plusDays(10);
         session(first, day, LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.CANCELLED);
 
@@ -217,37 +217,37 @@ class TrainingGroupSchemaIntegrationTest {
 
     @Test
     void sessionsMustStayInsideTheGoldenWindow() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
         LocalDate day = LocalDate.now().plusDays(10);
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> session(plan, day, LocalTime.of(5, 45), LocalTime.of(6, 45), SessionStatus.SCHEDULED));
+                () -> session(courseRun, day, LocalTime.of(5, 45), LocalTime.of(6, 45), SessionStatus.SCHEDULED));
     }
 
     @Test
     void sessionsMustEndByTenInTheMorning() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
         LocalDate day = LocalDate.now().plusDays(10);
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> session(plan, day, LocalTime.of(9, 30), LocalTime.of(10, 15), SessionStatus.SCHEDULED));
+                () -> session(courseRun, day, LocalTime.of(9, 30), LocalTime.of(10, 15), SessionStatus.SCHEDULED));
     }
 
     @Test
     void sessionsMustStartOnAQuarterHour() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
         LocalDate day = LocalDate.now().plusDays(10);
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> session(plan, day, LocalTime.of(6, 10), LocalTime.of(7, 10), SessionStatus.SCHEDULED));
+                () -> session(courseRun, day, LocalTime.of(6, 10), LocalTime.of(7, 10), SessionStatus.SCHEDULED));
     }
 
     // ---------------------------------------------------------------- workouts
 
     @Test
     void aWorkoutBelongsToExactlyOneModel() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        TrainingSession session = session(plan, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        TrainingSession session = session(courseRun, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
         Horse horse = horse();
 
         TrainingWorkout neither = new TrainingWorkout();
@@ -258,16 +258,16 @@ class TrainingGroupSchemaIntegrationTest {
 
     @Test
     void aSessionWorkoutIsAccepted() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        TrainingSession session = session(plan, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        TrainingSession session = session(courseRun, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
 
         assertDoesNotThrow(() -> workouts.saveAndFlush(sessionWorkout(session, horse())));
     }
 
     @Test
     void aHorseHasOneActiveWorkoutPerSession() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        TrainingSession session = session(plan, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        TrainingSession session = session(courseRun, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
         Horse horse = horse();
         workouts.saveAndFlush(sessionWorkout(session, horse));
 
@@ -276,8 +276,8 @@ class TrainingGroupSchemaIntegrationTest {
 
     @Test
     void aWorkoutThatIsNotRanHoldsNoResult() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        TrainingSession session = session(plan, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        TrainingSession session = session(courseRun, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
 
         TrainingWorkout noResult = sessionWorkout(session, horse());
         noResult.setStatus(WorkoutStatus.HELD);
@@ -291,8 +291,8 @@ class TrainingGroupSchemaIntegrationTest {
 
     @Test
     void aRanWorkoutMustHoldAResult() {
-        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
-        TrainingSession session = session(plan, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
+        CourseRun courseRun = courseRun(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), CourseRunStatus.UPCOMING);
+        TrainingSession session = session(courseRun, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
 
         TrainingWorkout ranWithoutResult = sessionWorkout(session, horse());
         ranWithoutResult.setStatus(WorkoutStatus.RAN);
@@ -308,14 +308,14 @@ class TrainingGroupSchemaIntegrationTest {
                 JOIN role_permissions rp ON rp.permission_id = p.id
                 JOIN roles r ON r.id = rp.role_id
                 WHERE r.name = 'HEAD_TRAINER' AND p.code IN
-                  ('TRAINING_GROUP_VIEW','TRAINING_GROUP_MANAGE','GROUP_PLAN_CREATE','SESSION_VIEW','SESSION_UPDATE')
+                  ('TRAINING_GROUP_VIEW','TRAINING_GROUP_MANAGE','COURSE_RUN_MANAGE','SESSION_VIEW','SESSION_UPDATE')
                 """, String.class);
         List<String> groomAuthorities = jdbc.queryForList("""
                 SELECT p.code FROM permissions p
                 JOIN role_permissions rp ON rp.permission_id = p.id
                 JOIN roles r ON r.id = rp.role_id
-                WHERE r.name = 'GROOM' AND p.code IN ('TRAINING_GROUP_VIEW','TRAINING_GROUP_MANAGE','GROUP_PLAN_VIEW',
-                  'GROUP_PLAN_LIST','GROUP_PLAN_CREATE','SESSION_VIEW','SESSION_UPDATE')
+                WHERE r.name = 'GROOM' AND p.code IN ('TRAINING_GROUP_VIEW','TRAINING_GROUP_MANAGE','COURSE_RUN_VIEW',
+                  'COURSE_RUN_LIST','COURSE_RUN_MANAGE','SESSION_VIEW','SESSION_UPDATE')
                 """, String.class);
 
         assertEquals(5, trainerAuthorities.size());
@@ -364,23 +364,23 @@ class TrainingGroupSchemaIntegrationTest {
         return members.saveAndFlush(member);
     }
 
-    private GroupPlan plan(TrainingGroup target, LocalDate start, LocalDate end, TrainingPlanStatus status) {
-        GroupPlan plan = new GroupPlan();
-        plan.setGroupId(target.getId());
-        plan.setCourseId(course.getId());
-        plan.setTrainerId(trainer.getId());
-        plan.setStartDate(start);
-        plan.setEndDate(end);
+    private CourseRun courseRun(TrainingGroup target, LocalDate start, LocalDate end, CourseRunStatus status) {
+        CourseRun courseRun = new CourseRun();
+        courseRun.setGroupId(target.getId());
+        courseRun.setCourseId(course.getId());
+        courseRun.setTrainerId(trainer.getId());
+        courseRun.setStartDate(start);
+        courseRun.setEndDate(end);
         Set<TrainingDay> days = new LinkedHashSet<>(List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY));
-        plan.setTrainingDays(days);
-        plan.setStatus(status);
-        return plans.saveAndFlush(plan);
+        courseRun.setTrainingDays(days);
+        courseRun.setStatus(status);
+        return courseRuns.saveAndFlush(courseRun);
     }
 
-    private TrainingSession session(GroupPlan plan, LocalDate day, LocalTime start, LocalTime end, SessionStatus status) {
+    private TrainingSession session(CourseRun courseRun, LocalDate day, LocalTime start, LocalTime end, SessionStatus status) {
         TrainingSession session = new TrainingSession();
-        session.setGroupPlanId(plan.getId());
-        session.setSubjectId(subject.getId());
+        session.setCourseRunId(courseRun.getId());
+        session.setExerciseId(exercise.getId());
         session.setTrainerId(trainer.getId());
         session.setSessionDate(day);
         session.setStartTime(start);

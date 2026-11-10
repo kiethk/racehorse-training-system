@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { PageHeader, ScreenLayout, Tabs } from '@/components/ui';
 import { CourseList } from './CourseList';
-import { SubjectList } from './SubjectList';
+import { ExerciseList } from './ExerciseList';
 
-type TrainingTab = 'courses' | 'subjects';
+type TrainingTab = 'courses' | 'exercises';
 
 export function TrainingCoursesView() {
   const [tab, setTab] = useState<TrainingTab>('courses');
@@ -16,12 +16,12 @@ export function TrainingCoursesView() {
       <Tabs
         tabs={[
           { id: 'courses', label: 'Training courses', icon: 'activity' },
-          { id: 'subjects', label: 'Subject library', icon: 'clipboard' },
+          { id: 'exercises', label: 'Exercise library', icon: 'clipboard' },
         ]}
         active={tab}
         onChange={(id) => setTab(id as TrainingTab)}
       />
-      {tab === 'courses' ? <CourseList /> : <SubjectList />}
+      {tab === 'courses' ? <CourseList /> : <ExerciseList />}
     </ScreenLayout>
   );
 }

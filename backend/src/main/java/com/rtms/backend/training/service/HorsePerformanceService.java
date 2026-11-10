@@ -4,15 +4,15 @@ import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
-import com.rtms.backend.training.dto.DashboardPlanRow;
+import com.rtms.backend.training.dto.DashboardCourseRunRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.enums.CourseRunStatus;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,18 +46,18 @@ public class HorsePerformanceService {
     private static final LocalTime DEFAULT_END_TIME = LocalTime.of(10, 0);
 
     private final TrainingWorkoutRepository workoutRepository;
-    private final GroupPlanRepository planRepository;
+    private final CourseRunRepository courseRunRepository;
     private final HorseViewAccessService accessService;
     private final HorseSpecialtyService specialtyService;
     private final HorseScopeService scopeService;
 
     public HorsePerformanceService(TrainingWorkoutRepository workoutRepository,
-                                   GroupPlanRepository planRepository,
+                                   CourseRunRepository courseRunRepository,
                                    HorseViewAccessService accessService,
                                    HorseSpecialtyService specialtyService,
                                    HorseScopeService scopeService) {
         this.workoutRepository = workoutRepository;
-        this.planRepository = planRepository;
+        this.courseRunRepository = courseRunRepository;
         this.accessService = accessService;
         this.specialtyService = specialtyService;
         this.scopeService = scopeService;
@@ -122,7 +122,7 @@ public class HorsePerformanceService {
      *
      * Luật "khối lượng tăng đột biến" đã bị bỏ: khóa XOAY VÒNG bài tập có cự ly rất khác nhau nên tổng cự ly
      * tuần dao động theo lịch xoay chứ không theo tải thật, gây báo động giả.
-     * (The "sudden volume spike" rule was dropped: the course ROTATES subjects of very different distance, so
+     * (The "sudden volume spike" rule was dropped: the course ROTATES exercises of very different distance, so
      * weekly distance varies with the rotation rather than the real load, causing false alarms.)
      *
      * Luật "sự cố lặp lại" cũng đã bị bỏ: nó đếm cả báo cáo do chính Trainer gửi từ thẻ cảnh báo, nên một lần
@@ -202,7 +202,7 @@ public class HorsePerformanceService {
      *
      * Số truy vấn là HẰNG SỐ, không phụ thuộc số ngựa: ngựa trong khu, kế hoạch, buổi tập 30 ngày,
      * buổi tập tính sở trường, đều lấy một lượt rồi ghép theo horseId.
-     * (The number of queries is CONSTANT, independent of the horse count: area horses, plans, 30-day
+     * (The number of queries is CONSTANT, independent of the horse count: area horses, course runs, 30-day
      * workouts and the specialty workouts are each fetched once and joined by horseId.)
      */
     @Transactional(readOnly = true)
@@ -213,8 +213,8 @@ public class HorsePerformanceService {
         }
         List<Long> horseIds = horses.stream().map(DashboardHorseRow::horseId).toList();
 
-        Map<Long, List<DashboardPlanRow>> plansByHorse = planRepository.findDashboardPlans(horseIds).stream()
-                .collect(Collectors.groupingBy(DashboardPlanRow::horseId));
+        Map<Long, List<DashboardCourseRunRow>> courseRunsByHorse = courseRunRepository.findDashboardCourseRuns(horseIds).stream()
+                .collect(Collectors.groupingBy(DashboardCourseRunRow::horseId));
         Map<Long, List<RecentWorkoutRow>> recentByHorse = workoutRepository
                 .findRecentCompletedWorkouts(horseIds, LocalDate.now().minusDays(RECENT_WORKOUT_DAYS)).stream()
                 .collect(Collectors.groupingBy(RecentWorkoutRow::horseId));
@@ -223,14 +223,14 @@ public class HorsePerformanceService {
         return horses.stream()
                 .map(horse -> buildDashboardRow(
                         horse,
-                        plansByHorse.getOrDefault(horse.horseId(), List.of()),
+                        courseRunsByHorse.getOrDefault(horse.horseId(), List.of()),
                         recentByHorse.getOrDefault(horse.horseId(), List.of()),
                         specialtyByHorse.get(horse.horseId())))
                 .toList();
     }
 
     private DashboardHorseResponse buildDashboardRow(DashboardHorseRow horse,
-                                                            List<DashboardPlanRow> plans,
+                                                            List<DashboardCourseRunRow> courseRuns,
                                                             List<RecentWorkoutRow> recent,
                                                             HorseSpecialtyResponse specialty) {
         DashboardHorseResponse response = new DashboardHorseResponse();
@@ -239,7 +239,7 @@ public class HorsePerformanceService {
         response.setBreed(horse.breed());
         response.setStallCode(horse.stallCode());
 
-        fillPlanProgress(response, pickCurrentPlan(plans));
+        fillCourseRunProgress(response, pickCurrentCourseRun(courseRuns));
         fillRatingStats(response, recent);
 
         List<HorseAlertResponse> alerts = evaluateAlerts(recent);
@@ -269,31 +269,31 @@ public class HorsePerformanceService {
     /**
      * Kế hoạch ưu tiên, chọn theo NGÀY chứ không theo thứ tự tạo: kế hoạch đang chạy; nếu không có thì kế hoạch sắp tới
      * bắt đầu sớm nhất; nếu không có thì kế hoạch đã kết thúc gần đây nhất. null nếu ngựa chưa có kế hoạch.
-     * (Preferred plan, chosen by DATE rather than creation order: the running plan; otherwise the upcoming plan that
-     * starts first; otherwise the plan that ended most recently. null if the horse has no plan.)
+     * (Preferred course run, chosen by DATE rather than creation order: the running course run; otherwise the upcoming course run that
+     * starts first; otherwise the course run that ended most recently. null if the horse has no course run.)
      */
-    static DashboardPlanRow pickCurrentPlan(List<DashboardPlanRow> plans) {
-        Optional<DashboardPlanRow> active = plans.stream()
-                .filter(plan -> plan.status() == TrainingPlanStatus.ACTIVE)
-                .min(Comparator.comparing(DashboardPlanRow::startDate));
+    static DashboardCourseRunRow pickCurrentCourseRun(List<DashboardCourseRunRow> courseRuns) {
+        Optional<DashboardCourseRunRow> active = courseRuns.stream()
+                .filter(courseRun -> courseRun.status() == CourseRunStatus.ACTIVE)
+                .min(Comparator.comparing(DashboardCourseRunRow::startDate));
         if (active.isPresent()) {
             return active.get();
         }
-        Optional<DashboardPlanRow> nextUpcoming = plans.stream()
-                .filter(plan -> plan.status() == TrainingPlanStatus.UPCOMING)
-                .min(Comparator.comparing(DashboardPlanRow::startDate));
+        Optional<DashboardCourseRunRow> nextUpcoming = courseRuns.stream()
+                .filter(courseRun -> courseRun.status() == CourseRunStatus.UPCOMING)
+                .min(Comparator.comparing(DashboardCourseRunRow::startDate));
         if (nextUpcoming.isPresent()) {
             return nextUpcoming.get();
         }
-        return plans.stream()
-                .max(Comparator.comparing(DashboardPlanRow::endDate))
+        return courseRuns.stream()
+                .max(Comparator.comparing(DashboardCourseRunRow::endDate))
                 .orElse(null);
     }
 
-    private void fillPlanProgress(DashboardHorseResponse response, DashboardPlanRow plan) {
-        if (plan == null) {
-            response.setPlanStatus("NONE");
-            response.setCourseName("No plan yet");
+    private void fillCourseRunProgress(DashboardHorseResponse response, DashboardCourseRunRow courseRun) {
+        if (courseRun == null) {
+            response.setCourseRunStatus("NONE");
+            response.setCourseName("No course run yet");
             response.setCompletedSessions(0);
             response.setTotalSessions(0);
             response.setCancelledSessions(0);
@@ -301,20 +301,20 @@ public class HorsePerformanceService {
             return;
         }
 
-        int total = plan.totalSessions() != null ? plan.totalSessions() : 0;
-        int completed = plan.completedSessions().intValue();
-        int cancelled = plan.cancelledSessions().intValue();
-        // Giống trang Plan: buổi bị hủy ra khỏi mẫu số (khóa 6 buổi hủy 2 đạt 100% khi tập đủ 4), trừ khi cả kế hoạch bị
+        int total = courseRun.totalSessions() != null ? courseRun.totalSessions() : 0;
+        int completed = courseRun.completedSessions().intValue();
+        int cancelled = courseRun.cancelledSessions().intValue();
+        // Giống trang Course run: buổi bị hủy ra khỏi mẫu số (khóa 6 buổi hủy 2 đạt 100% khi tập đủ 4), trừ khi cả kế hoạch bị
         // hủy giữa chừng: khi đó tập 3 trên 6 là 50%, không phải 100%.
-        // (Like the Plan page: cancelled sessions leave the denominator (a 6-session plan with 2 cancelled reaches 100%
-        // after 4), unless the whole plan was dropped part-way: then 3 held of 6 is 50%, not 100%.)
-        int counted = plan.status() == TrainingPlanStatus.CANCELLED ? total : Math.max(total - cancelled, 0);
+        // (Like the Course run page: cancelled sessions leave the denominator (a 6-session course run with 2 cancelled reaches 100%
+        // after 4), unless the whole course run was dropped part-way: then 3 held of 6 is 50%, not 100%.)
+        int counted = courseRun.status() == CourseRunStatus.CANCELLED ? total : Math.max(total - cancelled, 0);
 
-        response.setPlanId(plan.planId());
-        response.setPlanStatus(plan.status().name());
-        response.setStartDate(plan.startDate());
-        response.setEndDate(plan.endDate());
-        response.setCourseName(plan.courseName());
+        response.setCourseRunId(courseRun.courseRunId());
+        response.setCourseRunStatus(courseRun.status().name());
+        response.setStartDate(courseRun.startDate());
+        response.setEndDate(courseRun.endDate());
+        response.setCourseName(courseRun.courseName());
         response.setCompletedSessions(completed);
         response.setTotalSessions(total > 0 ? total : completed);
         response.setCancelledSessions(cancelled);

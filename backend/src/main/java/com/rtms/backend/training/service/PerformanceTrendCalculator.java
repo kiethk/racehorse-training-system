@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  * tập" nhiều hơn là phong độ của đàn. Trong một tuần hầu như con nào có kế hoạch cũng tập, và lấy trung bình của từng con
  * trước rồi mới lấy trung bình giữa các con thì con tập nhiều buổi không có trọng số lớn hơn.
  * (Pure functions, no DB. WHY ONE VALUE PER HORSE PER WEEK: each day trains different horses, so a daily average says
- * more about "which horses trained that day" than about the herd form. Within a week almost every horse with a plan
+ * more about "which horses trained that day" than about the herd form. Within a week almost every horse with a course run
  * trains, and averaging each horse first and then the horses means a horse with more sessions does not weigh more.)
  */
 final class PerformanceTrendCalculator {

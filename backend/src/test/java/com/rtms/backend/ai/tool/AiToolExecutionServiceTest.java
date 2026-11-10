@@ -44,10 +44,10 @@ import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.RacingReadinessStatus;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -57,10 +57,10 @@ import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.IntensityLevel;
-import com.rtms.backend.training.enums.SubjectCategory;
-import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.enums.ExerciseCategory;
+import com.rtms.backend.training.repository.ExerciseRepository;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.horse.entity.HorsePedigree;
@@ -117,7 +117,7 @@ class AiToolExecutionServiceTest {
     private GroomDailyTaskService groomDailyTaskService;
     private AdmissionApplicationRepository admissionApplicationRepository;
     private TrainingSessionRepository trainingSessionRepository;
-    private GroupPlanRepository horseTrainingPlanRepository;
+    private CourseRunRepository horseTrainingPlanRepository;
     private HorseSpecialtyService horseSpecialtyService;
     private HorsePerformanceService horsePerformanceService;
     private RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
@@ -126,7 +126,7 @@ class AiToolExecutionServiceTest {
     private CourseRepository courseRepository;
     private AuditLogRepository auditLogRepository;
     private CandidateHorseProfileRepository candidateHorseProfileRepository;
-    private SubjectRepository subjectRepository;
+    private ExerciseRepository exerciseRepository;
     private HorseHealthMetricRepository horseHealthMetricRepository;
     private HorsePedigreeRepository horsePedigreeRepository;
     private HorseIncidentReportRepository horseIncidentReportRepository;
@@ -155,7 +155,7 @@ class AiToolExecutionServiceTest {
         groomDailyTaskService = Mockito.mock(GroomDailyTaskService.class);
         admissionApplicationRepository = Mockito.mock(AdmissionApplicationRepository.class);
         trainingSessionRepository = Mockito.mock(TrainingSessionRepository.class);
-        horseTrainingPlanRepository = Mockito.mock(GroupPlanRepository.class);
+        horseTrainingPlanRepository = Mockito.mock(CourseRunRepository.class);
         horseSpecialtyService = Mockito.mock(HorseSpecialtyService.class);
         horsePerformanceService = Mockito.mock(HorsePerformanceService.class);
         racingReadinessAssessmentRepository = Mockito.mock(RacingReadinessAssessmentRepository.class);
@@ -164,7 +164,7 @@ class AiToolExecutionServiceTest {
         courseRepository = Mockito.mock(CourseRepository.class);
         auditLogRepository = Mockito.mock(AuditLogRepository.class);
         candidateHorseProfileRepository = Mockito.mock(CandidateHorseProfileRepository.class);
-        subjectRepository = Mockito.mock(SubjectRepository.class);
+        exerciseRepository = Mockito.mock(ExerciseRepository.class);
         horseHealthMetricRepository = Mockito.mock(HorseHealthMetricRepository.class);
         horsePedigreeRepository = Mockito.mock(HorsePedigreeRepository.class);
         horseIncidentReportRepository = Mockito.mock(HorseIncidentReportRepository.class);
@@ -199,7 +199,7 @@ class AiToolExecutionServiceTest {
                 courseRepository,
                 auditLogRepository,
                 candidateHorseProfileRepository,
-                subjectRepository,
+                exerciseRepository,
                 horseHealthMetricRepository,
                 horsePedigreeRepository,
                 horseIncidentReportRepository,
@@ -301,7 +301,7 @@ class AiToolExecutionServiceTest {
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertTrue(item.get("sessionTime").toString().contains("Ca Sáng"));
-        assertEquals("Sprint 1000m", item.get("subjectName"));
+        assertEquals("Sprint 1000m", item.get("exerciseName"));
         assertEquals(2L, item.get("horseCount"));
         List<?> horseNames = (List<?>) item.get("horseList");
         assertEquals(2, horseNames.size());
@@ -312,12 +312,12 @@ class AiToolExecutionServiceTest {
     void testTrainer_GetTrainerPlansSummary() {
         AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
 
-        PlanSummaryResponse summary = new PlanSummaryResponse(
+        HorseCourseRunResponse summary = new HorseCourseRunResponse(
                 1L, 10L, "RED RUM", 2L, "Sprint Course",
                 LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1),
-                TrainingPlanStatus.ACTIVE, 20L, 10L, 0L
+                CourseRunStatus.ACTIVE, 20L, 10L, 0L
         );
-        when(horseTrainingPlanRepository.findPlanSummaries(5L, 10L))
+        when(horseTrainingPlanRepository.findHorseCourseRuns(5L, 10L))
                 .thenReturn(List.of(summary));
         when(horseAttendanceService.getHistory(10L, trainer)).thenReturn(List.of(new HorseAttendanceResponse(
                 1L, "Nhom 1", false, "Sprint Course", "ACTIVE",
@@ -1125,22 +1125,22 @@ class AiToolExecutionServiceTest {
         c.setTotalSessions(12);
         when(courseRepository.findAll()).thenReturn(List.of(c));
 
-        Subject s = new Subject();
+        Exercise s = new Exercise();
         s.setId(10L);
         s.setName("Nước rút 400m");
-        s.setCategory(SubjectCategory.SPEED);
+        s.setCategory(ExerciseCategory.SPEED);
         s.setSurfaceType(SurfaceType.TURF);
         s.setTargetDistanceMeters(BigDecimal.valueOf(400));
         s.setIntensityLevel(IntensityLevel.HIGH);
         s.setDurationMinutes(45);
-        when(subjectRepository.findAll()).thenReturn(List.of(s));
+        when(exerciseRepository.findAll()).thenReturn(List.of(s));
 
         Object result = toolExecutionService.executeTool("getCourseCurriculumOverview", Map.of(), trainer);
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
         assertTrue(map.containsKey("courseCurriculumList"));
-        assertTrue(map.containsKey("technicalSubjectList"));
+        assertTrue(map.containsKey("technicalExerciseList"));
         assertEquals("/trainer/courses", map.get("actionUrl"));
     }
 

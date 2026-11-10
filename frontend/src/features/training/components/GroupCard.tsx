@@ -6,7 +6,7 @@ import { Button, HorseAvatar, Icon, IconButton, Panel, Pill, Tooltip } from '@/c
 import type { Horse } from '@/features/stable/types';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/display';
-import { PLAN_STATUS } from '../lib/status';
+import { COURSE_RUN_STATUS } from '../lib/status';
 import type { GroupMember, TrainingGroup } from '../types';
 import { horseDragDrop, type DraggableHorseItem } from './horseDragDrop';
 import { StatusPill } from './StatusPill';
@@ -104,7 +104,7 @@ export function GroupCard({
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
             Current Course
           </p>
-          {group.currentPlanStatus && group.currentCourseName ? (
+          {group.currentCourseRunStatus && group.currentCourseName ? (
             <div>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -113,15 +113,15 @@ export function GroupCard({
                     {group.currentCourseName}
                   </span>
                 </div>
-                <StatusPill status={PLAN_STATUS[group.currentPlanStatus]} size="sm" />
+                <StatusPill status={COURSE_RUN_STATUS[group.currentCourseRunStatus]} size="sm" />
               </div>
               <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                {group.currentPlanStartDate && group.currentPlanEndDate
-                  ? `${formatDate(group.currentPlanStartDate)} – ${formatDate(group.currentPlanEndDate)}`
-                  : group.currentPlanEndDate
-                    ? `Ends ${formatDate(group.currentPlanEndDate)}`
-                    : group.currentPlanStartDate
-                      ? `Starts ${formatDate(group.currentPlanStartDate)}`
+                {group.currentCourseRunStartDate && group.currentCourseRunEndDate
+                  ? `${formatDate(group.currentCourseRunStartDate)} – ${formatDate(group.currentCourseRunEndDate)}`
+                  : group.currentCourseRunEndDate
+                    ? `Ends ${formatDate(group.currentCourseRunEndDate)}`
+                    : group.currentCourseRunStartDate
+                      ? `Starts ${formatDate(group.currentCourseRunStartDate)}`
                       : 'Ongoing'}
               </p>
             </div>

@@ -23,7 +23,7 @@ import java.util.List;
  * hoạch đang chạy: ngựa bị chặn mà buổi tập vẫn nằm trong session, Groom vẫn được giao dắt đi tập. Gom về đây để
  * chặn tập luôn kéo theo hủy buổi tập tương lai.
  * (Before, 8 places (vet, groom, manager, incidents...) set 3-4 lock fields on the horse themselves and none
- * cancelled running plans: a horse was blocked while its workouts stayed in the session and the groom was still told
+ * cancelled running course runs: a horse was blocked while its workouts stayed in the session and the groom was still told
  * to lead it out. They are gathered here so blocking always cancels future workouts.)
  */
 @Service
@@ -51,9 +51,9 @@ public class TrainingDecisionService {
     }
 
     /**
-     * Chặn tập và hủy mọi buổi tập chưa diễn ra (session rỗng bị hủy theo, plan đang chạy chuyển CANCELLED). Gọi lại
+     * Chặn tập và hủy mọi buổi tập chưa diễn ra (session rỗng bị hủy theo, course run đang chạy chuyển CANCELLED). Gọi lại
      * khi ngựa đã bị chặn là vô hại: lần hủy thứ hai không còn gì để hủy.
-     * (Blocks training and cancels every workout not yet held (empty sessions are cancelled too, running plans become
+     * (Blocks training and cancels every workout not yet held (empty sessions are cancelled too, running course runs become
      * CANCELLED). Calling again on an already blocked horse is harmless: the second cancel has nothing left.)
      */
     @Transactional
@@ -80,12 +80,12 @@ public class TrainingDecisionService {
     public void assertCanTrain(Horse horse) {
         if (horse.getCurrentStatus() != HorseStatus.ELIGIBLE) {
             throw new ApiException(HttpStatus.CONFLICT, "HORSE_NOT_ELIGIBLE", String.format(
-                    "Horse '%s' has not been admitted to the club (status %s), so a plan cannot be created yet!",
+                    "Horse '%s' has not been admitted to the club (status %s), so a course run cannot be created yet!",
                     horse.getName(), horse.getCurrentStatus()));
         }
         if (horse.getTrainingDecision() == TrainingDecision.BLOCKED) {
             throw new ApiException(HttpStatus.CONFLICT, "TRAINING_BLOCKED", String.format(
-                    "Horse '%s' is resting: %s. A new plan cannot be created!",
+                    "Horse '%s' is resting: %s. A new course run cannot be created!",
                     horse.getName(), describeRest(horse)));
         }
     }
@@ -94,7 +94,7 @@ public class TrainingDecisionService {
      * Lý do nghỉ tập và hạn khám lại của một ngựa đang bị chặn, ví dụ "Tendon strain (re-examination at
      * 20/10/2026 14:00)". Dùng chung cho thông báo lỗi khi tạo kế hoạch và cho màn hình xem trước kế hoạch.
      * (The rest reason and re-examination time of a blocked horse, for example "Tendon strain (re-examination at
-     * 20/10/2026 14:00)". Shared by the plan creation error and the plan preview screen.)
+     * 20/10/2026 14:00)". Shared by the course run creation error and the course run preview screen.)
      */
     public String describeRest(Horse horse) {
         LocalDateTime nextExam = careScheduleRepository.findNextExamTime(horse.getId(), PENDING_EXAM_STATUSES);

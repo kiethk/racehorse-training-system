@@ -4,26 +4,26 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.DashboardHorseRow;
-import com.rtms.backend.training.dto.DashboardPlanRow;
+import com.rtms.backend.training.dto.DashboardCourseRunRow;
 import com.rtms.backend.training.dto.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PastWorkoutRow;
-import com.rtms.backend.training.dto.PlanSummaryResponse;
+import com.rtms.backend.training.dto.HorseCourseRunResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
 import com.rtms.backend.training.dto.SessionHorseNameRow;
 import com.rtms.backend.training.dto.SessionRow;
 import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.GroupPlan;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.CourseRun;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.TrainingDay;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.support.TrainingFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,7 +60,7 @@ class TrainingSessionQueriesIntegrationTest {
 
     @Autowired private TrainingFixtures fixtures;
     @Autowired private TrainingGroupRepository groups;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private StableStallRepository stalls;
@@ -73,13 +73,13 @@ class TrainingSessionQueriesIntegrationTest {
     private Horse blaze;        // owner two, groom two
     private User groomOne;
     private User groomTwo;
-    private GroupPlan plan;
+    private CourseRun courseRun;
     private TrainingSession held;           // today-3, Held, both horses have results
     private TrainingSession heldNoResult;   // today-2, Held, nobody recorded anything
     private TrainingSession ahead;          // today+2, Scheduled, both horses
     private TrainingSession cancelled;      // today+3, cancelled as a whole
-    private Subject sprint;
-    private Subject recovery;
+    private Exercise sprint;
+    private Exercise recovery;
 
     @BeforeEach
     void buildFixture() {
@@ -90,9 +90,9 @@ class TrainingSessionQueriesIntegrationTest {
         groomOne = userById(stalls.findById(thunder.getCurrentStallId()).orElseThrow().getGroomId());
         groomTwo = userById(stalls.findById(blaze.getCurrentStallId()).orElseThrow().getGroomId());
 
-        sprint = fixtures.subject(trainer, "Sprint", 60);
-        recovery = fixtures.subject(trainer, "Walk", 30);
-        recovery.setCategory(com.rtms.backend.training.enums.SubjectCategory.RECOVERY);
+        sprint = fixtures.exercise(trainer, "Sprint", 60);
+        recovery = fixtures.exercise(trainer, "Walk", 30);
+        recovery.setCategory(com.rtms.backend.training.enums.ExerciseCategory.RECOVERY);
         recovery = fixtures.save(recovery);
         Course course = fixtures.course(trainer, "Sprint Base", 4, sprint);
 
@@ -101,15 +101,15 @@ class TrainingSessionQueriesIntegrationTest {
         group.setName("Nhom 1");
         group = groups.saveAndFlush(group);
 
-        plan = new GroupPlan();
-        plan.setGroupId(group.getId());
-        plan.setCourseId(course.getId());
-        plan.setTrainerId(trainer.getId());
-        plan.setStartDate(today.minusDays(3));
-        plan.setEndDate(today.plusDays(3));
-        plan.setTrainingDays(new LinkedHashSet<>(List.of(TrainingDay.MONDAY)));
-        plan.setStatus(TrainingPlanStatus.ACTIVE);
-        plan = plans.saveAndFlush(plan);
+        courseRun = new CourseRun();
+        courseRun.setGroupId(group.getId());
+        courseRun.setCourseId(course.getId());
+        courseRun.setTrainerId(trainer.getId());
+        courseRun.setStartDate(today.minusDays(3));
+        courseRun.setEndDate(today.plusDays(3));
+        courseRun.setTrainingDays(new LinkedHashSet<>(List.of(TrainingDay.MONDAY)));
+        courseRun.setStatus(CourseRunStatus.ACTIVE);
+        courseRun = courseRuns.saveAndFlush(courseRun);
 
         held = session(sprint, today.minusDays(3), 6, SessionStatus.HELD);
         heldNoResult = session(recovery, today.minusDays(2), 6, SessionStatus.HELD);
@@ -134,7 +134,7 @@ class TrainingSessionQueriesIntegrationTest {
 
         assertEquals(1, trend.size());
         assertEquals(today.minusDays(3), trend.get(0).getDate());
-        assertEquals("Sprint", trend.get(0).getSubjectName());
+        assertEquals("Sprint", trend.get(0).getExerciseName());
     }
 
     @Test
@@ -182,7 +182,7 @@ class TrainingSessionQueriesIntegrationTest {
 
         assertEquals(1, day.size());
         assertEquals("Thunder", day.get(0).horseName());
-        assertEquals("Sprint", day.get(0).subjectName());
+        assertEquals("Sprint", day.get(0).exerciseName());
         assertTrue(cancelledDay.isEmpty());
     }
 
@@ -201,17 +201,17 @@ class TrainingSessionQueriesIntegrationTest {
 
         assertEquals(List.of(today.minusDays(2), today.minusDays(3)), past.stream().map(PastWorkoutRow::sessionDate).toList());
         assertEquals(List.of(WorkoutStatus.HELD, WorkoutStatus.RAN), past.stream().map(row -> row.workout().getStatus()).toList());
-        assertNotNull(past.get(0).subjectName());
+        assertNotNull(past.get(0).exerciseName());
     }
 
-    // ------------------------------------------------------------- plan summaries
+    // ------------------------------------------------------------- course run summaries
 
     @Test
-    void planSummariesCountEachHorsesOwnWorkoutsThatRanAndTheWholeCancelledSessions() {
-        List<PlanSummaryResponse> summaries = plans.findPlanSummaries(trainer.getId(), null);
+    void courseRunSummariesCountEachHorsesOwnWorkoutsThatRanAndTheWholeCancelledSessions() {
+        List<HorseCourseRunResponse> summaries = courseRuns.findHorseCourseRuns(trainer.getId(), null);
 
         assertEquals(2, summaries.size());
-        PlanSummaryResponse mine = summaries.stream().filter(row -> row.getHorseId().equals(thunder.getId())).findFirst().orElseThrow();
+        HorseCourseRunResponse mine = summaries.stream().filter(row -> row.getHorseId().equals(thunder.getId())).findFirst().orElseThrow();
         assertEquals("Thunder", mine.getHorseName());
         assertEquals("Sprint Base", mine.getCourseName());
         assertEquals(4, mine.getTotalSessions());
@@ -220,16 +220,16 @@ class TrainingSessionQueriesIntegrationTest {
     }
 
     @Test
-    void planSummariesCanBeNarrowedToOneHorse() {
-        List<PlanSummaryResponse> summaries = plans.findPlanSummaries(null, blaze.getId());
+    void courseRunSummariesCanBeNarrowedToOneHorse() {
+        List<HorseCourseRunResponse> summaries = courseRuns.findHorseCourseRuns(null, blaze.getId());
 
         assertEquals(1, summaries.size());
         assertEquals(blaze.getId(), summaries.get(0).getHorseId());
     }
 
     @Test
-    void dashboardPlansCarryTheSameCounters() {
-        List<DashboardPlanRow> rows = plans.findDashboardPlans(List.of(thunder.getId(), blaze.getId()));
+    void dashboardCourseRunsCarryTheSameCounters() {
+        List<DashboardCourseRunRow> rows = courseRuns.findDashboardCourseRuns(List.of(thunder.getId(), blaze.getId()));
 
         assertEquals(2, rows.size());
         assertTrue(rows.stream().allMatch(row -> row.totalSessions() == 4 && row.completedSessions() == 1 && row.cancelledSessions() == 1));
@@ -237,27 +237,27 @@ class TrainingSessionQueriesIntegrationTest {
 
     @Test
     void horsesInTrainingCountEachHorseOnce() {
-        long before = plans.countHorsesInTraining();
+        long before = courseRuns.countHorsesInTraining();
         assertTrue(before >= 2);
     }
 
     @Test
     void aTrainersDashboardHorsesAndAreaCheck() {
-        List<DashboardHorseRow> horses = plans.findDashboardHorses(trainer.getId());
+        List<DashboardHorseRow> horses = courseRuns.findDashboardHorses(trainer.getId());
         User other = fixtures.user("HEAD_TRAINER", "other");
 
         // Area A of the shared database already houses other horses, so only check that ours are in the Trainer's scope.
         assertTrue(horses.stream().map(DashboardHorseRow::horseId).toList().containsAll(List.of(thunder.getId(), blaze.getId())));
-        assertTrue(plans.existsHorseInTrainerArea(thunder.getId(), trainer.getId()));
-        assertFalse(plans.existsHorseInTrainerArea(thunder.getId(), other.getId()));
+        assertTrue(courseRuns.existsHorseInTrainerArea(thunder.getId(), trainer.getId()));
+        assertFalse(courseRuns.existsHorseInTrainerArea(thunder.getId(), other.getId()));
     }
 
     @Test
-    void aHorsesUnfinishedPlansAreFoundThroughItsWorkouts() {
-        List<GroupPlan> found = plans.findPlansOfHorse(thunder.getId(), List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING));
+    void aHorsesUnfinishedCourseRunsAreFoundThroughItsWorkouts() {
+        List<CourseRun> found = courseRuns.findCourseRunsOfHorse(thunder.getId(), List.of(CourseRunStatus.ACTIVE, CourseRunStatus.UPCOMING));
 
         assertEquals(1, found.size());
-        assertEquals(plan.getId(), found.get(0).getId());
+        assertEquals(courseRun.getId(), found.get(0).getId());
     }
 
     // ------------------------------------------------------------ session rows
@@ -270,7 +270,7 @@ class TrainingSessionQueriesIntegrationTest {
         assertEquals(3, visible.size());
         assertEquals(4, all.size());
         assertEquals(2L, visible.get(0).occupied());
-        assertEquals("Sprint", visible.get(0).subjectName());
+        assertEquals("Sprint", visible.get(0).exerciseName());
     }
 
     @Test
@@ -300,10 +300,10 @@ class TrainingSessionQueriesIntegrationTest {
         return user;
     }
 
-    private TrainingSession session(Subject subject, LocalDate date, int hour, SessionStatus status) {
+    private TrainingSession session(Exercise exercise, LocalDate date, int hour, SessionStatus status) {
         TrainingSession session = new TrainingSession();
-        session.setGroupPlanId(plan.getId());
-        session.setSubjectId(subject.getId());
+        session.setCourseRunId(courseRun.getId());
+        session.setExerciseId(exercise.getId());
         session.setTrainerId(trainer.getId());
         session.setSessionDate(date);
         session.setStartTime(LocalTime.of(hour, 0));

@@ -5,7 +5,7 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.enums.TaskSource;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 
@@ -230,7 +230,7 @@ class GroomDailyTaskServiceTest {
         when(taskRepository.findByGroomIdAndScheduledTimeBetween(eq(4L), any(), any()))
                 .thenReturn(List.of(sopTask));
 
-        // Source 2: a workout joined with its session at 06:00 (horse and subject names come in the same row)
+        // Source 2: a workout joined with its session at 06:00 (horse and exercise names come in the same row)
         com.rtms.backend.training.dto.GroomWorkoutRow workoutRow = new com.rtms.backend.training.dto.GroomWorkoutRow(
                 201L, 1L, "Silver Moon", com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED,
                 java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 30), "Steady 1200m run");

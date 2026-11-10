@@ -5,8 +5,8 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
-import com.rtms.backend.training.dto.GroupPlanDetailResponse;
-import com.rtms.backend.training.dto.GroupPlanRequest;
+import com.rtms.backend.training.dto.CourseRunDetailResponse;
+import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.SessionWorkoutResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
@@ -14,9 +14,9 @@ import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.TrainingDay;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.support.MutableClock;
@@ -58,18 +58,18 @@ class SessionWorkoutServiceIntegrationTest {
 
     @Autowired private SessionWorkoutService service;
     @Autowired private SessionScheduleService scheduleService;
-    @Autowired private GroupPlanService planService;
+    @Autowired private CourseRunService courseRunService;
     @Autowired private TrainingGroupService groupService;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     private AuthenticatedUser trainer;
-    private GroupPlanDetailResponse plan;
+    private CourseRunDetailResponse courseRun;
     private LocalDate monday;
 
     @BeforeEach
@@ -85,8 +85,8 @@ class SessionWorkoutServiceIntegrationTest {
         }
         TrainingGroupResponse group = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 1",
                 List.of(fixtures.horse("Thunder").getId(), fixtures.horse("Blaze").getId())), trainer);
-        Course course = fixtures.course(trainerUser, "Sprint", 3, fixtures.subject(trainerUser, "S1", 30));
-        plan = planService.createPlan(new GroupPlanRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
+        Course course = fixtures.course(trainerUser, "Sprint", 3, fixtures.exercise(trainerUser, "S1", 30));
+        courseRun = courseRunService.createCourseRun(new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
     }
 
     @AfterEach
@@ -107,7 +107,7 @@ class SessionWorkoutServiceIntegrationTest {
     }
 
     @Test
-    void recordingResultsMakesTheWorkoutRanAndLeavesTheSessionAndPlanAlone() {
+    void recordingResultsMakesTheWorkoutRanAndLeavesTheSessionAndCourseRunAlone() {
         clock.set(monday.atTime(12, 0));
         Long workoutId = firstWorkoutOfSession(0).getId();
 
@@ -116,18 +116,18 @@ class SessionWorkoutServiceIntegrationTest {
         assertEquals("RAN", recorded.status());
         assertNotNull(recorded.performanceRating());
         assertEquals(SessionStatus.HELD, sessions.findById(recorded.sessionId()).orElseThrow().getStatus());
-        assertEquals(TrainingPlanStatus.ACTIVE, plans.findById(plan.plan().id()).orElseThrow().getStatus());
+        assertEquals(CourseRunStatus.ACTIVE, courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus());
     }
 
     @Test
-    void resultsCanStillBeRecordedLongAfterThePlanClosed() {
+    void resultsCanStillBeRecordedLongAfterTheCourseRunClosed() {
         clock.set(monday.plusDays(60).atTime(12, 0));
         Long workoutId = firstWorkoutOfSession(0).getId();
 
         SessionWorkoutResponse recorded = service.recordResult(workoutId, validResult(), trainer);
 
         assertEquals("RAN", recorded.status());
-        assertEquals(TrainingPlanStatus.COMPLETED, plans.findById(plan.plan().id()).orElseThrow().getStatus());
+        assertEquals(CourseRunStatus.COMPLETED, courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus());
     }
 
     @Test
@@ -159,11 +159,11 @@ class SessionWorkoutServiceIntegrationTest {
     }
 
     @Test
-    void aRecordedResultOfACancelledPlanCanStillBeEditedAndRated() {
+    void aRecordedResultOfACancelledCourseRunCanStillBeEditedAndRated() {
         clock.set(monday.atTime(12, 0));
         Long workoutId = firstWorkoutOfSession(0).getId();
         service.recordResult(workoutId, validResult(), trainer);
-        planService.cancelPlan(plan.plan().id(), trainer);
+        courseRunService.cancelCourseRun(courseRun.courseRun().id(), trainer);
         CompleteWorkoutRequest edit = validResult();
         edit.setRecoveryHeartRate(190);
 
@@ -171,7 +171,7 @@ class SessionWorkoutServiceIntegrationTest {
 
         assertEquals(190, edited.recoveryHeartRate());
         assertTrue(edited.performanceRating() < 9);
-        assertEquals(TrainingPlanStatus.CANCELLED, plans.findById(plan.plan().id()).orElseThrow().getStatus());
+        assertEquals(CourseRunStatus.CANCELLED, courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus());
     }
 
     @Test
@@ -181,7 +181,7 @@ class SessionWorkoutServiceIntegrationTest {
         CompleteWorkoutRequest request = validResult();
         request.setTrainerFeedback("Good");
         service.recordResult(workoutId, request, trainer);
-        Long sessionId = sessions.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.plan().id()).get(0).getId();
+        Long sessionId = sessions.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.courseRun().id()).get(0).getId();
 
         var horses = scheduleService.getSession(sessionId, trainer).horses();
 
@@ -322,7 +322,7 @@ class SessionWorkoutServiceIntegrationTest {
     }
 
     private List<TrainingWorkout> workoutsOfSession(int sessionIndex) {
-        TrainingSession session = sessions.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.plan().id()).get(sessionIndex);
+        TrainingSession session = sessions.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.courseRun().id()).get(sessionIndex);
         return workouts.findAll().stream()
                 .filter(workout -> session.getId().equals(workout.getSessionId()))
                 .sorted((a, b) -> a.getId().compareTo(b.getId()))

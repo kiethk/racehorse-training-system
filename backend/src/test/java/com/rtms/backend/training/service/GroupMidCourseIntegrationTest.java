@@ -6,8 +6,8 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
-import com.rtms.backend.training.dto.GroupPlanDetailResponse;
-import com.rtms.backend.training.dto.GroupPlanRequest;
+import com.rtms.backend.training.dto.CourseRunDetailResponse;
+import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.HorseAttendanceResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
@@ -15,9 +15,9 @@ import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.TrainingDay;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -57,7 +57,7 @@ class GroupMidCourseIntegrationTest {
             List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
     @Autowired private TrainingGroupService groupService;
-    @Autowired private GroupPlanService planService;
+    @Autowired private CourseRunService courseRunService;
     @Autowired private SessionSettlementService settlement;
     @Autowired private HorseAttendanceService attendanceService;
     @Autowired private TrainingDecisionService decisionService;
@@ -65,7 +65,7 @@ class GroupMidCourseIntegrationTest {
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
     @Autowired private HorseRepository horses;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private TrainingGroupMemberRepository members;
@@ -77,7 +77,7 @@ class GroupMidCourseIntegrationTest {
     private Horse blaze;
     private TrainingGroupResponse group;
     private Course course;
-    private GroupPlanDetailResponse plan;
+    private CourseRunDetailResponse courseRun;
     private LocalDate monday;
 
     @BeforeEach
@@ -94,9 +94,9 @@ class GroupMidCourseIntegrationTest {
         thunder = fixtures.horse("Thunder");
         blaze = fixtures.horse("Blaze");
         group = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 1", List.of(thunder.getId(), blaze.getId())), trainer);
-        course = fixtures.course(trainerUser, "Sprint", 3, fixtures.subject(trainerUser, "S1", 30));
+        course = fixtures.course(trainerUser, "Sprint", 3, fixtures.exercise(trainerUser, "S1", 30));
         // Sessions: Monday, Wednesday and Friday at 06:00 to 06:30.
-        plan = planService.createPlan(new GroupPlanRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
+        courseRun = courseRunService.createCourseRun(new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
     }
 
     @AfterEach
@@ -138,15 +138,15 @@ class GroupMidCourseIntegrationTest {
 
     @Test
     void aGroupWhoseCourseHasNoSessionLeftToAttendTakesNoNewHorse() {
-        Course single = fixtures.course(trainerUser, "Single", 1, fixtures.subject(trainerUser, "One", 30));
+        Course single = fixtures.course(trainerUser, "Single", 1, fixtures.exercise(trainerUser, "One", 30));
         TrainingGroupResponse other = groupService.createGroup(
                 new CreateTrainingGroupRequest("Nhom 2", List.of(fixtures.horse("Echo").getId())), trainer);
-        planService.createPlan(new GroupPlanRequest(other.id(), single.getId(), monday.plusDays(7), MON_WED_FRI), trainer);
+        courseRunService.createCourseRun(new CourseRunRequest(other.id(), single.getId(), monday.plusDays(7), MON_WED_FRI), trainer);
         Horse flame = fixtures.horse("Flame");
         clock.set(monday.plusDays(7).atTime(6, 10));  // its only Session is running
 
         ApiException error = assertThrows(ApiException.class, () -> groupService.addHorse(other.id(), flame.getId(), trainer));
-        assertEquals("GROUP_PLAN_NO_SESSION_LEFT", error.getErrorCode());
+        assertEquals("COURSE_RUN_NO_SESSION_LEFT", error.getErrorCode());
     }
 
     // ------------------------------------------------------------------- leave
@@ -162,23 +162,23 @@ class GroupMidCourseIntegrationTest {
         assertEquals(List.of(WorkoutStatus.CANCELLED, WorkoutStatus.CANCELLED),
                 workoutsOf(thunder).subList(1, 3).stream().map(TrainingWorkout::getStatus).toList());
         assertTrue(workoutsOf(blaze).stream().noneMatch(workout -> workout.getStatus() == WorkoutStatus.CANCELLED));
-        assertEquals(TrainingPlanStatus.ACTIVE, plans.findById(plan.plan().id()).orElseThrow().getStatus());
+        assertEquals(CourseRunStatus.ACTIVE, courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus());
         assertTrue(members.findByHorseIdAndLeftAtIsNull(thunder.getId()).isEmpty());
     }
 
     @Test
-    void whenEveryHorseLeavesTheRemainingSessionsAreCancelledAndThePlanCloses() {
+    void whenEveryHorseLeavesTheRemainingSessionsAreCancelledAndTheCourseRunCloses() {
         clock.set(monday.atTime(12, 0));
         settlement.settle();
 
         groupService.removeHorse(group.id(), thunder.getId(), trainer);
         groupService.removeHorse(group.id(), blaze.getId(), trainer);
 
-        List<TrainingSession> all = sessions.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.plan().id());
+        List<TrainingSession> all = sessions.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.courseRun().id());
         assertEquals(SessionStatus.HELD, all.get(0).getStatus());
         assertEquals(SessionStatus.CANCELLED, all.get(1).getStatus());
         assertEquals(SessionStatus.CANCELLED, all.get(2).getStatus());
-        assertEquals(TrainingPlanStatus.COMPLETED, plans.findById(plan.plan().id()).orElseThrow().getStatus());
+        assertEquals(CourseRunStatus.COMPLETED, courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus());
     }
 
     @Test
@@ -186,31 +186,31 @@ class GroupMidCourseIntegrationTest {
         groupService.removeHorse(group.id(), thunder.getId(), trainer);
         groupService.removeHorse(group.id(), blaze.getId(), trainer);
 
-        assertEquals(TrainingPlanStatus.CANCELLED, plans.findById(plan.plan().id()).orElseThrow().getStatus());
+        assertEquals(CourseRunStatus.CANCELLED, courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus());
     }
 
     // -------------------------------------------------------------------- move
 
     @Test
-    void aMovedHorseLeavesTheOldPlanAndTakesTheNewGroupsRemainingSessions() {
-        Course stamina = fixtures.course(trainerUser, "Stamina", 3, fixtures.subject(trainerUser, "T1", 45));
+    void aMovedHorseLeavesTheOldCourseRunAndTakesTheNewGroupsRemainingSessions() {
+        Course stamina = fixtures.course(trainerUser, "Stamina", 3, fixtures.exercise(trainerUser, "T1", 45));
         TrainingGroupResponse other = groupService.createGroup(
                 new CreateTrainingGroupRequest("Nhom 2", List.of(fixtures.horse("Echo").getId())), trainer);
-        GroupPlanDetailResponse secondPlan = planService.createPlan(
-                new GroupPlanRequest(other.id(), stamina.getId(), monday, MON_WED_FRI), trainer);
+        CourseRunDetailResponse secondCourseRun = courseRunService.createCourseRun(
+                new CourseRunRequest(other.id(), stamina.getId(), monday, MON_WED_FRI), trainer);
         clock.set(monday.atTime(12, 0));
         settlement.settle();
 
         groupService.moveHorse(other.id(), thunder.getId(), trainer);
 
         List<TrainingWorkout> mine = workoutsOf(thunder);
-        // 3 in the old plan, and 2 in the new one: its first Session is already over when the horse arrives.
+        // 3 in the old course run, and 2 in the new one: its first Session is already over when the horse arrives.
         assertEquals(5, mine.size());
         assertEquals(1, mine.stream().filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count());
         assertEquals(2, mine.stream().filter(workout -> workout.getStatus() == WorkoutStatus.CANCELLED).count());
         assertEquals(2, mine.stream().filter(workout -> workout.getStatus() == WorkoutStatus.SCHEDULED).count());
         assertEquals(other.id(), members.findByHorseIdAndLeftAtIsNull(thunder.getId()).orElseThrow().getGroupId());
-        assertEquals(TrainingPlanStatus.ACTIVE, plans.findById(secondPlan.plan().id()).orElseThrow().getStatus());
+        assertEquals(CourseRunStatus.ACTIVE, courseRuns.findById(secondCourseRun.courseRun().id()).orElseThrow().getStatus());
     }
 
     // --------------------------------------------------------------- Vet block
@@ -291,11 +291,11 @@ class GroupMidCourseIntegrationTest {
     }
 
     @Test
-    void aHorseThatChangedGroupsShowsOneLinePerPlan() {
-        Course stamina = fixtures.course(trainerUser, "Stamina", 3, fixtures.subject(trainerUser, "T1", 45));
+    void aHorseThatChangedGroupsShowsOneLinePerCourseRun() {
+        Course stamina = fixtures.course(trainerUser, "Stamina", 3, fixtures.exercise(trainerUser, "T1", 45));
         TrainingGroupResponse other = groupService.createGroup(
                 new CreateTrainingGroupRequest("Nhom 2", List.of(fixtures.horse("Echo").getId())), trainer);
-        planService.createPlan(new GroupPlanRequest(other.id(), stamina.getId(), monday, MON_WED_FRI), trainer);
+        courseRunService.createCourseRun(new CourseRunRequest(other.id(), stamina.getId(), monday, MON_WED_FRI), trainer);
         clock.set(monday.atTime(12, 0));
         settlement.settle();
         groupService.moveHorse(other.id(), thunder.getId(), trainer);
@@ -317,7 +317,7 @@ class GroupMidCourseIntegrationTest {
 
     @Test
     void aSessionCancelledAsAWholeLeavesTheDenominatorButAHorsesOwnCancelledWorkoutDoesNot() {
-        List<TrainingSession> all = sessions.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.plan().id());
+        List<TrainingSession> all = sessions.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.courseRun().id());
         all.get(1).setStatus(SessionStatus.CANCELLED);
         sessions.saveAndFlush(all.get(1));
         workouts.cancelWorkoutsOfCancelledSessions();

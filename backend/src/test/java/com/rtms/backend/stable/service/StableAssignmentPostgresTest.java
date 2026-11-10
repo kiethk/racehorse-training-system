@@ -114,8 +114,8 @@ class StableAssignmentPostgresTest {
     }
     long session() {
         return jdbc.queryForObject("""
-            INSERT INTO training_lots(trainer_id,subject_id,lot_date,start_time,end_time)
-            SELECT ?,id,CURRENT_DATE+1,'08:00','09:00' FROM subjects ORDER BY id LIMIT 1 RETURNING id
+            INSERT INTO training_lots(trainer_id,exercise_id,lot_date,start_time,end_time)
+            SELECT ?,id,CURRENT_DATE+1,'08:00','09:00' FROM exercises ORDER BY id LIMIT 1 RETURNING id
             """, Long.class, trainer1);
     }
     void workout(long horse, long session, long groom, String status) {

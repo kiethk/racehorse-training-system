@@ -1,6 +1,6 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.PlanSessionCountRow;
+import com.rtms.backend.training.dto.CourseRunSessionCountRow;
 import com.rtms.backend.training.dto.SessionHorseNameRow;
 import com.rtms.backend.training.dto.SessionRow;
 import com.rtms.backend.training.entity.TrainingSession;
@@ -27,28 +27,28 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     @Query(value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(:key)) locked", nativeQuery = true)
     int lockSchedule(@Param("key") long key);
 
-    List<TrainingSession> findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(Long groupPlanId);
+    List<TrainingSession> findByCourseRunIdOrderBySessionDateAscStartTimeAsc(Long courseRunId);
 
-    List<TrainingSession> findByGroupPlanIdInOrderBySessionDateAscStartTimeAsc(Collection<Long> groupPlanIds);
+    List<TrainingSession> findByCourseRunIdInOrderBySessionDateAscStartTimeAsc(Collection<Long> courseRunIds);
 
     /** Mọi buổi chưa hủy của Trainer trong một ngày, theo giờ tăng dần. (A trainer's non-cancelled Sessions of a day, ascending.) */
     List<TrainingSession> findByTrainerIdAndSessionDateAndStatusNotOrderByStartTimeAsc(
             Long trainerId, LocalDate sessionDate, SessionStatus status);
 
-    long countByGroupPlanIdAndStatus(Long groupPlanId, SessionStatus status);
+    long countByCourseRunIdAndStatus(Long courseRunId, SessionStatus status);
 
     /** Buổi chưa hủy của Trainer trong một khoảng ngày, một truy vấn cho cả khóa. (A trainer's non-cancelled Sessions over a date range, one query for the whole course.) */
     List<TrainingSession> findByTrainerIdAndSessionDateBetweenAndStatusNot(
             Long trainerId, LocalDate from, LocalDate to, SessionStatus status);
 
-    /** Số buổi của nhiều kế hoạch theo trạng thái bằng MỘT truy vấn. (Session counts of many plans per status in ONE query.) */
+    /** Số buổi của nhiều kế hoạch theo trạng thái bằng MỘT truy vấn. (Session counts of many course runs per status in ONE query.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.PlanSessionCountRow(s.groupPlanId, s.status, COUNT(s))
+           SELECT new com.rtms.backend.training.dto.CourseRunSessionCountRow(s.courseRunId, s.status, COUNT(s))
            FROM TrainingSession s
-           WHERE s.groupPlanId IN :planIds
-           GROUP BY s.groupPlanId, s.status
+           WHERE s.courseRunId IN :courseRunIds
+           GROUP BY s.courseRunId, s.status
            """)
-    List<PlanSessionCountRow> countByPlanAndStatus(@Param("planIds") Collection<Long> planIds);
+    List<CourseRunSessionCountRow> countByCourseRunAndStatus(@Param("courseRunIds") Collection<Long> courseRunIds);
 
     /**
      * Buổi SCHEDULED đã hết giờ thành HELD bằng MỘT câu UPDATE; trả về số buổi đã đổi.
@@ -65,27 +65,27 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /**
      * Hủy mọi buổi SCHEDULED CHƯA bắt đầu của một kế hoạch bằng MỘT câu UPDATE; trả về số buổi đã hủy.
-     * (Cancels every SCHEDULED Session of a plan that has NOT started with ONE UPDATE; returns how many were cancelled.)
+     * (Cancels every SCHEDULED Session of a course run that has NOT started with ONE UPDATE; returns how many were cancelled.)
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
            UPDATE TrainingSession s
            SET s.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED
-           WHERE s.groupPlanId = :planId
+           WHERE s.courseRunId = :courseRunId
              AND s.status = com.rtms.backend.training.enums.SessionStatus.SCHEDULED
              AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :time))
            """)
-    int cancelNotStartedOfPlan(@Param("planId") Long planId, @Param("today") LocalDate today, @Param("time") LocalTime time);
+    int cancelNotStartedOfCourseRun(@Param("courseRunId") Long courseRunId, @Param("today") LocalDate today, @Param("time") LocalTime time);
 
-    /** Buổi SCHEDULED CHƯA bắt đầu của các kế hoạch đã cho, theo thứ tự. (SCHEDULED Sessions of the given plans that have NOT started, in order.) */
+    /** Buổi SCHEDULED CHƯA bắt đầu của các kế hoạch đã cho, theo thứ tự. (SCHEDULED Sessions of the given course runs that have NOT started, in order.) */
     @Query("""
            SELECT s FROM TrainingSession s
-           WHERE s.groupPlanId IN :planIds
+           WHERE s.courseRunId IN :courseRunIds
              AND s.status = com.rtms.backend.training.enums.SessionStatus.SCHEDULED
              AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :time))
            ORDER BY s.sessionDate, s.startTime
            """)
-    List<TrainingSession> findNotStartedOfPlans(@Param("planIds") Collection<Long> planIds,
+    List<TrainingSession> findNotStartedOfCourseRuns(@Param("courseRunIds") Collection<Long> courseRunIds,
                                                 @Param("today") LocalDate today, @Param("time") LocalTime time);
 
     List<TrainingSession> findByTrainerIdAndSessionDateBetweenOrderBySessionDateAscStartTimeAsc(
@@ -127,13 +127,13 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     /** Phần SELECT dùng chung cho mọi truy vấn xem buổi. (SELECT part shared by every Session view query.) */
     String SESSION_ROW_SELECT = """
             SELECT new com.rtms.backend.training.dto.SessionRow(
-                       s.id, s.trainerId, s.sessionDate, s.startTime, s.endTime, s.subjectId, sub.name,
+                       s.id, s.trainerId, s.sessionDate, s.startTime, s.endTime, s.exerciseId, sub.name,
                        sub.durationMinutes, s.status,
                        (SELECT COUNT(w) FROM TrainingWorkout w
                         WHERE w.sessionId = s.id
                           AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED))
             FROM TrainingSession s
-            JOIN Subject sub ON s.subjectId = sub.id
+            JOIN Exercise sub ON s.exerciseId = sub.id
             """;
 
     /** Lịch của Trainer. includeCancelled = false thì ẩn buổi đã hủy. (A Trainer's schedule; cancelled Sessions hidden unless asked.) */

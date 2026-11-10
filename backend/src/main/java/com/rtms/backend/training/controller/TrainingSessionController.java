@@ -2,7 +2,7 @@ package com.rtms.backend.training.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.dto.PlanSessionResponse;
+import com.rtms.backend.training.dto.CourseRunSessionResponse;
 import com.rtms.backend.training.dto.ScheduleSessionResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.RescheduleSessionRequest;
@@ -62,7 +62,7 @@ public class TrainingSessionController {
 
     @PatchMapping("/{id}/reschedule")
     @PreAuthorize("hasAuthority('SESSION_UPDATE')")
-    public ApiResponse<PlanSessionResponse> reschedule(
+    public ApiResponse<CourseRunSessionResponse> reschedule(
             @PathVariable Long id,
             @Valid @RequestBody RescheduleSessionRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
@@ -71,7 +71,7 @@ public class TrainingSessionController {
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAuthority('SESSION_UPDATE')")
-    public ApiResponse<PlanSessionResponse> cancel(
+    public ApiResponse<CourseRunSessionResponse> cancel(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(sessionService.cancel(id, currentUser));
     }

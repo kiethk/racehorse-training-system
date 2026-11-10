@@ -4,19 +4,19 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
-import com.rtms.backend.training.dto.GroupPlanDetailResponse;
-import com.rtms.backend.training.dto.GroupPlanRequest;
-import com.rtms.backend.training.dto.PlanSessionResponse;
+import com.rtms.backend.training.dto.CourseRunDetailResponse;
+import com.rtms.backend.training.dto.CourseRunRequest;
+import com.rtms.backend.training.dto.CourseRunSessionResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.TrainingDay;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.support.MutableClock;
@@ -55,12 +55,12 @@ class TrainingSessionServiceIntegrationTest {
             List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
     @Autowired private TrainingSessionService service;
-    @Autowired private GroupPlanService planService;
+    @Autowired private CourseRunService courseRunService;
     @Autowired private TrainingGroupService groupService;
     @Autowired private SessionSettlementService settlement;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private JdbcTemplate jdbc;
@@ -69,7 +69,7 @@ class TrainingSessionServiceIntegrationTest {
     private User trainerUser;
     private TrainingGroupResponse group;
     private Course course;
-    private GroupPlanDetailResponse plan;
+    private CourseRunDetailResponse courseRun;
     private LocalDate monday;
 
     @BeforeEach
@@ -85,9 +85,9 @@ class TrainingSessionServiceIntegrationTest {
         }
         group = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 1",
                 List.of(fixtures.horse("Thunder").getId(), fixtures.horse("Blaze").getId())), trainer);
-        course = fixtures.course(trainerUser, "Sprint", 3, fixtures.subject(trainerUser, "S1", 30));
+        course = fixtures.course(trainerUser, "Sprint", 3, fixtures.exercise(trainerUser, "S1", 30));
         // Sessions: Monday, Wednesday and Friday at 06:00 to 06:30.
-        plan = planService.createPlan(new GroupPlanRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
+        courseRun = courseRunService.createCourseRun(new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
     }
 
     @AfterEach
@@ -99,7 +99,7 @@ class TrainingSessionServiceIntegrationTest {
 
     @Test
     void aSessionIsMovedToAnotherQuarterHourKeepingItsLength() {
-        PlanSessionResponse moved = service.reschedule(sessionId(0), LocalTime.of(7, 15), trainer);
+        CourseRunSessionResponse moved = service.reschedule(sessionId(0), LocalTime.of(7, 15), trainer);
 
         assertEquals(LocalTime.of(7, 15), moved.startTime());
         assertEquals(LocalTime.of(7, 45), moved.endTime());
@@ -122,8 +122,8 @@ class TrainingSessionServiceIntegrationTest {
         User secondUser = trainerUser;
         TrainingGroupResponse other = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 2",
                 List.of(fixtures.horse("Echo").getId())), trainer);
-        Course second = fixtures.course(secondUser, "Stamina", 3, fixtures.subject(secondUser, "T1", 60));
-        planService.createPlan(new GroupPlanRequest(other.id(), second.getId(), monday, MON_WED_FRI), trainer);
+        Course second = fixtures.course(secondUser, "Stamina", 3, fixtures.exercise(secondUser, "T1", 60));
+        courseRunService.createCourseRun(new CourseRunRequest(other.id(), second.getId(), monday, MON_WED_FRI), trainer);
         // The second group runs 06:30 to 07:30 on Monday; moving the first group to 07:00 would collide.
 
         ApiException error = assertThrows(ApiException.class, () -> service.reschedule(sessionId(0), LocalTime.of(7, 0), trainer));
@@ -141,13 +141,13 @@ class TrainingSessionServiceIntegrationTest {
     // ----------------------------------------------------------- cancel session
 
     @Test
-    void cancellingASessionCancelsItsWorkoutsAndKeepsThePlanOpen() {
-        PlanSessionResponse cancelled = service.cancel(sessionId(1), trainer);
+    void cancellingASessionCancelsItsWorkoutsAndKeepsTheCourseRunOpen() {
+        CourseRunSessionResponse cancelled = service.cancel(sessionId(1), trainer);
 
         assertEquals("CANCELLED", cancelled.status());
         assertTrue(workoutsOf(1).stream().allMatch(workout -> workout.getStatus() == WorkoutStatus.CANCELLED));
-        assertEquals(TrainingPlanStatus.UPCOMING, planStatus());
-        assertEquals(plan.plan().endDate(), plans.findById(plan.plan().id()).orElseThrow().getEndDate());
+        assertEquals(CourseRunStatus.UPCOMING, courseRunStatus());
+        assertEquals(courseRun.courseRun().endDate(), courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getEndDate());
     }
 
     @Test
@@ -170,22 +170,22 @@ class TrainingSessionServiceIntegrationTest {
     }
 
     @Test
-    void cancellingTheLastSessionToRunClosesThePlanByTheRule() {
+    void cancellingTheLastSessionToRunClosesTheCourseRunByTheRule() {
         clock.set(monday.atTime(12, 0));
         settlement.settle();                       // the first Session is Held
         service.cancel(sessionId(1), trainer);
         service.cancel(sessionId(2), trainer);
 
-        assertEquals(TrainingPlanStatus.COMPLETED, planStatus());
+        assertEquals(CourseRunStatus.COMPLETED, courseRunStatus());
     }
 
     @Test
-    void cancellingEverySessionBeforeAnyWasHeldClosesThePlanAsCancelled() {
+    void cancellingEverySessionBeforeAnyWasHeldClosesTheCourseRunAsCancelled() {
         service.cancel(sessionId(0), trainer);
         service.cancel(sessionId(1), trainer);
         service.cancel(sessionId(2), trainer);
 
-        assertEquals(TrainingPlanStatus.CANCELLED, planStatus());
+        assertEquals(CourseRunStatus.CANCELLED, courseRunStatus());
     }
 
     // ----------------------------------------------------------- cancel workout
@@ -222,72 +222,72 @@ class TrainingSessionServiceIntegrationTest {
         assertEquals("SESSION_ALREADY_STARTED", error.getErrorCode());
     }
 
-    // -------------------------------------------------------------- cancel plan
+    // -------------------------------------------------------------- cancel course run
 
     @Test
-    void cancellingThePlanCancelsEverySessionAndReleasesItsDates() {
-        GroupPlanDetailResponse cancelled = planService.cancelPlan(plan.plan().id(), trainer);
+    void cancellingTheCourseRunCancelsEverySessionAndReleasesItsDates() {
+        CourseRunDetailResponse cancelled = courseRunService.cancelCourseRun(courseRun.courseRun().id(), trainer);
 
-        assertEquals("CANCELLED", cancelled.plan().status());
+        assertEquals("CANCELLED", cancelled.courseRun().status());
         assertTrue(cancelled.sessions().stream().allMatch(session -> session.status().equals("CANCELLED")));
 
         // The dates are free again: the same course can be assigned over them at once.
-        GroupPlanDetailResponse again = planService.createPlan(
-                new GroupPlanRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
-        assertEquals("UPCOMING", again.plan().status());
+        CourseRunDetailResponse again = courseRunService.createCourseRun(
+                new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
+        assertEquals("UPCOMING", again.courseRun().status());
     }
 
     @Test
-    void cancellingThePlanAfterSomeSessionsWereHeldIsStillCancelled() {
+    void cancellingTheCourseRunAfterSomeSessionsWereHeldIsStillCancelled() {
         clock.set(monday.plusDays(2).atTime(12, 0));
         settlement.settle();
 
-        GroupPlanDetailResponse cancelled = planService.cancelPlan(plan.plan().id(), trainer);
+        CourseRunDetailResponse cancelled = courseRunService.cancelCourseRun(courseRun.courseRun().id(), trainer);
 
-        assertEquals("CANCELLED", cancelled.plan().status());
-        assertEquals(2, cancelled.plan().sessionsHeld());
-        assertEquals(1, cancelled.plan().sessionsCancelled());
+        assertEquals("CANCELLED", cancelled.courseRun().status());
+        assertEquals(2, cancelled.courseRun().sessionsHeld());
+        assertEquals(1, cancelled.courseRun().sessionsCancelled());
     }
 
     @Test
-    void cancellingThePlanWhileASessionIsRunningLetsThatSessionFinish() {
+    void cancellingTheCourseRunWhileASessionIsRunningLetsThatSessionFinish() {
         clock.set(monday.plusDays(2).atTime(6, 10));        // the second Session (Wednesday) is running
 
-        GroupPlanDetailResponse cancelled = planService.cancelPlan(plan.plan().id(), trainer);
-        assertEquals("CANCELLED", cancelled.plan().status());
-        assertEquals(1, cancelled.plan().sessionsCancelled());
+        CourseRunDetailResponse cancelled = courseRunService.cancelCourseRun(courseRun.courseRun().id(), trainer);
+        assertEquals("CANCELLED", cancelled.courseRun().status());
+        assertEquals(1, cancelled.courseRun().sessionsCancelled());
 
         clock.set(monday.plusDays(2).atTime(7, 0));
         settlement.settle();
         TrainingSession running = sessions.findById(sessionId(1)).orElseThrow();
         assertEquals(SessionStatus.HELD, running.getStatus());
-        assertEquals(TrainingPlanStatus.CANCELLED, planStatus());
+        assertEquals(CourseRunStatus.CANCELLED, courseRunStatus());
     }
 
     @Test
-    void aClosedPlanCannotBeCancelledAgain() {
-        planService.cancelPlan(plan.plan().id(), trainer);
+    void aClosedCourseRunCannotBeCancelledAgain() {
+        courseRunService.cancelCourseRun(courseRun.courseRun().id(), trainer);
 
-        ApiException error = assertThrows(ApiException.class, () -> planService.cancelPlan(plan.plan().id(), trainer));
-        assertEquals("PLAN_ALREADY_CLOSED", error.getErrorCode());
+        ApiException error = assertThrows(ApiException.class, () -> courseRunService.cancelCourseRun(courseRun.courseRun().id(), trainer));
+        assertEquals("COURSE_RUN_ALREADY_CLOSED", error.getErrorCode());
     }
 
     @Test
-    void anotherTrainerCannotCancelThePlan() {
+    void anotherTrainerCannotCancelTheCourseRun() {
         AuthenticatedUser other = fixtures.principal(fixtures.user("HEAD_TRAINER", "other"));
 
-        ApiException error = assertThrows(ApiException.class, () -> planService.cancelPlan(plan.plan().id(), other));
-        assertEquals("GROUP_PLAN_NOT_FOUND", error.getErrorCode());
+        ApiException error = assertThrows(ApiException.class, () -> courseRunService.cancelCourseRun(courseRun.courseRun().id(), other));
+        assertEquals("COURSE_RUN_NOT_FOUND", error.getErrorCode());
     }
 
     // ------------------------------------------------------------------ helpers
 
     private Long sessionId(int index) {
-        return sessions.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.plan().id()).get(index).getId();
+        return sessions.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.courseRun().id()).get(index).getId();
     }
 
-    private TrainingPlanStatus planStatus() {
-        GroupPlan found = plans.findById(plan.plan().id()).orElseThrow();
+    private CourseRunStatus courseRunStatus() {
+        CourseRun found = courseRuns.findById(courseRun.courseRun().id()).orElseThrow();
         return found.getStatus();
     }
 

@@ -258,7 +258,7 @@ class HttpAuditInterceptorTest {
     @Test
     void givenPlanPreviewEndpoint_thenNoAuditCall() throws Exception {
         when(request.getMethod()).thenReturn("POST");
-        when(request.getRequestURI()).thenReturn("/api/group-plans/preview");
+        when(request.getRequestURI()).thenReturn("/api/course-runs/preview");
         when(response.getStatus()).thenReturn(200);
 
         interceptor.afterCompletion(request, response, null, null);

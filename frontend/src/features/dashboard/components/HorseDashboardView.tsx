@@ -20,8 +20,8 @@ import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import { displayError, formatNumber } from '@/lib/display';
 import { RATING_LEGEND, ratingDistribution } from '@/features/training/lib/rating';
-import { cancelledLabel, planProgress } from '@/features/training/lib/planProgress';
-import { PLAN_STATUS } from '@/features/training/lib/status';
+import { cancelledLabel, courseRunProgress } from '@/features/training/lib/courseRunProgress';
+import { COURSE_RUN_STATUS } from '@/features/training/lib/status';
 import { StatusPill } from '@/features/training/components/StatusPill';
 import { dashboardService } from '../services/dashboardService';
 import type { DashboardHorse } from '../types';
@@ -37,11 +37,11 @@ function newestHorseFirst(left: DashboardHorse, right: DashboardHorse): number {
 }
 
 /**
- * The third line of the course cell: the bar and the held/planned count, counted the same way as on the Plan page.
+ * The third line of the course cell: the bar and the held/planned count, counted the same way as on the course run page.
  * Cancelled sessions are named in the tooltip to keep the row short.
  */
 function CourseProgress({ horse }: { horse: DashboardHorse }) {
-  const progress = planProgress(horse.completedSessions, horse.totalSessions, horse.cancelledSessions, horse.planStatus);
+  const progress = courseRunProgress(horse.completedSessions, horse.totalSessions, horse.cancelledSessions, horse.courseRunStatus);
   if (progress.allCancelled) {
     return <p className="text-xs text-[var(--color-text-muted)]">All {progress.cancelled} sessions cancelled</p>;
   }
@@ -102,21 +102,21 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
     render: (horse) => <HorseSpecialtyBadges specialty={horse.specialty} stacked />,
   },
   {
-    // Course, plan status and progress share one column so the table fits without scrolling sideways.
+    // Course, course run status and progress share one column so the table fits without scrolling sideways.
     id: 'course',
     header: 'Training course',
     className: 'min-w-32',
     sortValue: (horse) => horse.progressPercent,
     render: (horse) =>
-      horse.planStatus === 'NONE' ? (
+      horse.courseRunStatus === 'NONE' ? (
         <span className="text-[var(--color-text-muted)]">Not enrolled</span>
       ) : (
         // Always three lines (course, status, progress) so every row reads the same way.
         <div className="space-y-1">
           <div className="text-[var(--color-text-secondary)]">
-            {horseBasePath.startsWith('/trainer') && horse.planId ? (
+            {horseBasePath.startsWith('/trainer') && horse.courseRunId ? (
               <Link
-                href={`/trainer/plans/${horse.planId}`}
+                href={`/trainer/course-runs/${horse.courseRunId}`}
                 className="hover:text-[var(--color-primary)] hover:underline"
               >
                 {horse.courseName}
@@ -125,7 +125,7 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
               horse.courseName
             )}
           </div>
-          <StatusPill status={PLAN_STATUS[horse.planStatus]} />
+          <StatusPill status={COURSE_RUN_STATUS[horse.courseRunStatus]} />
           <CourseProgress horse={horse} />
         </div>
       ),
@@ -179,7 +179,7 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
 
 /**
  * The dashboard of a role that looks after horses: counts, a performance chart, an optional health chart, how the
- * team rates, and a table of the horses with their current plan. The backend scopes the data to the viewer (an owner
+ * team rates, and a table of the horses with their current course run. The backend scopes the data to the viewer (an owner
  * sees own horses, a trainer the horses of the areas, the manager every horse), so this screen never selects its
  * content by role: each actor page composes it with its own title, link target and charts.
  */
@@ -218,7 +218,7 @@ export function HorseDashboardView({
     load();
   }, [load]);
 
-  const inTraining = useMemo(() => horses.filter((h) => h.planStatus === 'ACTIVE'), [horses]);
+  const inTraining = useMemo(() => horses.filter((h) => h.courseRunStatus === 'ACTIVE'), [horses]);
   const withAlerts = useMemo(() => horses.filter((h) => h.alertsCount > 0), [horses]);
 
   const averageRating = useMemo(() => {

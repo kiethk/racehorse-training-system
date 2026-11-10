@@ -5,7 +5,7 @@ import type { Horse } from '@/features/stable/types';
 import { formatDate } from '@/lib/display';
 
 /**
- * Identity, health gate and racing specialty of the selected horse, with a shortcut to its training plans.
+ * Identity, health gate and racing specialty of the selected horse, with a shortcut to its training course runs.
  * The training decision is shown exactly as the backend reports it; the screen never re-derives it.
  */
 export function HorseProfileHeader({
@@ -46,7 +46,7 @@ export function HorseProfileHeader({
         </div>
       </div>
 
-      <LinkButton href={horse ? `/trainer/plans?search=${encodeURIComponent(horse.name)}` : '/trainer/plans'} icon="layers">View training plans</LinkButton>
+      <LinkButton href={horse ? `/trainer/course-runs?search=${encodeURIComponent(horse.name)}` : '/trainer/course-runs'} icon="layers">View training course runs</LinkButton>
     </Panel>
   );
 }

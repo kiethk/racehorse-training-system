@@ -15,15 +15,15 @@ import {
   SectionTitle,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
-import { CATEGORY_OPTIONS, intensityOption, surfaceLabel } from '../lib/subjectOptions';
-import type { CreateCourseRequest, Subject, SubjectCategory } from '../types';
+import { CATEGORY_OPTIONS, intensityOption, surfaceLabel } from '../lib/exerciseOptions';
+import type { CreateCourseRequest, Exercise, ExerciseCategory } from '../types';
 import { useTrainingRules } from '../hooks/useTrainingRules';
-import { subjectDragDrop } from './subjectDragDrop';
+import { exerciseDragDrop } from './exerciseDragDrop';
 
 const DEFAULT_SESSIONS = 12;
 
 interface CourseFormProps {
-  subjects: Subject[];
+  exercises: Exercise[];
   submitting: boolean;
   error: string | null;
   onSubmit: (request: CreateCourseRequest) => void;
@@ -31,20 +31,20 @@ interface CourseFormProps {
 }
 
 /**
- * Form that builds a course out of an ordered rotation of subjects.
- * The subject library is presented as a separate side panel (mirroring StableStaffPanel)
- * where subjects are grouped by category and can be dragged directly into the rotation.
+ * Form that builds a course out of an ordered rotation of exercises.
+ * The exercise library is presented as a separate side panel (mirroring StableStaffPanel)
+ * where exercises are grouped by category and can be dragged directly into the rotation.
  */
 export function CourseForm(props: CourseFormProps) {
   return (
-    <subjectDragDrop.Provider>
+    <exerciseDragDrop.Provider>
       <CourseFormContent {...props} />
-    </subjectDragDrop.Provider>
+    </exerciseDragDrop.Provider>
   );
 }
 
 function CourseFormContent({
-  subjects,
+  exercises,
   submitting,
   error,
   onSubmit,
@@ -58,28 +58,28 @@ function CourseFormContent({
   const [search, setSearch] = useState('');
   const [validation, setValidation] = useState<string | null>(null);
 
-  const subjectById = useMemo(
-    () => new Map(subjects.map((subject) => [subject.id, subject])),
-    [subjects],
+  const exerciseById = useMemo(
+    () => new Map(exercises.map((exercise) => [exercise.id, exercise])),
+    [exercises],
   );
 
-  // Group subjects by category
-  const groupedSubjects = useMemo(() => {
-    const groups = new Map<SubjectCategory, Subject[]>();
+  // Group exercises by category
+  const groupedExercises = useMemo(() => {
+    const groups = new Map<ExerciseCategory, Exercise[]>();
     CATEGORY_OPTIONS.forEach((opt) => groups.set(opt.value, []));
-    subjects.forEach((sub) => {
+    exercises.forEach((sub) => {
       const list = groups.get(sub.category);
       if (list) list.push(sub);
       else groups.set(sub.category, [sub]);
     });
     return groups;
-  }, [subjects]);
+  }, [exercises]);
 
-  const { dropProps, isOver } = subjectDragDrop.useDropZone({
+  const { dropProps, isOver } = exerciseDragDrop.useDropZone({
     disabled: submitting,
-    accept: (subject) => !rotation.includes(subject.id),
-    onDrop: (subject) => {
-      setRotation((current) => [...current, subject.id]);
+    accept: (exercise) => !rotation.includes(exercise.id),
+    onDrop: (exercise) => {
+      setRotation((current) => [...current, exercise.id]);
     },
   });
 
@@ -88,9 +88,9 @@ function CourseFormContent({
       ? `Enter a whole number from 1 to ${rules?.maxCourseSessions ?? 60}.`
       : null;
 
-  // One subject per session, so the rotation cannot be longer than the course.
-  const tooManySubjects = !sessionsError && rotation.length > totalSessions
-    ? `A course cannot have more subjects (${rotation.length}) than sessions (${totalSessions}). Remove subjects or add sessions.`
+  // One exercise per session, so the rotation cannot be longer than the course.
+  const tooManyExercises = !sessionsError && rotation.length > totalSessions
+    ? `A course cannot have more exercises (${rotation.length}) than sessions (${totalSessions}). Remove exercises or add sessions.`
     : null;
 
   function handleSubmit(event: React.FormEvent) {
@@ -99,16 +99,16 @@ function CourseFormContent({
       setValidation('Enter a course name and a valid number of sessions.');
       return;
     }
-    if (rules && rotation.length > rules.maxCourseSubjects) {
-      setValidation(`A course can have at most ${rules.maxCourseSubjects} subjects.`);
+    if (rules && rotation.length > rules.maxCourseExercises) {
+      setValidation(`A course can have at most ${rules.maxCourseExercises} exercises.`);
       return;
     }
     if (rotation.length === 0) {
-      setValidation('Select at least one subject for the course rotation.');
+      setValidation('Select at least one exercise for the course rotation.');
       return;
     }
-    if (tooManySubjects) {
-      setValidation(tooManySubjects);
+    if (tooManyExercises) {
+      setValidation(tooManyExercises);
       return;
     }
     setValidation(null);
@@ -116,23 +116,23 @@ function CourseFormContent({
       name: name.trim(),
       targetGoal: targetGoal.trim() || undefined,
       totalSessions: Number(totalSessions),
-      subjects: rotation.map((subjectId, index) => ({ subjectId, orderIndex: index + 1 })),
+      exercises: rotation.map((exerciseId, index) => ({ exerciseId, orderIndex: index + 1 })),
     });
   }
 
   const message = validation ?? error;
 
   const filteredCount = useMemo(() => {
-    return subjects.filter((s) => s.name.toLowerCase().includes(search.trim().toLowerCase()))
+    return exercises.filter((s) => s.name.toLowerCase().includes(search.trim().toLowerCase()))
       .length;
-  }, [subjects, search]);
+  }, [exercises, search]);
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
       {/* Left Column: Course Form Panel */}
       <Panel padded className="min-w-0">
         <form onSubmit={handleSubmit} className="space-y-5">
-          <SectionTitle>Create course with subject rotation</SectionTitle>
+          <SectionTitle>Create course with exercise rotation</SectionTitle>
           {message && <Notice tone="error">{message}</Notice>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -167,10 +167,10 @@ function CourseFormContent({
             />
           </FormField>
 
-          {/* Course Subject Rotation (Drop Zone) */}
+          {/* Course Exercise Rotation (Drop Zone) */}
           <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
             <div className="flex items-center justify-between gap-2">
-              <FieldLabel>Subject rotation ({rotation.length} selected)</FieldLabel>
+              <FieldLabel>Exercise rotation ({rotation.length} selected)</FieldLabel>
               {rotation.length > 0 && (
                 <Button
                   type="button"
@@ -185,7 +185,7 @@ function CourseFormContent({
               )}
             </div>
 
-            {tooManySubjects && <p className="text-xs text-[var(--color-danger)]">{tooManySubjects}</p>}
+            {tooManyExercises && <p className="text-xs text-[var(--color-danger)]">{tooManyExercises}</p>}
 
             <div
               {...dropProps}
@@ -200,20 +200,20 @@ function CourseFormContent({
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <Icon name="clipboard" size={28} className="text-[var(--color-text-muted)]" />
                   <p className="mt-2 text-sm font-medium text-[var(--color-text-secondary)]">
-                    Drop subjects here
+                    Drop exercises here
                   </p>
                   <p className="mt-1 max-w-sm text-xs text-[var(--color-text-muted)]">
-                    Drag a subject from the library on the right, or click any subject card to add it to the rotation.
+                    Drag an exercise from the library on the right, or click any exercise card to add it to the rotation.
                   </p>
                 </div>
               ) : (
                 <ol className="space-y-2">
-                  {rotation.map((subjectId, index) => {
-                    const subject = subjectById.get(subjectId);
-                    const intensity = subject ? intensityOption(subject.intensityLevel) : null;
+                  {rotation.map((exerciseId, index) => {
+                    const exercise = exerciseById.get(exerciseId);
+                    const intensity = exercise ? intensityOption(exercise.intensityLevel) : null;
                     return (
                       <li
-                        key={`${subjectId}-${index}`}
+                        key={`${exerciseId}-${index}`}
                         className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 shadow-sm transition-shadow hover:shadow"
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
@@ -222,11 +222,11 @@ function CourseFormContent({
                           </span>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                              {subject?.name ?? `Subject #${subjectId}`}
+                              {exercise?.name ?? `Exercise #${exerciseId}`}
                             </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
-                              {subject && <span>{subject.durationMinutes} min</span>}
-                              {subject && <span>• {subject.targetDistanceMeters}m</span>}
+                              {exercise && <span>{exercise.durationMinutes} min</span>}
+                              {exercise && <span>• {exercise.targetDistanceMeters}m</span>}
                               {intensity && (
                                 <Pill tone={intensity.tone} size="sm">
                                   {intensity.label}
@@ -239,7 +239,7 @@ function CourseFormContent({
                           <IconButton
                             icon="x"
                             size="sm"
-                            label={`Remove subject ${index + 1} from rotation`}
+                            label={`Remove exercise ${index + 1} from rotation`}
                             disabled={submitting}
                             onClick={() =>
                               setRotation((curr) => curr.filter((_, i) => i !== index))
@@ -265,37 +265,37 @@ function CourseFormContent({
         </form>
       </Panel>
 
-      {/* Right Column: Separated Subject Library Side Panel (styled like StableStaffPanel) */}
+      {/* Right Column: Separated Exercise Library Side Panel (styled like StableStaffPanel) */}
       <aside
         className="min-w-0 lg:sticky lg:top-4 lg:self-start"
-        aria-label="Subject library"
+        aria-label="Exercise library"
       >
         <Panel className="overflow-hidden">
           <div className="space-y-3 border-b border-[var(--color-border)] p-4">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                  Subject library
+                  Exercise library
                 </h2>
                 <p className="text-xs text-[var(--color-text-secondary)]">
-                  {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'} available
+                  {exercises.length} {exercises.length === 1 ? 'exercise' : 'exercises'} available
                 </p>
               </div>
             </div>
             <SearchInput
               value={search}
               onChange={setSearch}
-              label="Search subjects"
-              placeholder="Search subjects..."
+              label="Search exercises"
+              placeholder="Search exercises..."
             />
           </div>
 
           <div className="scroll-slim max-h-[calc(100vh-16rem)] space-y-4 overflow-y-auto p-3">
             {CATEGORY_OPTIONS.map((category) => {
-              const categorySubjects = (groupedSubjects.get(category.value) ?? []).filter((s) =>
+              const categoryExercises = (groupedExercises.get(category.value) ?? []).filter((s) =>
                 s.name.toLowerCase().includes(search.trim().toLowerCase()),
               );
-              if (categorySubjects.length === 0) return null;
+              if (categoryExercises.length === 0) return null;
 
               return (
                 <div key={category.value} className="space-y-2">
@@ -304,20 +304,20 @@ function CourseFormContent({
                       {category.label}
                     </span>
                     <span className="text-xs text-[var(--color-text-muted)]">
-                      {categorySubjects.length}
+                      {categoryExercises.length}
                     </span>
                   </div>
 
                   <div className="space-y-2">
-                    {categorySubjects.map((subject) => {
-                      const isAdded = rotation.includes(subject.id);
+                    {categoryExercises.map((exercise) => {
+                      const isAdded = rotation.includes(exercise.id);
                       return (
-                        <DraggableSubjectCard
-                          key={subject.id}
-                          subject={subject}
+                        <DraggableExerciseCard
+                          key={exercise.id}
+                          exercise={exercise}
                           isAdded={isAdded}
                           disabled={submitting}
-                          onAdd={() => setRotation((curr) => [...curr, subject.id])}
+                          onAdd={() => setRotation((curr) => [...curr, exercise.id])}
                         />
                       );
                     })}
@@ -328,7 +328,7 @@ function CourseFormContent({
 
             {filteredCount === 0 && (
               <p className="py-6 text-center text-xs text-[var(--color-text-muted)]">
-                No subjects match &ldquo;{search}&rdquo;
+                No exercises match &ldquo;{search}&rdquo;
               </p>
             )}
           </div>
@@ -338,24 +338,24 @@ function CourseFormContent({
   );
 }
 
-function DraggableSubjectCard({
-  subject,
+function DraggableExerciseCard({
+  exercise,
   isAdded,
   disabled,
   onAdd,
 }: {
-  subject: Subject;
+  exercise: Exercise;
   isAdded: boolean;
   disabled: boolean;
   onAdd: () => void;
 }) {
-  const { dragProps, pickUp, isDragging } = subjectDragDrop.useDraggable({
-    item: subject,
-    label: subject.name,
+  const { dragProps, pickUp, isDragging } = exerciseDragDrop.useDraggable({
+    item: exercise,
+    label: exercise.name,
     disabled: disabled || isAdded,
   });
 
-  const intensity = intensityOption(subject.intensityLevel);
+  const intensity = intensityOption(exercise.intensityLevel);
 
   return (
     <div
@@ -371,7 +371,7 @@ function DraggableSubjectCard({
     >
       <div className="flex items-start justify-between gap-1.5">
         <span className="text-xs font-semibold text-[var(--color-text-primary)] line-clamp-1">
-          {subject.name}
+          {exercise.name}
         </span>
         {isAdded ? (
           <Pill tone="neutral" size="sm">
@@ -381,7 +381,7 @@ function DraggableSubjectCard({
           <IconButton
             icon="plus"
             size="sm"
-            label={`Add ${subject.name} to course`}
+            label={`Add ${exercise.name} to course`}
             disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
@@ -392,9 +392,9 @@ function DraggableSubjectCard({
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-[var(--color-text-secondary)]">
-        <span>{subject.durationMinutes} min</span>
-        <span>• {subject.targetDistanceMeters}m</span>
-        <span>• {surfaceLabel(subject.surfaceType)}</span>
+        <span>{exercise.durationMinutes} min</span>
+        <span>• {exercise.targetDistanceMeters}m</span>
+        <span>• {surfaceLabel(exercise.surfaceType)}</span>
         <Pill tone={intensity.tone} size="sm">
           {intensity.label}
         </Pill>

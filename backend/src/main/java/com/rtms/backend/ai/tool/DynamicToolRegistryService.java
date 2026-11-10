@@ -163,7 +163,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerGroups",
-                        "Tra cứu các Nhóm huấn luyện (Training Group) của HLV: mỗi nhóm tối đa 6 ngựa ra sân cùng nhau, gồm danh sách ngựa kèm Groom, khóa đang chạy hoặc sắp chạy (Group Plan) và thời gian; kèm danh sách nhóm đã giải tán (Disbanded) với những ngựa có mặt lúc giải tán. Dùng khi hỏi nhóm nào có những ngựa nào, ngựa X thuộc nhóm nào, nhóm nào đang rảnh.",
+                        "Tra cứu các Nhóm huấn luyện (Training Group) của HLV: mỗi nhóm tối đa 6 ngựa ra sân cùng nhau, gồm danh sách ngựa kèm Groom, khóa đang chạy hoặc sắp chạy (Course Run) và thời gian; kèm danh sách nhóm đã giải tán (Disbanded) với những ngựa có mặt lúc giải tán. Dùng khi hỏi nhóm nào có những ngựa nào, ngựa X thuộc nhóm nào, nhóm nào đang rảnh.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -194,7 +194,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerPlansSummary",
-                        "Tra cứu các khóa (Group Plan) mà ngựa của HLV đã và đang tham gia, mỗi dòng một ngựa một khóa: Tên khóa, Nhóm, Mục tiêu, Trạng thái phần của con ngựa và Attendance X/Y (số buổi đã chạy trên tổng số buổi không bị hủy cả buổi), giống màn hình lịch sử huấn luyện.",
+                        "Tra cứu các khóa (Course Run) mà ngựa của HLV đã và đang tham gia, mỗi dòng một ngựa một khóa: Tên khóa, Nhóm, Mục tiêu, Trạng thái phần của con ngựa và Attendance X/Y (số buổi đã chạy trên tổng số buổi không bị hủy cả buổi), giống màn hình lịch sử huấn luyện.",
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Trạng thái kế hoạch (ACTIVE, UPCOMING, COMPLETED)"),
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),

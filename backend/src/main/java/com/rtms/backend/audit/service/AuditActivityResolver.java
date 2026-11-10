@@ -54,9 +54,9 @@ public class AuditActivityResolver {
     private static final Pattern USER_BASE = Pattern.compile("^/api/users/?$");
 
     // Pattern definitions - Training
-    private static final Pattern TRAINING_PLANS_DETAIL = Pattern.compile("^/api/group-plans/(\\d+)/.*$");
-    private static final Pattern TRAINING_PLANS_ID = Pattern.compile("^/api/group-plans/(\\d+)/?$");
-    private static final Pattern TRAINING_PLANS_BASE = Pattern.compile("^/api/group-plans/?$");
+    private static final Pattern COURSE_RUNS_DETAIL = Pattern.compile("^/api/(?:course-runs|group-plans)/(\\d+)/.*$");
+    private static final Pattern COURSE_RUNS_ID = Pattern.compile("^/api/(?:course-runs|group-plans)/(\\d+)/?$");
+    private static final Pattern COURSE_RUNS_BASE = Pattern.compile("^/api/(?:course-runs|group-plans)/?$");
     private static final Pattern TRAINING_GROUP_MOVE = Pattern.compile("^/api/training-groups/(\\d+)/horses/move/?$");
     private static final Pattern SESSION_WORKOUT_RESULT = Pattern.compile("^/api/session-workouts/(\\d+)/result/?$");
     private static final Pattern SESSION_WORKOUT_DNR = Pattern.compile("^/api/session-workouts/(\\d+)/did-not-run/?$");
@@ -64,8 +64,8 @@ public class AuditActivityResolver {
     private static final Pattern COURSES_DETAIL = Pattern.compile("^/api/courses/(\\d+)/?$");
     private static final Pattern COURSES_BASE = Pattern.compile("^/api/courses/?$");
 
-    private static final Pattern SUBJECTS_DETAIL = Pattern.compile("^/api/subjects/(\\d+)/?$");
-    private static final Pattern SUBJECTS_BASE = Pattern.compile("^/api/subjects/?$");
+    private static final Pattern EXERCISES_DETAIL = Pattern.compile("^/api/(?:exercises|subjects)/(\\d+)/?$");
+    private static final Pattern EXERCISES_BASE = Pattern.compile("^/api/(?:exercises|subjects)/?$");
 
     private static final Pattern LOTS_DETAIL = Pattern.compile("^/api/training-sessions/(\\d+)/?$");
     private static final Pattern LOTS_BASE = Pattern.compile("^/api/training-sessions/?$");
@@ -222,41 +222,41 @@ public class AuditActivityResolver {
             );
         }
 
-        if ((m = TRAINING_PLANS_DETAIL.matcher(normalizedPath)).matches() || (m = TRAINING_PLANS_ID.matcher(normalizedPath)).matches()) {
+        if ((m = COURSE_RUNS_DETAIL.matcher(normalizedPath)).matches() || (m = COURSE_RUNS_ID.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
-            String action = "DELETE".equals(normalizedMethod) ? "Cancel Training Plan" : "Update Training Plan";
+            String action = "DELETE".equals(normalizedMethod) ? "Cancel Course Run" : "Update Course Run";
             return new ResolvedActivity(
                     action,
-                    "GroupPlan",
+                    "CourseRun",
                     id,
-                    ("DELETE".equals(normalizedMethod) ? "Removed training plan #" : "Updated milestones and schedule for training plan #") + id + statusSuffix
+                    ("DELETE".equals(normalizedMethod) ? "Removed course run #" : "Updated milestones and schedule for course run #") + id + statusSuffix
             );
         }
-        if (TRAINING_PLANS_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
+        if (COURSE_RUNS_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
             return new ResolvedActivity(
-                    "Create Training Plan",
-                    "GroupPlan",
+                    "Create Course Run",
+                    "CourseRun",
                     null,
-                    "Trainer created a new training plan for horse" + statusSuffix
+                    "Trainer assigned a course to a training group" + statusSuffix
             );
         }
 
-        if ((m = SUBJECTS_DETAIL.matcher(normalizedPath)).matches()) {
+        if ((m = EXERCISES_DETAIL.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
-            String action = "DELETE".equals(normalizedMethod) ? "Delete Training Subject" : "Update Training Subject";
+            String action = "DELETE".equals(normalizedMethod) ? "Delete Exercise" : "Update Exercise";
             return new ResolvedActivity(
                     action,
-                    "Subject",
+                    "Exercise",
                     id,
-                    ("DELETE".equals(normalizedMethod) ? "Removed training subject #" : "Updated training subject #") + id + statusSuffix
+                    ("DELETE".equals(normalizedMethod) ? "Removed exercise #" : "Updated exercise #") + id + statusSuffix
             );
         }
-        if (SUBJECTS_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
+        if (EXERCISES_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
             return new ResolvedActivity(
-                    "Create Training Subject",
-                    "Subject",
+                    "Create Exercise",
+                    "Exercise",
                     null,
-                    "Trainer created a new training discipline/subject" + statusSuffix
+                    "Trainer created a new exercise" + statusSuffix
             );
         }
 
@@ -705,9 +705,9 @@ public class AuditActivityResolver {
     private static String guessEntity(String path) {
         if (path.contains("/admissions")) return "AdmissionApplication";
         if (path.contains("/courses")) return "Course";
-        if (path.contains("/group-plans")) return "GroupPlan";
+        if (path.contains("/course-runs") || path.contains("/group-plans")) return "CourseRun";
         if (path.contains("/training-groups")) return "TrainingGroup";
-        if (path.contains("/subjects")) return "Subject";
+        if (path.contains("/exercises") || path.contains("/subjects")) return "Exercise";
         if (path.contains("/training-sessions")) return "TrainingSession";
         if (path.contains("/workouts") || path.contains("/session-workouts")) return "TrainingWorkout";
         if (path.contains("/training-rules")) return "TrainingRule";
@@ -723,9 +723,9 @@ public class AuditActivityResolver {
     private static String humanizeEntity(String entityName) {
         return switch (entityName) {
             case "AdmissionApplication" -> "Admission Application";
-            case "GroupPlan" -> "Training Plan";
+            case "CourseRun", "GroupPlan" -> "Course Run";
             case "Course" -> "Training Course";
-            case "Subject" -> "Training Subject";
+            case "Exercise", "Subject" -> "Exercise";
             case "TrainingSession" -> "Training Session";
             case "TrainingWorkout" -> "Workout Session";
             case "TrainingRule" -> "Training Rules";

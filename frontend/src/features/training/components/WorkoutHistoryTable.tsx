@@ -18,7 +18,7 @@ function buildColumns(rules: TrainingRules | null): DataTableColumn<HorseFitness
       sortValue: (row) => row.date,
       render: (row) => <span className="whitespace-nowrap font-medium">{formatDate(row.date)}</span>,
     },
-    { id: 'subject', header: 'Subject', render: (row) => row.subjectName },
+    { id: 'exercise', header: 'Exercise', render: (row) => row.exerciseName },
     {
       id: 'distance',
       header: 'Distance',

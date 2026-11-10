@@ -1,14 +1,14 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.TrainingGroupMember;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -31,22 +31,22 @@ import java.util.Objects;
 @Service
 public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
 
-    private static final List<TrainingPlanStatus> UNFINISHED = List.of(TrainingPlanStatus.UPCOMING, TrainingPlanStatus.ACTIVE);
+    private static final List<CourseRunStatus> UNFINISHED = List.of(CourseRunStatus.UPCOMING, CourseRunStatus.ACTIVE);
 
-    private final GroupPlanRepository planRepository;
+    private final CourseRunRepository courseRunRepository;
     private final TrainingSessionRepository sessionRepository;
     private final TrainingWorkoutRepository workoutRepository;
     private final TrainingGroupMemberRepository memberRepository;
     private final SessionSettlementService settlement;
     private final Clock clock;
 
-    public GroupWorkoutSyncServiceImpl(GroupPlanRepository planRepository,
+    public GroupWorkoutSyncServiceImpl(CourseRunRepository courseRunRepository,
                                        TrainingSessionRepository sessionRepository,
                                        TrainingWorkoutRepository workoutRepository,
                                        TrainingGroupMemberRepository memberRepository,
                                        SessionSettlementService settlement,
                                        Clock clock) {
-        this.planRepository = planRepository;
+        this.courseRunRepository = courseRunRepository;
         this.sessionRepository = sessionRepository;
         this.workoutRepository = workoutRepository;
         this.memberRepository = memberRepository;
@@ -58,9 +58,9 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     @Transactional
     public void assertCanJoin(Long groupId) {
         settlement.settle();
-        List<Long> planIds = unfinishedPlanIds(groupId);
-        if (!planIds.isEmpty() && notStartedSessions(planIds).isEmpty()) {
-            throw new ApiException(HttpStatus.CONFLICT, "GROUP_PLAN_NO_SESSION_LEFT",
+        List<Long> courseRunIds = unfinishedCourseRunIds(groupId);
+        if (!courseRunIds.isEmpty() && notStartedSessions(courseRunIds).isEmpty()) {
+            throw new ApiException(HttpStatus.CONFLICT, "COURSE_RUN_NO_SESSION_LEFT",
                     "This group's course has no session left to attend. Wait for it to finish, then add the horse!");
         }
     }
@@ -69,12 +69,12 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     @Transactional
     public int createFutureWorkouts(TrainingGroupMember member) {
         settlement.settle();
-        List<Long> planIds = unfinishedPlanIds(member.getGroupId());
-        if (planIds.isEmpty()) {
+        List<Long> courseRunIds = unfinishedCourseRunIds(member.getGroupId());
+        if (courseRunIds.isEmpty()) {
             return 0;
         }
         List<TrainingWorkout> created = new ArrayList<>();
-        for (TrainingSession session : notStartedSessions(planIds)) {
+        for (TrainingSession session : notStartedSessions(courseRunIds)) {
             TrainingWorkout workout = new TrainingWorkout();
             workout.setSessionId(session.getId());
             workout.setHorseId(member.getHorseId());
@@ -90,9 +90,9 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     @Transactional
     public void exitGroup(TrainingGroupMember member) {
         settlement.settle();
-        List<Long> planIds = unfinishedPlanIds(member.getGroupId());
-        if (!planIds.isEmpty()) {
-            List<TrainingSession> future = notStartedSessions(planIds);
+        List<Long> courseRunIds = unfinishedCourseRunIds(member.getGroupId());
+        if (!courseRunIds.isEmpty()) {
+            List<TrainingSession> future = notStartedSessions(courseRunIds);
             List<TrainingWorkout> mine = future.isEmpty() ? List.of()
                     : workoutRepository.findScheduledOfHorseInSessions(
                             member.getHorseId(), future.stream().map(TrainingSession::getId).toList());
@@ -154,12 +154,12 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     // TIỆN ÍCH (Helpers)
     // =================================================================
 
-    private List<Long> unfinishedPlanIds(Long groupId) {
-        return planRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED).stream().map(GroupPlan::getId).toList();
+    private List<Long> unfinishedCourseRunIds(Long groupId) {
+        return courseRunRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED).stream().map(CourseRun::getId).toList();
     }
 
-    private List<TrainingSession> notStartedSessions(List<Long> planIds) {
+    private List<TrainingSession> notStartedSessions(List<Long> courseRunIds) {
         LocalDateTime now = LocalDateTime.now(clock);
-        return sessionRepository.findNotStartedOfPlans(planIds, now.toLocalDate(), now.toLocalTime());
+        return sessionRepository.findNotStartedOfCourseRuns(courseRunIds, now.toLocalDate(), now.toLocalTime());
     }
 }

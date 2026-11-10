@@ -16,12 +16,12 @@ import com.rtms.backend.training.dto.GroupCandidateResponse;
 import com.rtms.backend.training.dto.RenameTrainingGroupRequest;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.enums.TrainingDay;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import jakarta.persistence.EntityManager;
@@ -61,7 +61,7 @@ class TrainingGroupServiceIntegrationTest {
     @Autowired private StableStallRepository stalls;
     @Autowired private HorseRepository horses;
     @Autowired private CourseRepository courses;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private TrainingGroupRepository groups;
     @Autowired private TrainingGroupMemberRepository members;
     @Autowired private JdbcTemplate jdbc;
@@ -253,12 +253,12 @@ class TrainingGroupServiceIntegrationTest {
     @Test
     void theListShowsTheCurrentCourseOfAGroup() {
         TrainingGroupResponse group = service.createGroup(new CreateTrainingGroupRequest("Nhom 1", List.of()), trainerPrincipal);
-        plan(group.id(), TrainingPlanStatus.ACTIVE);
+        courseRun(group.id(), CourseRunStatus.ACTIVE);
 
         TrainingGroupResponse listed = service.getGroups(trainerPrincipal).stream()
                 .filter(g -> g.id().equals(group.id())).findFirst().orElseThrow();
 
-        assertEquals("ACTIVE", listed.currentPlanStatus());
+        assertEquals("ACTIVE", listed.currentCourseRunStatus());
         assertTrue(listed.currentCourseName().startsWith("Group Course"));
     }
 
@@ -323,7 +323,7 @@ class TrainingGroupServiceIntegrationTest {
         return horses.saveAndFlush(horse);
     }
 
-    private GroupPlan plan(Long groupId, TrainingPlanStatus status) {
+    private CourseRun courseRun(Long groupId, CourseRunStatus status) {
         Course course = new Course();
         course.setName("Group Course " + System.nanoTime());
         course.setTotalSessions(4);
@@ -331,15 +331,15 @@ class TrainingGroupServiceIntegrationTest {
         course.setTrainerId(trainer.getId());
         course = courses.saveAndFlush(course);
 
-        GroupPlan plan = new GroupPlan();
-        plan.setGroupId(groupId);
-        plan.setCourseId(course.getId());
-        plan.setTrainerId(trainer.getId());
-        plan.setStartDate(LocalDate.now().plusDays(10));
-        plan.setEndDate(LocalDate.now().plusDays(20));
+        CourseRun courseRun = new CourseRun();
+        courseRun.setGroupId(groupId);
+        courseRun.setCourseId(course.getId());
+        courseRun.setTrainerId(trainer.getId());
+        courseRun.setStartDate(LocalDate.now().plusDays(10));
+        courseRun.setEndDate(LocalDate.now().plusDays(20));
         Set<TrainingDay> days = new LinkedHashSet<>(List.of(TrainingDay.MONDAY));
-        plan.setTrainingDays(days);
-        plan.setStatus(status);
-        return plans.saveAndFlush(plan);
+        courseRun.setTrainingDays(days);
+        courseRun.setStatus(status);
+        return courseRuns.saveAndFlush(courseRun);
     }
 }

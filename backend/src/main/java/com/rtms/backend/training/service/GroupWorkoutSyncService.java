@@ -24,7 +24,7 @@ public interface GroupWorkoutSyncService {
      * Cho thành viên ra khỏi nhóm: hủy Workout của các buổi chưa bắt đầu, hủy buổi nào không còn Workout nào, xóa tư cách thành viên và
      * để kế hoạch tự đóng nếu không còn buổi nào chờ chạy.
      * (Takes a member out of the group: cancels its Workouts in not-yet-started Sessions, cancels any Session left with none, deletes
-     * the membership and lets the plan close by itself if no Session is left to run.)
+     * the membership and lets the course run close by itself if no Session is left to run.)
      */
     void exitGroup(TrainingGroupMember member);
 

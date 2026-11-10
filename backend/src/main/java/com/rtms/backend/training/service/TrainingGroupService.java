@@ -27,10 +27,10 @@ public interface TrainingGroupService {
     TrainingGroupResponse renameGroup(Long groupId, RenameTrainingGroupRequest request, AuthenticatedUser currentUser);
 
     /**
-     * Giải tán nhóm trong MỘT giao dịch: hủy mọi kế hoạch chưa đóng theo luật Cancel plan, cho mọi ngựa rời nhóm rồi đánh dấu Disbanded;
+     * Giải tán nhóm trong MỘT giao dịch: hủy mọi kế hoạch chưa đóng theo luật Cancel course run, cho mọi ngựa rời nhóm rồi đánh dấu Disbanded;
      * nhóm chưa từng có kế hoạch thì bị xóa hẳn.
-     * (Disbands the group in ONE transaction: cancels every unfinished plan with the Cancel plan rules, takes every horse out, then
-     * marks the group Disbanded; a group that never had a plan is deleted.)
+     * (Disbands the group in ONE transaction: cancels every unfinished course run with the Cancel course run rules, takes every horse out, then
+     * marks the group Disbanded; a group that never had a course run is deleted.)
      */
     void disbandGroup(Long groupId, AuthenticatedUser currentUser);
 

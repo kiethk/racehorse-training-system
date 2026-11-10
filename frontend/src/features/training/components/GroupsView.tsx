@@ -132,15 +132,15 @@ export function GroupsView() {
   /** Counts what disbanding will cancel before asking, so the confirmation can say it. */
   const askDisband = (group: TrainingGroup) =>
     run(async () => {
-      const plans = await trainingService.getGroupPlans({ groupId: group.id });
-      const unfinished = plans.filter((plan) => plan.status === 'UPCOMING' || plan.status === 'ACTIVE');
-      const details = await Promise.all(unfinished.map((plan) => trainingService.getGroupPlan(plan.id)));
+      const courseRuns = await trainingService.getCourseRuns({ groupId: group.id });
+      const unfinished = courseRuns.filter((courseRun) => courseRun.status === 'UPCOMING' || courseRun.status === 'ACTIVE');
+      const details = await Promise.all(unfinished.map((courseRun) => trainingService.getCourseRun(courseRun.id)));
       const now = Date.now();
       const sessions = details
         .flatMap((detail) => detail.sessions)
         .filter((session) => session.status === 'SCHEDULED' && new Date(`${session.date}T${session.startTime}`).getTime() > now);
-      setDisbandTarget({ group, impact: { plans: unfinished.length, sessions: sessions.length, hasHistory: plans.length > 0 } });
-    }, 'Unable to read the group plans.');
+      setDisbandTarget({ group, impact: { courseRuns: unfinished.length, sessions: sessions.length, hasHistory: courseRuns.length > 0 } });
+    }, 'Unable to read the course runs.');
 
   const disbandGroup = () =>
     run(async () => {

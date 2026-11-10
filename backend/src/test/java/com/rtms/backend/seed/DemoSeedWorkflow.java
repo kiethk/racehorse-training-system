@@ -222,7 +222,7 @@ abstract class DemoSeedWorkflow {
     private Map<String,List<String>> unchangedRows() {
         Map<String,List<String>> result=new LinkedHashMap<>();
         for (String table:List.of("horses","admission_applications","admission_documents","candidate_horse_profiles",
-                "areas","stable_stalls","groom_profiles","trainer_profiles","veterinarian_profiles","subjects",
+                "areas","stable_stalls","groom_profiles","trainer_profiles","veterinarian_profiles","exercises",
                 "health_records","racing_readiness_assessments","notifications","audit_logs")) {
             String order=table.endsWith("_profiles") && !table.equals("candidate_horse_profiles") ? "user_id" : "id";
             result.put(table,jdbc.queryForList("SELECT (to_jsonb(t)-'owner_id')::text FROM "+table+" t ORDER BY "+order,String.class));
@@ -295,7 +295,7 @@ abstract class DemoSeedWorkflow {
             }
         }
         assertEquals(9, staffIds.size());
-        assertEquals(4L, jdbc.queryForObject("SELECT count(*) FROM subjects WHERE trainer_id=2",Long.class));
+        assertEquals(4L, jdbc.queryForObject("SELECT count(*) FROM exercises WHERE trainer_id=2",Long.class));
         assertTrue(areas.findByCode("E").isEmpty());
         assertEquals("E", areaService.createArea(AreaType.REGULAR).getCode());
         List<AreaTrainerAssignmentDto> trainerEdits = new ArrayList<>();
@@ -331,7 +331,7 @@ abstract class DemoSeedWorkflow {
         jdbc.update("UPDATE users SET created_at=? WHERE id BETWEEN 1 AND 11 AND created_at>?",now.get(),now.get());
         jdbc.update("UPDATE areas SET created_at=? WHERE created_at>?",now.get(),now.get());
         jdbc.update("UPDATE stable_stalls SET created_at=? WHERE created_at>?",now.get(),now.get());
-        System.out.println("SEED: prepared 30 Staff, 6 Areas, 72 Stalls; 4 Subjects preserved");
+        System.out.println("SEED: prepared 30 Staff, 6 Areas, 72 Stalls; 4 Exercises preserved");
     }
 
     private void seedAdmission(JsonNode p) throws Exception {
@@ -528,7 +528,7 @@ abstract class DemoSeedWorkflow {
         assertEquals(48L,count("horses")); assertEquals(54L,count("admission_applications"));
         assertEquals(324L,count("admission_documents")); assertEquals(72L,count("stable_stalls")); assertEquals(6L,count("areas"));
         assertEquals(ownerIds.isEmpty()?32L:39L,count("users")); assertEquals(24L,count("groom_profiles"));
-        assertEquals(3L,count("trainer_profiles")); assertEquals(3L,count("veterinarian_profiles")); assertEquals(4L,count("subjects"));
+        assertEquals(3L,count("trainer_profiles")); assertEquals(3L,count("veterinarian_profiles")); assertEquals(4L,count("exercises"));
         assertEquals(0L,jdbc.queryForObject("SELECT count(*) FROM horses WHERE sex IS NULL OR date_of_birth IS NULL OR registration_number IS NULL OR owner_id IS NULL",Long.class));
         assertEquals(0L,jdbc.queryForObject("SELECT count(*) FROM (SELECT groom_id FROM stable_stalls GROUP BY groom_id HAVING count(*)<>3 OR groom_id IS NULL) b",Long.class));
         assertEquals(0L,jdbc.queryForObject("SELECT count(*) FROM stable_stalls s JOIN areas a ON a.id=s.area_id JOIN groom_profiles g ON g.user_id=s.groom_id WHERE g.trainer_id IS DISTINCT FROM a.trainer_id",Long.class));

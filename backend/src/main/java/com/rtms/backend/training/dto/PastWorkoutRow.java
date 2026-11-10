@@ -8,13 +8,13 @@ import java.time.LocalTime;
 
 /**
  * Workout của một chiến mã trong một buổi đã diễn ra hoặc đã hủy, kèm ngày giờ, bài tập và nhóm của buổi đó.
- * (A horse's Workout in a Session that took place or was cancelled, with the Session's date, time, Subject and group.)
+ * (A horse's Workout in a Session that took place or was cancelled, with the Session's date, time, Exercise and group.)
  */
 public record PastWorkoutRow(TrainingWorkout workout,
                              LocalDate sessionDate,
                              LocalTime startTime,
                              LocalTime endTime,
-                             String subjectName,
+                             String exerciseName,
                              String groupName,
                              boolean groupDisbanded,
                              SessionStatus sessionStatus) {

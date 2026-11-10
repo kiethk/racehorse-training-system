@@ -7,8 +7,8 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
-import com.rtms.backend.training.dto.GroupPlanDetailResponse;
-import com.rtms.backend.training.dto.GroupPlanRequest;
+import com.rtms.backend.training.dto.CourseRunDetailResponse;
+import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.ScheduleSessionResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
@@ -54,7 +54,7 @@ class SessionScheduleServiceIntegrationTest {
 
     @Autowired private SessionScheduleService schedule;
     @Autowired private SessionWorkoutService workoutService;
-    @Autowired private GroupPlanService planService;
+    @Autowired private CourseRunService courseRunService;
     @Autowired private TrainingGroupService groupService;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
@@ -68,7 +68,7 @@ class SessionScheduleServiceIntegrationTest {
     private Horse thunder;
     private Horse blaze;
     private TrainingGroupResponse group;
-    private GroupPlanDetailResponse plan;
+    private CourseRunDetailResponse courseRun;
     private LocalDate monday;
 
     @BeforeEach
@@ -85,8 +85,8 @@ class SessionScheduleServiceIntegrationTest {
         thunder = fixtures.horse("Thunder");
         blaze = fixtures.horse("Blaze");
         group = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 1", List.of(thunder.getId(), blaze.getId())), trainer);
-        Course course = fixtures.course(trainerUser, "Sprint", 3, fixtures.subject(trainerUser, "S1", 30));
-        plan = planService.createPlan(new GroupPlanRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
+        Course course = fixtures.course(trainerUser, "Sprint", 3, fixtures.exercise(trainerUser, "S1", 30));
+        courseRun = courseRunService.createCourseRun(new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
     }
 
     @AfterEach
@@ -101,7 +101,7 @@ class SessionScheduleServiceIntegrationTest {
         assertEquals(3, week.size());
         assertEquals("Nhom 1", week.get(0).groupName());
         assertEquals("Sprint", week.get(0).courseName());
-        assertEquals("S1", week.get(0).subjectName());
+        assertEquals("S1", week.get(0).exerciseName());
         assertEquals(2, week.get(0).horseCount());
         assertEquals(0, week.get(0).needsResultCount());
     }
@@ -120,7 +120,7 @@ class SessionScheduleServiceIntegrationTest {
 
         assertTrue(schedule.getSessions(monday, monday.plusDays(6), null, false, other).isEmpty());
         ApiException error = assertThrows(ApiException.class,
-                () -> schedule.getSession(plan.sessions().get(0).id(), other));
+                () -> schedule.getSession(courseRun.sessions().get(0).id(), other));
         assertEquals("SESSION_NOT_FOUND", error.getErrorCode());
     }
 
@@ -128,8 +128,8 @@ class SessionScheduleServiceIntegrationTest {
     void theGroupFilterKeepsOnlyThatGroup() {
         TrainingGroupResponse other = groupService.createGroup(
                 new CreateTrainingGroupRequest("Nhom 2", List.of(fixtures.horse("Echo").getId())), trainer);
-        Course second = fixtures.course(trainerUser, "Stamina", 3, fixtures.subject(trainerUser, "T1", 45));
-        planService.createPlan(new GroupPlanRequest(other.id(), second.getId(), monday, MON_WED_FRI), trainer);
+        Course second = fixtures.course(trainerUser, "Stamina", 3, fixtures.exercise(trainerUser, "T1", 45));
+        courseRunService.createCourseRun(new CourseRunRequest(other.id(), second.getId(), monday, MON_WED_FRI), trainer);
 
         assertEquals(6, schedule.getSessions(monday, monday.plusDays(6), null, false, trainer).size());
         List<ScheduleSessionResponse> onlySecond = schedule.getSessions(monday, monday.plusDays(6), other.id(), false, trainer);
@@ -181,7 +181,7 @@ class SessionScheduleServiceIntegrationTest {
     void anOwnerSeesOnlyTheirOwnHorse() {
         AuthenticatedUser owner = new AuthenticatedUser(blaze.getOwnerId(), "o@test.invalid", "HORSE_OWNER");
 
-        SessionDetailResponse detail = schedule.getSession(plan.sessions().get(0).id(), owner);
+        SessionDetailResponse detail = schedule.getSession(courseRun.sessions().get(0).id(), owner);
 
         assertEquals(1, detail.horses().size());
         assertEquals("Blaze", detail.horses().get(0).horseName());
@@ -192,7 +192,7 @@ class SessionScheduleServiceIntegrationTest {
         AuthenticatedUser stranger = new AuthenticatedUser(fixtures.user("GROOM", "stranger").getId(), "s@test.invalid", "GROOM");
 
         assertTrue(schedule.getSessions(monday, monday.plusDays(6), null, false, stranger).isEmpty());
-        assertThrows(ApiException.class, () -> schedule.getSession(plan.sessions().get(0).id(), stranger));
+        assertThrows(ApiException.class, () -> schedule.getSession(courseRun.sessions().get(0).id(), stranger));
     }
 
     @Test
@@ -204,7 +204,7 @@ class SessionScheduleServiceIntegrationTest {
     // ------------------------------------------------------------------ helpers
 
     private TrainingWorkout workoutOf(Horse horse, int sessionIndex) {
-        Long sessionId = sessions.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.plan().id()).get(sessionIndex).getId();
+        Long sessionId = sessions.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.courseRun().id()).get(sessionIndex).getId();
         return workouts.findBySessionId(sessionId).stream()
                 .filter(workout -> workout.getHorseId().equals(horse.getId())).findFirst().orElseThrow();
     }

@@ -3,14 +3,14 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.dto.PlanSessionResponse;
+import com.rtms.backend.training.dto.CourseRunSessionResponse;
 import com.rtms.backend.training.dto.SessionWorkoutResponse;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.repository.ExerciseRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,32 +25,32 @@ import java.time.LocalTime;
 
 /**
  * Cài đặt TrainingSessionService. Sau mỗi thay đổi gọi settle() để kế hoạch tự đóng khi không còn buổi nào chờ chạy.
- * (Implements TrainingSessionService. After every change settle() runs so a plan closes by itself once no Session is left to run.)
+ * (Implements TrainingSessionService. After every change settle() runs so a course run closes by itself once no Session is left to run.)
  */
 @Service
 public class TrainingSessionServiceImpl implements TrainingSessionService {
 
     private final TrainingSessionRepository sessionRepository;
     private final TrainingWorkoutRepository workoutRepository;
-    private final SubjectRepository subjectRepository;
+    private final ExerciseRepository exerciseRepository;
     private final SessionSettlementService settlement;
     private final Clock clock;
 
     public TrainingSessionServiceImpl(TrainingSessionRepository sessionRepository,
                                       TrainingWorkoutRepository workoutRepository,
-                                      SubjectRepository subjectRepository,
+                                      ExerciseRepository exerciseRepository,
                                       SessionSettlementService settlement,
                                       Clock clock) {
         this.sessionRepository = sessionRepository;
         this.workoutRepository = workoutRepository;
-        this.subjectRepository = subjectRepository;
+        this.exerciseRepository = exerciseRepository;
         this.settlement = settlement;
         this.clock = clock;
     }
 
     @Override
     @Transactional
-    public PlanSessionResponse reschedule(Long sessionId, LocalTime newStartTime, AuthenticatedUser currentUser) {
+    public CourseRunSessionResponse reschedule(Long sessionId, LocalTime newStartTime, AuthenticatedUser currentUser) {
         sessionRepository.lockSchedule(ScheduleLocks.of(currentUser.getUserId()));
         settlement.settle();
         TrainingSession session = findOwnSession(sessionId, currentUser);
@@ -94,7 +94,7 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
 
     @Override
     @Transactional
-    public PlanSessionResponse cancel(Long sessionId, AuthenticatedUser currentUser) {
+    public CourseRunSessionResponse cancel(Long sessionId, AuthenticatedUser currentUser) {
         sessionRepository.lockSchedule(ScheduleLocks.of(currentUser.getUserId()));
         settlement.settle();
         TrainingSession session = findOwnSession(sessionId, currentUser);
@@ -155,10 +155,10 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
         }
     }
 
-    private PlanSessionResponse toResponse(TrainingSession session) {
-        Subject subject = subjectRepository.findById(session.getSubjectId()).orElse(null);
+    private CourseRunSessionResponse toResponse(TrainingSession session) {
+        Exercise exercise = exerciseRepository.findById(session.getExerciseId()).orElse(null);
         long horses = workoutRepository.countBySessionIdAndStatusNot(session.getId(), WorkoutStatus.CANCELLED);
-        return new PlanSessionResponse(session.getId(), session.getSessionDate(), session.getStartTime(), session.getEndTime(),
-                subject == null ? null : subject.getName(), session.getStatus().name(), (int) horses);
+        return new CourseRunSessionResponse(session.getId(), session.getSessionDate(), session.getStartTime(), session.getEndTime(),
+                exercise == null ? null : exercise.getName(), session.getStatus().name(), (int) horses);
     }
 }

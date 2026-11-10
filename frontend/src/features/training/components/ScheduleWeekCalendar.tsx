@@ -29,7 +29,7 @@ interface CommonCalendarItem {
   date: string;
   startTime: string;
   endTime: string;
-  subjectName: string;
+  exerciseName: string;
   groupName?: string | null;
   groupDisbanded?: boolean;
   horseCount?: number;
@@ -158,7 +158,7 @@ export function ScheduleWeekCalendar({
           date: item.sessionDate,
           startTime: item.startTime,
           endTime: item.endTime,
-          subjectName: item.subjectName,
+          exerciseName: item.exerciseName,
           cancelled,
           pill: WORKOUT_STATUS[cancelled ? 'CANCELLED' : item.workoutStatus],
         });
@@ -174,7 +174,7 @@ export function ScheduleWeekCalendar({
           date: s.date,
           startTime: s.startTime,
           endTime: s.endTime,
-          subjectName: s.subjectName,
+          exerciseName: s.exerciseName,
           groupName: s.groupName,
           groupDisbanded: s.groupDisbanded,
           horseCount: s.horseCount,
@@ -384,9 +384,9 @@ export function ScheduleWeekCalendar({
                             'line-clamp-2 break-words text-[11px] text-[var(--color-text-secondary)]',
                             isCancelled && 'text-[var(--color-text-muted)] line-through',
                           )}
-                          title={session.subjectName}
+                          title={session.exerciseName}
                         >
-                          {session.subjectName}
+                          {session.exerciseName}
                         </p>
 
                         {(session.horseCount !== undefined ||

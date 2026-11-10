@@ -1,7 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.dto.PlanSessionResponse;
+import com.rtms.backend.training.dto.CourseRunSessionResponse;
 import com.rtms.backend.training.dto.SessionWorkoutResponse;
 
 import java.time.LocalTime;
@@ -15,10 +15,10 @@ import java.time.LocalTime;
 public interface TrainingSessionService {
 
     /** Dời giờ bắt đầu; giờ mới phải đúng mốc 15 phút, trong Golden Window và không chồng buổi nào khác của Trainer. (Moves the start; the new time must be on the 15-minute step, inside the Golden Window and overlap no other Session of the Trainer.) */
-    PlanSessionResponse reschedule(Long sessionId, LocalTime newStartTime, AuthenticatedUser currentUser);
+    CourseRunSessionResponse reschedule(Long sessionId, LocalTime newStartTime, AuthenticatedUser currentUser);
 
     /** Hủy cả buổi (mưa, sân đóng) cùng mọi Workout còn SCHEDULED của nó; không dạy bù. (Cancels the whole Session and its SCHEDULED Workouts; no make-up.) */
-    PlanSessionResponse cancel(Long sessionId, AuthenticatedUser currentUser);
+    CourseRunSessionResponse cancel(Long sessionId, AuthenticatedUser currentUser);
 
     /** Hủy Workout của riêng một chiến mã; con vẫn ở trong nhóm. Buổi không còn Workout nào thì tự hủy. (Cancels one horse's Workout; the horse stays in the group. A Session left with none cancels itself.) */
     SessionWorkoutResponse cancelWorkout(Long workoutId, AuthenticatedUser currentUser);

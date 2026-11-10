@@ -5,13 +5,13 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.GroupMemberResponse;
-import com.rtms.backend.training.dto.GroupPlanDetailResponse;
-import com.rtms.backend.training.dto.GroupPlanRequest;
-import com.rtms.backend.training.dto.PlanSessionResponse;
+import com.rtms.backend.training.dto.CourseRunDetailResponse;
+import com.rtms.backend.training.dto.CourseRunRequest;
+import com.rtms.backend.training.dto.CourseRunSessionResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.enums.TrainingDay;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.support.MutableClock;
 import com.rtms.backend.training.support.TestClockConfig;
@@ -48,11 +48,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
 /**
- * Giải tán nhóm qua service: hủy kế hoạch chưa đóng theo luật Cancel plan, buổi đang chạy vẫn thành Held đúng giờ, ngựa rời nhóm,
+ * Giải tán nhóm qua service: hủy kế hoạch chưa đóng theo luật Cancel course run, buổi đang chạy vẫn thành Held đúng giờ, ngựa rời nhóm,
  * nhóm chưa từng có kế hoạch thì bị xóa hẳn, tên dùng lại được và nhóm đã giải tán không nhận ngựa hay kế hoạch mới.
- * (Disbanding a group through the service: unfinished plans are cancelled with the Cancel plan rules, a running Session still
- * becomes Held on time, horses leave, a group that never had a plan is removed, the name can be reused and a Disbanded group takes
- * no horse or new plan.)
+ * (Disbanding a group through the service: unfinished course runs are cancelled with the Cancel course run rules, a running Session still
+ * becomes Held on time, horses leave, a group that never had a course run is removed, the name can be reused and a Disbanded group takes
+ * no horse or new course run.)
  */
 @SpringBootTest
 @Import({TestClockConfig.class, TrainingFixtures.class})
@@ -63,14 +63,14 @@ class GroupDisbandIntegrationTest {
             List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
     @Autowired private TrainingGroupService groupService;
-    @Autowired private GroupPlanService planService;
+    @Autowired private CourseRunService courseRunService;
     @Autowired private SessionSettlementService settlement;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
     @Autowired private TrainingGroupMemberRepository members;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private TrainingGroupRepository groups;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private EntityManager entityManager;
     @Autowired private DataSource dataSource;
     @MockitoSpyBean private GroupWorkoutSyncService groupSync;
@@ -97,24 +97,24 @@ class GroupDisbandIntegrationTest {
     }
 
     @Test
-    void disbandingCancelsUnfinishedPlansFreesHorsesAndKeepsTheRunningSessionAsHeld() {
+    void disbandingCancelsUnfinishedCourseRunsFreesHorsesAndKeepsTheRunningSessionAsHeld() {
         TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder", "Blaze");
         Long horseId = group.members().get(0).horseId();
-        GroupPlanDetailResponse plan = assignCourse(group);
+        CourseRunDetailResponse courseRun = assignCourse(group);
         clock.set(monday.atTime(6, 15));
 
         groupService.disbandGroup(group.id(), trainer);
 
-        GroupPlanDetailResponse after = planService.getPlan(plan.plan().id(), trainer);
-        assertEquals("CANCELLED", after.plan().status());
+        CourseRunDetailResponse after = courseRunService.getCourseRun(courseRun.courseRun().id(), trainer);
+        assertEquals("CANCELLED", after.courseRun().status());
         assertEquals(List.of("SCHEDULED", "CANCELLED", "CANCELLED"),
-                after.sessions().stream().map(PlanSessionResponse::status).toList());
+                after.sessions().stream().map(CourseRunSessionResponse::status).toList());
         assertTrue(members.findByHorseIdAndLeftAtIsNull(horseId).isEmpty());
         assertEquals(0, members.countByGroupIdAndLeftAtIsNull(group.id()));
 
         clock.set(monday.atTime(12, 0));
         settlement.settle();
-        assertEquals("HELD", planService.getPlan(plan.plan().id(), trainer).sessions().get(0).status());
+        assertEquals("HELD", courseRunService.getCourseRun(courseRun.courseRun().id(), trainer).sessions().get(0).status());
     }
 
     @Test
@@ -135,7 +135,7 @@ class GroupDisbandIntegrationTest {
     }
 
     @Test
-    void aGroupThatNeverHadAPlanIsRemovedWithoutATrace() {
+    void aGroupThatNeverHadACourseRunIsRemovedWithoutATrace() {
         TrainingGroupResponse group = groupWithHorses("Test", "Thunder");
 
         groupService.disbandGroup(group.id(), trainer);
@@ -158,17 +158,17 @@ class GroupDisbandIntegrationTest {
     }
 
     @Test
-    void aDisbandedGroupRefusesNewHorsesNewPlansAndASecondDisband() {
+    void aDisbandedGroupRefusesNewHorsesNewCourseRunsAndASecondDisband() {
         TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder");
         Course course = course();
-        planService.createPlan(new GroupPlanRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
+        courseRunService.createCourseRun(new CourseRunRequest(group.id(), course.getId(), monday, MON_WED_FRI), trainer);
         groupService.disbandGroup(group.id(), trainer);
         Long newHorse = fixtures.horse("Echo").getId();
 
         assertEquals("GROUP_DISBANDED", assertThrows(ApiException.class,
                 () -> groupService.addHorse(group.id(), newHorse, trainer)).getErrorCode());
-        assertEquals("GROUP_DISBANDED", assertThrows(ApiException.class, () -> planService.createPlan(
-                new GroupPlanRequest(group.id(), course.getId(), monday.plusDays(30), MON_WED_FRI), trainer)).getErrorCode());
+        assertEquals("GROUP_DISBANDED", assertThrows(ApiException.class, () -> courseRunService.createCourseRun(
+                new CourseRunRequest(group.id(), course.getId(), monday.plusDays(30), MON_WED_FRI), trainer)).getErrorCode());
         assertEquals("GROUP_DISBANDED", assertThrows(ApiException.class,
                 () -> groupService.disbandGroup(group.id(), trainer)).getErrorCode());
     }
@@ -195,13 +195,13 @@ class GroupDisbandIntegrationTest {
     }
 
     @Test
-    void aFailureWhileDisbandingLeavesTheGroupItsHorsesAndItsPlansUntouched() throws Exception {
+    void aFailureWhileDisbandingLeavesTheGroupItsHorsesAndItsCourseRunsUntouched() throws Exception {
         TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder", "Blaze");
-        GroupPlanDetailResponse plan = assignCourse(group);
+        CourseRunDetailResponse courseRun = assignCourse(group);
         doThrow(new IllegalStateException("boom")).when(groupSync).exitGroup(any());
 
         // The test transaction cannot roll back on its own, so a JDBC savepoint stands in for the request's transaction:
-        // the failure comes after the plans were cancelled, and rolling back to the savepoint must undo all of it.
+        // the failure comes after the course runs were cancelled, and rolling back to the savepoint must undo all of it.
         entityManager.flush();
         Connection connection = DataSourceUtils.getConnection(dataSource);
         Savepoint beforeRequest = connection.setSavepoint();
@@ -211,9 +211,9 @@ class GroupDisbandIntegrationTest {
 
         assertNull(groups.findById(group.id()).orElseThrow().getDisbandedAt());
         assertEquals(2, members.countByGroupIdAndLeftAtIsNull(group.id()));
-        assertEquals("UPCOMING", plans.findById(plan.plan().id()).orElseThrow().getStatus().name());
+        assertEquals("UPCOMING", courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus().name());
         assertEquals(List.of("SCHEDULED", "SCHEDULED", "SCHEDULED"),
-                planService.getPlan(plan.plan().id(), trainer).sessions().stream().map(PlanSessionResponse::status).toList());
+                courseRunService.getCourseRun(courseRun.courseRun().id(), trainer).sessions().stream().map(CourseRunSessionResponse::status).toList());
     }
 
     @Test
@@ -237,10 +237,10 @@ class GroupDisbandIntegrationTest {
     }
 
     private Course course() {
-        return fixtures.course(trainerUser, "Sprint " + System.nanoTime(), 3, fixtures.subject(trainerUser, "S1", 30));
+        return fixtures.course(trainerUser, "Sprint " + System.nanoTime(), 3, fixtures.exercise(trainerUser, "S1", 30));
     }
 
-    private GroupPlanDetailResponse assignCourse(TrainingGroupResponse group) {
-        return planService.createPlan(new GroupPlanRequest(group.id(), course().getId(), monday, MON_WED_FRI), trainer);
+    private CourseRunDetailResponse assignCourse(TrainingGroupResponse group) {
+        return courseRunService.createCourseRun(new CourseRunRequest(group.id(), course().getId(), monday, MON_WED_FRI), trainer);
     }
 }

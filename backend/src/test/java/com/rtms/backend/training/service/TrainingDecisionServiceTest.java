@@ -57,7 +57,7 @@ class TrainingDecisionServiceTest {
     }
 
     @Test
-    @DisplayName("allow: back to ALLOWED, clears the reason, leaves plans untouched")
+    @DisplayName("allow: back to ALLOWED, clears the reason, leaves course runs untouched")
     void allow_clearsReason() {
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
         horse.setTrainingDecisionReason("Tendon strain");

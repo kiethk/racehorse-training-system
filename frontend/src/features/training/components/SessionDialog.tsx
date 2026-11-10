@@ -139,7 +139,7 @@ export function SessionDetailContent({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-              {session.groupName} · {session.subjectName}
+              {session.groupName} · {session.exerciseName}
             </h3>
             {session.groupDisbanded && <Pill tone="neutral" size="sm">Disbanded</Pill>}
           </div>

@@ -6,7 +6,7 @@ import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { newestFirst } from '../lib/listOrder';
 import { trainingService } from '../services/trainingService';
-import type { Course, CourseDetailResponse, CreateCourseRequest, Subject } from '../types';
+import type { Course, CourseDetailResponse, CreateCourseRequest, Exercise } from '../types';
 import { CourseDetailModal } from './CourseDetailModal';
 import { CourseForm } from './CourseForm';
 
@@ -42,7 +42,7 @@ function CourseCard({
 
 export function CourseList() {
   const [courses, setCourses] = useState<Course[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,9 +57,9 @@ export function CourseList() {
     setLoading(true);
     setError(null);
     try {
-      const [courseList, subjectList] = await Promise.all([trainingService.getCourses(), trainingService.getSubjects()]);
+      const [courseList, exerciseList] = await Promise.all([trainingService.getCourses(), trainingService.getExercises()]);
       setCourses([...courseList].sort(newestFirst));
-      setSubjects(subjectList);
+      setExercises(exerciseList);
     } catch (cause) {
       setError(displayError(cause, 'Unable to load training courses.'));
     } finally {
@@ -124,7 +124,7 @@ export function CourseList() {
     >
       {showForm && (
         <CourseForm
-          subjects={subjects}
+          exercises={exercises}
           submitting={submitting}
           error={formError}
           onSubmit={createCourse}

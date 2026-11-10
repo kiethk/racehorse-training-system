@@ -7,7 +7,7 @@ import type { ScheduleSession } from '../types';
 import { StatusPill } from './StatusPill';
 
 /**
- * One Session as a card: time, group, subject, how many horses and its status. A Held Session that still misses results carries a
+ * One Session as a card: time, group, exercise, how many horses and its status. A Held Session that still misses results carries a
  * "Needs result" label with the number of horses, so the Trainer notices what is left to record.
  */
 export function SessionCard({ session, onOpen }: { session: ScheduleSession; onOpen: (id: number) => void }) {
@@ -23,7 +23,7 @@ export function SessionCard({ session, onOpen }: { session: ScheduleSession; onO
         <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{session.groupName}</p>
         {session.groupDisbanded && <Pill tone="neutral" size="sm">Disbanded</Pill>}
       </div>
-      <p className="truncate text-xs text-[var(--color-text-secondary)]">{session.subjectName}</p>
+      <p className="truncate text-xs text-[var(--color-text-secondary)]">{session.exerciseName}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
         <span className="flex items-center gap-1">
           <Icon name="horse" size={12} />

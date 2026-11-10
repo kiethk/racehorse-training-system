@@ -5,11 +5,11 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.SessionWorkoutResponse;
 import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.repository.ExerciseRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.http.HttpStatus;
@@ -25,18 +25,18 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
 
     private final TrainingWorkoutRepository workoutRepository;
     private final TrainingSessionRepository sessionRepository;
-    private final SubjectRepository subjectRepository;
+    private final ExerciseRepository exerciseRepository;
     private final WorkoutResultSimulationService simulationService;
     private final SessionSettlementService settlement;
 
     public SessionWorkoutServiceImpl(TrainingWorkoutRepository workoutRepository,
                                      TrainingSessionRepository sessionRepository,
-                                     SubjectRepository subjectRepository,
+                                     ExerciseRepository exerciseRepository,
                                      WorkoutResultSimulationService simulationService,
                                      SessionSettlementService settlement) {
         this.workoutRepository = workoutRepository;
         this.sessionRepository = sessionRepository;
-        this.subjectRepository = subjectRepository;
+        this.exerciseRepository = exerciseRepository;
         this.simulationService = simulationService;
         this.settlement = settlement;
     }
@@ -48,9 +48,9 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
         TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
         assertTookPlace(workout);
         TrainingSession session = findSession(workout);
-        Subject subject = subjectRepository.findById(session.getSubjectId())
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SUBJECT_NOT_FOUND", "Subject of this workout not found!"));
-        return simulationService.generate(subject);
+        Exercise exercise = exerciseRepository.findById(session.getExerciseId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "EXERCISE_NOT_FOUND", "Exercise of this workout not found!"));
+        return simulationService.generate(exercise);
     }
 
     @Override

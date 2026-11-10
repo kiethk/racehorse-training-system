@@ -1,7 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.IntensityLevel;
 import org.springframework.stereotype.Service;
 
@@ -17,18 +17,18 @@ public class WorkoutResultSimulationService {
     private static final int DEFAULT_DURATION_MINUTES = 60;
     private static final double POOR_RECOVERY_CHANCE = 0.1;
 
-    public WorkoutResultPreviewResponse generate(Subject subject) {
+    public WorkoutResultPreviewResponse generate(Exercise exercise) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
-        IntensityLevel intensity = subject.getIntensityLevel() == null
+        IntensityLevel intensity = exercise.getIntensityLevel() == null
                 ? IntensityLevel.MEDIUM
-                : subject.getIntensityLevel();
+                : exercise.getIntensityLevel();
 
-        BigDecimal targetDistance = subject.getTargetDistanceMeters() == null
+        BigDecimal targetDistance = exercise.getTargetDistanceMeters() == null
                 ? DEFAULT_DISTANCE_METERS
-                : subject.getTargetDistanceMeters();
-        int targetDuration = subject.getDurationMinutes() == null
+                : exercise.getTargetDistanceMeters();
+        int targetDuration = exercise.getDurationMinutes() == null
                 ? DEFAULT_DURATION_MINUTES
-                : subject.getDurationMinutes();
+                : exercise.getDurationMinutes();
 
         BigDecimal actualDistance = scaled(targetDistance.doubleValue()
                 * random.nextDouble(0.95, 1.051));

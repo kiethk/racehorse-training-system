@@ -14,12 +14,12 @@ import com.rtms.backend.training.dto.HorseStallInfo;
 import com.rtms.backend.training.dto.RenameTrainingGroupRequest;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingGroupMember;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -50,39 +50,39 @@ import java.util.stream.Collectors;
 @Service
 public class TrainingGroupServiceImpl implements TrainingGroupService {
 
-    private static final List<TrainingPlanStatus> UNFINISHED =
-            List.of(TrainingPlanStatus.UPCOMING, TrainingPlanStatus.ACTIVE);
+    private static final List<CourseRunStatus> UNFINISHED =
+            List.of(CourseRunStatus.UPCOMING, CourseRunStatus.ACTIVE);
 
     private final TrainingGroupRepository groupRepository;
     private final TrainingGroupMemberRepository memberRepository;
-    private final GroupPlanRepository planRepository;
+    private final CourseRunRepository courseRunRepository;
     private final CourseRepository courseRepository;
     private final HorseRepository horseRepository;
     private final UserRepository userRepository;
     private final TrainingDecisionService trainingDecisionService;
     private final GroupWorkoutSyncService groupSync;
-    private final GroupPlanService planService;
+    private final CourseRunService courseRunService;
     private final Clock clock;
 
     public TrainingGroupServiceImpl(TrainingGroupRepository groupRepository,
                                     TrainingGroupMemberRepository memberRepository,
-                                    GroupPlanRepository planRepository,
+                                    CourseRunRepository courseRunRepository,
                                     CourseRepository courseRepository,
                                     HorseRepository horseRepository,
                                     UserRepository userRepository,
                                     TrainingDecisionService trainingDecisionService,
                                     GroupWorkoutSyncService groupSync,
-                                    GroupPlanService planService,
+                                    CourseRunService courseRunService,
                                     Clock clock) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
-        this.planRepository = planRepository;
+        this.courseRunRepository = courseRunRepository;
         this.courseRepository = courseRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
         this.trainingDecisionService = trainingDecisionService;
         this.groupSync = groupSync;
-        this.planService = planService;
+        this.courseRunService = courseRunService;
         this.clock = clock;
     }
 
@@ -178,10 +178,10 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Transactional
     public void disbandGroup(Long groupId, AuthenticatedUser currentUser) {
         findLiveOwnGroup(groupId, currentUser);
-        for (GroupPlan plan : planRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED)) {
-            planService.cancelPlan(plan.getId(), currentUser);
+        for (CourseRun courseRun : courseRunRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED)) {
+            courseRunService.cancelCourseRun(courseRun.getId(), currentUser);
         }
-        // Cancelling plans runs bulk updates that clear the persistence context, so the rows are read again.
+        // Cancelling course runs runs bulk updates that clear the persistence context, so the rows are read again.
         List<Long> leavingIds = new ArrayList<>();
         for (TrainingGroupMember member : memberRepository.findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(groupId)) {
             groupSync.exitGroup(member);
@@ -189,7 +189,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         }
         memberRepository.flush();
         TrainingGroup group = groupRepository.findById(groupId).orElseThrow();
-        if (planRepository.existsByGroupId(groupId)) {
+        if (courseRunRepository.existsByGroupId(groupId)) {
             // The horses that leave now share the group's disband time, which is how its roster is told apart from earlier leavers.
             LocalDateTime disbandedAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
             List<TrainingGroupMember> leaving = memberRepository.findAllById(leavingIds);
@@ -398,9 +398,9 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         Map<Long, List<TrainingGroupMember>> membersByGroup = allMembers.stream()
                 .collect(Collectors.groupingBy(TrainingGroupMember::getGroupId));
 
-        Map<Long, GroupPlan> currentPlanByGroup = currentPlans(groupIds);
+        Map<Long, CourseRun> currentCourseRunByGroup = currentCourseRuns(groupIds);
         Map<Long, String> courseNames = courseRepository.findAllById(
-                        currentPlanByGroup.values().stream().map(GroupPlan::getCourseId).collect(Collectors.toSet()))
+                        currentCourseRunByGroup.values().stream().map(CourseRun::getCourseId).collect(Collectors.toSet()))
                 .stream().collect(Collectors.toMap(Course::getId, Course::getName));
 
         List<TrainingGroupResponse> result = new ArrayList<>();
@@ -409,22 +409,22 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                     .map(m -> new GroupMemberResponse(m.getHorseId(), horseNames.get(m.getHorseId()), m.getGroomId(),
                             groomNames.get(m.getGroomId()), m.getJoinedAt()))
                     .toList();
-            GroupPlan plan = currentPlanByGroup.get(group.getId());
+            CourseRun courseRun = currentCourseRunByGroup.get(group.getId());
             result.add(new TrainingGroupResponse(group.getId(), group.getName(), group.getTrainerId(), memberResponses,
-                    plan == null ? null : courseNames.get(plan.getCourseId()),
-                    plan == null ? null : plan.getStatus().name(),
-                    plan == null ? null : plan.getStartDate(),
-                    plan == null ? null : plan.getEndDate(), group.isDisbanded()));
+                    courseRun == null ? null : courseNames.get(courseRun.getCourseId()),
+                    courseRun == null ? null : courseRun.getStatus().name(),
+                    courseRun == null ? null : courseRun.getStartDate(),
+                    courseRun == null ? null : courseRun.getEndDate(), group.isDisbanded()));
         }
         return result;
     }
 
     /** Khóa đang chạy của mỗi nhóm, hoặc khóa sắp chạy sớm nhất nếu chưa có khóa nào chạy. (The running course of each group, else the earliest upcoming one.) */
-    private Map<Long, GroupPlan> currentPlans(Collection<Long> groupIds) {
-        return planRepository.findByGroupIdInAndStatusIn(groupIds, UNFINISHED).stream()
-                .collect(Collectors.toMap(GroupPlan::getGroupId, Function.identity(), (a, b) -> {
+    private Map<Long, CourseRun> currentCourseRuns(Collection<Long> groupIds) {
+        return courseRunRepository.findByGroupIdInAndStatusIn(groupIds, UNFINISHED).stream()
+                .collect(Collectors.toMap(CourseRun::getGroupId, Function.identity(), (a, b) -> {
                     if (a.getStatus() != b.getStatus()) {
-                        return a.getStatus() == TrainingPlanStatus.ACTIVE ? a : b;
+                        return a.getStatus() == CourseRunStatus.ACTIVE ? a : b;
                     }
                     return a.getStartDate().isBefore(b.getStartDate()) ? a : b;
                 }));
