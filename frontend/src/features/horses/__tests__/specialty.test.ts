@@ -5,6 +5,7 @@ import type { HorseSpecialty } from '../types/index.ts';
 
 const base: HorseSpecialty = {
   minWorkoutsPerGroup: 3,
+  minAverageRating: 7,
   strongDistances: [],
   preferredSurface: null,
   distanceStats: [],

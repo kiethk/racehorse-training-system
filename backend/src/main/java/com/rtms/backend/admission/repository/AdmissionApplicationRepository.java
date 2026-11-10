@@ -153,6 +153,8 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByTrainerIdAndStatusOrderBySubmittedAtAscIdAsc(Long trainerId,
                                                                                AdmissionStatus status);
 
+    boolean existsByTrainerIdAndStatus(Long trainerId, AdmissionStatus status);
+
     /**
      * Hồ sơ Trainer này ĐÃ đánh giá — không lọc theo status.
      *
@@ -199,5 +201,11 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByStatusAndArrivalDeadlineAtBetweenOrderByArrivalDeadlineAtAsc(
             AdmissionStatus status, LocalDateTime from, LocalDateTime to);
+    @Query("""
+            SELECT a FROM AdmissionApplication a
+            WHERE a.submittedAt >= :since OR (a.submittedAt IS NULL AND a.createdAt >= :since)
+            ORDER BY a.submittedAt DESC
+            """)
+    List<AdmissionApplication> findAdmissionsSince(@Param("since") java.time.LocalDateTime since);
 }
 

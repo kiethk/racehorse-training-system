@@ -32,8 +32,8 @@ export default function UrgentCasesPage() {
     try {
       if (!silent) setLoading(true);
       setError(null);
-      const pending = await admissionsApi.getPendingUrgentAlerts();
-      setUrgentCases(pending || []);
+      const allCases = await admissionsApi.getPendingUrgentAlerts(true);
+      setUrgentCases(allCases || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load urgent cases list');
     } finally {
@@ -79,13 +79,13 @@ export default function UrgentCasesPage() {
     [urgentCases],
   );
   const criticalCount = useMemo(
-    () => urgentCases.filter((c) => c.severity === 'CRITICAL').length,
+    () => urgentCases.filter((c) => c.severity === 'CRITICAL' && c.status !== 'COMPLETED').length,
     [urgentCases],
   );
 
   const filteredCases = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return urgentCases.filter((c) => {
+    const list = urgentCases.filter((c) => {
       if (filter === 'ACTIVE' && c.status === 'COMPLETED') return false;
       if (filter === 'COMPLETED' && c.status !== 'COMPLETED') return false;
 
@@ -100,6 +100,24 @@ export default function UrgentCasesPage() {
         String(c.scheduleId).includes(q)
       );
     });
+
+    // Sắp xếp theo thời gian mới nhất đứng trước (reportedAt DESC, scheduledAt DESC, scheduleId DESC)
+    return list.sort((a, b) => {
+      const timeA = a.reportedAt
+        ? new Date(a.reportedAt).getTime()
+        : a.scheduledAt
+        ? new Date(a.scheduledAt).getTime()
+        : 0;
+      const timeB = b.reportedAt
+        ? new Date(b.reportedAt).getTime()
+        : b.scheduledAt
+        ? new Date(b.scheduledAt).getTime()
+        : 0;
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return (b.scheduleId || 0) - (a.scheduleId || 0);
+    });
   }, [urgentCases, filter, searchQuery]);
 
   return (
@@ -111,7 +129,6 @@ export default function UrgentCasesPage() {
             title="Urgent Cases"
             actions={
               <div className="flex items-center gap-2">
-                
                 <Button variant="secondary" icon="refresh" onClick={handleRefresh} loading={loading}>
                   Refresh
                 </Button>

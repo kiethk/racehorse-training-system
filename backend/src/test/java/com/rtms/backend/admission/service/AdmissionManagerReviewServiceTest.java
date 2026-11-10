@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -226,7 +227,7 @@ class AdmissionManagerReviewServiceTest {
         CareSchedule pending = new CareSchedule();
         pending.setId(1L);
         pending.setHorseId(10L);
-        pending.setStatus(CareScheduleStatus.REQUESTED);
+        pending.setStatus(CareScheduleStatus.SCHEDULED);
 
         CareSchedule overdue = new CareSchedule();
         overdue.setId(2L);
@@ -242,17 +243,17 @@ class AdmissionManagerReviewServiceTest {
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        // AD-025 rule 6: lá»‹ch chÆ°a diá»…n ra (SCHEDULED) cá»§a ngá»±a rá»›t tuyá»ƒn bá»‹ xÃ³a cá»©ng.
-        verify(careScheduleRepository).deleteOpenSchedulesIfUnreferenced(
-                10L, List.of(CareScheduleStatus.SCHEDULED));
+        // Lịch chưa diễn ra (SCHEDULED) của ngựa rớt tuyển được chuyển sang CANCELLED.
+        verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
+                eq(10L), eq(List.of(CareScheduleStatus.SCHEDULED)), anyString(), any(LocalDateTime.class));
         verify(careScheduleRepository, never()).saveAll(any());
 
-        // COMPLETED schedules are never queried in this call â€” no interference
+        // COMPLETED schedules are never queried in this call — no interference
         verify(careScheduleRepository, never()).findByHorseIdOrderByScheduledAtAsc(any());
     }
 
     @Test
-    @DisplayName("REJECT: khong co lich can xoa — deleteOpenSchedulesIfUnreferenced van duoc goi")
+    @DisplayName("REJECT: khong co lich can xoa — cancelOpenSchedulesIfUnreferenced van duoc goi")
     void reject_noSchedulesToCancel_saveAllCalledWithEmptyList() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -267,8 +268,8 @@ class AdmissionManagerReviewServiceTest {
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        verify(careScheduleRepository).deleteOpenSchedulesIfUnreferenced(
-                10L, List.of(CareScheduleStatus.SCHEDULED));
+        verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
+                eq(10L), eq(List.of(CareScheduleStatus.SCHEDULED)), anyString(), any(LocalDateTime.class));
     }
 
     @Test
@@ -281,7 +282,7 @@ class AdmissionManagerReviewServiceTest {
         CareSchedule requested = new CareSchedule();
         requested.setId(100L);
         requested.setHorseId(10L);
-        requested.setStatus(CareScheduleStatus.REQUESTED);
+        requested.setStatus(CareScheduleStatus.SCHEDULED);
 
         CareSchedule inProgress = new CareSchedule();
         inProgress.setId(101L);
@@ -297,7 +298,7 @@ class AdmissionManagerReviewServiceTest {
         assertThrows(IllegalStateException.class,
                 () -> service.review(1L, 5L, rejectRequest("Rejected")));
 
-        verify(careScheduleRepository, never()).deleteOpenSchedulesIfUnreferenced(any(), any());
+        verify(careScheduleRepository, never()).cancelOpenSchedulesIfUnreferenced(any(), any(), any(), any());
     }
     // REJECT â€” validation failures
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

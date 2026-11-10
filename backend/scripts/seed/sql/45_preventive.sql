@@ -30,7 +30,7 @@ BEGIN
 
     -- Lịch đang chờ đã vào cửa sổ 14 ngày thì đã được xếp giờ. (Pending schedules inside the 14-day horizon are booked.)
     FOR c IN SELECT cs.id, cs.horse_id FROM care_schedule cs
-              WHERE cs.status = 'REQUESTED' AND cs.care_type = 'ROUTINE'
+              WHERE cs.status = 'SCHEDULED' AND cs.veterinarian_id IS NULL AND cs.care_type = 'ROUTINE'
                 AND GREATEST(cs.created_at, cs.requested_at - INTERVAL '14 days') <= pg_temp.clock()
               ORDER BY cs.requested_at
     LOOP
@@ -52,7 +52,7 @@ BEGIN
            SET scheduled_at = NULL,
                status = 'SCHEDULED'
          WHERE (care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE')
-           AND status IN ('IN_PROGRESS', 'PAUSED');
+           AND status = 'IN_PROGRESS';
 
         UPDATE care_schedule SET scheduled_at = NULL WHERE care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE';
 

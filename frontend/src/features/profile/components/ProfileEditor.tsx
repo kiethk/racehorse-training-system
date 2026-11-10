@@ -7,6 +7,7 @@ import { ROLE_LABELS } from '@/lib/roleRoute';
 import { toast } from '@/lib/toast';
 import type { AuthUser } from '@/types/auth';
 import { profileService } from '../services/profileService';
+import { ChangePasswordModal } from './ChangePasswordModal';
 
 interface Props {
   profile: AuthUser;
@@ -24,6 +25,7 @@ export function ProfileEditor({ profile, onSaved, onReset }: Props) {
   const [nameError, setNameError] = useState<string>();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const dirty = fullName !== profile.fullName || phone !== (profile.phone ?? '') || address !== (profile.address ?? '') || !!photo || removeAvatar;
   const preview = photo?.preview ?? (removeAvatar ? null : profile.avatarUrl);
 
@@ -100,6 +102,11 @@ export function ProfileEditor({ profile, onSaved, onReset }: Props) {
           <FormField label="Email" htmlFor="profile-email"><Input value={profile.email} readOnly type="email" /></FormField>
           <FormField label="Role" htmlFor="profile-role"><Input value={ROLE_LABELS[profile.role]} readOnly /></FormField>
           {profile.createdAt && <div className="space-y-1"><p className="text-xs font-medium text-[var(--color-text-secondary)]">Member since</p><p className="text-sm">{formatDate(profile.createdAt)}</p></div>}
+          <div className="pt-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowPasswordModal(true)}>
+              Change password
+            </Button>
+          </div>
           <ProfessionalDetails profile={profile} />
         </Panel>
       </div>
@@ -107,6 +114,9 @@ export function ProfileEditor({ profile, onSaved, onReset }: Props) {
         <Button type="button" onClick={onReset} disabled={!dirty || saving}>Cancel</Button>
         <Button type="submit" variant="primary" loading={saving} disabled={!dirty || !!photoError}>Save changes</Button>
       </div>
+      {showPasswordModal && (
+        <ChangePasswordModal open={showPasswordModal} onClose={() => setShowPasswordModal(false)} />
+      )}
     </form>
   );
 }

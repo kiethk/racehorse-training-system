@@ -6,21 +6,22 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.CourseSubject;
-import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.CourseExercise;
+import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.IntensityLevel;
-import com.rtms.backend.training.enums.SubjectCategory;
+import com.rtms.backend.training.enums.ExerciseCategory;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.CourseSubjectRepository;
-import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.repository.CourseExerciseRepository;
+import com.rtms.backend.training.repository.ExerciseRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestComponent;
@@ -30,7 +31,7 @@ import java.math.BigDecimal;
 /**
  * Dữ liệu dựng sẵn cho test huấn luyện: Trainer có một khu, ngựa có chuồng và Groom, bài tập và khóa. Mọi thứ được tạo trong
  * transaction của test nên được rollback.
- * (Ready-made data for the training tests: a Trainer with an area, horses with a stall and a Groom, Subjects and Courses.
+ * (Ready-made data for the training tests: a Trainer with an area, horses with a stall and a Groom, Exercises and Courses.
  * Everything is created inside the test transaction, so it rolls back.)
  */
 @TestComponent
@@ -41,9 +42,9 @@ public class TrainingFixtures {
     @Autowired private AreaRepository areas;
     @Autowired private StableStallRepository stalls;
     @Autowired private HorseRepository horses;
-    @Autowired private SubjectRepository subjects;
+    @Autowired private ExerciseRepository exercises;
     @Autowired private CourseRepository courses;
-    @Autowired private CourseSubjectRepository courseSubjects;
+    @Autowired private CourseExerciseRepository courseExercises;
     @Autowired private TrainingWorkoutRepository workouts;
 
     private Area area;
@@ -51,7 +52,7 @@ public class TrainingFixtures {
 
     /** Trainer mới phụ trách khu A. (A new Trainer in charge of area A.) */
     public User trainer() {
-        User trainer = user("HEAD_TRAINER", "trainer");
+        User trainer = user(Roles.HEAD_TRAINER, "trainer");
         area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
         area.setTrainerId(trainer.getId());
         areas.saveAndFlush(area);
@@ -74,8 +75,8 @@ public class TrainingFixtures {
 
     /** Ngựa trong khu A với chuồng riêng và một Groom mới. (A horse in area A with its own stall and a new Groom.) */
     public Horse horse(String name) {
-        User groom = user("GROOM", "groom");
-        User owner = user("HORSE_OWNER", "owner");
+        User groom = user(Roles.GROOM, "groom");
+        User owner = user(Roles.HORSE_OWNER, "owner");
         StableStall stall = new StableStall();
         stall.setAreaId(area.getId());
         stall.setGroomId(groom.getId());
@@ -90,24 +91,24 @@ public class TrainingFixtures {
         return horses.saveAndFlush(horse);
     }
 
-    public Subject subject(User trainer, String name, int minutes) {
-        Subject subject = new Subject();
-        subject.setTrainerId(trainer.getId());
-        subject.setCategory(SubjectCategory.SPEED);
-        subject.setName(name);
-        subject.setSurfaceType(SurfaceType.TURF);
-        subject.setTargetDistanceMeters(BigDecimal.valueOf(800));
-        subject.setIntensityLevel(IntensityLevel.HIGH);
-        subject.setDurationMinutes(minutes);
-        return subjects.saveAndFlush(subject);
+    public Exercise exercise(User trainer, String name, int minutes) {
+        Exercise exercise = new Exercise();
+        exercise.setTrainerId(trainer.getId());
+        exercise.setCategory(ExerciseCategory.SPEED);
+        exercise.setName(name);
+        exercise.setSurfaceType(SurfaceType.TURF);
+        exercise.setTargetDistanceMeters(BigDecimal.valueOf(800));
+        exercise.setIntensityLevel(IntensityLevel.HIGH);
+        exercise.setDurationMinutes(minutes);
+        return exercises.saveAndFlush(exercise);
     }
 
-    /** Lưu lại một bài đã sửa trong test. (Saves a Subject changed inside a test.) */
-    public Subject save(Subject subject) {
-        return subjects.saveAndFlush(subject);
+    /** Lưu lại một bài đã sửa trong test. (Saves an Exercise changed inside a test.) */
+    public Exercise save(Exercise exercise) {
+        return exercises.saveAndFlush(exercise);
     }
 
-    public Course course(User trainer, String name, int totalSessions, Subject... orderedSubjects) {
+    public Course course(User trainer, String name, int totalSessions, Exercise... orderedExercises) {
         Course course = new Course();
         course.setName(name);
         course.setTotalSessions(totalSessions);
@@ -115,12 +116,12 @@ public class TrainingFixtures {
         course.setTrainerId(trainer.getId());
         course = courses.saveAndFlush(course);
         int order = 1;
-        for (Subject subject : orderedSubjects) {
-            CourseSubject link = new CourseSubject();
+        for (Exercise exercise : orderedExercises) {
+            CourseExercise link = new CourseExercise();
             link.setCourseId(course.getId());
-            link.setSubjectId(subject.getId());
+            link.setExerciseId(exercise.getId());
             link.setOrderIndex(order++);
-            courseSubjects.saveAndFlush(link);
+            courseExercises.saveAndFlush(link);
         }
         return course;
     }

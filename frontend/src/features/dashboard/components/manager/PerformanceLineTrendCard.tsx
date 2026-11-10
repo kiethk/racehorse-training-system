@@ -6,7 +6,7 @@ import { displayError, formatDate, formatNumber } from '@/lib/display';
 import { dashboardService } from '../../services/dashboardService';
 import type { PerformanceTrend, PerformanceWeek } from '../../types';
 
-const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit' };
 
 export function PerformanceLineTrendCard() {
   const [trend, setTrend] = useState<PerformanceTrend | null>(null);
@@ -56,7 +56,7 @@ export function PerformanceLineTrendCard() {
       <Panel padded className="space-y-2">
         <SectionTitle>Performance Trajectory</SectionTitle>
         <p className="text-xs text-[var(--color-text-secondary)]">
-          Weekly equine performance trajectory across active training plans.
+          Weekly equine performance trajectory across active course runs.
         </p>
         <EmptyState icon="activity" title="No completed sessions yet" description="Completed training sessions will plot a performance curve here." />
       </Panel>

@@ -22,6 +22,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.regex.Pattern;
 import java.time.Duration;
 import java.util.*;
 
@@ -38,6 +39,15 @@ public class AgentOrchestratorService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentOrchestratorService.class);
     private static final int MAX_REACT_ITERATIONS = 4;
+
+    private static final Pattern VIETNAMESE_PATTERN = Pattern.compile(
+            "[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+    );
+
+    boolean isVietnameseText(String text) {
+        return text != null && VIETNAMESE_PATTERN.matcher(text).find();
+    }
 
     private final String aiBaseUrl;
     private final String aiApiKey;
@@ -113,6 +123,7 @@ public class AgentOrchestratorService {
     @SuppressWarnings("unchecked")
     public AiChatResponseDto processChat(AiChatRequestDto request, AuthenticatedUser currentUser) {
         Long conversationId = request.conversationId();
+        boolean isVi = isVietnameseText(request.message());
 
         // 1. Quản lý Conversation Thread bền vững trong Database
         if (conversationService != null && currentUser != null && currentUser.getUserId() != null) {
@@ -131,7 +142,9 @@ public class AgentOrchestratorService {
 
         if (aiApiKey == null || aiApiKey.isBlank()) {
             log.warn("AgentOrchestratorService: AI_API_KEY chưa được cấu hình.");
-            String fallbackReply = "Chưa cấu hình AI_API_KEY. Vui lòng thiết lập biến môi trường AI_API_KEY trong Run Configuration của IDE hoặc application.properties để sử dụng trợ lý AI.";
+            String fallbackReply = isVi
+                    ? "Chưa cấu hình AI_API_KEY. Vui lòng thiết lập biến môi trường AI_API_KEY trong Run Configuration của IDE hoặc application.properties để sử dụng trợ lý AI."
+                    : "AI_API_KEY is not configured. Please set the AI_API_KEY environment variable in your IDE Run Configuration or application.properties to enable the RTMS AI Assistant.";
             if (conversationService != null && conversationId != null) {
                 conversationService.saveMessage(conversationId, "assistant", fallbackReply, null);
             }
@@ -151,7 +164,9 @@ public class AgentOrchestratorService {
         // Fast Short-Circuit: Nếu 100% câu hỏi nằm ngoài phạm vi RTMS, từ chối ngay mà không kích hoạt ReAct loop
         if (intents.isPureOutOfDomain()) {
             log.info("AgentOrchestratorService: Phát hiện câu hỏi 100% Out-of-Domain. Kích hoạt Pre-Flight Refusal.");
-            String cannedRefusal = "Tôi là Trợ lý AI RTMS, được thiết kế chuyên biệt để hỗ trợ vận hành và quản lý trường đua ngựa (chiến mã, lịch tập, chuồng trại, y tế và giải đua). Yêu cầu của bạn nằm ngoài phạm vi nghiệp vụ được phân công nên tôi không thể hỗ trợ.";
+            String cannedRefusal = isVi
+                    ? "Tôi là Trợ lý AI RTMS, được thiết kế chuyên biệt để hỗ trợ vận hành và quản lý trường đua ngựa (chiến mã, lịch tập, chuồng trại, y tế và giải đua). Yêu cầu của bạn nằm ngoài phạm vi nghiệp vụ được phân công nên tôi không thể hỗ trợ."
+                    : "I am the RTMS AI Assistant, specialized exclusively in racehorse training and management operations (horses, training schedules, stabling, veterinary care, and racing). Your request is outside my assigned operational scope, so I cannot assist with it.";
             if (conversationService != null && conversationId != null) {
                 try {
                     conversationService.saveMessage(conversationId, "assistant", cannedRefusal, null);
@@ -205,9 +220,15 @@ public class AgentOrchestratorService {
         if (intents.hasInDomain()) {
             promptBuilder.append(String.join("\n", intents.inDomainIntents()));
             if (intents.hasOutOfDomain()) {
-                promptBuilder.append("\n\n[LƯU Ý HỆ THỐNG: Người dùng có hỏi thêm các vế ngoài phạm vi chuyên môn RTMS: \"")
-                        .append(String.join("; ", intents.outOfDomainIntents()))
-                        .append("\". BẮT BUỘC chỉ trả lời vế nghiệp vụ ở trên và từ chối dứt khoát các vế ngoài phạm vi này theo đúng Quy tắc 16, tuyệt đối không giải đáp hay đưa ra lời khuyên ngoài luồng.]");
+                if (isVi) {
+                    promptBuilder.append("\n\n[LƯU Ý HỆ THỐNG: Người dùng có hỏi thêm các vế ngoài phạm vi chuyên môn RTMS: \"")
+                            .append(String.join("; ", intents.outOfDomainIntents()))
+                            .append("\". BẮT BUỘC chỉ trả lời vế nghiệp vụ ở trên và từ chối dứt khoát các vế ngoài phạm vi này theo đúng Quy tắc 16, tuyệt đối không giải đáp hay đưa ra lời khuyên ngoài luồng.]");
+                } else {
+                    promptBuilder.append("\n\n[SYSTEM DIRECTIVE: The user also asked out-of-scope question(s): \"")
+                            .append(String.join("; ", intents.outOfDomainIntents()))
+                            .append("\". You MUST answer ONLY the in-domain operational inquiry above and explicitly decline the out-of-scope topic(s) per Rule 16. Do not answer or advise on out-of-scope topics.]");
+                }
             }
         } else {
             promptBuilder.append(request.message());
@@ -231,13 +252,17 @@ public class AgentOrchestratorService {
             Map<String, Object> aiResponse = callAiChatCompletions(messages, tools);
 
             if (aiResponse == null || !aiResponse.containsKey("choices")) {
-                finalAnswer = "Xin lỗi, hiện tại không thể kết nối đến máy chủ AI. Vui lòng thử lại sau.";
+                finalAnswer = isVi
+                        ? "Xin lỗi, hiện tại không thể kết nối đến máy chủ AI. Vui lòng thử lại sau."
+                        : "Sorry, cannot connect to the AI server at this moment. Please try again later.";
                 break;
             }
 
             List<Map<String, Object>> choices = (List<Map<String, Object>>) aiResponse.get("choices");
             if (choices == null || choices.isEmpty()) {
-                finalAnswer = "Không nhận được phản hồi hợp lệ từ máy chủ AI.";
+                finalAnswer = isVi
+                        ? "Không nhận được phản hồi hợp lệ từ máy chủ AI."
+                        : "Received invalid or empty response from the AI server.";
                 break;
             }
 
@@ -310,7 +335,8 @@ public class AgentOrchestratorService {
         }
 
         boolean isMeaninglessAnswer = finalAnswer == null || finalAnswer.isBlank()
-                || finalAnswer.trim().equals("Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn.");
+                || finalAnswer.trim().equals("Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn.")
+                || finalAnswer.trim().equals("I have completed the data retrieval according to your request.");
 
         if (isMeaninglessAnswer && !executedTools.isEmpty()) {
             // Thử gọi 1 turn tổng hợp cuối cùng yêu cầu LLM tóm tắt kết quả tool
@@ -318,7 +344,9 @@ public class AgentOrchestratorService {
                 List<Map<String, Object>> summaryMessages = new ArrayList<>(messages);
                 summaryMessages.add(Map.of(
                         "role", "user",
-                        "content", "Dựa trên dữ liệu từ các công cụ đã thực thi ở trên, hãy tổng hợp câu trả lời chi tiết và rõ ràng cho tôi. Trình bày bằng bảng Markdown, gạch đầu dòng phân tích cụ thể, và điều hướng liên kết phù hợp. Tuyệt đối không chỉ trả lời ngắn ngủi hoặc chung chung."
+                        "content", isVi
+                                ? "Dựa trên dữ liệu từ các công cụ đã thực thi ở trên, hãy tổng hợp câu trả lời chi tiết và rõ ràng cho tôi. Trình bày bằng bảng Markdown, gạch đầu dòng phân tích cụ thể, và điều hướng liên kết phù hợp. Tuyệt đối không chỉ trả lời ngắn ngủi hoặc chung chung."
+                                : "Based on the data retrieved from the executed tools above, synthesize a comprehensive and detailed response in English. Format using Markdown tables, structured bullet points with in-depth analysis, and relevant navigation links. Do not provide a brief or generic summary."
                 ));
                 Map<String, Object> summaryResponse = callAiChatCompletions(summaryMessages, null);
                 if (summaryResponse != null && summaryResponse.containsKey("choices")) {
@@ -327,7 +355,9 @@ public class AgentOrchestratorService {
                         Map<String, Object> msg = (Map<String, Object>) choices.get(0).get("message");
                         if (msg != null && msg.get("content") != null) {
                             String summaryContent = ((String) msg.get("content")).trim();
-                            if (!summaryContent.isBlank() && !summaryContent.equals("Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn.")) {
+                            if (!summaryContent.isBlank()
+                                    && !summaryContent.equals("Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn.")
+                                    && !summaryContent.equals("I have completed the data retrieval according to your request.")) {
                                 finalAnswer = summaryContent;
                                 isMeaninglessAnswer = false;
                             }
@@ -340,16 +370,22 @@ public class AgentOrchestratorService {
 
             // Nếu LLM vẫn không trả lời hoặc trả về câu vô nghĩa, tự động định dạng dữ liệu từ executedTools
             if (isMeaninglessAnswer) {
-                finalAnswer = formatFallbackToolSummary(executedTools);
+                finalAnswer = formatFallbackToolSummary(executedTools, isVi);
             }
         } else if (finalAnswer == null || finalAnswer.isBlank()) {
-            finalAnswer = "Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn.";
+            finalAnswer = isVi
+                    ? "Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn."
+                    : "I have completed the data retrieval according to your request.";
         }
 
         // Bổ sung ghi chú từ chối xác định cho các vế Out-of-Domain nếu có
         if (intents.hasOutOfDomain()) {
             String oodItems = String.join(", ", intents.outOfDomainIntents());
-            finalAnswer += "\n\n*Lưu ý: Về yêu cầu ngoài nghiệp vụ [" + oodItems + "], Trợ lý AI RTMS được thiết kế chuyên biệt cho hệ thống quản lý trường đua ngựa nên xin phép từ chối giải đáp các câu hỏi không liên quan.*";
+            if (isVi) {
+                finalAnswer += "\n\n*Lưu ý: Về yêu cầu ngoài nghiệp vụ [" + oodItems + "], Trợ lý AI RTMS được thiết kế chuyên biệt cho hệ thống quản lý trường đua ngựa nên xin phép từ chối giải đáp các câu hỏi không liên quan.*";
+            } else {
+                finalAnswer += "\n\n*Note: Regarding the out-of-scope request [" + oodItems + "], the RTMS AI Assistant is specialized in racehorse operations and management, and cannot assist with external requests.*";
+            }
         }
 
         // 5. Lưu phản hồi của trợ lý vào Database
@@ -371,7 +407,11 @@ public class AgentOrchestratorService {
 
         return String.format("""
                 Bạn là Trợ lý AI Thông minh RTMS (Racehorse Training Management System) chuyên nghiệp cho trường đua ngựa.
-                Thông tin người dùng hiện tại: %s, Vai trò: %s.
+                Current User: %s, Assigned Role: %s.
+
+                CORE LANGUAGE POLICY (CHỈ THỊ NGÔN NGỮ CỐT LÕI - TUÂN THỦ BẮT BUỘC):
+                - DEFAULT LANGUAGE IS ENGLISH: You MUST formulate, synthesize, and present all your responses, summaries, analysis, tables, explanations, and recommendations in professional, clear, and structured English by default.
+                - MULTI-LINGUAL SUPPORT: If and ONLY if the user specifically addresses you in Vietnamese (tiếng Việt), you may respond in Vietnamese. Otherwise, your default operational language for all interactions, tool data synthesis, and explanations is strictly English.
 
                 QUY TẮC BẮT BUỘC (TUÂN THỦ TUYỆT ĐỐI 100%%):
                 1. TUYỆT ĐỐI KHÔNG HIỂN THỊ ID SỐ NỘI BỘ TRONG DATABASE TRONG CÂU TRẢ LỜI (Ví dụ: không viết "Ngựa #1", "Ngựa ID 5", "Stall 10", "Session #12", "Groom #3"). Luôn luôn chuyển đổi và hiển thị bằng TÊN ĐẦY ĐỦ VÀ CÓ Ý NGHĨA (Ví dụ: "Chiến mã Thunder Flash", "Chuồng A-01", "Groom Nguyễn Văn A", "Ca Sáng (08:00 - 09:30)").
@@ -412,8 +452,8 @@ public class AgentOrchestratorService {
 
                 9. ĐỊNH DẠNG TRẢ LỜI BẰNG MARKDOWN RÕ RÀNG VÀ TỔNG HỢP CHUYÊN SÂU:
                    - BẮT BUỘC tổng hợp và giải thích sâu dữ liệu thu thập được từ các công cụ. Sử dụng bảng Markdown cho danh sách nhiều cột (ví dụ: Ca tập, Bài tập, Danh sách ngựa; hoặc Tên kế hoạch, Mục tiêu, Trạng thái, Tiến độ; Sinh hiệu ngựa), bullet points cho các phân tích chi tiết, in đậm các số liệu quan trọng.
-                   - CẤM TUYỆT ĐỐI chỉ trả lời câu cụt lủn, chung chung sáo rỗng vô nghĩa như "Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn." AI luôn phải trình bày dữ liệu chi tiết kèm phân tích nghiệp vụ.
-                   - Luôn trả lời bằng tiếng Việt lịch sự, gãy gọn, chuyên nghiệp và súc tích.
+                   - CẤM TUYỆT ĐỐI chỉ trả lời câu cụt lủn, chung chung sáo rỗng vô nghĩa như "Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn." hoặc "I have completed the data retrieval according to your request." AI luôn phải trình bày dữ liệu chi tiết kèm phân tích nghiệp vụ.
+                   - Mặc định luôn trả lời bằng tiếng Anh lịch sự, gãy gọn, chuyên nghiệp và súc tích (Default language is English). Chỉ chuyển sang tiếng Việt khi người dùng chủ động giao tiếp bằng tiếng Việt.
 
                 10. BẢNG TRA CỨU ROUTE FRONTEND CHÍNH XÁC & LIÊN KẾT ĐIỀU HƯỚNG (TUYỆT ĐỐI TRÁNH LỖI 404):
                    - Khi tạo action link điều hướng nội bộ Markdown `[Xem chi tiết](route)`, BẮT BUỘC:
@@ -423,7 +463,6 @@ public class AgentOrchestratorService {
                          - Lịch tập: `/trainer/schedule`
                          - Kế hoạch huấn luyện: `/trainer/plans` (hoặc `/trainer/plans/[id]`)
                          - Dashboard & Cảnh báo rủi ro: `/trainer/dashboard` (LƯU Ý: KHÔNG CÓ ROUTE `/trainer/risk-alerts`, chỉ dùng `/trainer/dashboard`)
-                         - Đăng ký đua & Thành tích: `/trainer/racing` (hoặc `/trainer/racing/[id]`)
                          - Thẩm định nhập đàn: `/trainer/admissions` (hoặc `/trainer/admissions/[id]`)
                          - Chuồng trại & Phân công: `/trainer/stable`
                          - Giáo trình khóa học: `/trainer/courses`
@@ -544,11 +583,10 @@ public class AgentOrchestratorService {
                 17. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO HUẤN LUYỆN VIÊN (HEAD_TRAINER DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Ô chuồng [Stall]; mỗi Ô chuồng có 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
-                     + Trainer xếp ngựa vào các Nhóm huấn luyện [Training Group], tối đa 6 ngựa, mỗi ngựa chỉ ở một nhóm và hai ngựa cùng Groom không chung một nhóm. Nhóm có thể bị giải tán [Disbanded]: giữ tên và lịch sử, không còn ngựa.
-                     + Nhóm chạy một Khóa [Course] theo một Kế hoạch nhóm [Group Plan] -> gồm nhiều Buổi tập [Session], mỗi buổi cả nhóm cùng ra sân chạy một Bài tập [Subject] -> mỗi ngựa trong buổi có một Workout.
+                     + Trainer xếp ngựa vào các Nhóm huấn luyện [Training Group], tối đa 6 ngựa, mỗi ngựa chỉ ở một nhóm; một Groom có thể dắt nhiều ngựa trong cùng một nhóm. Nhóm có thể bị giải tán [Disbanded]: giữ tên và lịch sử, không còn ngựa.
+                     + Nhóm chạy một Khóa [Course] qua một Lượt chạy khóa [Course Run] -> gồm nhiều Buổi tập [Session], mỗi buổi cả nhóm cùng ra sân chạy một Bài tập [Exercise] -> mỗi ngựa trong buổi có một Workout.
                      + Trạng thái Workout: Scheduled (chưa diễn ra) -> Needs result (buổi đã qua giờ, chưa xác nhận) -> Ran (đã ghi chỉ số, là bằng chứng ngựa đã chạy) hoặc Did not run (Trainer xác nhận không chạy); Cancelled là bị hủy trước giờ. Không có học bù.
                      + Attendance X/Y của một ngựa trong một khóa: X là số buổi Ran, Y là số buổi của khóa không bị hủy cả buổi. Buổi Needs result KHÔNG được tính là đã chạy.
-                     + Chiến mã có thành tích tốt được Huấn luyện viên đăng ký tham gia các Giải đua [Race Registration].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
                      + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `totalSessions` và `sessionList`).
                      + Buổi nào chưa ghi kết quả / chưa điểm danh: Dùng `getTrainerSchedule` với `needsResultOnly=true` (đọc `totalWorkoutsNeedingResult` và `horseList` từng buổi).
@@ -556,7 +594,6 @@ public class AgentOrchestratorService {
                      + Tra cứu ngựa thuộc quyền huấn luyện: Dùng `getTrainerHorses` -> để lấy danh sách tên và ID ngựa.
                      + Tra cứu khóa và Attendance của ngựa: Dùng `getTrainerPlansSummary` (đọc `progress` dạng X/Y).
                      + Lịch sử buổi tập đã diễn ra của một ngựa: Dùng `getWorkoutHistory` (đọc `outcome`).
-                     + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `totalRaceRegistrations`).
                      + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `pendingReviewCount`).
                       + Phân tích & Xếp hạng sở trường: Dùng `getHorseSpecialtyAnalysis` (đọc `rankedHorseList` và `specialtyCount`).
                 """;
@@ -614,31 +651,39 @@ public class AgentOrchestratorService {
         };
     }
 
-    private String formatFallbackToolSummary(List<Map<String, Object>> executedTools) {
+    String formatFallbackToolSummary(List<Map<String, Object>> executedTools) {
+        return formatFallbackToolSummary(executedTools, true);
+    }
+
+    String formatFallbackToolSummary(List<Map<String, Object>> executedTools, boolean isVi) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Dưới đây là thông tin chi tiết được ghi nhận từ hệ thống:\n\n");
+        if (isVi) {
+            sb.append("Dưới đây là thông tin chi tiết được ghi nhận từ hệ thống:\n\n");
+        } else {
+            sb.append("Here is the detailed information retrieved from the system:\n\n");
+        }
         for (Map<String, Object> entry : executedTools) {
-            String tool = (String) entry.get("tool");
             Object res = entry.get("result");
             if (res instanceof Map<?, ?> map) {
                 if ("ERROR".equals(map.get("status"))) {
-                    sb.append("⚠️ **Thông báo**: ").append(map.get("error")).append("\n\n");
+                    sb.append(isVi ? "⚠️ **Thông báo**: " : "⚠️ **Notice**: ").append(map.get("error")).append("\n\n");
                     continue;
                 }
                 for (Map.Entry<?, ?> e : map.entrySet()) {
                     String key = String.valueOf(e.getKey());
                     Object val = e.getValue();
+                    String label = isVi ? humanizeKey(key) : humanizeKeyEn(key);
                     if (val instanceof List<?> list && !list.isEmpty()) {
-                        sb.append("### ").append(humanizeKey(key)).append("\n");
-                        appendListAsMarkdown(sb, list);
+                        sb.append("### ").append(label).append("\n");
+                        appendListAsMarkdown(sb, list, isVi);
                         sb.append("\n");
                     } else if (val != null && !(val instanceof Map)) {
-                        sb.append("- **").append(humanizeKey(key)).append("**: ").append(val).append("\n");
+                        sb.append("- **").append(label).append("**: ").append(val).append("\n");
                     }
                 }
                 sb.append("\n");
             } else if (res instanceof List<?> list && !list.isEmpty()) {
-                appendListAsMarkdown(sb, list);
+                appendListAsMarkdown(sb, list, isVi);
                 sb.append("\n");
             }
         }
@@ -646,6 +691,10 @@ public class AgentOrchestratorService {
     }
 
     private void appendListAsMarkdown(StringBuilder sb, List<?> list) {
+        appendListAsMarkdown(sb, list, true);
+    }
+
+    private void appendListAsMarkdown(StringBuilder sb, List<?> list, boolean isVi) {
         if (list.isEmpty()) return;
         Object first = list.get(0);
         if (first instanceof Map<?, ?> firstMap) {
@@ -653,7 +702,7 @@ public class AgentOrchestratorService {
             for (Object k : firstMap.keySet()) {
                 headers.add(String.valueOf(k));
             }
-            sb.append("| ").append(String.join(" | ", headers.stream().map(this::humanizeKey).toList())).append(" |\n");
+            sb.append("| ").append(String.join(" | ", headers.stream().map(k -> isVi ? humanizeKey(k) : humanizeKeyEn(k)).toList())).append(" |\n");
             sb.append("| ").append(String.join(" | ", headers.stream().map(h -> "---").toList())).append(" |\n");
             for (Object item : list) {
                 if (item instanceof Map<?, ?> m) {
@@ -672,12 +721,264 @@ public class AgentOrchestratorService {
         }
     }
 
+    String humanizeKeyEn(String key) {
+        if (key == null || key.isBlank()) return "";
+        return switch (key) {
+            // Horse & Pedigree
+            case "horseName", "tenNgua" -> "Horse Name";
+            case "horseId", "maSoNgua" -> "Horse ID";
+            case "registrationNumber", "maDangKy" -> "Registration Number";
+            case "candidateName" -> "Candidate Horse Name";
+            case "sex" -> "Sex";
+            case "dateOfBirth" -> "Date of Birth";
+            case "trainingDecisionReason" -> "Training Restriction Reason";
+            case "registryName" -> "Registry Name";
+            case "sireRegistrationNumber" -> "Sire Registration (UELN)";
+            case "damRegistrationNumber" -> "Dam Registration (UELN)";
+            case "pedigreeNotes" -> "Pedigree Notes";
+            case "breed" -> "Breed";
+            case "sire" -> "Sire";
+            case "dam" -> "Dam";
+            case "origin" -> "Origin";
+            case "pedigreeGeneration" -> "Pedigree Generation";
+            case "joinedAt" -> "Joined Date";
+            case "horseList", "myHorseList", "danhSachNgua" -> "Horse List";
+            case "caredHorseList", "danhSachNguaDangChamSoc" -> "Assigned Horses";
+            case "horseInStall" -> "Horse in Stall";
+            case "totalOwnedHorses", "totalClubHorses", "horseCount", "tongSoNguaQuanLy" -> "Total Horses";
+
+            // Vitals & Health
+            case "weight", "canNang" -> "Weight (kg)";
+            case "temperature", "thanNhiet" -> "Body Temperature (°C)";
+            case "heartRate", "avgHeartRate", "maxHeartRate", "nhipTim" -> "Heart Rate (bpm)";
+            case "respiratoryRate", "nhipTho" -> "Respiratory Rate";
+            case "bodyConditionScore" -> "Body Condition Score (BCS 1-9)";
+            case "hydrationStatus" -> "Hydration Status";
+            case "clinicalNotes", "clinicalObservations", "notes", "nhanXet" -> "Clinical Observations";
+            case "diagnosis", "latestDiagnosis" -> "Diagnosis";
+            case "treatmentPlan" -> "Treatment Plan";
+            case "treatmentPlanName" -> "Treatment Plan Name";
+            case "medicationName" -> "Medication";
+            case "dosage" -> "Dosage";
+            case "frequency" -> "Frequency";
+            case "route" -> "Route";
+            case "duration" -> "Duration (days)";
+            case "withdrawalDays" -> "Withdrawal Period (days)";
+            case "administeredByRole" -> "Administered By Role";
+            case "recordType" -> "Record Type";
+            case "veterinarianName" -> "Attending Veterinarian";
+            case "rescheduleReason" -> "Reschedule Reason";
+            case "rescheduleNote" -> "Reschedule Note";
+            case "activeInjuries" -> "Active Injuries";
+            case "conditionType" -> "Condition Type";
+            case "expectedRecoveryDate" -> "Expected Recovery Date";
+            case "zoneId" -> "Anatomical Zone";
+            case "medicalRestrictionNotes", "restrictionDetails" -> "Medical Restrictions";
+            case "symptoms", "intakeSymptoms" -> "Symptoms";
+            case "severity" -> "Severity";
+            case "measurementDate", "ngayDo" -> "Measurement Date";
+            case "examDate", "lastExamDate" -> "Examination Date";
+            case "examType" -> "Examination Type";
+            case "totalUrgentAlerts" -> "Urgent Care Alerts";
+            case "alertList" -> "Alert List";
+            case "totalPrescriptions" -> "Active Prescriptions";
+            case "treatmentList" -> "Treatment List";
+            case "treatmentType" -> "Treatment Type";
+            case "careType" -> "Care Type";
+            case "purpose" -> "Care Purpose";
+            case "upcomingCareSchedule" -> "Upcoming Care Schedule";
+            case "inQuarantineArea" -> "In Quarantine Area";
+            case "abnormalSigns" -> "Abnormal Signs";
+            case "alertLevel" -> "Alert Level";
+            case "immediateActionRequired" -> "Immediate Action Required";
+            case "commonConditions" -> "Common Conditions";
+            case "recurrenceRisk" -> "Recurrence Risk";
+            case "preventiveRecommendations" -> "Preventive Recommendations";
+            case "recommendedIntervention" -> "Recommended Intervention";
+            case "requiredTests" -> "Required Diagnostic Tests";
+            case "minObservationTime" -> "Minimum Observation Period";
+            case "referenceGuidelines" -> "Reference Guidelines";
+            case "readinessScore" -> "Readiness Score";
+            case "readinessStatus" -> "Readiness Status";
+            case "vetRecommendations" -> "Veterinary Recommendations";
+            case "proposedTrainingRestriction" -> "Proposed Training Restriction";
+
+            // Stables & Capacity
+            case "stallLocation", "stall", "stallCode", "stallNumber", "viTriChuong" -> "Stall Location";
+            case "areaName", "areaCode", "areaType", "khuVuc" -> "Barn / Area";
+            case "totalStalls" -> "Total Stalls";
+            case "occupiedStalls" -> "Occupied Stalls";
+            case "vacantStalls" -> "Vacant Stalls";
+            case "occupiedStallsCount" -> "Occupied Stalls Count";
+            case "vacantStallsCount" -> "Vacant Stalls Count";
+            case "occupiedRegularStalls" -> "Occupied Regular Stalls";
+            case "quarantineCasesCount" -> "Quarantine Cases";
+            case "occupancyRate" -> "Occupancy Rate";
+            case "bottleneckForecast" -> "Stabling Bottleneck Forecast";
+            case "managementRecommendations" -> "Management Recommendations";
+            case "stallStatus" -> "Stall Status";
+            case "stallCodeList", "danhSachMaChuong" -> "Assigned Stalls";
+
+            // Staff & Assignments
+            case "fullName" -> "Full Name";
+            case "email" -> "Email";
+            case "phone", "groomPhone", "soDienThoai" -> "Phone";
+            case "role", "roleTitle", "vaiTro" -> "Role";
+            case "activeStatus" -> "Active Status";
+            case "specialtyInfo" -> "Specialty Info";
+            case "address" -> "Address";
+            case "joinedDate" -> "Joined Date";
+            case "certificationNumber" -> "Certification Number";
+            case "licenseNumber" -> "License Number";
+            case "specialization" -> "Specialization";
+            case "totalStaff", "tongSoNhanSu" -> "Total Staff";
+            case "roleBreakdown", "phanLoaiTheoVaiTro" -> "Role Breakdown";
+            case "staffList", "danhSachNhanSu" -> "Staff List";
+            case "assignedGroomName", "groomName", "assignedGroom", "tenGroom" -> "Assigned Groom";
+            case "assignedGroomCount" -> "Assigned Groom Count";
+            case "assignedTrainer", "tenHuanLuyenVien" -> "Assigned Trainer";
+            case "assignedVet" -> "Assigned Vet";
+            case "designatedTrainer" -> "Designated Trainer";
+            case "assignedStallCount", "soChuongPhuTrach" -> "Assigned Stall Count";
+            case "totalGrooms", "tongSoGroomLamViecCung" -> "Total Grooms";
+            case "tasksTodayCount" -> "Tasks Today Count";
+            case "workloadStatus" -> "Workload Status";
+            case "groomWorkloadList" -> "Groom Workload List";
+            case "overloadedStaff" -> "Overloaded Staff";
+            case "proposedStallTransfer" -> "Proposed Stall Transfer";
+
+            // Training & Workouts
+            case "trainingDecision", "isTrainingAllowed", "quyetDinhTapLuyen" -> "Training Decision";
+            case "decisionReason" -> "Decision Reason";
+            case "totalWorkouts" -> "Total Workouts";
+            case "completedSessions" -> "Completed Sessions (Ran)";
+            case "totalSessions" -> "Total Sessions";
+            case "groupName" -> "Training Group";
+            case "joinedOn" -> "Joined Date";
+            case "outcome" -> "Outcome";
+            case "needsResultCount" -> "Needs Result Count";
+            case "totalWorkoutsNeedingResult" -> "Total Workouts Needing Result";
+            case "totalGroups", "groupList" -> "Active Training Groups";
+            case "disbandedGroupCount", "disbandedGroupList" -> "Disbanded Groups";
+            case "currentCourse" -> "Current Course";
+            case "currentPlanStatus" -> "Course Status";
+            case "currentPlanPeriod" -> "Course Period";
+            case "planName" -> "Plan Name";
+            case "courseName" -> "Course Name";
+            case "exerciseName" -> "Training Exercise";
+            case "targetGoal" -> "Target Goal";
+            case "progress" -> "Progress";
+            case "startDate" -> "Start Date";
+            case "endDate" -> "End Date";
+            case "startTime" -> "Start Time";
+            case "endTime" -> "End Time";
+            case "sessionTime" -> "Session Time";
+            case "surface" -> "Track Surface";
+            case "preferredSurface" -> "Preferred Surface";
+            case "intensity" -> "Intensity";
+            case "durationMinutes" -> "Duration (mins)";
+            case "targetDistance" -> "Target Distance";
+            case "actualDistanceMeters" -> "Actual Distance (m)";
+            case "actualDurationMinutes" -> "Actual Duration (mins)";
+            case "averageSpeedKmh" -> "Average Speed (km/h)";
+            case "videoUrl" -> "Workout Video URL";
+            case "surfaceType" -> "Track Surface Type";
+            case "intensityLevel" -> "Intensity Level";
+            case "targetDistanceMeters" -> "Target Distance (m)";
+            case "trainingDays" -> "Weekly Schedule";
+            case "trainerName" -> "Trainer Name";
+            case "topSpeedKmh", "optimalSpeed" -> "Optimal Speed (km/h)";
+            case "fitnessProgressionRate" -> "Fitness Progression Rate";
+            case "racingPotentialEvaluation" -> "Racing Potential Evaluation";
+            case "totalDistance14Days" -> "Total 14-Day Distance (m)";
+            case "workoutCount" -> "Workout Count";
+            case "highIntensitySessions" -> "High Intensity Sessions";
+            case "riskAssessment" -> "Risk Assessment";
+            case "trainingRecommendations" -> "Training Recommendations";
+            case "lastWorkout" -> "Last Workout";
+            case "fitnessReview" -> "Fitness Review";
+
+            // Rankings & Specialties
+            case "specialties" -> "Specialties";
+            case "specialtyCount" -> "Specialty Count";
+            case "averageRating" -> "Average Rating";
+            case "bestRating" -> "Best Rating";
+            case "specialtyBreakdown" -> "Specialty Breakdown";
+            case "rankedHorseList" -> "Ranked Horse List";
+            case "sortBy" -> "Sort By";
+            case "rank" -> "Rank";
+
+            // Admissions
+            case "totalApplications" -> "Total Applications";
+            case "inProgressApplications" -> "In-Progress Applications";
+            case "approvedApplications" -> "Approved Applications";
+            case "rejectedOrExpiredApplications" -> "Rejected or Expired Applications";
+            case "pendingManagerReviewCount" -> "Pending Manager Review Count";
+            case "pendingAdmissionReviews" -> "Pending Admission Reviews";
+            case "quarantineStallCode" -> "Quarantine Stall";
+            case "groomFeedback" -> "Groom Feedback";
+            case "vetFeedback" -> "Vet Feedback";
+            case "trainerFeedback" -> "Trainer Feedback";
+            case "managerFeedback" -> "Manager Feedback";
+            case "currentStage" -> "Current Stage";
+            case "submittedDate" -> "Submission Date";
+            case "ownerName" -> "Owner Name";
+            case "groomCheckResult" -> "Groom Intake Check";
+            case "vetExamResult" -> "Vet Screening Exam";
+            case "managerApprovalResult" -> "Manager Final Approval";
+            case "pendingExamCount" -> "Pending Vet Exams";
+            case "examList" -> "Pending Exam List";
+            case "pendingReviewCount" -> "Pending Trainer Reviews";
+            case "stageBreakdown" -> "Stage Breakdown";
+
+            // Races
+            case "location" -> "Racecourse / Location";
+            case "distanceMeters" -> "Distance (m)";
+            case "trackType" -> "Track Type";
+            case "eventDate" -> "Event Date";
+            case "eventTime" -> "Start Time";
+
+            // Audit
+            case "action" -> "Action";
+            case "entityName" -> "Entity Name";
+            case "entityId" -> "Entity ID";
+            case "httpMethod" -> "HTTP Method";
+            case "requestPath" -> "Request Path";
+            case "statusCode" -> "Status Code";
+            case "details" -> "Details";
+            case "performedBy" -> "Performed By";
+            case "changeDetails" -> "Change Details";
+            case "totalAuditLogs" -> "Total Audit Logs";
+            case "auditLogList" -> "Audit Log List";
+
+            // Common
+            case "status", "currentStatus", "horseStatus", "trangThai" -> "Status";
+            case "systemStatus" -> "System Status";
+            case "description", "detailedDescription" -> "Description";
+            case "actionUrl", "navigationUrl" -> "Navigation URL";
+
+            default -> {
+                String spaced = key.replaceAll("([a-z])([A-Z])", "$1 $2");
+                yield Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
+            }
+        };
+    }
+
     String humanizeKey(String key) {
         if (key == null || key.isBlank()) return "";
         return switch (key) {
             // Ngựa & Phả hệ
             case "horseName", "tenNgua" -> "Tên ngựa";
-            case "registrationNumber", "horseId", "maDangKy", "maSoNgua" -> "Mã đăng ký";
+            case "horseId", "maSoNgua" -> "ID Ngựa";
+            case "registrationNumber", "maDangKy" -> "Mã đăng ký";
+            case "candidateName" -> "Tên ngựa ứng viên";
+            case "sex" -> "Giới tính";
+            case "dateOfBirth" -> "Ngày sinh";
+            case "trainingDecisionReason" -> "Lý do hạn chế tập luyện";
+            case "registryName" -> "Tổ chức đăng kiểm";
+            case "sireRegistrationNumber" -> "Mã UELN cha";
+            case "damRegistrationNumber" -> "Mã UELN mẹ";
+            case "pedigreeNotes" -> "Ghi chú nguồn gốc";
             case "breed" -> "Giống ngựa";
             case "sire" -> "Ngựa cha (Sire)";
             case "dam" -> "Ngựa mẹ (Dam)";
@@ -694,9 +995,27 @@ public class AgentOrchestratorService {
             case "temperature", "thanNhiet" -> "Thân nhiệt";
             case "heartRate", "avgHeartRate", "maxHeartRate", "nhipTim" -> "Nhịp tim";
             case "respiratoryRate", "nhipTho" -> "Nhịp thở";
+            case "bodyConditionScore" -> "Điểm thể trạng (BCS 1-9)";
+            case "hydrationStatus" -> "Tình trạng bù nước";
             case "clinicalNotes", "clinicalObservations", "notes", "nhanXet" -> "Ghi chú lâm sàng";
             case "diagnosis", "latestDiagnosis" -> "Chẩn đoán bệnh lý";
             case "treatmentPlan" -> "Phác đồ điều trị";
+            case "treatmentPlanName" -> "Tên phác đồ điều trị";
+            case "medicationName" -> "Tên thuốc";
+            case "dosage" -> "Liều lượng";
+            case "frequency" -> "Tần suất dùng";
+            case "route" -> "Đường dùng thuốc";
+            case "duration" -> "Thời gian dùng (ngày)";
+            case "withdrawalDays" -> "Thời gian ngưng Doping (ngày)";
+            case "administeredByRole" -> "Người thực hiện cấp thuốc";
+            case "recordType" -> "Phân loại bệnh án";
+            case "veterinarianName" -> "Bác sĩ phụ trách";
+            case "rescheduleReason" -> "Lý do dời lịch";
+            case "rescheduleNote" -> "Ghi chú dời lịch";
+            case "activeInjuries" -> "Chấn thương đang điều trị";
+            case "conditionType" -> "Loại chấn thương/bệnh";
+            case "expectedRecoveryDate" -> "Dự kiến hồi phục";
+            case "zoneId" -> "Vị trí giải phẫu (Zone)";
             case "medicalRestrictionNotes", "restrictionDetails" -> "Chỉ định y tế";
             case "symptoms", "intakeSymptoms" -> "Triệu chứng";
             case "severity" -> "Mức độ nghiêm trọng";
@@ -733,6 +1052,9 @@ public class AgentOrchestratorService {
             case "totalStalls" -> "Tổng số ô chuồng";
             case "occupiedStalls" -> "Số chuồng đang sử dụng";
             case "vacantStalls" -> "Số chuồng trống";
+            case "occupiedStallsCount" -> "Số ô chuồng đang dùng";
+            case "vacantStallsCount" -> "Số ô chuồng còn trống";
+            case "occupiedRegularStalls" -> "Chuồng thường đang dùng";
             case "quarantineCasesCount" -> "Số ca cách ly";
             case "occupancyRate" -> "Tỷ lệ lấp đầy";
             case "bottleneckForecast" -> "Dự báo điểm nghẽn chuồng";
@@ -747,6 +1069,11 @@ public class AgentOrchestratorService {
             case "role", "roleTitle", "vaiTro" -> "Vai trò";
             case "activeStatus" -> "Trạng thái hoạt động";
             case "specialtyInfo" -> "Thông tin chuyên môn";
+            case "address" -> "Địa chỉ";
+            case "joinedDate" -> "Ngày gia nhập";
+            case "certificationNumber" -> "Số chứng chỉ HLV";
+            case "licenseNumber" -> "Số CCHN Bác sĩ thú y";
+            case "specialization" -> "Chuyên khoa thú y";
             case "totalStaff", "tongSoNhanSu" -> "Tổng số nhân sự";
             case "roleBreakdown", "phanLoaiTheoVaiTro" -> "Phân loại theo vai trò";
             case "staffList", "danhSachNhanSu" -> "Danh sách nhân sự";
@@ -781,7 +1108,7 @@ public class AgentOrchestratorService {
             case "currentPlanPeriod" -> "Thời gian khóa";
             case "planName" -> "Tên kế hoạch";
             case "courseName" -> "Tên khóa học";
-            case "subjectName" -> "Bài tập / Môn học";
+            case "exerciseName" -> "Bài tập / Môn học";
             case "targetGoal" -> "Mục tiêu huấn luyện";
             case "progress" -> "Tiến độ";
             case "startDate" -> "Ngày bắt đầu";
@@ -795,6 +1122,14 @@ public class AgentOrchestratorService {
             case "durationMinutes" -> "Thời lượng (phút)";
             case "targetDistance" -> "Cự ly mục tiêu";
             case "actualDistanceMeters" -> "Cự ly thực tế (m)";
+            case "actualDurationMinutes" -> "Thời lượng chạy thực tế (phút)";
+            case "averageSpeedKmh" -> "Tốc độ trung bình (km/h)";
+            case "videoUrl" -> "Video buổi tập";
+            case "surfaceType" -> "Mặt sân tập";
+            case "intensityLevel" -> "Cường độ bài tập";
+            case "targetDistanceMeters" -> "Cự ly giáo án (m)";
+            case "trainingDays" -> "Lịch tập trong tuần";
+            case "trainerName" -> "Huấn luyện viên";
             case "topSpeedKmh", "optimalSpeed" -> "Tốc độ tối ưu";
             case "fitnessProgressionRate" -> "Tiến độ thể lực";
             case "racingPotentialEvaluation" -> "Tiềm năng thi đấu";
@@ -831,6 +1166,11 @@ public class AgentOrchestratorService {
             case "totalTasksCount" -> "Tổng số công việc";
             case "totalWorkItemsCount" -> "Tổng số đầu việc";
             case "biosecurityNotes" -> "Quy tắc an toàn sinh học";
+            case "imageUrl" -> "Ảnh hiện trường";
+            case "handlerName" -> "Người xử lý";
+            case "handledAt" -> "Thời điểm xử lý";
+            case "handlerNote" -> "Ghi chú xử lý";
+            case "careScheduleId" -> "Mã lịch khám phát sinh";
             case "incidentTitle", "title" -> "Tiêu đề sự cố";
             case "incidentStatus" -> "Trạng thái sự cố";
             case "reportedAt", "timestamp" -> "Thời gian ghi nhận";
@@ -847,6 +1187,13 @@ public class AgentOrchestratorService {
             case "rejectedOrExpiredApplications", "rejected", "arrivalExpired" -> "Số đơn từ chối / quá hạn";
             case "applicationList" -> "Danh sách đơn đăng ký";
             case "applicationStatus" -> "Trạng thái đơn";
+            case "arrivalDeadlineAt" -> "Hạn chót xe chở tới trại";
+            case "arrivedAt" -> "Thời điểm tới cổng";
+            case "quarantineStallCode" -> "Chuồng cách ly";
+            case "groomFeedback" -> "Nhận xét của Groom";
+            case "vetFeedback" -> "Nhận xét của Bác sĩ thú y";
+            case "trainerFeedback" -> "Nhận xét của HLV";
+            case "managerFeedback" -> "Ý kiến của Quản lý";
             case "currentStage" -> "Giai đoạn hiện tại";
             case "submittedDate" -> "Ngày nộp đơn";
             case "ownerName" -> "Chủ sở hữu";
@@ -859,13 +1206,20 @@ public class AgentOrchestratorService {
             case "stageBreakdown" -> "Chi tiết theo giai đoạn";
 
             // Giải đua
-            case "raceName" -> "Tên giải đua";
-            case "registrationDate" -> "Ngày đăng ký đua";
-            case "totalRaceRegistrations" -> "Tổng số giải đăng ký";
-            case "raceList" -> "Danh sách giải đua";
+            case "location" -> "Địa điểm / Trường đua";
+            case "distanceMeters" -> "Cự ly thi đấu (m)";
+            case "trackType" -> "Mặt sân đua";
+            case "eventDate" -> "Ngày thi đấu chính thức";
+            case "eventTime" -> "Giờ xuất phát";
 
             // Nhật ký kiểm toán
             case "action" -> "Hành động thao tác";
+            case "entityName" -> "Đối tượng tác động";
+            case "entityId" -> "ID đối tượng";
+            case "httpMethod" -> "Phương thức HTTP";
+            case "requestPath" -> "Đường dẫn API";
+            case "statusCode" -> "Mã HTTP";
+            case "details" -> "Chi tiết dữ liệu";
             case "performedBy" -> "Người thực hiện";
             case "changeDetails" -> "Chi tiết thay đổi";
             case "totalAuditLogs" -> "Tổng số nhật ký";

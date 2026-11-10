@@ -145,4 +145,60 @@ class AgentOrchestratorServiceTest {
         // Fallback for unknown camelCase key
         org.junit.jupiter.api.Assertions.assertEquals("Unknown Custom Field", service.humanizeKey("unknownCustomField"));
     }
+
+    @Test
+    @DisplayName("AI Assistant defaults to English when user asks in English and adaptive Vietnamese when in Vietnamese")
+    void testAdaptiveLanguageSupport() {
+        AgentOrchestratorService service = new AgentOrchestratorService(
+                "https://api.groq.com/openai/v1",
+                "", // empty api key to trigger fallback
+                "qwen/qwen3.8-27b",
+                toolRegistryService,
+                toolExecutionService,
+                objectMapper
+        );
+
+        AuthenticatedUser owner = new AuthenticatedUser(10L, "owner@test.com", "HORSE_OWNER");
+
+        // 1. English input -> English fallback
+        AiChatRequestDto enRequest = new AiChatRequestDto("Where are my horses located?", List.of());
+        AiChatResponseDto enResponse = service.processChat(enRequest, owner);
+        assertNotNull(enResponse);
+        assertTrue(enResponse.reply().contains("AI_API_KEY is not configured"));
+
+        // 2. Vietnamese input -> Vietnamese fallback
+        AiChatRequestDto viRequest = new AiChatRequestDto("Ngựa của tôi đang ở chuồng nào?", List.of());
+        AiChatResponseDto viResponse = service.processChat(viRequest, owner);
+        assertNotNull(viResponse);
+        assertTrue(viResponse.reply().contains("Chưa cấu hình AI_API_KEY"));
+    }
+
+    @Test
+    @DisplayName("humanizeKeyEn converts camelCase domain keys accurately into professional English labels")
+    void testHumanizeKeyEn() {
+        AgentOrchestratorService service = new AgentOrchestratorService(
+                "https://api.groq.com/openai/v1",
+                "test-key",
+                "qwen/qwen3.8-27b",
+                toolRegistryService,
+                toolExecutionService,
+                objectMapper
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals("Horse Name", service.humanizeKeyEn("horseName"));
+        org.junit.jupiter.api.Assertions.assertEquals("Registration Number", service.humanizeKeyEn("registrationNumber"));
+        org.junit.jupiter.api.Assertions.assertEquals("Body Temperature (°C)", service.humanizeKeyEn("temperature"));
+        org.junit.jupiter.api.Assertions.assertEquals("Heart Rate (bpm)", service.humanizeKeyEn("heartRate"));
+        org.junit.jupiter.api.Assertions.assertEquals("Stall Location", service.humanizeKeyEn("stallLocation"));
+        org.junit.jupiter.api.Assertions.assertEquals("Training Decision", service.humanizeKeyEn("trainingDecision"));
+        org.junit.jupiter.api.Assertions.assertEquals("Total Staff", service.humanizeKeyEn("totalStaff"));
+        org.junit.jupiter.api.Assertions.assertEquals("Role Breakdown", service.humanizeKeyEn("roleBreakdown"));
+        org.junit.jupiter.api.Assertions.assertEquals("Total Applications", service.humanizeKeyEn("totalApplications"));
+        org.junit.jupiter.api.Assertions.assertEquals("Specialties", service.humanizeKeyEn("specialties"));
+        org.junit.jupiter.api.Assertions.assertEquals("Specialty Count", service.humanizeKeyEn("specialtyCount"));
+        org.junit.jupiter.api.Assertions.assertEquals("Average Rating", service.humanizeKeyEn("averageRating"));
+        org.junit.jupiter.api.Assertions.assertEquals("Best Rating", service.humanizeKeyEn("bestRating"));
+        org.junit.jupiter.api.Assertions.assertEquals("Specialty Breakdown", service.humanizeKeyEn("specialtyBreakdown"));
+        org.junit.jupiter.api.Assertions.assertEquals("Sort By", service.humanizeKeyEn("sortBy"));
+    }
 }

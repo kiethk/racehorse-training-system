@@ -15,7 +15,7 @@ import com.rtms.backend.notification.repository.NotificationRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -82,7 +82,7 @@ class AssignmentEnforcementTest {
     private NotificationRepository notificationRepository;
 
     @Mock
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
 
     private CareScheduleService careScheduleService;
     private NotificationService notificationService;
@@ -114,17 +114,15 @@ class AssignmentEnforcementTest {
     }
 
     @Test
-    @DisplayName("7 & 9. AD-022: Thu y khong the tu choi ca — API cancel da bi xoa bo")
+    @DisplayName("7 & 9. Thu y khong the tu choi ca — chi co Club Manager moi co quyen cancel")
     void vet_cannotCancelSchedule_throwsForbidden() {
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
-    @DisplayName("13. AD-022: không còn API hủy ca khám — kẹt lịch chuyển qua reschedule, hết quyền cancel")
+    @DisplayName("13. Chi Club Manager duoc phep cancel ca kham")
     void cancelEndpointAbolished_underAd022() {
-        // Khóa học / API cũ POST /api/care-schedules/{id}/cancel đã bị xóa khỏi Controller.
-        // Quyền quản lý chuyển sang POST /api/care-schedules/{id}/reschedule.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test

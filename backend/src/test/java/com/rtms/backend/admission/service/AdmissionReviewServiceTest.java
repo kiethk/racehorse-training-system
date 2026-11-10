@@ -215,6 +215,7 @@ class AdmissionReviewServiceTest {
 
     @Test
     void assignedVetFailureFromStateMachineIsPreserved() {
+        schedule.setVeterinarianId(6L);
         when(admissions.findById(1L)).thenReturn(Optional.of(admission));
         // No IN_PROGRESS schedule found
         when(careSchedules.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(1L, CareScheduleStatus.IN_PROGRESS))
@@ -235,7 +236,7 @@ class AdmissionReviewServiceTest {
 
     @Test
     void requestedExaminationAutoAssignsAndStartsForReviewingVet() {
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setVeterinarianId(null);
         when(admissions.findById(1L)).thenReturn(Optional.of(admission));
         when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
@@ -256,7 +257,7 @@ class AdmissionReviewServiceTest {
 
     @Test
     void requestedExaminationRejectsDifferentVet() {
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setVeterinarianId(99L);
         when(admissions.findById(1L)).thenReturn(Optional.of(admission));
         when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))

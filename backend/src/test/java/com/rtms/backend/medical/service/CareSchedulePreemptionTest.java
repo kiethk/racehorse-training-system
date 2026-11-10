@@ -23,7 +23,7 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import org.junit.jupiter.api.Disabled;
+
+@Disabled("Preemption and pause feature abolished per 4-state lifecycle simplification")
 class CareSchedulePreemptionTest {
 
     private CareScheduleRepository schedules;
@@ -60,7 +63,7 @@ class CareSchedulePreemptionTest {
         events = mock(ApplicationEventPublisher.class);
         notifications = mock(NotificationService.class);
 
-        GroupWorkoutSyncService groupSync = mock(GroupWorkoutSyncService.class);
+        TrainingGroupService groupSync = mock(TrainingGroupService.class);
         TrainingDecisionService trainingDecisionService = new TrainingDecisionService(horses, schedules, groupSync);
 
         service = new CareScheduleService(
@@ -139,7 +142,7 @@ class CareSchedulePreemptionTest {
 
         // Verification:
         // 1. Vet 1's routine exam was preempted to PAUSED
-        assertEquals(CareScheduleStatus.PAUSED, vet1Routine.getStatus());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, vet1Routine.getStatus());
 
         // 2. Urgent case was assigned to Vet 1
         assertEquals(1L, urgent.getVeterinarianId());
@@ -176,14 +179,14 @@ class CareSchedulePreemptionTest {
 
         // New urgent cannot preempt; remains in REQUESTED status
         assertNull(newUrgent.getVeterinarianId());
-        assertEquals(CareScheduleStatus.REQUESTED, newUrgent.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, newUrgent.getStatus());
     }
 
     @Test
     @DisplayName("AD-022: cancelCareSchedule abolished — auto-resume happens on completeCareSchedule")
     void urgentCancellationResumesPausedExam() {
         // Under AD-022, cancelCareSchedule is removed; auto-resume is triggered by completion.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
@@ -196,7 +199,7 @@ class CareSchedulePreemptionTest {
         pausedExam.setHorseId(101L);
         pausedExam.setVeterinarianId(1L);
         pausedExam.setCareType(CareType.ROUTINE);
-        pausedExam.setStatus(CareScheduleStatus.PAUSED);
+        pausedExam.setStatus(CareScheduleStatus.IN_PROGRESS);
         pausedExam.setScheduledAt(scheduledAt);
 
         User vet1 = eligibleVet(1L);
@@ -253,7 +256,7 @@ class CareSchedulePreemptionTest {
 
         assertEquals(vet.getId(), urgent.getVeterinarianId());
         assertEquals(CareScheduleStatus.SCHEDULED, urgent.getStatus());
-        assertEquals(CareScheduleStatus.REQUESTED, booked.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
         assertNull(booked.getVeterinarianId());
         assertNull(booked.getScheduledAt());
     }
@@ -269,7 +272,7 @@ class CareSchedulePreemptionTest {
 
         service.assignRequestedSchedule(urgentRequest(999L, 500L));
 
-        assertEquals(CareScheduleStatus.REQUESTED, booked.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
         assertEquals(1L, booked.getVeterinarianId());
         assertNull(booked.getScheduledAt());
     }
@@ -290,9 +293,9 @@ class CareSchedulePreemptionTest {
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
 
-        assertEquals(CareScheduleStatus.PAUSED, exam.getStatus());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, exam.getStatus());
         assertEquals(vet.getId(), urgent.getVeterinarianId());
-        assertEquals(CareScheduleStatus.REQUESTED, booked.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
     }
 
     @Test
@@ -311,7 +314,7 @@ class CareSchedulePreemptionTest {
         service.assignRequestedSchedule(urgent);
 
         assertEquals(CareScheduleStatus.IN_PROGRESS, exam.getStatus());
-        assertEquals(CareScheduleStatus.REQUESTED, urgent.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, urgent.getStatus());
     }
 
     @Test
@@ -329,7 +332,7 @@ class CareSchedulePreemptionTest {
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
 
-        assertEquals(CareScheduleStatus.PAUSED, current.getStatus());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, current.getStatus());
         assertEquals(CareScheduleStatus.IN_PROGRESS, stale.getStatus());
         assertEquals(1L, urgent.getVeterinarianId());
     }
@@ -349,7 +352,7 @@ class CareSchedulePreemptionTest {
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
 
-        assertEquals(CareScheduleStatus.PAUSED, current.getStatus());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, current.getStatus());
         assertEquals(1L, urgent.getVeterinarianId());
     }
 
@@ -399,7 +402,7 @@ class CareSchedulePreemptionTest {
         cs.setId(id);
         cs.setHorseId(100L);
         cs.setCareType(CareType.URGENT);
-        cs.setStatus(CareScheduleStatus.REQUESTED);
+        cs.setStatus(CareScheduleStatus.SCHEDULED);
         cs.setSourceIncidentId(incidentId);
         return cs;
     }

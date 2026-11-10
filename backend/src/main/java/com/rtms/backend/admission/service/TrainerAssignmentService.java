@@ -6,11 +6,13 @@ import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,15 +35,26 @@ public class TrainerAssignmentService {
     private final HorseRepository horseRepository;
     private final HeadTrainerWorkloadService workloadService;
     private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
     public TrainerAssignmentService(AdmissionApplicationRepository admissionRepository,
                                     HorseRepository horseRepository,
                                     HeadTrainerWorkloadService workloadService,
                                     NotificationService notificationService) {
+        this(admissionRepository, horseRepository, workloadService, notificationService, null);
+    }
+
+    @Autowired
+    public TrainerAssignmentService(AdmissionApplicationRepository admissionRepository,
+                                    HorseRepository horseRepository,
+                                    HeadTrainerWorkloadService workloadService,
+                                    NotificationService notificationService,
+                                    @Autowired(required = false) UserRepository userRepository) {
         this.admissionRepository = admissionRepository;
         this.horseRepository = horseRepository;
         this.workloadService = workloadService;
         this.notificationService = notificationService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -61,7 +74,14 @@ public class TrainerAssignmentService {
             return Optional.empty();
         }
         if (admission.getTrainerId() != null) {
-            return Optional.of(admission.getTrainerId());
+            boolean active = userRepository == null || userRepository.findById(admission.getTrainerId())
+                    .map(User::isActive)
+                    .orElse(false);
+            if (active) {
+                return Optional.of(admission.getTrainerId());
+            }
+            log.warn("Assigned Head Trainer #{} for admission #{} is inactive. Auto-reassigning...", admission.getTrainerId(), admissionId);
+            admission.setTrainerId(null);
         }
 
         Optional<User> selected = workloadService.selectLeastLoadedHeadTrainer();

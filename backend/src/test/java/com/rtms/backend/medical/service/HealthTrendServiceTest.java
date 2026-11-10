@@ -5,7 +5,7 @@ import com.rtms.backend.medical.dto.HealthReadingRow;
 import com.rtms.backend.medical.dto.HealthTrendResponse;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.service.HorseScopeService;
+import com.rtms.backend.training.service.TrainingAccessPolicy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 class HealthTrendServiceTest {
 
     @Mock private HorseHealthMetricRepository metricRepository;
-    @Mock private HorseScopeService scopeService;
+    @Mock private TrainingAccessPolicy accessPolicy;
     @InjectMocks private HealthTrendService service;
 
     private final AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
@@ -43,7 +43,7 @@ class HealthTrendServiceTest {
     @Test
     @DisplayName("The last 30 days up to today, for the horses in the scope of the role")
     void trendCoversThirtyDays() {
-        when(scopeService.horseIdsOf(owner)).thenReturn(List.of(60L, 61L));
+        when(accessPolicy.horseIdsOf(owner)).thenReturn(List.of(60L, 61L));
         when(metricRepository.findHealthReadings(List.of(60L, 61L), today.minusDays(29).atStartOfDay(),
                 today.plusDays(1).atStartOfDay())).thenReturn(List.of());
 
@@ -58,7 +58,7 @@ class HealthTrendServiceTest {
     @DisplayName("A day counts its readings and lists each abnormal horse once, with all its issues merged")
     void abnormalHorsesAreListedOncePerDay() {
         LocalDate day = today.minusDays(2);
-        when(scopeService.horseIdsOf(owner)).thenReturn(List.of(60L, 61L, 62L));
+        when(accessPolicy.horseIdsOf(owner)).thenReturn(List.of(60L, 61L, 62L));
         when(metricRepository.findHealthReadings(any(), any(), any())).thenReturn(List.of(
                 reading(day, 61L, "Zephyr", "38.0", "40", "6.0"),    // normal
                 reading(day, 60L, "Atlas", "38.9", "40", "6.0"),     // fever
@@ -85,7 +85,7 @@ class HealthTrendServiceTest {
     @Test
     @DisplayName("Abnormal horses of one day are listed by name")
     void abnormalHorsesAreSortedByName() {
-        when(scopeService.horseIdsOf(owner)).thenReturn(List.of(60L, 61L));
+        when(accessPolicy.horseIdsOf(owner)).thenReturn(List.of(60L, 61L));
         when(metricRepository.findHealthReadings(any(), any(), any())).thenReturn(List.of(
                 reading(today, 61L, "Zephyr", "39.5", "40", "6.0"),
                 reading(today, 60L, "Atlas", "38.0", "40", "3.0")));
@@ -98,7 +98,7 @@ class HealthTrendServiceTest {
     @Test
     @DisplayName("A role with no horses gets an empty chart and no query")
     void noHorsesNoQuery() {
-        when(scopeService.horseIdsOf(owner)).thenReturn(List.of());
+        when(accessPolicy.horseIdsOf(owner)).thenReturn(List.of());
 
         assertTrue(service.getTrend(owner).days().isEmpty());
         verify(metricRepository, never()).findHealthReadings(any(), any(), any());

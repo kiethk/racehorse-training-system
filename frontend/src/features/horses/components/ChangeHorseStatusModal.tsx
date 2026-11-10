@@ -98,7 +98,9 @@ export function ChangeHorseStatusModal({
           : `${horse.name} restored to Eligible`,
         isTransitionToInactive
           ? 'Stall released and pending schedules cancelled.'
-          : 'Assigned to regular stall with Groom and Trainer.',
+          : horse.trainingDecision === 'BLOCKED'
+            ? 'Assigned to regular stall. Training remains BLOCKED pending vet follow-up exam.'
+            : 'Assigned to regular stall with Groom and Trainer.',
       );
       onSuccess(updated);
       onClose();
@@ -161,9 +163,13 @@ export function ChangeHorseStatusModal({
           <Notice tone="error" title="No Regular Stalls Available">
             Cannot restore horse: No regular stalls are currently available in the stable. Please vacate or assign an existing regular stall before restoring this horse.
           </Notice>
+        ) : horse.trainingDecision === 'BLOCKED' ? (
+          <Notice tone="warning" title="Medical Hold Preserved">
+            This horse is currently BLOCKED from training by veterinary decision ({horse.trainingDecisionReason || 'medical restriction'}). Restoring to Eligible will assign an available regular stall, keep this training block intact, and automatically schedule a follow-up veterinary exam. Only a Veterinarian can unblock training.
+          </Notice>
         ) : (
           <Notice tone="info" title="Restoration to Active">
-            Restoring this horse will re-enable training and assign them to an available regular stall, linking them with their Area Trainer and Groom.
+            Restoring this horse will assign them to an available regular stall with an Area Trainer and Groom, allowing training activities to proceed.
           </Notice>
         )}
 

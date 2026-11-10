@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupTasks, type TaskBlock } from '../lib/groupTasks.ts';
+import { groupTasks, type TaskBlock, type SingleTask } from '../lib/groupTasks.ts';
 import type { TodayTaskItem } from '../types/index.ts';
 
 function task(overrides: Partial<TodayTaskItem>): TodayTaskItem {
@@ -58,6 +58,21 @@ describe('groupTasks', () => {
 
     assert.deepEqual(entries.map((e) => e.kind), ['block', 'single', 'single']);
     assert.deepEqual(entries.map((e) => e.startTime), ['05:00:00', '05:00:00', '06:00:00']);
+  });
+
+  it('merges the workouts of one session into one row listing every horse', () => {
+    const workout = { source: 'WORKOUT' as const, actionable: false, startTime: '07:30:00', endTime: '08:15:00', title: 'Training session · Gate Loading' };
+    const entries = groupTasks([
+      task({ ...workout, refId: 1, horseName: 'Nausicaa' }),
+      task({ ...workout, refId: 2, horseName: 'Eagle' }),
+      task({ ...workout, refId: 3, horseName: 'Si Renesme' }),
+      task({ ...workout, refId: 4, horseName: 'Other', startTime: '09:00:00', endTime: '09:45:00' }),
+    ]);
+
+    assert.equal(entries.length, 2);
+    const first = entries[0] as SingleTask;
+    assert.deepEqual(first.horseNames, ['Eagle', 'Nausicaa', 'Si Renesme']);
+    assert.deepEqual((entries[1] as SingleTask).horseNames, ['Other']);
   });
 
   it('shows each completion once with the horses it covered, and skips completions without evidence', () => {

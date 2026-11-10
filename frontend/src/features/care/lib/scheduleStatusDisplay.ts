@@ -17,13 +17,10 @@ export interface ScheduleStatusDisplay {
  * Always read `status`: the derived `overdue` boolean cannot tell these two apart.
  */
 const STATUS_DISPLAY: Record<CareScheduleStatus, ScheduleStatusDisplay> = {
-  REQUESTED: { label: 'Requested', tone: 'warning', icon: 'clock' },
   SCHEDULED: { label: 'Scheduled', tone: 'neutral', icon: 'calendar' },
   IN_PROGRESS: { label: 'In Progress', tone: 'primary', icon: 'activity' },
-  PAUSED: { label: 'Paused', tone: 'warning', icon: 'clock' },
-  DELAYED: { label: 'Delayed', tone: 'warning', icon: 'clock' },
-  OVERDUE: { label: 'Overdue', tone: 'danger', icon: 'alert-triangle' },
   COMPLETED: { label: 'Completed', tone: 'success', icon: 'check' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger', icon: 'x' },
 };
 
 const UNKNOWN_STATUS: ScheduleStatusDisplay = { label: 'Unknown', tone: 'neutral', icon: 'circle' };

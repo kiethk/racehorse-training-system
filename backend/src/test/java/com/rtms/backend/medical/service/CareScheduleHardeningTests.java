@@ -25,7 +25,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -55,7 +55,7 @@ class CareScheduleHardeningTests {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     private NotificationService notificationService;
     private AdmissionApplicationRepository admissionRepository;
     private CareScheduleService service;
@@ -68,7 +68,7 @@ class CareScheduleHardeningTests {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(GroupWorkoutSyncService.class);
+        workoutService = mock(TrainingGroupService.class);
         notificationService = mock(NotificationService.class);
         admissionRepository = mock(AdmissionApplicationRepository.class);
 
@@ -140,7 +140,7 @@ class CareScheduleHardeningTests {
         routine.setId(101L);
         routine.setHorseId(10L);
         routine.setCareType(CareType.ROUTINE);
-        routine.setStatus(CareScheduleStatus.REQUESTED);
+        routine.setStatus(CareScheduleStatus.SCHEDULED);
         routine.setAdmissionId(null);
         routine.setDurationMinutes(30);
 
@@ -178,7 +178,7 @@ class CareScheduleHardeningTests {
         urgent.setId(102L);
         urgent.setHorseId(10L);
         urgent.setCareType(CareType.URGENT);
-        urgent.setStatus(CareScheduleStatus.REQUESTED);
+        urgent.setStatus(CareScheduleStatus.SCHEDULED);
         urgent.setSourceIncidentId(50L);
         urgent.setAdmissionId(null);
         urgent.setDurationMinutes(30);

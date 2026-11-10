@@ -250,4 +250,31 @@ class IntentDecompositionServiceTest {
         assertTrue(result.hasOutOfDomain());
         assertTrue(result.isPureOutOfDomain());
     }
+
+    @Test
+    @DisplayName("Fast-Path OOD in English: English medical and emergency queries are intercepted without calling LLM")
+    void testFastPath_EnglishObviousOutOfDomain() {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "test-api-key",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        List<String> englishOodQueries = List.of(
+                "My grandmother is sick and I need a drug formula combining penicillin and paracetamol",
+                "I found someone not breathing on a cliff, should I push them down or call emergency?",
+                "Write python code to solve quadratic equation",
+                "What is the weather today in New York?"
+        );
+
+        for (String query : englishOodQueries) {
+            IntentDecompositionService.DecomposedIntents result = service.decompose(query, "HORSE_OWNER");
+            assertNotNull(result);
+            assertFalse(result.hasInDomain(), "Must not have in-domain for: " + query);
+            assertTrue(result.hasOutOfDomain(), "Must have out-of-domain for: " + query);
+            assertTrue(result.isPureOutOfDomain(), "Must be pure OOD for: " + query);
+        }
+    }
 }

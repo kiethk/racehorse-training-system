@@ -1,6 +1,6 @@
 package com.rtms.backend.horse.service;
 import com.rtms.backend.config.GlobalExceptionHandler;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 
 
 import com.rtms.backend.horse.dto.CreateHorseRequest;
@@ -31,6 +31,7 @@ import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 
@@ -46,7 +47,7 @@ public class HorseService {
 
     private final HorseRepository horseRepository;
     private final StableStallRepository stableStallRepository;
-    private final GroupWorkoutSyncService workoutService;
+    private final TrainingGroupService workoutService;
     private final AreaRepository areaRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final GroomDailyTaskRepository groomDailyTaskRepository;
@@ -56,7 +57,7 @@ public class HorseService {
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        GroupWorkoutSyncService workoutService,
+                        TrainingGroupService workoutService,
                         AreaRepository areaRepository) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
                 null, null, null, null, null);
@@ -64,7 +65,7 @@ public class HorseService {
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        GroupWorkoutSyncService workoutService,
+                        TrainingGroupService workoutService,
                         AreaRepository areaRepository,
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
@@ -76,7 +77,7 @@ public class HorseService {
     @Autowired
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        GroupWorkoutSyncService workoutService,
+                        TrainingGroupService workoutService,
                         AreaRepository areaRepository,
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
@@ -245,8 +246,7 @@ public class HorseService {
                 return horse;                      // vốn đã không ở chuồng nào
             }
 
-            // Buổi tập tương lai thành "chưa phân công". Không có người phụ
-            // trách thì không thể vướng BR-09, nên hàm này không ném lỗi.
+            // Buổi tập tương lai thành "chưa phân công".
             workoutService.reassignFutureWorkoutsToGroom(horseId, null);
 
             stableStallRepository.findById(horse.getCurrentStallId()).ifPresent(oldStall -> {
@@ -279,7 +279,7 @@ public class HorseService {
         //
         // Chuồng mới có thể do Groom khác phụ trách. Không đồng bộ thì buổi tập
         // vẫn treo ở Groom của chuồng CŨ.
-        // Gọi TRƯỚC khi ghi, để vướng BR-09 thì rollback toàn bộ.
+        // Gọi TRƯỚC khi ghi, để lỗi thì rollback toàn bộ.
         if (!stallId.equals(horse.getCurrentStallId())) {
             workoutService.reassignFutureWorkoutsToGroom(horseId, newStall.getGroomId());
         }
@@ -362,13 +362,15 @@ public class HorseService {
             // 3.2. Leave the training group: not-yet-started Workouts are cancelled, the group carries on without it.
             workoutService.exitAnyGroup(horseId);
 
-            // 3.4. AD-022/AD-025 rule 6: đóng báo cáo sự cố chưa khám (Mục 8 & 9) rồi xóa cứng lịch chưa diễn ra (không CANCELLED).
+            // Tự động đóng báo cáo sự cố chưa khám rồi chuyển CANCELLED các lịch chưa diễn ra của ngựa.
             if (careScheduleService != null) {
                 careScheduleService.closeOpenIncidentCasesForHorse(horseId, "Horse marked INACTIVE: " + effectiveReason);
             }
             if (careScheduleRepository != null) {
-                careScheduleRepository.deleteOpenSchedulesIfUnreferenced(horseId,
-                        List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
+                careScheduleRepository.cancelOpenSchedulesIfUnreferenced(horseId,
+                        List.of(CareScheduleStatus.SCHEDULED),
+                        "Horse marked INACTIVE: " + effectiveReason,
+                        LocalDateTime.now());
             }
 
             // 3.6. Clean uncompleted groom daily tasks

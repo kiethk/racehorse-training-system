@@ -40,9 +40,9 @@ import java.util.stream.Collectors;
 @Service
 public class HorseIncidentReportService {
 
-    /** Ca chưa khám. Ca đang khám hoặc tạm dừng thì Vet đã ở bên ngựa, báo cáo mới chỉ gắn vào. */
+    /** Ca chưa khám. */
     private static final Set<CareScheduleStatus> NOT_EXAMINED =
-            Set.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.OVERDUE);
+            Set.of(CareScheduleStatus.SCHEDULED);
 
     private final HorseIncidentReportRepository incidentReportRepository;
     private final HorseRepository horseRepository;

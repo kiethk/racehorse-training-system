@@ -280,7 +280,7 @@ class HorseIncidentReportRoutingTest {
     @Test
     @DisplayName("Ca chưa có Vet: báo cáo gắn vào vẫn ở REPORTED")
     void aReportOnACaseWithoutVetStaysReported() {
-        CareSchedule urgent = schedule(100L, CareType.URGENT, CareScheduleStatus.REQUESTED, null);
+        CareSchedule urgent = schedule(100L, CareType.URGENT, CareScheduleStatus.SCHEDULED, null);
         when(careScheduleService.findOpenIncidentCase(HORSE_ID)).thenReturn(Optional.of(urgent));
 
         HorseIncidentReport report = service.createReport(request(IncidentSeverity.LOW), groom);
@@ -290,7 +290,7 @@ class HorseIncidentReportRoutingTest {
     }
 
     private CareSchedule stubCreatedCase(CareType type, long id, Long vetId) {
-        CareSchedule created = schedule(id, type, vetId != null ? CareScheduleStatus.SCHEDULED : CareScheduleStatus.REQUESTED, vetId);
+        CareSchedule created = schedule(id, type, CareScheduleStatus.SCHEDULED, vetId);
         CareScheduleResponse response = mock(CareScheduleResponse.class);
         when(response.id()).thenReturn(id);
         when(careScheduleService.createSchedule(eq(HORSE_ID), eq(type), anyString(), isNull(), anyLong())).thenReturn(response);

@@ -43,7 +43,7 @@ public class CareSchedule {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private CareScheduleStatus status = CareScheduleStatus.REQUESTED;
+    private CareScheduleStatus status = CareScheduleStatus.SCHEDULED;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -77,6 +77,9 @@ public class CareSchedule {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "cancel_reason", columnDefinition = "TEXT")
+    private String cancelReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -86,7 +89,7 @@ public class CareSchedule {
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
-        if (status == null) status = CareScheduleStatus.REQUESTED;
+        if (status == null) status = CareScheduleStatus.SCHEDULED;
         if (purpose == null) purpose = CareSchedulePurpose.FOLLOW_UP;
         if (durationMinutes <= 0) durationMinutes = 30;
         createdAt = now;
@@ -163,6 +166,9 @@ public class CareSchedule {
 
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+
+    public String getCancelReason() { return cancelReason; }
+    public void setCancelReason(String cancelReason) { this.cancelReason = cancelReason; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

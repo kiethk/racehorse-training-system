@@ -1,11 +1,11 @@
 -- =====================================================================
--- 50_training.sql — bài tập, khóa học, Training Group, Group Plan, Session và Workout của 3 Head Trainer (~13 tuần + sắp tới).
--- (Subjects, courses, training groups, group plans, sessions and workouts of the 3 head trainers: ~13 weeks of history plus upcoming.)
+-- 50_training.sql — bài tập, khóa học, Training Group, Course Run, Session và Workout của 3 Head Trainer (~13 tuần + sắp tới).
+-- (Exercises, courses, training groups, course runs, sessions and workouts of the 3 head trainers: ~13 weeks of history plus upcoming.)
 --
--- Luật đang giữ (TrainingGroupService / GroupPlanService / SessionSettlementService, migration V202610311000):
---   - Nhóm tối đa 6 ngựa, mỗi ngựa một nhóm, không hai ngựa cùng Groom trong một nhóm (BR-10, BR-09); ngựa ELIGIBLE, không bị
+-- Luật đang giữ (TrainingGroupService / CourseRunService / SessionSettlementService, migration V202610311000):
+--   - Nhóm tối đa 6 ngựa, mỗi ngựa một nhóm (BR-10); ngựa ELIGIBLE, không bị
 --     chặn tập, trong khu của Trainer. Ngựa đang bị chặn tập không nằm trong nhóm nào.
---   - Các Group Plan chưa đóng của một nhóm không chồng ngày; mỗi plan có đúng total_sessions buổi, xoay vòng bài của khóa,
+--   - Các Course Run chưa đóng của một nhóm không chồng ngày; mỗi plan có đúng total_sessions buổi, xoay vòng bài của khóa,
 --     chỉ vào các thứ đã chọn.
 --   - Session trong khung 06:00-10:00, bắt đầu :00/:15/:30/:45, không chồng Session khác của Trainer, xếp first-fit theo ngày.
 --   - Trạng thái theo ĐỒNG HỒ: Session hết giờ là HELD (kể cả chưa ghi kết quả), plan đóng khi không còn Session chờ chạy
@@ -14,7 +14,7 @@
 --   - Buổi đã ghi kết quả có đủ 7 chỉ số; điểm phong độ tính đúng công thức WorkoutPerformanceCalculator.
 -- Kịch bản demo có sẵn: Session đã HELD còn thiếu kết quả (nhãn "Cần ghi kết quả"), ngựa vào giữa khóa, ngựa bị bỏ riêng một buổi,
 -- ngựa "không chạy", Session bị hủy vì mưa, plan bị hủy giữa chừng, plan xếp hàng chờ sau plan đang chạy.
--- (Rules kept: group of at most 6 with one horse per groom and one group per horse, no overlapping unfinished plans per group,
+-- (Rules kept: group of at most 6 and one group per horse, no overlapping unfinished plans per group,
 -- Sessions on quarter hours inside the golden window placed first-fit per day, statuses follow the clock, blocking removes a horse
 -- from its group and cancels what has not started. Demo scenarios: a Held Session missing results, a mid-course joiner, one horse
 -- cancelled for a single Session, a horse that did not run, a rainy Session cancelled, a plan dropped part-way, a queued plan.)
@@ -76,8 +76,8 @@ CREATE FUNCTION pg_temp.group_bands(p_group BIGINT) RETURNS TEXT[] AS $$
     WITH ran AS (
         SELECT pg_temp.band(sub.target_distance_meters) AS band, count(*) AS n
           FROM training_sessions s
-          JOIN group_plans p ON p.id = s.group_plan_id
-          JOIN subjects sub ON sub.id = s.subject_id
+          JOIN course_runs p ON p.id = s.course_run_id
+          JOIN exercises sub ON sub.id = s.exercise_id
          WHERE p.group_id = p_group AND s.status = 'HELD' AND sub.category <> 'RECOVERY'
            AND s.session_date >= pg_temp.today() - 90
          GROUP BY 1),
@@ -102,15 +102,15 @@ $$ LANGUAGE sql IMMUTABLE;
 -- Kết quả một buổi tập theo cách WorkoutResultSimulationService sinh số liệu, chỉnh theo "năng lực" của ngựa
 -- (0..1, cao = khỏe) và cờ mệt mỏi. (Workout result the way WorkoutResultSimulationService generates it, tuned by the
 -- horse's ability (0..1) and a fatigue flag.)
-CREATE FUNCTION pg_temp.workout_result(p_seed TEXT, p_subject BIGINT, p_ability NUMERIC, p_fatigue BOOLEAN, p_bands TEXT[],
+CREATE FUNCTION pg_temp.workout_result(p_seed TEXT, p_exercise BIGINT, p_ability NUMERIC, p_fatigue BOOLEAN, p_bands TEXT[],
     OUT dist NUMERIC, OUT dur NUMERIC, OUT top NUMERIC, OUT avg NUMERIC, OUT hr INT, OUT hr_max INT, OUT hr_rec INT,
     OUT rating INT) AS $$
 DECLARE
-    s subjects;
+    s exercises;
     v_lo NUMERIC; v_hi NUMERIC; v_hr_lo INT; v_hr_hi INT;
     a NUMERIC := LEAST(1, GREATEST(0, p_ability + pg_temp.rnd(p_seed || 'n', -0.12, 0.12)));
 BEGIN
-    SELECT * INTO s FROM subjects WHERE id = p_subject;
+    SELECT * INTO s FROM exercises WHERE id = p_exercise;
     SELECT x.lo, x.hi, x.hlo, x.hhi INTO v_lo, v_hi, v_hr_lo, v_hr_hi
       FROM (VALUES ('LOW', 15.0, 24.0, 115, 140), ('MEDIUM', 24.0, 36.0, 140, 165), ('HIGH', 36.0, 50.0, 155, 175))
            x(level, lo, hi, hlo, hhi)
@@ -151,16 +151,16 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 
 -- Bài tập và khóa học. Khóa có nhiều kiểu: một bài lặp lại, nhiều bài xoay vòng, toàn bài khác nhau, khóa chưa dùng.
--- (Subjects and courses. Course kinds: one subject repeated, several subjects rotated, all distinct, an unused one.)
-CREATE FUNCTION pg_temp.subject(p_trainer TEXT, p_name TEXT, p_desc TEXT, p_surface TEXT, p_distance INT, p_intensity TEXT,
+-- (Exercises and courses. Course kinds: one exercise repeated, several exercises rotated, all distinct, an unused one.)
+CREATE FUNCTION pg_temp.exercise(p_trainer TEXT, p_name TEXT, p_desc TEXT, p_surface TEXT, p_distance INT, p_intensity TEXT,
                                 p_category TEXT, p_minutes INT, p_created_days_ago INT) RETURNS VOID AS $$
-    INSERT INTO subjects (trainer_id, name, description, surface_type, target_distance_meters, intensity_level, category,
+    INSERT INTO exercises (trainer_id, name, description, surface_type, target_distance_meters, intensity_level, category,
                           duration_minutes, created_at, updated_at)
     VALUES (pg_temp.uid(p_trainer), p_name, p_desc, p_surface, p_distance, p_intensity, p_category, p_minutes,
             pg_temp.at(-p_created_days_ago, TIME '09:00'), pg_temp.at(-p_created_days_ago, TIME '09:00'))
 $$ LANGUAGE sql;
 
-CREATE FUNCTION pg_temp.course(p_trainer TEXT, p_name TEXT, p_goal TEXT, p_sessions INT, p_subjects TEXT[],
+CREATE FUNCTION pg_temp.course(p_trainer TEXT, p_name TEXT, p_goal TEXT, p_sessions INT, p_exercises TEXT[],
                                p_created_days_ago INT) RETURNS VOID AS $$
 DECLARE
     v_course BIGINT;
@@ -169,10 +169,10 @@ DECLARE
 BEGIN
     INSERT INTO courses (name, target_goal, total_sessions, created_by_id, created_at, updated_at, trainer_id)
     VALUES (p_name, p_goal, p_sessions, v_trainer, v_at, v_at, v_trainer) RETURNING id INTO v_course;
-    FOR i IN 1..array_length(p_subjects, 1) LOOP
-        INSERT INTO course_subjects (course_id, subject_id, order_index, created_at)
-        SELECT v_course, s.id, i, v_at FROM subjects s WHERE s.trainer_id = v_trainer AND s.name = p_subjects[i];
-        IF NOT FOUND THEN RAISE EXCEPTION 'Unknown subject % of %', p_subjects[i], p_trainer; END IF;
+    FOR i IN 1..array_length(p_exercises, 1) LOOP
+        INSERT INTO course_exercises (course_id, exercise_id, order_index, created_at)
+        SELECT v_course, s.id, i, v_at FROM exercises s WHERE s.trainer_id = v_trainer AND s.name = p_exercises[i];
+        IF NOT FOUND THEN RAISE EXCEPTION 'Unknown exercise % of %', p_exercises[i], p_trainer; END IF;
     END LOOP;
     PERFORM pg_temp.audit(v_trainer, 'Create Training Course', 'Course', NULL, 'Trainer registered a new curriculum course',
                           v_at, 'POST', '/api/courses');
@@ -200,8 +200,8 @@ BEGIN
     RETURN v_start;
 END $$ LANGUAGE plpgsql;
 
--- Chia các ngựa đã cho thành các nhóm tối đa 6 ngựa, không hai ngựa cùng Groom trong một nhóm. Ngựa đang bị chặn tập bỏ qua.
--- (Splits the horses into groups of at most 6 with no two horses of one groom. Horses blocked right now are skipped.)
+-- Chia các ngựa đã cho thành các nhóm tối đa 6 ngựa; seed chủ ý rải Groom khác nhau vào mỗi nhóm cho dữ liệu đa dạng (luật không bắt buộc). Ngựa đang bị chặn tập bỏ qua.
+-- (Splits the horses into groups of at most 6; the seed deliberately spreads grooms across a group for variety, the rules do not require it. Horses blocked right now are skipped.)
 CREATE FUNCTION pg_temp.make_groups(p_trainer TEXT, p_prefix TEXT, p_horses TEXT[]) RETURNS BIGINT[] AS $$
 DECLARE
     v_trainer BIGINT := pg_temp.uid(p_trainer);
@@ -250,7 +250,7 @@ DECLARE
 BEGIN
     SELECT * INTO s FROM training_sessions WHERE id = p_session;
     IF p_recorded THEN
-        r := pg_temp.workout_result(p_plan || '-' || p_horse || '-' || p_session, s.subject_id, p_ability, p_fatigue, NULL);
+        r := pg_temp.workout_result(p_plan || '-' || p_horse || '-' || p_session, s.exercise_id, p_ability, p_fatigue, NULL);
         INSERT INTO training_workouts (session_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
                                        top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
                                        performance_rating, trainer_feedback, created_at, updated_at)
@@ -263,7 +263,7 @@ BEGIN
     END IF;
 END $$ LANGUAGE plpgsql;
 
--- Một khóa giao cho một nhóm (GroupPlanService.createPlan): các buổi xếp first-fit, mỗi thành viên có một Workout mỗi buổi.
+-- Một khóa giao cho một nhóm (CourseRunService.createPlan): các buổi xếp first-fit, mỗi thành viên có một Workout mỗi buổi.
 -- Trạng thái suy ra từ đồng hồ và các khoảng nghỉ trong seed_block. Chỉ buổi của các ngày TRƯỚC hôm nay mới có kết quả; buổi
 -- đã hết giờ hôm nay luôn chưa ghi để demo việc ghi kết quả. p_unrecorded: buổi đã qua gần nhất cũng để trống kết quả.
 -- p_exclude: ngựa chưa vào nhóm lúc tạo plan (vào giữa khóa bằng pg_temp.join_plan).
@@ -271,12 +271,12 @@ END $$ LANGUAGE plpgsql;
 -- clock and the rest windows in seed_block. Only Sessions before today have results; Sessions that ended today are left to
 -- record. p_unrecorded leaves the latest past Session without results too. p_exclude: horses not yet in the group when the plan
 -- was created (they join mid-course with pg_temp.join_plan).)
-CREATE FUNCTION pg_temp.make_group_plan(p_group BIGINT, p_course BIGINT, p_start DATE, p_days TEXT,
+CREATE FUNCTION pg_temp.make_course_run(p_group BIGINT, p_course BIGINT, p_start DATE, p_days TEXT,
                                         p_unrecorded BOOLEAN DEFAULT FALSE, p_exclude BIGINT[] DEFAULT '{}',
                                         p_fatigue BIGINT DEFAULT NULL) RETURNS BIGINT AS $$
 DECLARE
-    v_trainer BIGINT; v_total INT; v_subjects BIGINT[]; v_dates DATE[]; v_created TIMESTAMP;
-    v_plan BIGINT; v_subject BIGINT; v_minutes INT; v_start TIME; v_end TIME; v_last_past INT := 0;
+    v_trainer BIGINT; v_total INT; v_exercises BIGINT[]; v_dates DATE[]; v_created TIMESTAMP;
+    v_plan BIGINT; v_exercise BIGINT; v_minutes INT; v_start TIME; v_end TIME; v_last_past INT := 0;
     s RECORD; m RECORD; v_block TIMESTAMP; v_approved TIMESTAMP; v_ability NUMERIC; v_end_ts TIMESTAMP;
     v_rec TIMESTAMP; v_status TEXT; v_recorded BOOLEAN;
 BEGIN
@@ -285,23 +285,23 @@ BEGIN
     IF (SELECT trainer_id FROM courses WHERE id = p_course) <> v_trainer THEN
         RAISE EXCEPTION 'Course % does not belong to the trainer of group %', p_course, p_group;
     END IF;
-    SELECT array_agg(subject_id ORDER BY order_index) INTO v_subjects FROM course_subjects WHERE course_id = p_course;
+    SELECT array_agg(exercise_id ORDER BY order_index) INTO v_exercises FROM course_exercises WHERE course_id = p_course;
     v_dates := pg_temp.session_dates(p_start, p_days, v_total);
     v_created := LEAST((p_start - 2) + TIME '16:00', pg_temp.clock() - INTERVAL '2 hours');
 
     -- Chèn với trạng thái đã đóng để ràng buộc loại trừ chỉ xét plan chưa đóng khi trạng thái cuối được đặt.
     -- (Inserted as closed so the exclusion constraint only looks at unfinished plans once the final status is set.)
-    INSERT INTO group_plans (group_id, course_id, trainer_id, start_date, end_date, training_days, status, created_at, updated_at)
+    INSERT INTO course_runs (group_id, course_id, trainer_id, start_date, end_date, training_days, status, created_at, updated_at)
     VALUES (p_group, p_course, v_trainer, v_dates[1], v_dates[v_total], pg_temp.sorted_days(p_days), 'COMPLETED', v_created, v_created)
     RETURNING id INTO v_plan;
 
     FOR i IN 1..v_total LOOP
-        v_subject := v_subjects[((i - 1) % array_length(v_subjects, 1)) + 1];
-        SELECT duration_minutes INTO v_minutes FROM subjects WHERE id = v_subject;
+        v_exercise := v_exercises[((i - 1) % array_length(v_exercises, 1)) + 1];
+        SELECT duration_minutes INTO v_minutes FROM exercises WHERE id = v_exercise;
         v_start := pg_temp.place_session(v_trainer, v_dates[i], v_minutes);
         v_end := v_start + make_interval(mins => v_minutes);
-        INSERT INTO training_sessions (group_plan_id, subject_id, trainer_id, session_date, start_time, end_time, status, created_at, updated_at)
-        VALUES (v_plan, v_subject, v_trainer, v_dates[i], v_start, v_end,
+        INSERT INTO training_sessions (course_run_id, exercise_id, trainer_id, session_date, start_time, end_time, status, created_at, updated_at)
+        VALUES (v_plan, v_exercise, v_trainer, v_dates[i], v_start, v_end,
                 CASE WHEN v_dates[i] + v_end <= pg_temp.clock() THEN 'HELD' ELSE 'SCHEDULED' END, v_created,
                 CASE WHEN v_dates[i] + v_end <= pg_temp.clock() THEN v_dates[i] + v_end ELSE v_created END);
     END LOOP;
@@ -309,7 +309,7 @@ BEGIN
     -- v_last_past counts only Sessions on days before today.
     SELECT COALESCE(max(idx), 0) INTO v_last_past FROM (
         SELECT row_number() OVER (ORDER BY session_date, start_time) idx, status, session_date
-          FROM training_sessions WHERE group_plan_id = v_plan) x
+          FROM training_sessions WHERE course_run_id = v_plan) x
      WHERE x.status = 'HELD' AND x.session_date < pg_temp.today();
 
     FOR m IN SELECT hm.horse_id, hm.groom_id FROM training_group_members hm
@@ -323,7 +323,7 @@ BEGIN
         v_ability := pg_temp.rnd('ability' || m.horse_id, 0.0, 1.0);
         FOR s IN SELECT id, idx, session_date, end_time, status FROM (
                      SELECT id, row_number() OVER (ORDER BY session_date, start_time) idx, session_date, end_time, status
-                       FROM training_sessions WHERE group_plan_id = v_plan) q ORDER BY idx LOOP
+                       FROM training_sessions WHERE course_run_id = v_plan) q ORDER BY idx LOOP
             v_end_ts := s.session_date + s.end_time;
             v_rec := v_end_ts + make_interval(mins => pg_temp.rndi('rec' || v_plan || m.horse_id || s.idx, 5, 35));
             IF v_block IS NOT NULL AND v_end_ts > v_block THEN
@@ -344,8 +344,8 @@ BEGIN
         END IF;
     END LOOP;
 
-    PERFORM pg_temp.audit(v_trainer, 'Create Training Plan', 'GroupPlan', v_plan,
-                          'Trainer created a new training plan for a group', v_created, 'POST', '/api/group-plans');
+    PERFORM pg_temp.audit(v_trainer, 'Create Training Plan', 'CourseRun', v_plan,
+                          'Trainer created a new training plan for a group', v_created, 'POST', '/api/course-runs');
     RETURN v_plan;
 END $$ LANGUAGE plpgsql;
 
@@ -356,11 +356,11 @@ DECLARE
     v_groom BIGINT; v_ability NUMERIC := pg_temp.rnd('ability' || p_horse, 0.0, 1.0);
     s RECORD; v_rec TIMESTAMP; v_recorded BOOLEAN;
 BEGIN
-    SELECT hm.groom_id INTO v_groom FROM training_group_members hm JOIN group_plans p ON p.group_id = hm.group_id
+    SELECT hm.groom_id INTO v_groom FROM training_group_members hm JOIN course_runs p ON p.group_id = hm.group_id
      WHERE p.id = p_plan AND hm.horse_id = p_horse;
     IF v_groom IS NULL THEN RAISE EXCEPTION 'Horse % is not a member of the group of plan %', p_horse, p_plan; END IF;
     FOR s IN SELECT id, session_date, end_time, status, row_number() OVER (ORDER BY session_date, start_time) idx
-               FROM training_sessions WHERE group_plan_id = p_plan ORDER BY session_date, start_time LOOP
+               FROM training_sessions WHERE course_run_id = p_plan ORDER BY session_date, start_time LOOP
         CONTINUE WHEN s.session_date < p_from OR s.status = 'CANCELLED';
         v_rec := s.session_date + s.end_time + make_interval(mins => pg_temp.rndi('rec' || p_plan || p_horse || s.idx, 5, 35));
         v_recorded := s.status = 'HELD' AND s.session_date < pg_temp.today();
@@ -375,7 +375,7 @@ CREATE FUNCTION pg_temp.cancel_workout(p_plan BIGINT, p_horse BIGINT, p_idx INT)
            actual_distance_meters = NULL, actual_duration_minutes = NULL, top_speed_kmh = NULL, average_speed_kmh = NULL,
            average_heart_rate = NULL, max_heart_rate = NULL, recovery_heart_rate = NULL, performance_rating = NULL, trainer_feedback = NULL
       FROM (SELECT id, session_date FROM (SELECT id, session_date, row_number() OVER (ORDER BY session_date, start_time) idx
-                                            FROM training_sessions WHERE group_plan_id = p_plan) q WHERE idx = p_idx) s
+                                            FROM training_sessions WHERE course_run_id = p_plan) q WHERE idx = p_idx) s
      WHERE w.session_id = s.id AND w.horse_id = p_horse
 $$ LANGUAGE sql;
 
@@ -385,7 +385,7 @@ CREATE FUNCTION pg_temp.did_not_run(p_plan BIGINT, p_horse BIGINT, p_idx INT) RE
            actual_distance_meters = NULL, actual_duration_minutes = NULL, top_speed_kmh = NULL, average_speed_kmh = NULL,
            average_heart_rate = NULL, max_heart_rate = NULL, recovery_heart_rate = NULL, performance_rating = NULL, trainer_feedback = NULL
       FROM (SELECT id, session_date, end_time FROM (SELECT id, session_date, end_time, row_number() OVER (ORDER BY session_date, start_time) idx
-                                                      FROM training_sessions WHERE group_plan_id = p_plan) q WHERE idx = p_idx) s
+                                                      FROM training_sessions WHERE course_run_id = p_plan) q WHERE idx = p_idx) s
      WHERE w.session_id = s.id AND w.horse_id = p_horse
 $$ LANGUAGE sql;
 
@@ -396,7 +396,7 @@ DECLARE
 BEGIN
     SELECT id, (session_date - 1) + TIME '18:00' INTO v_session, v_at FROM (
         SELECT id, session_date, row_number() OVER (ORDER BY session_date, start_time) idx
-          FROM training_sessions WHERE group_plan_id = p_plan) q WHERE idx = p_idx;
+          FROM training_sessions WHERE course_run_id = p_plan) q WHERE idx = p_idx;
     UPDATE training_workouts SET status = 'CANCELLED', updated_at = v_at, actual_distance_meters = NULL, actual_duration_minutes = NULL,
            top_speed_kmh = NULL, average_speed_kmh = NULL, average_heart_rate = NULL, max_heart_rate = NULL,
            recovery_heart_rate = NULL, performance_rating = NULL, trainer_feedback = NULL
@@ -410,11 +410,11 @@ BEGIN
     UPDATE training_workouts SET status = 'CANCELLED', updated_at = p_at, actual_distance_meters = NULL, actual_duration_minutes = NULL,
            top_speed_kmh = NULL, average_speed_kmh = NULL, average_heart_rate = NULL, max_heart_rate = NULL,
            recovery_heart_rate = NULL, performance_rating = NULL, trainer_feedback = NULL
-     WHERE session_id IN (SELECT id FROM training_sessions WHERE group_plan_id = p_plan AND session_date + start_time > p_at);
+     WHERE session_id IN (SELECT id FROM training_sessions WHERE course_run_id = p_plan AND session_date + start_time > p_at);
     UPDATE training_sessions SET status = 'CANCELLED', updated_at = p_at
-     WHERE group_plan_id = p_plan AND session_date + start_time > p_at;
+     WHERE course_run_id = p_plan AND session_date + start_time > p_at;
     INSERT INTO seed_plan_cancel VALUES (p_plan);
-    UPDATE group_plans SET status = 'CANCELLED', updated_at = p_at WHERE id = p_plan;
+    UPDATE course_runs SET status = 'CANCELLED', updated_at = p_at WHERE id = p_plan;
 END $$ LANGUAGE plpgsql;
 
 -- Chuỗi khóa của các nhóm: mỗi nhóm chạy lần lượt các khóa, khóa sau bắt đầu ngay sau khóa trước, đến khi có một khóa xếp hàng chờ
@@ -440,7 +440,7 @@ BEGIN
             IF v_current AND p_late_group = gi THEN
                 SELECT horse_id INTO v_late FROM training_group_members WHERE group_id = p_groups[gi] AND left_at IS NULL ORDER BY id DESC LIMIT 1;
             END IF;
-            v_plan := pg_temp.make_group_plan(p_groups[gi], v_course, v_start, v_days,
+            v_plan := pg_temp.make_course_run(p_groups[gi], v_course, v_start, v_days,
                                               v_current AND p_unrecorded_group = gi,
                                               CASE WHEN v_late IS NULL THEN '{}'::BIGINT[] ELSE ARRAY[v_late] END);
             IF v_late IS NOT NULL THEN
@@ -464,16 +464,16 @@ DECLARE
 BEGIN
     CREATE TEMP TABLE seed_group_bands ON COMMIT DROP AS
         SELECT g.id AS group_id, pg_temp.group_bands(g.id) AS bands FROM training_groups g;
-    FOR r IN SELECT w.id, w.horse_id, w.session_id, s.subject_id, s.group_plan_id AS plan_id, b.bands,
+    FOR r IN SELECT w.id, w.horse_id, w.session_id, s.exercise_id, s.course_run_id AS plan_id, b.bands,
                     w.recovery_heart_rate >= 118 AS fatigue,
-                    (SELECT count(*) FROM training_sessions o WHERE o.group_plan_id = s.group_plan_id
+                    (SELECT count(*) FROM training_sessions o WHERE o.course_run_id = s.course_run_id
                         AND (o.session_date, o.start_time) <= (s.session_date, s.start_time)) AS idx
                FROM training_workouts w
                JOIN training_sessions s ON s.id = w.session_id
-               JOIN group_plans p ON p.id = s.group_plan_id
+               JOIN course_runs p ON p.id = s.course_run_id
                JOIN seed_group_bands b ON b.group_id = p.group_id
               WHERE w.status = 'RAN' LOOP
-        x := pg_temp.workout_result(r.plan_id || '-' || r.horse_id || '-' || r.session_id, r.subject_id,
+        x := pg_temp.workout_result(r.plan_id || '-' || r.horse_id || '-' || r.session_id, r.exercise_id,
                                     pg_temp.rnd('ability' || r.horse_id, 0.0, 1.0) + 0.015 * r.idx, r.fatigue, r.bands);
         UPDATE training_workouts
            SET actual_distance_meters = x.dist, actual_duration_minutes = x.dur, top_speed_kmh = x.top, average_speed_kmh = x.avg,
@@ -489,12 +489,12 @@ CREATE FUNCTION pg_temp.settle_plans() RETURNS VOID AS $$
 BEGIN
     UPDATE training_sessions s SET status = 'CANCELLED', updated_at = s.created_at
      WHERE s.status = 'SCHEDULED' AND NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.session_id = s.id AND w.status <> 'CANCELLED');
-    UPDATE group_plans p
-       SET status = CASE WHEN EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status = 'SCHEDULED')
+    UPDATE course_runs p
+       SET status = CASE WHEN EXISTS (SELECT 1 FROM training_sessions s WHERE s.course_run_id = p.id AND s.status = 'SCHEDULED')
                          THEN CASE WHEN p.start_date > pg_temp.today() THEN 'UPCOMING' ELSE 'ACTIVE' END
-                         WHEN EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status = 'HELD')
+                         WHEN EXISTS (SELECT 1 FROM training_sessions s WHERE s.course_run_id = p.id AND s.status = 'HELD')
                          THEN 'COMPLETED' ELSE 'CANCELLED' END,
-           updated_at = GREATEST(p.created_at, COALESCE((SELECT max(s.updated_at) FROM training_sessions s WHERE s.group_plan_id = p.id), p.created_at))
+           updated_at = GREATEST(p.created_at, COALESCE((SELECT max(s.updated_at) FROM training_sessions s WHERE s.course_run_id = p.id), p.created_at))
      WHERE NOT EXISTS (SELECT 1 FROM seed_plan_cancel c WHERE c.plan_id = p.id);
 END $$ LANGUAGE plpgsql;
 
@@ -505,18 +505,18 @@ DECLARE
     v_plan BIGINT;
     v_horse BIGINT;
 BEGIN
-    -- ----------------------------------------------------------------- subjects and courses
-    PERFORM pg_temp.subject('TR01', 'Aerobic Base Canter', 'Steady canter on turf to build the aerobic base.', 'TURF', 1600, 'MEDIUM', 'ENDURANCE', 60, 120);
-    PERFORM pg_temp.subject('TR01', 'Long Stride Gallop', 'Sustained gallop to condition long-stride rhythm.', 'DIRT', 2000, 'MEDIUM', 'ENDURANCE', 60, 120);
-    PERFORM pg_temp.subject('TR01', 'Uphill Power Gallop', 'Incline work for hindquarter drive and cardiac economy.', 'DIRT', 1600, 'HIGH', 'ENDURANCE', 60, 118);
-    PERFORM pg_temp.subject('TR01', 'Gate Breakout Sprint', 'Explosive gate opening and a 400 m initial drive.', 'DIRT', 400, 'HIGH', 'GATE_START', 45, 118);
-    PERFORM pg_temp.subject('TR01', 'Turn and Straight Sprint', 'Hold the line through the turn, accelerate on the straight.', 'SYNTHETIC', 1000, 'HIGH', 'SPEED', 60, 117);
-    PERFORM pg_temp.subject('TR01', 'Furlong Interval Bursts', 'Short bursts with 2-minute recovery between furlongs.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 117);
-    PERFORM pg_temp.subject('TR01', 'Walk and Hydro Cooling', 'Active walking and cold-water hosing to clear lactate.', 'SYNTHETIC', 800, 'LOW', 'RECOVERY', 45, 116);
-    PERFORM pg_temp.subject('TR01', 'Trot Balance Work', 'Balance, stride symmetry and joint mobility at trot.', 'TURF', 1200, 'LOW', 'RECOVERY', 45, 116);
-    PERFORM pg_temp.subject('TR01', 'Gate Loading Composure', 'Calm loading into the starting stall and a quiet stand.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 115);
-    PERFORM pg_temp.subject('TR01', 'Official Speed Trial', 'Full mock trial with electronic timing.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 115);
-    PERFORM pg_temp.subject('TR01', 'Sand Track Stamina', 'Deep sand work for stamina, not in any course yet.', 'DIRT', 1800, 'MEDIUM', 'ENDURANCE', 60, 20);
+    -- ----------------------------------------------------------------- exercises and courses
+    PERFORM pg_temp.exercise('TR01', 'Aerobic Base Canter', 'Steady canter on turf to build the aerobic base.', 'TURF', 1600, 'MEDIUM', 'ENDURANCE', 60, 120);
+    PERFORM pg_temp.exercise('TR01', 'Long Stride Gallop', 'Sustained gallop to condition long-stride rhythm.', 'DIRT', 2000, 'MEDIUM', 'ENDURANCE', 60, 120);
+    PERFORM pg_temp.exercise('TR01', 'Uphill Power Gallop', 'Incline work for hindquarter drive and cardiac economy.', 'DIRT', 1600, 'HIGH', 'ENDURANCE', 60, 118);
+    PERFORM pg_temp.exercise('TR01', 'Gate Breakout Sprint', 'Explosive gate opening and a 400 m initial drive.', 'DIRT', 400, 'HIGH', 'GATE_START', 45, 118);
+    PERFORM pg_temp.exercise('TR01', 'Turn and Straight Sprint', 'Hold the line through the turn, accelerate on the straight.', 'SYNTHETIC', 1000, 'HIGH', 'SPEED', 60, 117);
+    PERFORM pg_temp.exercise('TR01', 'Furlong Interval Bursts', 'Short bursts with 2-minute recovery between furlongs.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 117);
+    PERFORM pg_temp.exercise('TR01', 'Walk and Hydro Cooling', 'Active walking and cold-water hosing to clear lactate.', 'SYNTHETIC', 800, 'LOW', 'RECOVERY', 45, 116);
+    PERFORM pg_temp.exercise('TR01', 'Trot Balance Work', 'Balance, stride symmetry and joint mobility at trot.', 'TURF', 1200, 'LOW', 'RECOVERY', 45, 116);
+    PERFORM pg_temp.exercise('TR01', 'Gate Loading Composure', 'Calm loading into the starting stall and a quiet stand.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 115);
+    PERFORM pg_temp.exercise('TR01', 'Official Speed Trial', 'Full mock trial with electronic timing.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 115);
+    PERFORM pg_temp.exercise('TR01', 'Sand Track Stamina', 'Deep sand work for stamina, not in any course yet.', 'DIRT', 1800, 'MEDIUM', 'ENDURANCE', 60, 20);
     PERFORM pg_temp.course('TR01', 'Gate Confidence Drill', 'Calm, confident loading and stand in the starting gate.', 6,
                            ARRAY['Gate Loading Composure'], 110);
     PERFORM pg_temp.course('TR01', 'Novice Foundation', 'Base fitness and steady rhythm for newly admitted horses.', 10,
@@ -531,22 +531,22 @@ BEGIN
                            ARRAY['Trot Balance Work', 'Walk and Hydro Cooling'], 100);
     PERFORM pg_temp.course('TR01', 'Winter Base Block', 'Planned for the winter break, no horse enrolled yet.', 20,
                            ARRAY['Aerobic Base Canter', 'Sand Track Stamina', 'Trot Balance Work'], 10);
-    PERFORM pg_temp.subject('TR02', 'Distance Canter', 'Even canter over a long distance.', 'TURF', 2000, 'MEDIUM', 'ENDURANCE', 60, 90);
-    PERFORM pg_temp.subject('TR02', 'Hill Repeats', 'Repeated short climbs at a strong canter.', 'DIRT', 1400, 'HIGH', 'ENDURANCE', 60, 90);
-    PERFORM pg_temp.subject('TR02', 'Breeze Work', 'Fast work over 800 m at race pace.', 'TURF', 800, 'HIGH', 'SPEED', 45, 90);
-    PERFORM pg_temp.subject('TR02', 'Pace Change Drill', 'Switch between canter and gallop on command.', 'SYNTHETIC', 1200, 'MEDIUM', 'SPEED', 60, 88);
-    PERFORM pg_temp.subject('TR02', 'Starting Stall Practice', 'Walk-in, stand and walk-out of the starting stalls.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 88);
-    PERFORM pg_temp.subject('TR02', 'Pool Recovery Swim', 'Low-impact swimming after hard work.', 'SYNTHETIC', 400, 'LOW', 'RECOVERY', 45, 88);
+    PERFORM pg_temp.exercise('TR02', 'Distance Canter', 'Even canter over a long distance.', 'TURF', 2000, 'MEDIUM', 'ENDURANCE', 60, 90);
+    PERFORM pg_temp.exercise('TR02', 'Hill Repeats', 'Repeated short climbs at a strong canter.', 'DIRT', 1400, 'HIGH', 'ENDURANCE', 60, 90);
+    PERFORM pg_temp.exercise('TR02', 'Breeze Work', 'Fast work over 800 m at race pace.', 'TURF', 800, 'HIGH', 'SPEED', 45, 90);
+    PERFORM pg_temp.exercise('TR02', 'Pace Change Drill', 'Switch between canter and gallop on command.', 'SYNTHETIC', 1200, 'MEDIUM', 'SPEED', 60, 88);
+    PERFORM pg_temp.exercise('TR02', 'Starting Stall Practice', 'Walk-in, stand and walk-out of the starting stalls.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 88);
+    PERFORM pg_temp.exercise('TR02', 'Pool Recovery Swim', 'Low-impact swimming after hard work.', 'SYNTHETIC', 400, 'LOW', 'RECOVERY', 45, 88);
     PERFORM pg_temp.course('TR02', 'Distance Builder', 'Build stamina for 2,000 m and longer.', 9,
                            ARRAY['Distance Canter', 'Hill Repeats', 'Pool Recovery Swim'], 85);
     PERFORM pg_temp.course('TR02', 'Speed Sharpening', 'Race pace and quick changes of speed.', 8,
                            ARRAY['Breeze Work', 'Pace Change Drill', 'Hill Repeats', 'Pool Recovery Swim'], 85);
     PERFORM pg_temp.course('TR02', 'Starting Stall Basics', 'Stall manners for horses new to racing.', 4,
                            ARRAY['Starting Stall Practice'], 85);
-    PERFORM pg_temp.subject('TR03', 'Desert Endurance Trot', 'Long, even trot for Arabian endurance.', 'DIRT', 3000, 'LOW', 'ENDURANCE', 60, 50);
-    PERFORM pg_temp.subject('TR03', 'Tempo Canter', 'Canter at a fixed tempo with heart-rate targets.', 'TURF', 1800, 'MEDIUM', 'ENDURANCE', 60, 50);
-    PERFORM pg_temp.subject('TR03', 'Short Sprint Repeats', '3 x 300 m sprints with walk recovery.', 'TURF', 900, 'HIGH', 'SPEED', 45, 50);
-    PERFORM pg_temp.subject('TR03', 'Stretch and Walk', 'Hand walking and stretching.', 'SYNTHETIC', 600, 'LOW', 'RECOVERY', 45, 50);
+    PERFORM pg_temp.exercise('TR03', 'Desert Endurance Trot', 'Long, even trot for Arabian endurance.', 'DIRT', 3000, 'LOW', 'ENDURANCE', 60, 50);
+    PERFORM pg_temp.exercise('TR03', 'Tempo Canter', 'Canter at a fixed tempo with heart-rate targets.', 'TURF', 1800, 'MEDIUM', 'ENDURANCE', 60, 50);
+    PERFORM pg_temp.exercise('TR03', 'Short Sprint Repeats', '3 x 300 m sprints with walk recovery.', 'TURF', 900, 'HIGH', 'SPEED', 45, 50);
+    PERFORM pg_temp.exercise('TR03', 'Stretch and Walk', 'Hand walking and stretching.', 'SYNTHETIC', 600, 'LOW', 'RECOVERY', 45, 50);
     PERFORM pg_temp.course('TR03', 'Arabian Endurance Base', 'Aerobic base for endurance racing.', 6,
                            ARRAY['Desert Endurance Trot', 'Tempo Canter'], 45);
     PERFORM pg_temp.course('TR03', 'Pace Variation', 'Tempo, sprints and recovery in one block.', 6,
@@ -568,13 +568,13 @@ BEGIN
             SELECT ss.groom_id INTO v_g FROM horses h JOIN stable_stalls ss ON ss.id = h.current_stall_id WHERE h.id = v_h;
             INSERT INTO training_group_members (group_id, horse_id, groom_id, joined_at) VALUES (v_old, v_h, v_g, pg_temp.at(-125, TIME '09:00'));
         END LOOP;
-        PERFORM pg_temp.make_group_plan(v_old, (SELECT id FROM courses WHERE name = 'Gate Confidence Drill' AND trainer_id = v_trainer),
+        PERFORM pg_temp.make_course_run(v_old, (SELECT id FROM courses WHERE name = 'Gate Confidence Drill' AND trainer_id = v_trainer),
                                         pg_temp.today() - 118, 'MONDAY,WEDNESDAY,FRIDAY');
-        v_plan := pg_temp.make_group_plan(v_old, (SELECT id FROM courses WHERE name = 'Novice Foundation' AND trainer_id = v_trainer),
+        v_plan := pg_temp.make_course_run(v_old, (SELECT id FROM courses WHERE name = 'Novice Foundation' AND trainer_id = v_trainer),
                                           pg_temp.today() - 104, 'MONDAY,WEDNESDAY,FRIDAY');
         PERFORM pg_temp.cancel_plan(v_plan, (SELECT session_date + end_time FROM (
             SELECT session_date, end_time, row_number() OVER (ORDER BY session_date, start_time) idx
-              FROM training_sessions WHERE group_plan_id = v_plan) q WHERE idx = 4) + INTERVAL '30 minutes');
+              FROM training_sessions WHERE course_run_id = v_plan) q WHERE idx = 4) + INTERVAL '30 minutes');
         -- Disband (TrainingGroupService.disband): the horses leave at the disband time, the group row stays with its disbanded_at.
         UPDATE training_group_members SET left_at = v_gone WHERE group_id = v_old AND left_at IS NULL;
         UPDATE training_groups SET disbanded_at = v_gone, updated_at = v_gone WHERE id = v_old;
@@ -598,26 +598,26 @@ BEGIN
 
     -- ----------------------------------------------------------------- demo scenarios
     -- Trainer1, group 1, second course: one horse did not actually run in the third Session.
-    SELECT p.id INTO v_plan FROM group_plans p JOIN training_groups g ON g.id = p.group_id
+    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
      WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 1' ORDER BY p.start_date OFFSET 1 LIMIT 1;
     SELECT horse_id INTO v_horse FROM training_group_members m JOIN training_groups g ON g.id = m.group_id
      WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 1' ORDER BY m.id LIMIT 1;
     IF v_plan IS NOT NULL AND v_horse IS NOT NULL THEN PERFORM pg_temp.did_not_run(v_plan, v_horse, 3); END IF;
 
     -- Trainer1, group 2, second course: heavy rain cancelled the fourth Session for the whole group.
-    SELECT p.id INTO v_plan FROM group_plans p JOIN training_groups g ON g.id = p.group_id
+    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
      WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 2' ORDER BY p.start_date OFFSET 1 LIMIT 1;
     IF v_plan IS NOT NULL THEN PERFORM pg_temp.cancel_session(v_plan, 4); END IF;
 
     -- Trainer1, group 3, running course: the Trainer rests one horse for its next Session only.
-    SELECT p.id INTO v_plan FROM group_plans p JOIN training_groups g ON g.id = p.group_id
+    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
      WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 3' AND p.status = 'ACTIVE' ORDER BY p.start_date LIMIT 1;
     SELECT horse_id INTO v_horse FROM training_group_members m JOIN training_groups g ON g.id = m.group_id
      WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 3' ORDER BY m.id LIMIT 1;
     IF v_plan IS NOT NULL AND v_horse IS NOT NULL THEN
         PERFORM pg_temp.cancel_workout(v_plan, v_horse, (SELECT idx FROM (
             SELECT row_number() OVER (ORDER BY session_date, start_time) idx, session_date, start_time, status
-              FROM training_sessions WHERE group_plan_id = v_plan) q
+              FROM training_sessions WHERE course_run_id = v_plan) q
             WHERE q.status = 'SCHEDULED' ORDER BY idx LIMIT 1));
     END IF;
 
@@ -630,18 +630,18 @@ BEGIN
            performance_rating = pg_temp.rating(w.actual_distance_meters, w.actual_duration_minutes, w.top_speed_kmh, w.average_speed_kmh, w.average_heart_rate, 225, w.recovery_heart_rate)
      WHERE w.id = (SELECT w2.id FROM training_workouts w2
                      JOIN training_sessions s2 ON s2.id = w2.session_id
-                     JOIN group_plans p2 ON p2.id = s2.group_plan_id
+                     JOIN course_runs p2 ON p2.id = s2.course_run_id
                      JOIN training_groups g2 ON g2.id = p2.group_id
                     WHERE g2.trainer_id = pg_temp.uid('TR01') AND w2.status = 'RAN'
                     ORDER BY s2.session_date DESC, s2.start_time DESC LIMIT 1 OFFSET 3);
 
     -- Trainer2, group 1, second course: dropped part-way (Cancel plan after the fourth Session).
-    SELECT p.id INTO v_plan FROM group_plans p JOIN training_groups g ON g.id = p.group_id
+    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
      WHERE g.trainer_id = pg_temp.uid('TR02') AND g.name = 'Track Group 1' ORDER BY p.start_date OFFSET 1 LIMIT 1;
     IF v_plan IS NOT NULL THEN
         PERFORM pg_temp.cancel_plan(v_plan, (SELECT session_date + end_time FROM (
             SELECT session_date, end_time, row_number() OVER (ORDER BY session_date, start_time) idx
-              FROM training_sessions WHERE group_plan_id = v_plan) q WHERE idx = 4) + INTERVAL '30 minutes');
+              FROM training_sessions WHERE course_run_id = v_plan) q WHERE idx = 4) + INTERVAL '30 minutes');
     END IF;
 
     -- Trainer1, a live group nobody has joined yet (no members, no plan).

@@ -65,19 +65,6 @@ export function HorseOverview({
         <HorseInfoSection
           title="Profile details"
           icon="clipboard"
-          aside={
-            admissionId ? (
-              <Link
-                href={`/${rolePath}/admissions/${admissionId}`}
-                className="group inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-primary)] hover:underline"
-                title="View official documents in admission record"
-              >
-                <Icon name="file-text" size={13} />
-                <span>Documents</span>
-                <Icon name="external-link" size={11} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
-              </Link>
-            ) : null
-          }
         >
           <div className="space-y-3.5">
             <HorseInfoRow label="Registration number" value={horse.registrationNumber?.trim()} />

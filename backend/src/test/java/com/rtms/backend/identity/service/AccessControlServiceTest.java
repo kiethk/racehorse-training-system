@@ -171,4 +171,48 @@ class AccessControlServiceTest {
         
         assertTrue(res.getPermissionCodes().isEmpty());
     }
+
+    @Test
+    void testUpdateRolePermissions_DuplicateCodesHandledSafely() {
+        Role role = new Role();
+        role.setId(2L);
+        role.setName("GROOM");
+        
+        Permission perm = new Permission();
+        perm.setId(5L);
+        perm.setCode("AREA_VIEW");
+
+        when(roleRepository.findById(2L)).thenReturn(Optional.of(role));
+        when(permissionRepository.findByCodeIn(List.of("AREA_VIEW"))).thenReturn(List.of(perm));
+        when(roleRepository.save(any(Role.class))).thenAnswer(i -> i.getArgument(0));
+
+        RolePermissionUpdateRequest req = new RolePermissionUpdateRequest();
+        req.setPermissionCodes(List.of("AREA_VIEW", "AREA_VIEW"));
+
+        AccessControlMatrixResponse.RolePermissionSummary res = accessControlService.updateRolePermissions(2L, req);
+
+        assertEquals(1, res.getPermissionCodes().size());
+        assertTrue(res.getPermissionCodes().contains("AREA_VIEW"));
+    }
+
+    @Test
+    void testUpdateRolePermissions_NonManagerCannotBeGrantedUserManage() {
+        Role role = new Role();
+        role.setId(2L);
+        role.setName("GROOM");
+
+        Permission userManage = new Permission();
+        userManage.setId(9L);
+        userManage.setCode("USER_MANAGE");
+
+        when(roleRepository.findById(2L)).thenReturn(Optional.of(role));
+        when(permissionRepository.findByCodeIn(List.of("USER_MANAGE"))).thenReturn(List.of(userManage));
+
+        RolePermissionUpdateRequest req = new RolePermissionUpdateRequest();
+        req.setPermissionCodes(List.of("USER_MANAGE"));
+
+        ApiException ex = assertThrows(ApiException.class, () -> accessControlService.updateRolePermissions(2L, req));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertTrue(ex.getMessage().contains("Only CLUB_MANAGER"));
+    }
 }

@@ -23,7 +23,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -65,7 +65,7 @@ class UrgentCareCompletionTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
     @Mock private NotificationService notificationService;
-    @Mock private GroupWorkoutSyncService workoutService;
+    @Mock private TrainingGroupService workoutService;
 
     private CareScheduleService careScheduleService;
 
@@ -497,13 +497,13 @@ class UrgentCareCompletionTest {
     void testCancel_lastPendingExamOfBlockedHorse_rejected() {
         // Under AD-022, cancelCareSchedule is removed entirely. The LAST_FOLLOW_UP
         // vulnerability no longer exists because neither Vet nor Manager can delete exams.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
     @DisplayName("AD-022: duplicate booking cancellation abolished — reschedule used instead")
     void testCancel_blockedHorseWithAnotherPendingExam_allowed() {
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     private void stubCompletion() {

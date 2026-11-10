@@ -116,6 +116,22 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
             </td>
           ),
           hr: () => <hr className="my-3 border-[var(--color-border)]" />,
+          img: ({ src, alt, ...props }: React.ComponentPropsWithoutRef<'img'>) => (
+            <span className="my-2 block overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] shadow-sm">
+              <img
+                src={src}
+                alt={alt || 'Hình ảnh đính kèm'}
+                loading="lazy"
+                className="max-h-56 w-auto max-w-full rounded-lg object-contain mx-auto transition-transform hover:scale-[1.02]"
+                {...props}
+              />
+              {alt && (
+                <span className="block px-2.5 py-1 text-center text-[11px] text-[var(--color-text-secondary)] italic border-t border-[var(--color-border)]">
+                  {alt}
+                </span>
+              )}
+            </span>
+          ),
           pre: ({ children, ...props }: React.ComponentPropsWithoutRef<'pre'>) => {
             let isChart = false;
             let language = '';

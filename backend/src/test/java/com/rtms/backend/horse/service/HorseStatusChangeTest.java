@@ -17,7 +17,7 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,7 +43,7 @@ class HorseStatusChangeTest {
     @Mock
     private StableStallRepository stableStallRepository;
     @Mock
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     @Mock
     private AreaRepository areaRepository;
     @Mock
@@ -125,9 +126,9 @@ class HorseStatusChangeTest {
         // Assert the horse left its training group (its not-yet-started Workouts are cancelled there)
         verify(workoutService).exitAnyGroup(horseId);
 
-        // Assert Care hard-deleted (AD-025 rule 6: no more CANCELLED)
-        verify(careScheduleRepository).deleteOpenSchedulesIfUnreferenced(
-                eq(horseId), eq(List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED)));
+        // Assert Care schedules transitioned to CANCELLED
+        verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
+                eq(horseId), eq(List.of(CareScheduleStatus.SCHEDULED)), anyString(), any(LocalDateTime.class));
         verify(careScheduleRepository, never()).saveAll(any());
 
         // Assert Groom tasks deleted

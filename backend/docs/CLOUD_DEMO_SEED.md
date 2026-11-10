@@ -22,7 +22,7 @@ From `backend/`:
 
 Preflight checks fixture identity/dependencies and all 324 original file checksums, then uploads/reads/deletes one JPG and one PDF with the real private storage service. It does not seed DB rows.
 
-Seed refuses an already populated dataset. It removes only the identified migration fixtures (Horses 5/6/7, their legacy care/pedigree/Admission snapshot cascade), preserves 4 Subjects and existing account IDs/passwords, normalizes 9 Staff, registers 7 additional Owners and creates 21 Grooms. It calls real Stable/Admission services to create and assign Areas/Stalls, upload each dossier and advance it to the reviewed target stage. Seed-only chronology/identity normalization is scoped to the manual workflow; no public backdating or ownership-transfer API is added. Snapshot protection triggers remain enabled.
+Seed refuses an already populated dataset. It removes only the identified migration fixtures (Horses 5/6/7, their legacy care/pedigree/Admission snapshot cascade), preserves 4 Exercises and existing account IDs/passwords, normalizes 9 Staff, registers 7 additional Owners and creates 21 Grooms. It calls real Stable/Admission services to create and assign Areas/Stalls, upload each dossier and advance it to the reviewed target stage. Seed-only chronology/identity normalization is scoped to the manual workflow; no public backdating or ownership-transfer API is added. Snapshot protection triggers remain enabled.
 
 ## Result
 
@@ -39,7 +39,7 @@ Public horse identity references, stock photographs and fictional clinical/workf
 
 ## Verified execution — 17 October 2026
 
-Completed on the reviewed Neon target with 324 authenticated Cloudinary assets. All source SHA-256 checks, 48 Horse photo API checks, five actor detail checks and 56 Owner scope requests passed. The four existing Subjects were preserved. Real Admission services also created their initial examination schedules and in-app assignment notifications; no manual routine Groom tasks or training data were added.
+Completed on the reviewed Neon target with 324 authenticated Cloudinary assets. All source SHA-256 checks, 48 Horse photo API checks, five actor detail checks and 56 Owner scope requests passed. The four existing Exercises were preserved. Real Admission services also created their initial examination schedules and in-app assignment notifications; no manual routine Groom tasks or training data were added.
 
 Browser verification passed for Manager Horses, Stable, filtered Admissions and Horse Detail, plus 16 pages across all eight Owners. Private PDF download passed for Manager, the correct Owner and assigned Trainer/Groom/Vet; foreign Owner and anonymous access were rejected. PDF iframe and photo previews both loaded.
 

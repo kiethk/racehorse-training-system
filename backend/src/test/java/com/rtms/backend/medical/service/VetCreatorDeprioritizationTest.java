@@ -110,7 +110,7 @@ class VetCreatorDeprioritizationTest {
         requestedSchedule.setId(1001L);
         requestedSchedule.setHorseId(horse.getId());
         requestedSchedule.setCareType(CareType.ROUTINE);
-        requestedSchedule.setStatus(CareScheduleStatus.REQUESTED);
+        requestedSchedule.setStatus(CareScheduleStatus.SCHEDULED);
         requestedSchedule.setRequestedAt(futureSlot);
         requestedSchedule.setDurationMinutes(30);
         requestedSchedule.setRequestedById(vet1.getId()); // Creator is Vet1
@@ -134,7 +134,7 @@ class VetCreatorDeprioritizationTest {
         requestedSchedule.setId(1002L);
         requestedSchedule.setHorseId(horse.getId());
         requestedSchedule.setCareType(CareType.ROUTINE);
-        requestedSchedule.setStatus(CareScheduleStatus.REQUESTED);
+        requestedSchedule.setStatus(CareScheduleStatus.SCHEDULED);
         requestedSchedule.setRequestedAt(futureSlot);
         requestedSchedule.setDurationMinutes(30);
         requestedSchedule.setRequestedById(vet1.getId());
