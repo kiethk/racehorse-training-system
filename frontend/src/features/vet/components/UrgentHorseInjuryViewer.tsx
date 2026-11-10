@@ -7,8 +7,11 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 
 import {
-  zoneForPoint,
   zoneById,
+  zoneForRegionKey,
+  regionKeyForNormalized,
+  normalizeScenePoint,
+  regionKeyLabel,
   resolveInjuryWorldPosition,
   resolveInjuryNormal,
   isNormalizedPoint,
@@ -70,7 +73,7 @@ function HorseModel({
     onReady?.();
   }, [onReady]);
 
-  const transform = useMemo(() => {
+  const { transform, runtimeBounds } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(scene);
     const size = new THREE.Vector3();
     box.getSize(size);
@@ -82,12 +85,18 @@ function HorseModel({
     const scale = targetHeight / height;
 
     return {
-      scale,
-      position: [
-        -center.x * scale,
-        -box.min.y * scale - 1.3,
-        -center.z * scale,
-      ] as [number, number, number],
+      transform: {
+        scale,
+        position: [
+          -center.x * scale,
+          -box.min.y * scale - 1.3,
+          -center.z * scale,
+        ] as [number, number, number],
+      },
+      runtimeBounds: {
+        min: { x: box.min.x, y: box.min.y, z: box.min.z },
+        max: { x: box.max.x, y: box.max.y, z: box.max.z },
+      },
     };
   }, [scene]);
 
@@ -97,10 +106,13 @@ function HorseModel({
 
     const hitPoint = event.point;
     let normal: [number, number, number] = [0, 1, 0];
-    let worldNormal = new THREE.Vector3(0, 1, 0);
+    let faceNormal: { x: number; y: number; z: number } | null = null;
+    let offsetNormal = new THREE.Vector3(0, 1, 0);
     if (event.face && event.object) {
       const normalMatrix = new THREE.Matrix3().getNormalMatrix(event.object.matrixWorld);
-      worldNormal = event.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+      const worldNormal = event.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+      offsetNormal = worldNormal;
+      faceNormal = { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z };
       normal = resolveInjuryNormal(
         [
           Number(worldNormal.x.toFixed(4)),
@@ -115,14 +127,24 @@ function HorseModel({
 
     // Normal offset 1mm (0.001) to eliminate Z-fighting on surface hit
     const normalOffset = 0.001;
-    const snappedWorldPoint = hitPoint.clone().add(worldNormal.clone().multiplyScalar(normalOffset));
+    const snappedWorldPoint = hitPoint.clone().add(offsetNormal.clone().multiplyScalar(normalOffset));
 
+    // The local point lives in glTF scene space (runtime-transform inverse).
+    // Classify it against the RUNTIME bounding box of the same transform —
+    // MODEL_BOUNDS holds mesh accessor bounds (~100x larger here because the
+    // glTF applies scale 0.01) and would misclassify nearly every hit.
     const local = {
       x: (snappedWorldPoint.x - transform.position[0]) / transform.scale,
       y: (snappedWorldPoint.y - transform.position[1]) / transform.scale,
       z: (snappedWorldPoint.z - transform.position[2]) / transform.scale,
     };
-    const zoneId = zoneForPoint(local);
+    // Canonical 8-region key (head/neck/back/abdomen/foreleg/hindleg L-R) so the
+    // click result matches the Body region catalog and Select options 1:1.
+    // The raw face normal refines spine vs chest/belly on trunk hits.
+    const zoneId = regionKeyForNormalized(
+      normalizeScenePoint(local, runtimeBounds),
+      faceNormal,
+    );
 
     onPointerHit?.({
       position: [
@@ -301,7 +323,10 @@ function Marker({
     tagWrapperRef.current.style.pointerEvents = isOccluded ? 'none' : 'auto';
   });
 
-  const label = injury.label || (injury.zoneId && zoneById(injury.zoneId)?.label) || 'INJURY';
+  const label =
+    injury.label ||
+    regionKeyLabel(injury.zoneId) ||
+    'INJURY';
   const hasDetail = Boolean(
     injury.severity ||
       injury.status ||
@@ -475,7 +500,9 @@ function Fallback2D({ injuries }: { injuries: InjuryMarkerData[] }) {
   const H = 200;
   const counts: Record<string, number> = {};
   const pts = injuries.map((inj) => {
-    const zone = (inj.zoneId && zoneById(inj.zoneId)) || undefined;
+    // Region keys (canonical or legacy) translate back to a geometry zone for anchoring.
+    const geoZone = inj.zoneId ? zoneForRegionKey(inj.zoneId) : undefined;
+    const zone = (geoZone && zoneById(geoZone)) || undefined;
     const anchor = zone ? zone.anchor : null;
     if (zone) counts[zone.id] = (counts[zone.id] || 0) + 1;
     const idx = zone ? counts[zone.id] - 1 : 0;

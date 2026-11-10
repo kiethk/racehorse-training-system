@@ -25,6 +25,7 @@ describe('FleetDistribution & Specialty Calculations', () => {
         horseId: 1,
         specialty: {
           minWorkoutsPerGroup: 3,
+          minAverageRating: 7,
           strongDistances: ['SPRINT'],
           preferredSurface: null,
           distanceStats: [],
@@ -34,6 +35,7 @@ describe('FleetDistribution & Specialty Calculations', () => {
         horseId: 2,
         specialty: {
           minWorkoutsPerGroup: 3,
+          minAverageRating: 7,
           strongDistances: ['MILE'],
           preferredSurface: null,
           distanceStats: [],
@@ -43,6 +45,7 @@ describe('FleetDistribution & Specialty Calculations', () => {
         horseId: 3,
         specialty: {
           minWorkoutsPerGroup: 3,
+          minAverageRating: 7,
           strongDistances: ['MIDDLE', 'STAYER'],
           preferredSurface: null,
           distanceStats: [
@@ -55,6 +58,7 @@ describe('FleetDistribution & Specialty Calculations', () => {
         horseId: 4,
         specialty: {
           minWorkoutsPerGroup: 3,
+          minAverageRating: 7,
           strongDistances: [],
           preferredSurface: null,
           distanceStats: [],

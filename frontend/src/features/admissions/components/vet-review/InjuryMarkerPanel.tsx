@@ -5,7 +5,12 @@ import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Input, Select } from '@/components/ui/Input';
-import { zoneById, worldToNormalized } from '@/features/vet/lib/injuryZones';
+import {
+  markerZoneLabel,
+  matchBodyRegion,
+  regionKeyLabel,
+  worldToNormalized,
+} from '@/features/vet/lib/injuryZones';
 import type { HorseBodyRegion } from '@/features/health/types';
 import type { CreateInjuryMarkerRequest } from '../../types';
 import { INJURY_SEVERITY_OPTIONS } from './constants';
@@ -63,6 +68,12 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
   const { markers, setMarkers, bodyRegions, readOnly, onAppendToFindings, fieldErrors, setFieldErrors } = props;
   const [isAddMode, setIsAddMode] = useState(false);
 
+  const clearMarkerErrors = () => {
+    if (setFieldErrors && fieldErrors?.injuryMarkers) {
+      setFieldErrors((prev) => ({ ...prev, injuryMarkers: '' }));
+    }
+  };
+
   const handleInjuryHit = (hit: {
     position: [number, number, number];
     normal: [number, number, number];
@@ -72,15 +83,17 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `marker-${Date.now()}`;
-    const zone = hit.zoneId ? zoneById(hit.zoneId) : undefined;
-    const zoneName = zone?.label ?? 'Unspecified';
+    // hit.zoneId is the canonical 8-region key from the click classification;
+    // the matching catalog region auto-selects the Body region Select.
+    const region = matchBodyRegion(bodyRegions, hit.zoneId);
+    const zoneName = region?.displayName ?? regionKeyLabel(hit.zoneId) ?? 'Unspecified';
     const newMarker: InjuryMarker = {
       id,
       position: hit.position,
       normal: hit.normal,
       zoneId: hit.zoneId,
       injuryType: '',
-      bodyRegionId: bodyRegions.length ? bodyRegions[0].id : null,
+      bodyRegionId: region?.id ?? (bodyRegions.length ? bodyRegions[0].id : null),
       description: '',
       severity: 'MODERATE',
     };
@@ -89,9 +102,7 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
       const line = `- 3D injury marker [${zoneName}] at [${hit.position.map((n) => n.toFixed(2)).join(', ')}]`;
       onAppendToFindings(line);
     }
-    if (setFieldErrors && fieldErrors?.injuryMarkers) {
-      setFieldErrors((prev) => ({ ...prev, injuryMarkers: '' }));
-    }
+    clearMarkerErrors();
   };
 
   const handleDeleteMarker = (id: string) => {
@@ -116,6 +127,9 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
 
   const regionOptions = bodyRegions.length ? bodyRegions : [];
 
+  /** Zone label per agreed priority: bodyRegionId → zoneId (canonical, then legacy). */
+  const zoneLabelOf = (marker: InjuryMarker) => markerZoneLabel(bodyRegions, marker);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -135,7 +149,7 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
       </div>
 
       <UrgentHorseInjuryViewer
-        injuries={markers}
+        injuries={markers.map((m) => ({ ...m, label: zoneLabelOf(m) }))}
         isAddMode={isAddMode}
         readOnly={readOnly}
         onPointerHit={handleInjuryHit}
@@ -170,7 +184,7 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
         ) : (
           <div className="space-y-3">
             {markers.map((marker, index) => {
-              const zoneName = (marker.zoneId && zoneById(marker.zoneId)?.label) || 'Unspecified';
+              const zoneName = zoneLabelOf(marker) ?? 'Unspecified';
               return (
                 <div
                   key={marker.id}
@@ -238,9 +252,16 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
                         id={`marker-region-${marker.id}`}
                         value={marker.bodyRegionId ?? ''}
                         disabled={readOnly || regionOptions.length === 0}
-                        onChange={(e) =>
-                          handleUpdateMarker(marker.id, { bodyRegionId: Number(e.target.value) })
-                        }
+                        onChange={(e) => {
+                          // Changing the catalog region syncs the marker's zoneId
+                          // (and thus the 3D tag label + Zone badge) with it.
+                          const nextId = Number(e.target.value);
+                          const region = regionOptions.find((r) => r.id === nextId);
+                          handleUpdateMarker(marker.id, {
+                            bodyRegionId: nextId,
+                            zoneId: region?.modelNodeKey ?? marker.zoneId,
+                          });
+                        }}
                         className="text-xs"
                       >
                         {regionOptions.length === 0 && (
