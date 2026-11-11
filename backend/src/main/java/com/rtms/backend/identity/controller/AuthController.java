@@ -2,6 +2,7 @@ package com.rtms.backend.identity.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.identity.dto.ChangePasswordRequest;
+import com.rtms.backend.identity.dto.ChangePasswordResponse;
 import com.rtms.backend.identity.dto.LoginRequest;
 import com.rtms.backend.identity.dto.LoginResponse;
 import com.rtms.backend.identity.dto.OwnerRegistrationRequest;
@@ -84,18 +85,21 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    public ApiResponse<String> changePassword(
+    public ApiResponse<ChangePasswordResponse> changePassword(
             @jakarta.validation.Valid @RequestBody ChangePasswordRequest request,
             HttpServletResponse response) {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
 
-        authService.changePassword(currentUser.getUserId(), request);
+        AuthService.LoginResult result = authService.changePassword(currentUser.getUserId(), request);
 
-        // Expire refresh token cookie so user logs in afresh
-        setRefreshCookie(response, "deleted", 0);
+        // Keep current session valid with fresh refresh token cookie
+        setRefreshCookie(response, result.refreshToken(), refreshExpirationMs / 1000);
 
-        return ApiResponse.success("Password changed successfully. Please sign in with your new password.");
+        return ApiResponse.success(new ChangePasswordResponse(
+                result.token(),
+                "Password changed successfully."
+        ));
     }
 
     @Operation(security = {})

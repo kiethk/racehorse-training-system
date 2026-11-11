@@ -38,10 +38,15 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-export async function changePassword(request: ChangePasswordRequest): Promise<ApiResponse<string>> {
-  try {
-    return await apiPost<ApiResponse<string>>('/api/auth/change-password', request);
-  } finally {
-    setAccessToken(null);
+export interface ChangePasswordResponse {
+  accessToken: string;
+  message: string;
+}
+
+export async function changePassword(request: ChangePasswordRequest): Promise<ApiResponse<ChangePasswordResponse>> {
+  const res = await apiPost<ApiResponse<ChangePasswordResponse>>('/api/auth/change-password', request);
+  if (res?.data?.accessToken) {
+    setAccessToken(res.data.accessToken);
   }
+  return res;
 }
