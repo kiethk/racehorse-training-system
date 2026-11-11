@@ -38,6 +38,7 @@ public final class NotificationTypes {
     public static final String HORSE_EDIT_REQUESTED = "HORSE_EDIT_REQUESTED";
     public static final String HORSE_EDIT_REVIEWED = "HORSE_EDIT_REVIEWED";
     public static final String PRESCRIPTION_CREATED = "PRESCRIPTION_CREATED";
+    public static final String HORSE_TRAINING_ALLOWED = "HORSE_TRAINING_ALLOWED";
     public static final String BIO_SPC_ANOMALY_DETECTED = "BIO_SPC_ANOMALY_DETECTED";
 
     public static final String REFERENCE_ADMISSION = "ADMISSION";
