@@ -219,7 +219,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(Long userId, ChangePasswordRequest request) {
+    public LoginResult changePassword(Long userId, ChangePasswordRequest request) {
         if (request == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request body is required");
         }
@@ -242,10 +242,25 @@ public class AuthService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
+        user = userRepository.saveAndFlush(user);
 
-        // Revoke all active tokens so user must log in again with new password
+        // Revoke all prior active tokens so stale sessions on other devices are terminated
         refreshTokenRepository.revokeAllActiveTokensByUser(user, LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS + 1));
+
+        // Issue fresh access & refresh tokens to keep the current session seamless
+        String accessToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
+        String rawRefreshToken = generateOpaqueToken();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(hashToken(rawRefreshToken));
+        refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(refreshExpirationMs / 1000));
+        refreshTokenRepository.save(refreshToken);
+
+        LoginResponse loginResponse = LoginResponse.fromUser(user, null);
+        loginResponse.setAccessToken(accessToken);
+
+        return new LoginResult(accessToken, rawRefreshToken, loginResponse);
     }
 
     public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {
