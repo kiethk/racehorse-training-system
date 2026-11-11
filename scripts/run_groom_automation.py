@@ -21,6 +21,7 @@ TESTS_DIR = REPO_ROOT / "tests" / "e2e"
 RESULTS_DIR = TESTS_DIR / "results"
 SCREENSHOTS_DIR = RESULTS_DIR / "screenshots"
 REPORT_HTML_DIR = RESULTS_DIR / "report"
+REPORT_HTML_FILE = RESULTS_DIR / "report.html"
 MARKDOWN_REPORT_PATH = RESULTS_DIR / "groom_test_execution_report.md"
 
 DOWNLOADS_DIR = Path("C:/Users/LENOVO/Downloads")
@@ -136,6 +137,14 @@ def sync_and_verify_evidence() -> dict:
         }
 
     print(f"Verified {found_count}/{TOTAL_TEST_CASES} screenshot evidence files.")
+
+    # Sync and ensure report.html exists both in repo and downloads
+    src_report = REPORT_HTML_DIR / "index.html"
+    if src_report.exists() and src_report.stat().st_size > 0:
+        shutil.copy2(src_report, REPORT_HTML_FILE)
+        shutil.copy2(src_report, EVIDENCE_DOWNLOADS_DIR / "report.html")
+        print(f"Synced standalone HTML report to:\n - {REPORT_HTML_FILE}\n - {EVIDENCE_DOWNLOADS_DIR / 'report.html'}")
+
     return evidence_records
 
 
@@ -176,7 +185,8 @@ def generate_markdown_report(records: dict, exit_code: int):
         f"- **In-Repository**: `{SCREENSHOTS_DIR}` ({passed} PNGs)",
         f"- **Thư mục Downloads**: `{EVIDENCE_DOWNLOADS_DIR}` ({passed} PNGs)",
         f"- **File nén ZIP**: `{EVIDENCE_ZIP_PATH}`",
-        f"- **Báo cáo HTML Playwright**: `{REPORT_HTML_DIR / 'index.html'}`",
+        f"- **Báo cáo HTML Playwright**: `{REPORT_HTML_FILE}`",
+        f"- **Báo cáo HTML trong Downloads**: `{EVIDENCE_DOWNLOADS_DIR / 'report.html'}`",
         "",
         "---",
         "",

@@ -30,6 +30,11 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       // Verify status badges inside table
       await expect(table.getByText('Groom review').first()).toBeVisible();
 
+      // Verify pagination bar
+      const paginationNav = page.locator('nav[aria-label="Pagination"]');
+      await expect(paginationNav).toBeVisible();
+      await expect(paginationNav.getByText(/Showing \d+ to \d+ of \d+ results/i)).toBeVisible();
+
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_01');
     });
@@ -56,11 +61,17 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
     test('GRM_AUTO_03: Filter admissions queue by status', async ({ page }) => {
       await pom.gotoAdmissions();
 
-      // Open status filter select
       const statusSelect = page.locator('select').first();
-      await statusSelect.selectOption('VET_REVIEW');
-
       const applyButton = page.getByRole('button', { name: 'Apply' });
+
+      // First filter by GROOM_REVIEW
+      await statusSelect.selectOption('GROOM_REVIEW');
+      await applyButton.click();
+      await expect(page.getByText('GG DAKAR')).toBeVisible();
+      await expect(page.getByText('VELOCITY STAR')).not.toBeVisible();
+
+      // Switch filter to VET_REVIEW
+      await statusSelect.selectOption('VET_REVIEW');
       await applyButton.click();
 
       // VELOCITY STAR has status VET_REVIEW
@@ -84,6 +95,15 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       await expect(page.getByRole('heading', { name: 'Groom decision' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Reject' })).toBeVisible();
+
+      // Verify documents tab and inspect attached documents
+      const docsTab = page.getByRole('tab', { name: /Documents/i });
+      await expect(docsTab).toBeVisible();
+      await docsTab.click();
+      await expect(page.getByText('dakar_profile.jpg')).toBeVisible();
+
+      // Return to overview for comprehensive screenshot
+      await page.getByRole('tab', { name: 'Overview' }).click();
 
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_04');
@@ -204,6 +224,10 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       await expect(page.getByText(/Today's progress: 2\/6 items completed/i)).toBeVisible();
       await expect(page.getByText('33%')).toBeVisible();
 
+      // Verify progress bar element
+      const progressBar = page.locator('div[style*="width: 33%"]');
+      await expect(progressBar).toBeVisible();
+
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_10');
     });
@@ -218,6 +242,12 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       await expect(page.getByRole('heading', { name: 'Complete 2 tasks' })).toBeVisible();
       await expect(page.getByRole('dialog').getByText('GG DAKAR')).toBeVisible();
       await expect(page.getByRole('dialog').getByText('GALATEO')).toBeVisible();
+
+      // Verify checkboxes are checked by default
+      const checkboxes = page.getByRole('dialog').locator('input[type="checkbox"]');
+      expect(await checkboxes.count()).toBe(2);
+      await expect(checkboxes.first()).toBeChecked();
+      await expect(checkboxes.nth(1)).toBeChecked();
 
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_11');
@@ -243,18 +273,24 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
     test('GRM_AUTO_13: Complete task submission and status transition', async ({ page }) => {
       await pom.gotoTasks();
 
-      await page.getByRole('button', { name: 'Complete (2)' }).first().click();
+      // Open the 05:30 single-horse stall mucking task
+      const cleanBlock = page.locator('div', { hasText: '05:30' }).filter({ hasText: 'Stall Mucking' }).first();
+      await cleanBlock.getByRole('button', { name: /^Complete$/i }).click();
 
       // Fill note
       const noteInput = page.getByRole('dialog').locator('textarea');
-      await noteInput.fill('Fresh water and electrolyte added to buckets.');
+      await noteInput.fill('Stall mucked out, fresh pine shavings and clean bedding laid.');
 
-      // Click Mark 2 as completed
-      const submitBtn = page.getByRole('dialog').getByRole('button', { name: /Mark \d+ as completed/i });
+      // Click Mark as completed
+      const submitBtn = page.getByRole('dialog').getByRole('button', { name: /Mark as completed|Mark 1 as completed/i });
       await submitBtn.click();
 
       // Toast confirmation
       await expect(page.locator('text=Tasks completed')).toBeVisible({ timeout: 5000 });
+
+      // Verify the task transitioned to Completed with green badge
+      await expect(page.getByText("Today's progress: 3/6 items completed")).toBeVisible();
+      await expect(cleanBlock.locator('span', { hasText: /^Completed$/ }).first()).toBeVisible();
 
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_13');
@@ -274,8 +310,10 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
         buffer: Buffer.from('data:image/jpeg;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'),
       });
 
-      // Verify photo count updated in hint
+      // Verify photo count updated in hint and thumbnail is displayed
       await expect(page.getByText('1/5')).toBeVisible();
+      await expect(page.getByRole('list', { name: 'Selected photos' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'View selected photo 1' })).toBeVisible();
 
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_14');
@@ -350,6 +388,11 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       await expect(page.getByText('Detailed description')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Submit incident report' })).toBeVisible();
 
+      // Verify all 4 severity radio options are available
+      for (const sev of ['Low', 'Medium', 'High', 'Critical']) {
+        await expect(page.locator('label', { hasText: sev }).first()).toBeVisible();
+      }
+
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_17');
     });
@@ -372,11 +415,14 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
     test('GRM_AUTO_19: Validate mandatory fields on incident creation', async ({ page }) => {
       await pom.gotoIncidentForm();
 
-      // Try submitting without title and description
+      // HTML5 form constraint validation blocks empty submission
+      const titleInput = page.getByPlaceholder(/Example: Swollen/i);
+      expect(await titleInput.evaluate((el: HTMLInputElement) => el.checkValidity())).toBe(false);
+      expect(await titleInput.evaluate((el: HTMLInputElement) => el.validationMessage)).toBeTruthy();
+
+      // Submit attempt stays on form page
       const submitBtn = page.getByRole('button', { name: 'Submit incident report' });
       await submitBtn.click();
-
-      // HTML5 or custom validation keeps page on form
       await expect(page).toHaveURL(/\/groom\/incidents\/new/);
 
       // Evidence capture
@@ -441,13 +487,21 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
     test('GRM_AUTO_23: Filter incident list by status chip', async ({ page }) => {
       await pom.gotoIncidents();
 
-      // Click Resolved filter chip (rendered with role="radio")
+      // Click "Under review" filter chip
+      const reviewChip = page.getByRole('radio', { name: 'Under review' });
+      await reviewChip.click();
+
+      // Verify report #12 (IN_REVIEW) is shown and #14 (RESOLVED) is hidden
+      await expect(page.getByText('#12')).toBeVisible();
+      await expect(page.getByText('#14')).not.toBeVisible();
+
+      // Click "Resolved" filter chip
       const resolvedChip = page.getByRole('radio', { name: 'Resolved' });
       await resolvedChip.click();
 
-      // Verify table displays #14 (Resolved) and hides other statuses
+      // Verify table displays #14 (Resolved) and hides #12
       await expect(page.getByText('#14')).toBeVisible();
-      await expect(page.getByText('#13')).not.toBeVisible();
+      await expect(page.getByText('#12')).not.toBeVisible();
 
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_23');
@@ -494,6 +548,11 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       const unassignedStalls = page.locator('text=Not your stall');
       await expect(unassignedStalls.first()).toBeVisible();
 
+      // Q-A10 is assigned to current groom -> does not have "Not your stall"
+      const stall10 = page.locator('[aria-label*="Q-A10"]').first();
+      await expect(stall10).toBeVisible();
+      await expect(stall10.locator('text=Not your stall')).not.toBeVisible();
+
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_26');
     });
@@ -509,6 +568,11 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       await expect(page.getByRole('paragraph').filter({ hasText: 'GALATEO' })).toBeVisible();
       await expect(page.getByRole('main').getByText('Minh Groom')).toBeVisible();
 
+      // Verify task and incident sections and action links in drawer
+      await expect(page.getByText("Today's tasks")).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Open daily tasks' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Report incident' })).toBeVisible();
+
       // Evidence capture
       await pom.captureEvidence('GRM_AUTO_27');
     });
@@ -520,7 +584,16 @@ test.describe('Groom (M04) Automated E2E Test Suite & Visual Verification', () =
       const threeDBtn = page.getByRole('radio', { name: /3D barn/i });
       await threeDBtn.click();
 
-      // Verify 3D view mode triggers
+      // Verify 3D view mode triggers camera angle controls
+      await expect(page.getByRole('radio', { name: 'Isometric' })).toBeVisible();
+
+      // Toggle back to 2D Plan
+      const planBtn = page.getByRole('radio', { name: /^Plan$/i });
+      await planBtn.click();
+      await expect(page.getByText('Quarantine Area A')).toBeVisible();
+
+      // Switch back to 3D Barn to capture 3D view evidence
+      await threeDBtn.click();
       await expect(page.getByRole('radio', { name: 'Isometric' })).toBeVisible();
 
       // Evidence capture

@@ -411,24 +411,46 @@ export class GroomPageObject {
       },
     ];
 
+    let currentTasks = defaultTasks.map((t) => ({ ...t }));
+
     await this.page.route('**/api/groom-daily-tasks/today*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          data: defaultTasks,
+          data: currentTasks,
         }),
       });
     });
 
     await this.page.route('**/api/groom-daily-tasks/complete', async (route) => {
+      const rawBody = route.request().postData() || '';
+      const matchedIds: number[] = [];
+      const regex = /name="taskIds"\r?\n\r?\n(\d+)/g;
+      let match;
+      while ((match = regex.exec(rawBody)) !== null) {
+        matchedIds.push(Number(match[1]));
+      }
+
+      currentTasks = currentTasks.map((t) => {
+        if (matchedIds.length === 0 || matchedIds.includes(t.refId)) {
+          return {
+            ...t,
+            status: 'COMPLETED',
+            completionId: 99,
+            completionNote: 'Completed via batch update',
+          };
+        }
+        return t;
+      });
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          data: { completedCount: 2 },
+          data: { completedCount: matchedIds.length || 1 },
         }),
       });
     });
