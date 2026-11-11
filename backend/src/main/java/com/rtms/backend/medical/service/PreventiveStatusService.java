@@ -149,20 +149,16 @@ public class PreventiveStatusService {
             CareSchedule milestone = existing.get();
             switch (milestone.getStatus()) {
                 case IN_PROGRESS:
-                case DELAYED:
-                case OVERDUE:
-                case PAUSED:
                     // Vet đang khám chính ca này; kết quả ca khám sẽ quyết định mốc kế tiếp.
-                    // AD-022: ACTIVE_STATUSES nay gồm cả OVERDUE/PAUSED. Thiếu hai nhánh này,
-                    // ca rơi xuống default và mốc mới sinh sẽ đụng unique index.
                     return existing;
-                case REQUESTED:
-                    milestone.setRequestedAt(requestedAt);
-                    milestone.setDescription(description);
-                    return Optional.of(schedules.save(milestone));
                 case SCHEDULED:
+                    if (milestone.getVeterinarianId() == null) {
+                        milestone.setRequestedAt(requestedAt);
+                        milestone.setDescription(description);
+                        return Optional.of(schedules.save(milestone));
+                    }
                     LocalDate slotDay = milestone.getScheduledAt() == null
-                            ? milestone.getRequestedAt().toLocalDate()
+                            ? (milestone.getRequestedAt() != null ? milestone.getRequestedAt().toLocalDate() : today)
                             : milestone.getScheduledAt().toLocalDate();
                     if (!target.isAfter(slotDay.plusDays(OPPORTUNITY_WINDOW_DAYS))) {
                         // Ca đã xếp vẫn còn việc để làm: giữ giờ của vet, chỉ cập nhật danh sách mũi còn lại.
@@ -194,7 +190,7 @@ public class PreventiveStatusService {
         milestone.setAdmissionId(currentAdmissionId(horseId));
         milestone.setCareType(CareType.ROUTINE);
         milestone.setPurpose(CareSchedulePurpose.PREVENTIVE);
-        milestone.setStatus(CareScheduleStatus.REQUESTED);
+        milestone.setStatus(CareScheduleStatus.SCHEDULED);
         milestone.setRequestedAt(requestedAt);
         milestone.setRequestedById(actorId);
         milestone.setIdempotencyKey(operationKey);
@@ -215,7 +211,7 @@ public class PreventiveStatusService {
     @Transactional
     public Optional<CareSchedule> deferMilestone(Long horseId, String operationKey, Long actorId, LocalDate deferredTo) {
         Optional<CareSchedule> milestone = upsertMilestone(horseId, operationKey, actorId, LocalDate.now(clock));
-        milestone.filter(m -> m.getStatus() == CareScheduleStatus.REQUESTED).ifPresent(m -> {
+        milestone.filter(m -> m.getStatus() == CareScheduleStatus.SCHEDULED && m.getScheduledAt() == null && m.getVeterinarianId() == null).ifPresent(m -> {
             m.setRequestedAt(deferredTo.atTime(MILESTONE_TIME));
             m.setRescheduleReason(RescheduleReason.UNDER_TREATMENT);
             schedules.save(m);

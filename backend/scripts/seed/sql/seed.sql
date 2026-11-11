@@ -17,5 +17,4 @@
 \ir 50_training.sql
 \ir 60_groom.sql
 \ir 65_vitals.sql
-\ir 70_racing.sql
 \ir 99_verify.sql

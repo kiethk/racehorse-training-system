@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Xếp một buổi vào Golden Window của một ngày bằng first-fit. Toàn hàm thuần, không đụng DB, nên lập kế hoạch và xem trước dùng
  * CHUNG một cách tính, và viết unit test được mà không cần Spring.
- * (Places a Session into the Golden Window of one day with first-fit. All functions are pure with no DB access, so creating a plan
+ * (Places a Session into the Golden Window of one day with first-fit. All functions are pure with no DB access, so creating a course run
  * and previewing one share ONE calculation, unit-testable without Spring.)
  *
  * Vì sao quét khe ở giữa mà không "nối vào sau buổi cuối": lỗ trống ở giữa SẼ xuất hiện khi một buổi bị hủy; chỉ biết nối đuôi
@@ -72,7 +72,7 @@ public final class SessionSlotFinder {
             }
             if (taken.end().isAfter(cursor)) {
                 // Nhảy qua buổi này, con trỏ KHÔNG lùi; một bài 40 phút kết thúc 06:40 thì buổi sau bắt đầu 06:45.
-                // (Skip this Session, the pointer never moves back; a 40-minute Subject ending 06:40 puts the next at 06:45.)
+                // (Skip this Session, the pointer never moves back; a 40-minute Exercise ending 06:40 puts the next at 06:45.)
                 cursor = FarmSchedulePolicy.roundUpToSessionStartStep(taken.end());
             }
         }

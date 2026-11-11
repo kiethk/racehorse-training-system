@@ -1,5 +1,6 @@
 package com.rtms.backend.training.dto;
 
+import com.rtms.backend.config.TrainingLimits;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -42,21 +43,21 @@ public class CompleteWorkoutRequest {
     private BigDecimal averageSpeedKmh;
 
     @NotNull(message = "Average heart rate is required")
-    @Min(value = 30, message = "Average heart rate must be at least 30 bpm")
-    @Max(value = 240, message = "Average heart rate cannot exceed 240 bpm")
+    @Min(value = TrainingLimits.MIN_HEART_RATE_BPM, message = "Average heart rate must be at least 30 bpm")
+    @Max(value = TrainingLimits.MAX_HEART_RATE_BPM, message = "Average heart rate cannot exceed 240 bpm")
     private Integer averageHeartRate;
 
     @NotNull(message = "Maximum heart rate is required")
-    @Min(value = 30, message = "Maximum heart rate must be at least 30 bpm")
-    @Max(value = 240, message = "Maximum heart rate cannot exceed 240 bpm")
+    @Min(value = TrainingLimits.MIN_HEART_RATE_BPM, message = "Maximum heart rate must be at least 30 bpm")
+    @Max(value = TrainingLimits.MAX_HEART_RATE_BPM, message = "Maximum heart rate cannot exceed 240 bpm")
     private Integer maxHeartRate;
 
     @NotNull(message = "Recovery heart rate is required")
-    @Min(value = 30, message = "Recovery heart rate must be at least 30 bpm")
-    @Max(value = 240, message = "Recovery heart rate cannot exceed 240 bpm")
+    @Min(value = TrainingLimits.MIN_HEART_RATE_BPM, message = "Recovery heart rate must be at least 30 bpm")
+    @Max(value = TrainingLimits.MAX_HEART_RATE_BPM, message = "Recovery heart rate cannot exceed 240 bpm")
     private Integer recoveryHeartRate;
 
-    @Size(max = 2000, message = "Trainer feedback cannot exceed 2000 characters")
+    @Size(max = TrainingLimits.MAX_TRAINER_FEEDBACK_LENGTH, message = "Trainer feedback cannot exceed 2000 characters")
     private String trainerFeedback;
 
     public BigDecimal getActualDistanceMeters() { return actualDistanceMeters; }

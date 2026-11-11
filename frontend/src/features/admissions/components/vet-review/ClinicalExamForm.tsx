@@ -341,13 +341,11 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
-    // Care Scheduling V2: SCHEDULED, IN_PROGRESS, DELAYED, and OVERDUE exams are open and directly editable.
+    // Care Scheduling: SCHEDULED and IN_PROGRESS exams are open and directly editable.
     const isGated =
       scheduleStatus != null &&
       scheduleStatus !== 'SCHEDULED' &&
-      scheduleStatus !== 'IN_PROGRESS' &&
-      scheduleStatus !== 'DELAYED' &&
-      scheduleStatus !== 'OVERDUE';
+      scheduleStatus !== 'IN_PROGRESS';
     // A visit opened by an incident report needs a Follow-up only when the horse stays blocked.
     const followUpRequired = !fromIncident || trainingDecision === 'BLOCKED';
     const followUpActive = scheduleFollowUp || followUpRequired;
@@ -778,7 +776,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
-      const openStatuses = ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE'];
+      const openStatuses = ['SCHEDULED', 'IN_PROGRESS'];
       if (scheduleStatus && !openStatuses.includes(scheduleStatus)) {
         setFormError(
           'Care schedule must be in an active state before recording and submitting findings.',
@@ -805,7 +803,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     async function executeSubmit() {
       if (inFlight.current) return;
-      const openStatuses = ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE'];
+      const openStatuses = ['SCHEDULED', 'IN_PROGRESS'];
       if (scheduleStatus && !openStatuses.includes(scheduleStatus)) {
         setFormError(
           'Care schedule must be in an active state before recording and submitting findings.',
@@ -1372,21 +1370,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         </div>
       ) : null;
 
-    const renderGates = () => (
-      <>
-        {scheduleStatus === 'REQUESTED' && (
-          <div
-            role="status"
-            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-sm text-[var(--color-info)]"
-          >
-            <div className="flex items-center gap-2">
-              <Icon name="clock" size={18} className="shrink-0 text-[var(--color-info)]" />
-              <strong className="block text-sm font-bold">Care schedule is REQUESTED</strong>
-            </div>
-          </div>
-        )}
-      </>
-    );
+    const renderGates = () => null;
 
     const renderSplitStickyForm = () => (
       <form onSubmit={handleFormSubmit} noValidate className="pb-24 md:pb-0">

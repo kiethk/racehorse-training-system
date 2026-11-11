@@ -26,7 +26,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -54,7 +54,7 @@ class CareScheduleDirectAssignmentTest {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     private CareScheduleService service;
 
     @BeforeEach
@@ -65,7 +65,7 @@ class CareScheduleDirectAssignmentTest {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(GroupWorkoutSyncService.class);
+        workoutService = mock(TrainingGroupService.class);
         service = new CareScheduleService(
                 schedules,
                 horses,
@@ -149,7 +149,7 @@ class CareScheduleDirectAssignmentTest {
 
         service.assignRequestedSchedule(requested);
 
-        assertEquals(CareScheduleStatus.REQUESTED, requested.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
         assertNull(requested.getVeterinarianId());
         assertNull(requested.getScheduledAt());
     }
@@ -251,7 +251,7 @@ class CareScheduleDirectAssignmentTest {
         schedule.setId(600L);
         schedule.setHorseId(horseId);
         schedule.setCareType(CareType.INITIAL);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         schedule.setRequestedAt(requestedAt);
         return schedule;
@@ -267,7 +267,7 @@ class CareScheduleDirectAssignmentTest {
         schedule.setId(500L);
         schedule.setHorseId(horseId);
         schedule.setCareType(CareType.URGENT);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         schedule.setSourceIncidentId(incidentId);
         return schedule;
@@ -310,7 +310,7 @@ class CareScheduleDirectAssignmentTest {
         requested.setId(500L);
         requested.setHorseId(99L);
         requested.setCareType(CareType.URGENT);
-        requested.setStatus(CareScheduleStatus.REQUESTED);
+        requested.setStatus(CareScheduleStatus.SCHEDULED);
         requested.setDurationMinutes(30);
         requested.setSourceIncidentId(700L);
 
@@ -361,7 +361,7 @@ class CareScheduleDirectAssignmentTest {
         verify(workoutService, never()).exitAnyGroup(99L);
         verify(schedules, atLeastOnce()).save(argThat(schedule ->
                 schedule.getCareType() == CareType.URGENT
-                        && schedule.getStatus() == CareScheduleStatus.REQUESTED
+                        && schedule.getStatus() == CareScheduleStatus.SCHEDULED
                         && schedule.getVeterinarianId() == null
                         && schedule.getScheduledAt() == null
                         && Long.valueOf(700L).equals(schedule.getSourceIncidentId())));
@@ -397,7 +397,7 @@ class CareScheduleDirectAssignmentTest {
         schedule.setId(500L);
         schedule.setHorseId(horseId);
         schedule.setCareType(CareType.URGENT);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         // No source incident here: ranking tests stop before incident handling by using ROUTINE behavior below.
         schedule.setCareType(CareType.ROUTINE);

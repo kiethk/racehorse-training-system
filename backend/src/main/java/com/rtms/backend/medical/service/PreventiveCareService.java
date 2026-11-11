@@ -148,7 +148,7 @@ public class PreventiveCareService {
                     request.getHorseId(), CareSchedulePurpose.PREVENTIVE, ACTIVE_PREVENTIVE_STATUSES);
             if (milestone.isPresent()) {
                 CareSchedule active = milestone.get();
-                if (active.getStatus() != CareScheduleStatus.REQUESTED) {
+                if (active.getVeterinarianId() != null) {
                     throw new ApiException(HttpStatus.CONFLICT, "PREVENTIVE_ALREADY_SCHEDULED",
                             "This horse already has an active preventive care visit. Reschedule that visit instead");
                 }
@@ -169,7 +169,7 @@ public class PreventiveCareService {
         schedule.setIdempotencyKey(idempotencyKey);
         schedule.setCareType(CareType.ROUTINE);
         schedule.setPurpose(purpose);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         schedule.setDescription(description);
         schedule.setRequestedAt(requestedAt);

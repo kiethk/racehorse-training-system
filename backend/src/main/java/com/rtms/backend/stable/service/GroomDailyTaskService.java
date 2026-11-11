@@ -10,8 +10,8 @@ import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.stable.entity.StableStall;
-import com.rtms.backend.training.entity.Subject;
-import com.rtms.backend.training.dto.GroomWorkoutRow;
+import com.rtms.backend.training.entity.Exercise;
+import com.rtms.backend.training.repository.projection.GroomWorkoutRow;
 import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.enums.SopSlot;
 import com.rtms.backend.stable.enums.TaskSource;
@@ -330,7 +330,7 @@ public class GroomDailyTaskService {
                 .findByGroomIdAndScheduledTimeBetween(targetGroomId, dayStart, dayEnd);
 
         // Nguồn 2 — Buổi tập, đã JOIN sẵn giờ session, tên ngựa và tên bài tập trong MỘT câu query
-        // (Source 2 — Workouts, with session times, horse name and subject name already joined in ONE query)
+        // (Source 2 — Workouts, with session times, horse name and exercise name already joined in ONE query)
         List<GroomWorkoutRow> workouts = workoutRepository.findGroomWorkoutRows(targetGroomId, targetDate);
 
         // Nguồn 3 — Lịch thú y của ngựa trong chuồng mình
@@ -416,8 +416,8 @@ public class GroomDailyTaskService {
                     w.endTime(),
                     w.horseId(),
                     w.horseName(),
-                    "Training session · " + w.subjectName(),
-                    "Lead the horse to the track, assist the trainer, and bring the horse back after the session",
+                    "Training session · " + w.exerciseName(),
+                    null,
                     w.status().name(),
                     false).withStallCode(horseStallCodeById.get(w.horseId())));                      // Trainer mới là người đóng buổi tập
         }

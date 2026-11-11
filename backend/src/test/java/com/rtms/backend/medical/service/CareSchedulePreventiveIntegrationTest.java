@@ -6,8 +6,6 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
-import com.rtms.backend.identity.entity.Role;
-import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
@@ -24,9 +22,6 @@ import com.rtms.backend.medical.enums.VaccinationSource;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
-import com.rtms.backend.medical.repository.InjuryRecordRepository;
-import com.rtms.backend.medical.repository.PrescriptionRepository;
-import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import org.junit.jupiter.api.DisplayName;
 
@@ -34,7 +29,7 @@ import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +40,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -75,7 +69,7 @@ class CareSchedulePreventiveIntegrationTest {
     @Mock ApplicationEventPublisher events;
     @Mock EntityManager entityManager;
     @Mock NotificationService notifications;
-    @Mock GroupWorkoutSyncService workouts;
+    @Mock TrainingGroupService workouts;
     @Mock PreventiveVaccinationService vaccinations;
 
     private CareScheduleService service;
@@ -87,9 +81,9 @@ class CareSchedulePreventiveIntegrationTest {
         service = new CareScheduleService(schedules, horses, healthRecords, metrics, admissions, stalls, users,
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
-                mock(InjuryRecordRepository.class),
-                mock(TreatmentPlanRepository.class),
-                mock(PrescriptionRepository.class));
+                mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -145,7 +139,7 @@ class CareSchedulePreventiveIntegrationTest {
         CompleteCareScheduleRequest request = request();
         request.setVaccinations(List.of(vaccination(1L)));
         when(vaccinations.validate(any(), any())).thenThrow(new ApiException(
-                HttpStatus.BAD_REQUEST, "INVALID_VACCINATION", "bad"));
+                org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_VACCINATION", "bad"));
 
         assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, request, 20L));
 
@@ -222,12 +216,12 @@ class CareSchedulePreventiveIntegrationTest {
         milestone.setHorseId(10L);
         milestone.setCareType(CareType.ROUTINE);
         milestone.setPurpose(CareSchedulePurpose.PREVENTIVE);
-        milestone.setStatus(CareScheduleStatus.REQUESTED);
+        milestone.setStatus(CareScheduleStatus.SCHEDULED);
         milestone.setRequestedAt(LocalDateTime.now().plusDays(180));
 
         service.assignRequestedSchedule(milestone);
 
-        assertEquals(CareScheduleStatus.REQUESTED, milestone.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, milestone.getStatus());
         assertNull(milestone.getVeterinarianId());
         verify(horses, never()).findByIdForUpdate(any());
         verify(schedules, never()).save(any());
@@ -260,13 +254,13 @@ class CareSchedulePreventiveIntegrationTest {
     @DisplayName("AD-022: cancelCareSchedule abolished — care schedules are moved via reschedule instead")
     void blockedHorseCannotLoseItsLastFollowUpEvenIfAPreventiveMilestoneExists() {
         // Under AD-022, cancelCareSchedule is removed. Blocked horses retain their follow-ups.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
     @DisplayName("AD-022: preventive milestone cancellation abolished")
     void preventiveMilestoneOfABlockedHorseCanBeCancelled() {
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     // ---- helpers ----
@@ -301,10 +295,10 @@ class CareSchedulePreventiveIntegrationTest {
         return schedule;
     }
 
-    private static User manager() {
-        Role role = new Role();
+    private static com.rtms.backend.identity.entity.User manager() {
+        com.rtms.backend.identity.entity.Role role = new com.rtms.backend.identity.entity.Role();
         role.setName("CLUB_MANAGER");
-        User user = new User();
+        com.rtms.backend.identity.entity.User user = new com.rtms.backend.identity.entity.User();
         user.setId(1L);
         user.setRole(role);
         return user;

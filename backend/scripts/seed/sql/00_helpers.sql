@@ -236,7 +236,7 @@ CREATE FUNCTION pg_temp.new_schedule(p_horse BIGINT, p_care_type TEXT, p_purpose
     INSERT INTO care_schedule (horse_id, admission_id, source_incident_id, care_type, status, duration_minutes, description,
                                created_at, updated_at, requested_at, scheduled_date, source_schedule_id, requested_by_id, idempotency_key,
                                purpose)
-    VALUES (p_horse, p_admission, p_incident, p_care_type, 'REQUESTED', 30, p_desc, p_created_at, p_created_at,
+    VALUES (p_horse, p_admission, p_incident, p_care_type, 'SCHEDULED', 30, p_desc, p_created_at, p_created_at,
             p_requested_at, CAST(p_requested_at AS DATE), p_source, p_requested_by, p_key, p_purpose)
     RETURNING id
 $$ LANGUAGE sql;
@@ -368,13 +368,13 @@ DECLARE
 BEGIN
     IF (SELECT current_status FROM horses WHERE id = p_horse) = 'REJECTED' THEN RETURN NULL; END IF;
     SELECT * INTO m FROM care_schedule
-     WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS');
+     WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status IN ('SCHEDULED', 'IN_PROGRESS');
     SELECT min(due) INTO v_target FROM pg_temp.due_list(p_horse, p_missing_due, v_on);
     IF v_target IS NULL THEN RETURN m.id; END IF;
     v_req := (CASE WHEN v_target > v_on THEN v_target ELSE v_on + 1 END) + TIME '14:00';
     IF m.id IS NOT NULL THEN
         IF m.status = 'IN_PROGRESS' THEN RETURN m.id; END IF;
-        IF m.status = 'REQUESTED' THEN
+        IF m.veterinarian_id IS NULL THEN
             UPDATE care_schedule SET requested_at = v_req, description = pg_temp.describe_due(p_horse, p_missing_due, v_on, v_req::DATE),
                                      updated_at = p_at
              WHERE id = m.id;
@@ -506,7 +506,7 @@ BEGIN
     IF p_defer_days IS NOT NULL THEN
         PERFORM pg_temp.upsert_milestone(h.id, 'preventive:' || v_hr, c.veterinarian_id, p_at::DATE, p_at);
         UPDATE care_schedule SET requested_at = (p_at::DATE + p_defer_days) + TIME '14:00', reschedule_reason = 'UNDER_TREATMENT'
-         WHERE horse_id = h.id AND purpose = 'PREVENTIVE' AND status = 'REQUESTED';
+         WHERE horse_id = h.id AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED';
     ELSIF v_has_vaccines THEN
         PERFORM pg_temp.upsert_milestone(h.id, 'preventive:' || v_hr, c.veterinarian_id,
                                          CASE WHEN c.care_type = 'INITIAL' THEN NULL ELSE p_at::DATE END, p_at);
@@ -569,7 +569,7 @@ BEGIN
               AND lower(doc.horse_k) = substring(p_image FROM '/(h[0-9]+)-')))
     RETURNING id INTO v_incident;
     SELECT id INTO v_schedule FROM care_schedule
-     WHERE horse_id = p_horse AND care_type = 'URGENT' AND status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS');
+     WHERE horse_id = p_horse AND care_type = 'URGENT' AND status IN ('SCHEDULED', 'IN_PROGRESS');
     IF v_schedule IS NULL THEN
         v_schedule := pg_temp.new_schedule(p_horse, 'URGENT', 'FOLLOW_UP', p_desc, NULL, p_at, NULL, v_incident);
         IF p_auto_assign THEN

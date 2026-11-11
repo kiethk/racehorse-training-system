@@ -10,6 +10,7 @@ import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.event.InitialExamCompletedEvent;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.identity.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,11 +40,14 @@ class TrainerAssignmentServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private UserRepository userRepository;
+
     private TrainerAssignmentService service;
 
     @BeforeEach
     void setUp() {
-        service = new TrainerAssignmentService(admissionRepository, horseRepository, workloadService, notificationService);
+        service = new TrainerAssignmentService(admissionRepository, horseRepository, workloadService, notificationService, userRepository);
     }
 
     @Test
@@ -68,6 +72,11 @@ class TrainerAssignmentServiceTest {
     @Test
     @DisplayName("Đơn đã có Trainer: không chọn lại, không gửi thông báo lần hai")
     void assignIfNeeded_alreadyAssigned_isNoOp() {
+        User activeTrainer = new User();
+        activeTrainer.setId(8L);
+        activeTrainer.setActive(true);
+        when(userRepository.findById(8L)).thenReturn(Optional.of(activeTrainer));
+
         when(admissionRepository.findByIdForUpdate(1L))
                 .thenReturn(Optional.of(admission(AdmissionStatus.TRAINER_REVIEW, 8L)));
 
@@ -75,6 +84,29 @@ class TrainerAssignmentServiceTest {
 
         verifyNoInteractions(workloadService, notificationService);
         verify(admissionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Đơn có Trainer nhưng Trainer bị inactive: tự động gán lại cho Trainer active ít việc nhất")
+    void assignIfNeeded_assignedTrainerInactive_reassignsToActiveTrainer() {
+        AdmissionApplication admission = admission(AdmissionStatus.TRAINER_REVIEW, 99L);
+        when(admissionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+
+        User inactiveTrainer = new User();
+        inactiveTrainer.setId(99L);
+        inactiveTrainer.setActive(false);
+        when(userRepository.findById(99L)).thenReturn(Optional.of(inactiveTrainer));
+
+        when(workloadService.selectLeastLoadedHeadTrainer()).thenReturn(Optional.of(trainer(8L)));
+        Horse horse = new Horse();
+        horse.setName("Desert Star");
+        when(horseRepository.findById(20L)).thenReturn(Optional.of(horse));
+
+        Optional<Long> result = service.assignIfNeeded(1L);
+
+        assertEquals(Optional.of(8L), result);
+        assertEquals(8L, admission.getTrainerId());
+        verify(admissionRepository).save(admission);
     }
 
     @Test

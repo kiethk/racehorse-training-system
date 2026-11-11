@@ -70,4 +70,35 @@ class RefreshTokenRepositoryTest {
         assertTrue(refreshTokenRepository.findById(expiredToken.getId()).isEmpty(), "Expired token must be purged");
         assertTrue(refreshTokenRepository.findById(oldRevoked.getId()).isEmpty(), "Old revoked token must be purged");
     }
+
+    @Test
+    void testRevokeAllActiveTokensByUser() {
+        User user = userRepository.findAll().stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("No user in test database"));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        RefreshToken activeToken1 = new RefreshToken();
+        activeToken1.setUser(user);
+        activeToken1.setTokenHash(UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""));
+        activeToken1.setExpiresAt(now.plusDays(7));
+        activeToken1.setRevokedAt(null);
+        refreshTokenRepository.save(activeToken1);
+
+        RefreshToken activeToken2 = new RefreshToken();
+        activeToken2.setUser(user);
+        activeToken2.setTokenHash(UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""));
+        activeToken2.setExpiresAt(now.plusDays(7));
+        activeToken2.setRevokedAt(null);
+        refreshTokenRepository.save(activeToken2);
+
+        LocalDateTime revokeTime = now.minusMinutes(1);
+        int updated = refreshTokenRepository.revokeAllActiveTokensByUser(user, revokeTime);
+        assertTrue(updated >= 2, "Expected at least 2 tokens revoked");
+
+        RefreshToken updated1 = refreshTokenRepository.findById(activeToken1.getId()).orElseThrow();
+        RefreshToken updated2 = refreshTokenRepository.findById(activeToken2.getId()).orElseThrow();
+        assertNotNull(updated1.getRevokedAt());
+        assertNotNull(updated2.getRevokedAt());
+    }
 }

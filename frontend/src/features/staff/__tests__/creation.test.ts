@@ -9,11 +9,15 @@ describe('Staff creation validation', () => {
     const errors = validateStaffCreation({ ...valid, fullName: ' ', email: 'invalid', password: ' ' });
     assert.ok(errors.fullName); assert.ok(errors.email); assert.ok(errors.password);
   });
-  it('accepts the phone boundary and rejects oversized input', () => {
-    assert.equal(validateStaffCreation({ ...valid, phone: '1'.repeat(20) }).phone, undefined);
+  it('accepts the phone boundary and rejects oversized or malformed input', () => {
+    assert.equal(validateStaffCreation({ ...valid, phone: '0912345678' }).phone, undefined);
+    assert.equal(validateStaffCreation({ ...valid, phone: '+84912345678' }).phone, undefined);
+    assert.equal(validateStaffCreation({ ...valid, phone: '1234567890' }).phone, undefined);
+    assert.ok(validateStaffCreation({ ...valid, phone: '123' }).phone);
     assert.ok(validateStaffCreation({ ...valid, phone: '1'.repeat(21) }).phone);
   });
-  it('checks UTF-8 password bytes rather than character count alone', () => {
+  it('checks password length between 8 and 72 UTF-8 bytes', () => {
+    assert.ok(validateStaffCreation({ ...valid, password: 'short' }).password);
     assert.equal(validateStaffCreation({ ...valid, password: 'é'.repeat(36) }).password, undefined);
     assert.ok(validateStaffCreation({ ...valid, password: 'é'.repeat(37) }).password);
   });

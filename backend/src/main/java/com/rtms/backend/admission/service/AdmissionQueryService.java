@@ -593,9 +593,9 @@ public class AdmissionQueryService {
                 vetId, activeStatuses);
         long active = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
         long awaiting = careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.OVERDUE));
+                vetId, List.of(CareScheduleStatus.SCHEDULED));
         long inProgress = careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.DELAYED, CareScheduleStatus.PAUSED));
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS));
         long approved = careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses);
         long reviewed = careScheduleRepository.countReviewedVetQueueItems(vetId);
         return new VetQueueSummaryResponse(total, active, awaiting, inProgress, approved, reviewed);

@@ -61,6 +61,10 @@ export function getNotificationHref(item: NotificationItem, role: Role | undefin
 
   // 3. Huấn luyện viên
   if (role === 'HEAD_TRAINER') {
+    if (item.notificationType === 'HORSE_TRAINING_ALLOWED' && refId) {
+      // referenceId là Horse ID (xem CareScheduleService), route tới chi tiết ngựa.
+      return `/trainer/horses/${refId}`;
+    }
     return `/trainer/schedule`;
   }
 

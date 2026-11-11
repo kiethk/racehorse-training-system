@@ -44,7 +44,7 @@ describe('BioSpcControlChart Logic Tests', () => {
       { id: 3, recordedAt: '2026-11-03T08:00:00', value: 32.5, isSpecialCause: false, anomalyDescription: null },
       { id: 4, recordedAt: '2026-11-04T08:00:00', value: 32.0, isSpecialCause: false, anomalyDescription: null },
       { id: 5, recordedAt: '2026-11-05T08:00:00', value: 33.0, isSpecialCause: false, anomalyDescription: null },
-      { id: 6, recordedAt: '2026-11-06T08:00:00', value: 37.5, isSpecialCause: true, anomalyDescription: 'Critical: Value (37.50) exceeds UCL (36.10)' },
+      { id: 6, recordedAt: '2026-11-06T08:00:00', value: 37.5, isSpecialCause: true, anomalyDescription: 'Critical: Value (37.50) exceeds upper safe threshold (36.10)' },
     ],
   };
 
@@ -71,7 +71,7 @@ describe('BioSpcControlChart Logic Tests', () => {
 
     const latestPoint = mockActiveSpc.points[mockActiveSpc.points.length - 1];
     assert.equal(latestPoint.isSpecialCause, true);
-    assert.ok(latestPoint.anomalyDescription?.includes('exceeds UCL'));
+    assert.ok(latestPoint.anomalyDescription?.includes('exceeds upper safe threshold'));
   });
 
   it('computes safe dynamic y-axis range', () => {
@@ -102,6 +102,6 @@ describe('BioSpcControlChart Logic Tests', () => {
 
     const uclPoint = mockActiveSpc.points[5];
     assert.equal(uclPoint.isSpecialCause, true);
-    assert.ok(uclPoint.anomalyDescription?.includes('exceeds UCL'));
+    assert.ok(uclPoint.anomalyDescription?.includes('exceeds upper safe threshold'));
   });
 });

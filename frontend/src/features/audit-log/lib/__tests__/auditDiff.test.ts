@@ -52,11 +52,33 @@ describe('Audit Diff Parser', () => {
     assert.equal(result.targetUrl, '/manager/accounts?userId=5');
   });
 
+  it('parses plain text failure with reason gracefully', () => {
+    const result = parseAuditDetails('Manager created a new account (Attempt failed) - Reason: Certification number already in use', 'User', null);
+    assert.equal(result.isJson, false);
+    assert.equal(result.summary, 'Manager created a new account (Attempt failed)');
+    assert.equal(result.reason, 'Certification number already in use');
+    assert.equal(result.diffs.length, 0);
+  });
+
+  it('parses structured JSON failure without diffs and preserves reason and summary', () => {
+    const json = JSON.stringify({
+      summary: 'Manager created a new account (Attempt failed)',
+      reason: 'Email already in use',
+      module: 'STAFF'
+    });
+    const result = parseAuditDetails(json, 'User', null);
+    assert.equal(result.isJson, true);
+    assert.equal(result.summary, 'Manager created a new account (Attempt failed)');
+    assert.equal(result.reason, 'Email already in use');
+    assert.equal(result.raw, 'Manager created a new account (Attempt failed)');
+    assert.equal(result.diffs.length, 0);
+  });
+
   it('resolves universal entity redirection URLs according to system rules', () => {
     assert.equal(resolveEntityUrl('AdmissionApplication', 99), '/manager/admissions/99');
     assert.equal(resolveEntityUrl('Horse', 42), '/manager/horses/42');
-    assert.equal(resolveEntityUrl('StableStall', 5), '/manager/stable');
-    assert.equal(resolveEntityUrl('Area', 2), '/manager/stable');
+    assert.equal(resolveEntityUrl('StableStall', 5), '/manager/stable?stallId=5');
+    assert.equal(resolveEntityUrl('Area', 2), '/manager/stable?areaId=2');
     assert.equal(resolveEntityUrl('User', 10), '/manager/accounts?userId=10');
     assert.equal(resolveEntityUrl('STAFF', 12), '/manager/accounts?userId=12');
     assert.equal(resolveEntityUrl('Unknown', 1), null);
@@ -77,7 +99,7 @@ describe('Audit Diff Parser', () => {
     assert.equal(resolveValueLink('assignedTrainer', 'Head Trainer (#2)'), '/manager/accounts?userId=2');
     assert.equal(resolveValueLink('assignedTrainer', 'Head Trainer'), '/manager/accounts?search=Head%20Trainer');
     assert.equal(resolveValueLink('assignedVet', 'Dr. Sarah Jenkins'), '/manager/accounts?search=Dr.%20Sarah%20Jenkins');
-    assert.equal(resolveValueLink('stallCode', 'A-04'), '/manager/stable');
+    assert.equal(resolveValueLink('stallCode', 'A-04'), '/manager/stable?stallCode=A-04');
     assert.equal(resolveValueLink('occupantHorse', 'Thunder Spirit (#1)'), '/manager/horses/1');
     assert.equal(resolveValueLink('status', 'ELIGIBLE'), null);
     assert.equal(resolveValueLink('reason', 'None'), null);

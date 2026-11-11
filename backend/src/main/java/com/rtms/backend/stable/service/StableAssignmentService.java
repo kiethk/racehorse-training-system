@@ -11,9 +11,10 @@ import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
+import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,14 +35,14 @@ public class StableAssignmentService {
     private final UserRepository users;
     private final GroomProfileRepository profiles;
     private final HorseRepository horses;
-    private final GroupWorkoutSyncService workouts;
+    private final TrainingGroupService workouts;
     private final EntityManager em;
     private final AreaTrainerAssignmentPolicy trainerPolicy;
     private final GroomAssignmentTriggers groomAssignmentTriggers;
 
     public StableAssignmentService(AreaRepository areas, StableStallRepository stalls,
                                    UserRepository users, GroomProfileRepository profiles,
-                                   HorseRepository horses, GroupWorkoutSyncService workouts, EntityManager em,
+                                   HorseRepository horses, TrainingGroupService workouts, EntityManager em,
                                    AreaTrainerAssignmentPolicy trainerPolicy,
                                    GroomAssignmentTriggers groomAssignmentTriggers) {
         this.areas = areas;
@@ -193,9 +194,12 @@ public class StableAssignmentService {
         for (var edit : groomEdits) {
             for (StableStall stall : blocks.get(new Block(edit.getAreaId(), edit.getBlockNumber()))) {
                 Horse horse = horseByStall.get(stall.getId());
-                if (horse != null && edit.getGroomId() == null) {
+                boolean hasHorseOrReservation = horse != null
+                        || stall.getStatus() == StallStatus.OCCUPIED
+                        || stall.getStatus() == StallStatus.RESERVED;
+                if (hasHorseOrReservation && edit.getGroomId() == null) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "Cannot remove Groom from a block with horses. Swap Groom instead.");
+                            "Cannot remove Groom from a block with active horses or reserved stalls. Swap Groom instead.");
                 }
                 if (horse != null && !Objects.equals(stall.getGroomId(), edit.getGroomId())) {
                     horseGroomChanges.put(horse.getId(), edit.getGroomId());

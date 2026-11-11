@@ -463,7 +463,6 @@ public class AgentOrchestratorService {
                          - Lịch tập: `/trainer/schedule`
                          - Kế hoạch huấn luyện: `/trainer/plans` (hoặc `/trainer/plans/[id]`)
                          - Dashboard & Cảnh báo rủi ro: `/trainer/dashboard` (LƯU Ý: KHÔNG CÓ ROUTE `/trainer/risk-alerts`, chỉ dùng `/trainer/dashboard`)
-                         - Đăng ký đua & Thành tích: `/trainer/racing` (hoặc `/trainer/racing/[id]`)
                          - Thẩm định nhập đàn: `/trainer/admissions` (hoặc `/trainer/admissions/[id]`)
                          - Chuồng trại & Phân công: `/trainer/stable`
                          - Giáo trình khóa học: `/trainer/courses`
@@ -584,11 +583,10 @@ public class AgentOrchestratorService {
                 17. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO HUẤN LUYỆN VIÊN (HEAD_TRAINER DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Ô chuồng [Stall]; mỗi Ô chuồng có 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
-                     + Trainer xếp ngựa vào các Nhóm huấn luyện [Training Group], tối đa 6 ngựa, mỗi ngựa chỉ ở một nhóm và hai ngựa cùng Groom không chung một nhóm. Nhóm có thể bị giải tán [Disbanded]: giữ tên và lịch sử, không còn ngựa.
-                     + Nhóm chạy một Khóa [Course] theo một Kế hoạch nhóm [Group Plan] -> gồm nhiều Buổi tập [Session], mỗi buổi cả nhóm cùng ra sân chạy một Bài tập [Subject] -> mỗi ngựa trong buổi có một Workout.
+                     + Trainer xếp ngựa vào các Nhóm huấn luyện [Training Group], tối đa 6 ngựa, mỗi ngựa chỉ ở một nhóm; một Groom có thể dắt nhiều ngựa trong cùng một nhóm. Nhóm có thể bị giải tán [Disbanded]: giữ tên và lịch sử, không còn ngựa.
+                     + Nhóm chạy một Khóa [Course] qua một Lượt chạy khóa [Course Run] -> gồm nhiều Buổi tập [Session], mỗi buổi cả nhóm cùng ra sân chạy một Bài tập [Exercise] -> mỗi ngựa trong buổi có một Workout.
                      + Trạng thái Workout: Scheduled (chưa diễn ra) -> Needs result (buổi đã qua giờ, chưa xác nhận) -> Ran (đã ghi chỉ số, là bằng chứng ngựa đã chạy) hoặc Did not run (Trainer xác nhận không chạy); Cancelled là bị hủy trước giờ. Không có học bù.
                      + Attendance X/Y của một ngựa trong một khóa: X là số buổi Ran, Y là số buổi của khóa không bị hủy cả buổi. Buổi Needs result KHÔNG được tính là đã chạy.
-                     + Chiến mã có thành tích tốt được Huấn luyện viên đăng ký tham gia các Giải đua [Race Registration].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
                      + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `totalSessions` và `sessionList`).
                      + Buổi nào chưa ghi kết quả / chưa điểm danh: Dùng `getTrainerSchedule` với `needsResultOnly=true` (đọc `totalWorkoutsNeedingResult` và `horseList` từng buổi).
@@ -596,7 +594,6 @@ public class AgentOrchestratorService {
                      + Tra cứu ngựa thuộc quyền huấn luyện: Dùng `getTrainerHorses` -> để lấy danh sách tên và ID ngựa.
                      + Tra cứu khóa và Attendance của ngựa: Dùng `getTrainerPlansSummary` (đọc `progress` dạng X/Y).
                      + Lịch sử buổi tập đã diễn ra của một ngựa: Dùng `getWorkoutHistory` (đọc `outcome`).
-                     + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `totalRaceRegistrations`).
                      + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `pendingReviewCount`).
                       + Phân tích & Xếp hạng sở trường: Dùng `getHorseSpecialtyAnalysis` (đọc `rankedHorseList` và `specialtyCount`).
                 """;
@@ -868,7 +865,7 @@ public class AgentOrchestratorService {
             case "currentPlanPeriod" -> "Course Period";
             case "planName" -> "Plan Name";
             case "courseName" -> "Course Name";
-            case "subjectName" -> "Training Subject";
+            case "exerciseName" -> "Training Exercise";
             case "targetGoal" -> "Target Goal";
             case "progress" -> "Progress";
             case "startDate" -> "Start Date";
@@ -935,21 +932,11 @@ public class AgentOrchestratorService {
             case "stageBreakdown" -> "Stage Breakdown";
 
             // Races
-            case "raceName" -> "Race Name";
-            case "raceCategory" -> "Race Category";
             case "location" -> "Racecourse / Location";
-            case "organizer" -> "Organizer";
             case "distanceMeters" -> "Distance (m)";
             case "trackType" -> "Track Type";
             case "eventDate" -> "Event Date";
             case "eventTime" -> "Start Time";
-            case "nominationDeadline" -> "Nomination Deadline";
-            case "jockeyName" -> "Jockey";
-            case "entryFee" -> "Entry Fee";
-            case "prizeDetails" -> "Prize Details";
-            case "registrationDate" -> "Registration Date";
-            case "totalRaceRegistrations" -> "Total Race Registrations";
-            case "raceList" -> "Race List";
 
             // Audit
             case "action" -> "Action";
@@ -1121,7 +1108,7 @@ public class AgentOrchestratorService {
             case "currentPlanPeriod" -> "Thời gian khóa";
             case "planName" -> "Tên kế hoạch";
             case "courseName" -> "Tên khóa học";
-            case "subjectName" -> "Bài tập / Môn học";
+            case "exerciseName" -> "Bài tập / Môn học";
             case "targetGoal" -> "Mục tiêu huấn luyện";
             case "progress" -> "Tiến độ";
             case "startDate" -> "Ngày bắt đầu";
@@ -1219,21 +1206,11 @@ public class AgentOrchestratorService {
             case "stageBreakdown" -> "Chi tiết theo giai đoạn";
 
             // Giải đua
-            case "raceName" -> "Tên giải đua";
-            case "raceCategory" -> "Hạng mục giải đua";
             case "location" -> "Địa điểm / Trường đua";
-            case "organizer" -> "Đơn vị tổ chức";
             case "distanceMeters" -> "Cự ly thi đấu (m)";
             case "trackType" -> "Mặt sân đua";
             case "eventDate" -> "Ngày thi đấu chính thức";
             case "eventTime" -> "Giờ xuất phát";
-            case "nominationDeadline" -> "Hạn chót đăng ký nộp hồ sơ";
-            case "jockeyName" -> "Nài ngựa";
-            case "entryFee" -> "Lệ phí tham gia";
-            case "prizeDetails" -> "Cơ cấu giải thưởng";
-            case "registrationDate" -> "Ngày đăng ký đua";
-            case "totalRaceRegistrations" -> "Tổng số giải đăng ký";
-            case "raceList" -> "Danh sách giải đua";
 
             // Nhật ký kiểm toán
             case "action" -> "Hành động thao tác";

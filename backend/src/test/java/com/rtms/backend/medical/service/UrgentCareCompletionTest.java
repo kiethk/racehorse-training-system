@@ -16,9 +16,6 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
-import com.rtms.backend.medical.repository.InjuryRecordRepository;
-import com.rtms.backend.medical.repository.PrescriptionRepository;
-import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
@@ -26,7 +23,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -45,9 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -70,7 +65,7 @@ class UrgentCareCompletionTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
     @Mock private NotificationService notificationService;
-    @Mock private GroupWorkoutSyncService workoutService;
+    @Mock private TrainingGroupService workoutService;
 
     private CareScheduleService careScheduleService;
 
@@ -89,9 +84,9 @@ class UrgentCareCompletionTest {
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
                 mock(PreventiveVaccinationService.class),
-                mock(InjuryRecordRepository.class),
-                mock(TreatmentPlanRepository.class),
-                mock(PrescriptionRepository.class));
+                mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -222,7 +217,7 @@ class UrgentCareCompletionTest {
         stubCompletion();
         incident.setGroomId(55L);
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident));
+                .thenReturn(java.util.List.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
@@ -267,12 +262,12 @@ class UrgentCareCompletionTest {
         when(horseRepository.findTrainerIdByHorseId(horse.getId())).thenReturn(Optional.of(88L));
         stubCompletion();
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident, second, third));
+                .thenReturn(java.util.List.of(incident, second, third));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
-        for (HorseIncidentReport r : List.of(incident, second, third)) {
+        for (HorseIncidentReport r : java.util.List.of(incident, second, third)) {
             assertEquals(IncidentStatus.RESOLVED, r.getStatus());
             assertEquals(vet.getId(), r.getHandledById());
             assertNotNull(r.getHandledAt());
@@ -300,7 +295,7 @@ class UrgentCareCompletionTest {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         stubCompletion();
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident));
+                .thenReturn(java.util.List.of(incident));
 
         var response = careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
@@ -316,7 +311,7 @@ class UrgentCareCompletionTest {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         stubCompletion();
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of());
+                .thenReturn(java.util.List.of());
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
@@ -353,11 +348,11 @@ class UrgentCareCompletionTest {
 
         when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
         when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
-                .thenReturn(List.of(incident, merged));
+                .thenReturn(java.util.List.of(incident, merged));
 
         var reports = careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), vet.getId());
 
-        assertEquals(List.of(30L, 31L), reports.stream().map(r -> r.id()).toList());
+        assertEquals(java.util.List.of(30L, 31L), reports.stream().map(r -> r.id()).toList());
     }
 
     @Test
@@ -366,7 +361,7 @@ class UrgentCareCompletionTest {
         incident.setReportedAt(LocalDateTime.now());
         when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
         when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
-                .thenReturn(List.of());
+                .thenReturn(java.util.List.of());
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
         var reports = careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), vet.getId());
@@ -456,7 +451,7 @@ class UrgentCareCompletionTest {
                 eq(10L), eq(CareType.URGENT), anyList(), eq(100L))).thenReturn(true);
         incident.setGroomId(55L);
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident));
+                .thenReturn(java.util.List.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
@@ -502,13 +497,13 @@ class UrgentCareCompletionTest {
     void testCancel_lastPendingExamOfBlockedHorse_rejected() {
         // Under AD-022, cancelCareSchedule is removed entirely. The LAST_FOLLOW_UP
         // vulnerability no longer exists because neither Vet nor Manager can delete exams.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
     @DisplayName("AD-022: duplicate booking cancellation abolished — reschedule used instead")
     void testCancel_blockedHorseWithAnotherPendingExam_allowed() {
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     private void stubCompletion() {
@@ -536,7 +531,7 @@ class UrgentCareCompletionTest {
         CompleteCareScheduleRequest req = completeRequest(decision);
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
-        next.setScheduledDate(LocalDate.now().plusDays(3).toString());
+        next.setScheduledDate(java.time.LocalDate.now().plusDays(3).toString());
         next.setDescription("Recheck after urgent examination");
         req.setNextSchedule(next);
         return req;

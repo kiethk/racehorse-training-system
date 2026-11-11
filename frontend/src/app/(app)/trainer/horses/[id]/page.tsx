@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { TrainerHorseDetailView } from '@/features/training/components/TrainerHorseDetailView';
+import { TrainerHorseDetailView } from '@/features/training/components/horses/TrainerHorseDetailView';
 
 export const metadata: Metadata = {
   title: 'Horse Profile | Trainer | RTMS',

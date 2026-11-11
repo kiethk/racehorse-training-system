@@ -247,7 +247,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         horseId={urgentCase.horseId}
         severity={urgentCase.severity}
         action={
-          (urgentCase.status === 'SCHEDULED' || urgentCase.status === 'PAUSED' || urgentCase.status === 'OVERDUE') && (
+          urgentCase.status === 'SCHEDULED' && (
             <Button
               variant="destructive"
               icon="activity"
@@ -376,7 +376,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       </Panel>
 
       {/* Main Workspace Area */}
-      {(urgentCase.status === 'SCHEDULED' || urgentCase.status === 'PAUSED') && (
+      {urgentCase.status === 'SCHEDULED' && (
         <Panel padded className="border-l-4 border-l-[var(--color-warning)] bg-[var(--color-warning-soft)]/20">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
@@ -401,7 +401,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         </Panel>
       )}
 
-      {(urgentCase.status === 'IN_PROGRESS' || urgentCase.status === 'DELAYED' || urgentCase.status === 'OVERDUE') && (
+      {urgentCase.status === 'IN_PROGRESS' && (
         <ClinicalExamForm
           ref={formRef}
           variant="STANDARD"

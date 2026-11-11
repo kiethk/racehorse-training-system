@@ -143,8 +143,8 @@ class AuditLogArchivePurgeTest {
 
     @Test
     void purgeAuditLogs_withCustomRange_usesBetweenDelete() {
-        LocalDateTime from = LocalDateTime.of(2026, 10, 1, 0, 0);
-        LocalDateTime before = LocalDateTime.of(2026, 10, 5, 23, 59);
+        LocalDateTime from = LocalDateTime.of(2026, 8, 1, 0, 0);
+        LocalDateTime before = LocalDateTime.of(2026, 8, 5, 23, 59);
 
         when(repository.deleteByCreatedAtBetween(from, before)).thenReturn(25);
 
@@ -152,6 +152,33 @@ class AuditLogArchivePurgeTest {
         AuditPurgeResponse response = service.purgeAuditLogs(10L, request);
 
         assertEquals(25, response.purgedCount());
+    }
+
+    @Test
+    void purgeAuditLogs_withinLast30Days_throwsRetentionViolation() {
+        LocalDateTime recentDate = LocalDateTime.now().minusDays(5);
+        AuditPurgeRequest request = new AuditPurgeRequest(recentDate, null, "Illegal purge");
+
+        ApiException ex = assertThrows(ApiException.class, () ->
+                service.purgeAuditLogs(10L, request)
+        );
+
+        assertEquals("PURGE_RETENTION_VIOLATION", ex.getErrorCode());
+    }
+
+    @Test
+    void purgeAuditLogs_fromDateOnly_purgesUpToThirtyDaysAgoNotNow() {
+        LocalDateTime from = LocalDateTime.now().minusDays(45);
+        when(repository.deleteByCreatedAtBetween(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(10);
+
+        AuditPurgeRequest request = new AuditPurgeRequest(null, from, "Purge older");
+        AuditPurgeResponse response = service.purgeAuditLogs(10L, request);
+
+        assertEquals(10, response.purgedCount());
+        ArgumentCaptor<LocalDateTime> captor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(repository).deleteByCreatedAtBetween(captor.capture(), captor.capture());
+        assertEquals(from, captor.getAllValues().get(0));
+        assertTrue(captor.getAllValues().get(1).isBefore(LocalDateTime.now().minusDays(29)));
     }
 
     @Test

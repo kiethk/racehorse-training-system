@@ -2,7 +2,7 @@
 
 Import `createDragDrop` from `@/components/ui`. Native HTML drag and drop, no additional dependency. The primitive owns the active item, drag lifecycle, accepted destinations, hover state, cancellation and screen reader announcements. Features own layout, business rules, confirmation and persistence.
 
-## Subject into Course
+## Exercise into Course
 
 Create one typed instance **at module scope**, shared by all source/destination components in that feature:
 
@@ -10,25 +10,25 @@ Create one typed instance **at module scope**, shared by all source/destination 
 'use client';
 
 import { createDragDrop } from '@/components/ui';
-import type { Subject } from '../types';
+import type { Exercise } from '../types';
 
-export const subjectDragDrop = createDragDrop<Subject>();
+export const exerciseDragDrop = createDragDrop<Exercise>();
 ```
 
-Wrap the screen in `<subjectDragDrop.Provider>`. Hooks must run in children of that provider. Separate provider instances are isolated, even when nested. Do not call the factory inside a component.
+Wrap the screen in `<exerciseDragDrop.Provider>`. Hooks must run in children of that provider. Separate provider instances are isolated, even when nested. Do not call the factory inside a component.
 
 Source card:
 
 ```tsx
-const { dragProps, pickUp, isDragging } = subjectDragDrop.useDraggable({
-  item: subject,
-  label: subject.name,
+const { dragProps, pickUp, isDragging } = exerciseDragDrop.useDraggable({
+  item: exercise,
+  label: exercise.name,
   disabled: saving,
 });
 
 return (
   <SelectableCard {...dragProps} selected={isDragging} disabled={saving} onClick={pickUp}>
-    {subject.name}
+    {exercise.name}
   </SelectableCard>
 );
 ```
@@ -36,16 +36,16 @@ return (
 Destination:
 
 ```tsx
-const { dropProps, canDrop, isOver, drop } = subjectDragDrop.useDropZone({
+const { dropProps, canDrop, isOver, drop } = exerciseDragDrop.useDropZone({
   disabled: saving,
-  accept: subject => !selectedSubjects.some(item => item.id === subject.id),
-  onDrop: subject => setSelectedSubjects(items => [...items, subject]),
+  accept: exercise => !selectedExercises.some(item => item.id === exercise.id),
+  onDrop: exercise => setSelectedExercises(items => [...items, exercise]),
 });
 
 return (
   <Panel {...dropProps} className={cn(isOver && 'ring-2 ring-[var(--color-primary)]')}>
-    {/* Render selected subjects here. */}
-    <Button disabled={!canDrop} onClick={drop}>Add selected subject</Button>
+    {/* Render selected exercises here. */}
+    <Button disabled={!canDrop} onClick={drop}>Add selected exercise</Button>
   </Panel>
 );
 ```
@@ -72,4 +72,4 @@ The Add button provides the same action by click, Enter or Space after selecting
 ## Existing consumers
 
 - Stable: `src/features/stable/components/staffDragDrop.ts`, `StaffAssignment`, `AreaCard`, `StableStaffPanel`. Staff limits, occupied-block protection and swap confirmation stay in Stable.
-- Runnable Subject → Course example: `/design-test`, section **Drag and drop** (`src/app/design-test/DragDropExample.tsx`). Example state is local and makes no API writes.
+- Runnable Exercise → Course example: `/design-test`, section **Drag and drop** (`src/app/design-test/DragDropExample.tsx`). Example state is local and makes no API writes.

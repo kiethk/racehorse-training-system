@@ -97,8 +97,11 @@ export const admissionsApi = {
     return response.data;
   },
 
-  getPendingUrgentAlerts: async (): Promise<UrgentAssignmentAlert[]> => {
-    const response = await apiGet<ApiResponse<UrgentAssignmentAlert[]>>('/api/care-schedules/urgent-alerts/pending');
+  getPendingUrgentAlerts: async (includeCompleted = false): Promise<UrgentAssignmentAlert[]> => {
+    const query = includeCompleted ? '?includeCompleted=true' : '';
+    const response = await apiGet<ApiResponse<UrgentAssignmentAlert[]>>(
+      `/api/care-schedules/urgent-alerts/pending${query}`
+    );
     return response.data;
   },
 

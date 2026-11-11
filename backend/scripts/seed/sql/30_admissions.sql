@@ -29,10 +29,10 @@ DECLARE
 BEGIN
     LOOP
         SELECT * INTO c FROM care_schedule
-         WHERE horse_id = p_horse AND purpose = 'FOLLOW_UP' AND care_type = 'ROUTINE' AND status IN ('REQUESTED', 'SCHEDULED')
+         WHERE horse_id = p_horse AND purpose = 'FOLLOW_UP' AND care_type = 'ROUTINE' AND status = 'SCHEDULED'
          ORDER BY requested_at LIMIT 1;
         EXIT WHEN c.id IS NULL;
-        IF c.status = 'REQUESTED' THEN
+        IF c.veterinarian_id IS NULL THEN
             v_assign := GREATEST(c.created_at, c.requested_at - INTERVAL '14 days');
             EXIT WHEN v_assign > v_limit;
             PERFORM pg_temp.book(c.id, p_vet);
@@ -84,9 +84,9 @@ DECLARE
 BEGIN
     LOOP
         SELECT * INTO m FROM care_schedule
-         WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status IN ('REQUESTED', 'SCHEDULED');
+         WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED';
         EXIT WHEN m.id IS NULL;
-        IF m.status = 'REQUESTED' THEN
+        IF m.veterinarian_id IS NULL THEN
             v_assign := GREATEST(m.created_at, m.requested_at - INTERVAL '14 days');
             EXIT WHEN v_assign > v_limit;
             -- Lần tiêm thứ hai ghi từ "To do" trước khi lịch được xếp. (Second round recorded from "To do".)
@@ -139,7 +139,7 @@ BEGIN
             -- REQUESTED ở ngày mới). (Blocked after booking: the manager moves the visit after the rest period.)
             SELECT * INTO v_rest FROM seed_block WHERE horse_id = p_horse AND from_ts <= v_slot
              ORDER BY from_ts DESC LIMIT 1;
-            UPDATE care_schedule SET status = 'REQUESTED', veterinarian_id = NULL, scheduled_at = NULL,
+            UPDATE care_schedule SET status = 'SCHEDULED', veterinarian_id = NULL, scheduled_at = NULL,
                                      requested_at = (COALESCE(v_rest.to_ts, pg_temp.clock())::DATE + 1) + TIME '14:00',
                                      reschedule_reason = 'UNDER_TREATMENT', reschedule_note = 'Vaccinate after the rest period.',
                                      updated_at = v_rest.from_ts
@@ -392,8 +392,8 @@ BEGIN
                                       'Club Manager approved application #' || v_adm || ' and allocated regular stable stall',
                                       v_t, 'POST', '/api/admissions/' || v_adm || '/manager-review');
             ELSE
-                IF EXISTS (SELECT 1 FROM care_schedule WHERE horse_id = v_horse AND status IN ('REQUESTED', 'IN_PROGRESS')) THEN
-                    RAISE EXCEPTION 'Admission % cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS', a.k;
+                IF EXISTS (SELECT 1 FROM care_schedule WHERE horse_id = v_horse AND status = 'IN_PROGRESS') THEN
+                    RAISE EXCEPTION 'Admission % cannot be rejected while veterinary care is IN_PROGRESS', a.k;
                 END IF;
                 DELETE FROM care_schedule
                  WHERE horse_id = v_horse AND status IN ('SCHEDULED', 'PAUSED', 'DELAYED', 'OVERDUE');

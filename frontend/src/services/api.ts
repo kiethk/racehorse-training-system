@@ -17,9 +17,14 @@ function getApiUrl(path: string): string {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public errorCode?: string) {
+  status: number;
+  errorCode?: string;
+
+  constructor(status: number, message: string, errorCode?: string) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.errorCode = errorCode;
   }
 }
 
