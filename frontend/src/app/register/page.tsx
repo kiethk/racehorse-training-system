@@ -1,12 +1,14 @@
 /* eslint-disable no-restricted-syntax */
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AuthCard } from '@/components/auth/AuthCard';
-import { Button, FormField, Icon, Input, Notice } from '@/components/ui';
+import { Button, FormField, Icon, Input, Notice, TurnstileWidget, type TurnstileWidgetHandle } from '@/components/ui';
 import { registerOwner } from '@/services/auth';
+import { toast } from '@/lib/toast';
+import { cn } from '@/lib/cn';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PHONE_REGEX = /^(0|\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{9,15}$/;
@@ -20,6 +22,8 @@ export default function RegisterPage() {
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -83,6 +87,8 @@ export default function RegisterPage() {
     return Object.keys(nextErrors).length === 0;
   }
 
+  const hasMinLength = password.length >= 8;
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
@@ -99,19 +105,22 @@ export default function RegisterPage() {
         password,
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
+        captchaToken,
       });
 
       // Redirect to login page with registration hint
+      toast.success('Account created successfully');
       router.push('/login?registered=1');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       setServerError(msg);
+      setCaptchaToken('');
+      turnstileRef.current?.reset();
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
   }
-
-  const hasMinLength = password.length >= 8;
 
   return (
     <AuthCard
@@ -203,7 +212,7 @@ export default function RegisterPage() {
           error={errors.password}
           hint={
             password ? (
-              <span className={`inline-flex items-center gap-1.5 text-xs ${hasMinLength ? 'text-emerald-500 font-medium' : 'text-[var(--color-text-muted)]'}`}>
+              <span className={cn('inline-flex items-center gap-1.5 text-xs', hasMinLength ? 'font-medium text-[var(--color-success)]' : 'text-[var(--color-text-muted)]')}>
                 <Icon name={hasMinLength ? 'check' : 'circle'} size={12} />
                 At least 8 characters
               </span>
@@ -264,12 +273,28 @@ export default function RegisterPage() {
           </div>
         </FormField>
 
+        <FormField label="Security check" htmlFor="register-security-check" required>
+          <TurnstileWidget
+            ref={turnstileRef}
+            id="register-security-check"
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA'}
+            onVerify={setCaptchaToken}
+            onExpire={() => {
+              setCaptchaToken('');
+              turnstileRef.current?.reset();
+            }}
+            onError={() => setCaptchaToken('')}
+            className="w-full"
+          />
+        </FormField>
+
         <Button
           type="submit"
           id="register-submit"
           variant="primary"
           className="h-10 w-full mt-2 font-medium shadow-md"
           loading={submitting}
+          disabled={submitting || !captchaToken}
         >
           Create account
         </Button>

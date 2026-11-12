@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -74,6 +75,20 @@ public class EmailService {
         );
 
         sendEmail(toEmail, subject, htmlContent, textContent);
+    }
+
+    @Async
+    public void sendAdmissionGroomReviewAssignedEmail(String toEmail, String fullName, String horseName,
+            LocalDateTime reviewDueAt, String admissionUrl) {
+        String subject = "New admission to review";
+        String text = "Dear " + fullName + ",\n\n" + horseName
+                + " is assigned to you for admission review.\nReview due: " + reviewDueAt
+                + "\n\nView admission: " + admissionUrl + "\n\nRiverside Training Club";
+        String html = "<html><body><h2>New admission to review</h2><p>Dear " + escape(fullName)
+                + ",</p><p>" + escape(horseName) + " is assigned to you for admission review.</p>"
+                + "<p>Review due: " + escape(String.valueOf(reviewDueAt)) + "</p><p><a href='"
+                + escape(admissionUrl) + "'>View admission</a></p><p>Riverside Training Club</p></body></html>";
+        sendEmail(toEmail, subject, html, text);
     }
 
     /**

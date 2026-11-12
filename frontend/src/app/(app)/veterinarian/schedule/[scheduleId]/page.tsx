@@ -8,7 +8,7 @@ import { BackLink, Spinner } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { DetailSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '@/features/admissions/services/api';
-import type { CareScheduleDetail } from '@/features/admissions/types';
+import type { AdmissionDocument, CareScheduleDetail } from '@/features/admissions/types';
 import { UrgentCaseView } from '@/features/admissions/components/UrgentCaseView';
 import { VetReviewForm } from '@/features/admissions/components/VetReviewForm';
 import { SchedulePatientHeader } from '@/features/care/components/SchedulePatientHeader';
@@ -24,6 +24,7 @@ export default function ScheduleDetailPage() {
   const successHref = fromAdmissions ? '/veterinarian/admissions?tab=APPROVED' : '/veterinarian/schedule';
   const backLabel = fromAdmissions ? 'Back to Admissions' : 'Back to Schedule';
   const [detail, setDetail] = useState<CareScheduleDetail | null>(null);
+  const [documents, setDocuments] = useState<AdmissionDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +35,9 @@ export default function ScheduleDetailPage() {
       setError(null);
       const res = await admissionsApi.getCareScheduleDetail(scheduleId);
       setDetail(res);
+      setDocuments(res.schedule.admissionId
+        ? await admissionsApi.getDocuments(res.schedule.admissionId).catch(() => [])
+        : []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load schedule';
       setError(msg);
@@ -121,6 +125,7 @@ export default function ScheduleDetailPage() {
                 schedulePurpose={detail.schedule.purpose}
                 candidateName={detail.horse?.name}
                 horseId={detail.schedule.horseId ?? undefined}
+                documents={documents}
                 onStartExam={handleStartExam}
                 onSuccess={() => router.push(successHref)}
               />

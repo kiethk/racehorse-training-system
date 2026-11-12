@@ -66,7 +66,7 @@ class CareScheduleDateFilterTest {
                 mock(HorseIncidentReportRepository.class), mock(VeterinarianProfileRepository.class), mock(AuditLogRepository.class),
                 mock(ApplicationEventPublisher.class), mock(EntityManager.class), mock(NotificationService.class),
                 mock(TrainingDecisionService.class), mock(PreventiveVaccinationService.class), mock(InjuryRecordRepository.class),
-                mock(TreatmentPlanRepository.class), new com.fasterxml.jackson.databind.ObjectMapper()
+                mock(TreatmentPlanRepository.class), mock(PrescriptionRepository.class)
         );
     }
 

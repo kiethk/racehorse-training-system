@@ -14,6 +14,7 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
+import com.rtms.backend.stable.repository.StableStallRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +51,7 @@ class CareScheduleVetQueueQueryTest {
     @Autowired private UserRepository users;
     @Autowired private RoleRepository roles;
     @Autowired private HorseRepository horses;
-    @Autowired private com.rtms.backend.stable.repository.StableStallRepository stableStalls;
+    @Autowired private StableStallRepository stableStalls;
 
     private Long vetId;
     private Long horseId;
@@ -164,6 +165,16 @@ class CareScheduleVetQueueQueryTest {
 
         assertEquals(1, completed.getContent().size());
         assertEquals(1L, completed.getTotalElements());
+    }
+
+    @Test
+    void reviewedPillIncludesCompletedExamAndCountMatchesPage() {
+        Page<CareSchedule> reviewed = careSchedules.findVetQueuePage(vetId, false, "", "REVIEWED",
+                null, null, null, "", PageRequest.of(0, 1));
+
+        assertEquals(1L, reviewed.getTotalElements());
+        assertEquals(Set.of(completedExam.getId()), idsOf(reviewed));
+        assertEquals(reviewed.getTotalElements(), careSchedules.countReviewedVetQueueItems(vetId));
     }
 
 

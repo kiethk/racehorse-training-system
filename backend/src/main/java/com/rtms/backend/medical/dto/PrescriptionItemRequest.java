@@ -1,18 +1,15 @@
 package com.rtms.backend.medical.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.rtms.backend.medical.enums.MedicationRoute;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/**
- * Đơn thuốc Vet kê tự do (Track 0 — ROADMAP v3.0).
- * Bỏ medicationId/withdrawalDays/startDate/endDate; thêm medicationName/duration/notes.
- * BE tự tính startDate = today, endDate = today + duration.
- * Serialize thành JSON snake_case lưu vào treatment_plans.instructions.
- */
+import java.time.LocalDate;
+
+/** Prescription details recorded when an examination is completed. One row per medication in prescriptions. */
 public class PrescriptionItemRequest {
 
     @NotBlank(message = "Medication name is required")
@@ -30,13 +27,20 @@ public class PrescriptionItemRequest {
     @Size(max = 50, message = "Frequency must not exceed 50 characters")
     private String frequency;
 
-    @NotNull(message = "Duration is required")
-    @Min(value = 1, message = "Duration must be at least 1 day")
-    @Max(value = 365, message = "Duration must not exceed 365 days")
-    private Integer duration;
+    @NotNull(message = "Start date is required")
+    private LocalDate startDate;
 
-    @Size(max = 1000, message = "Notes must not exceed 1000 characters")
-    private String notes;
+    @NotNull(message = "End date is required")
+    private LocalDate endDate;
+
+    @Size(max = 1000, message = "Instructions must not exceed 1000 characters")
+    private String instructions;
+
+    @JsonIgnore
+    @AssertTrue(message = "End date must be on or after start date")
+    public boolean isDateRangeValid() {
+        return startDate != null && endDate != null && !endDate.isBefore(startDate);
+    }
 
     public String getMedicationName() { return medicationName; }
     public void setMedicationName(String medicationName) { this.medicationName = medicationName; }
@@ -50,9 +54,12 @@ public class PrescriptionItemRequest {
     public String getFrequency() { return frequency; }
     public void setFrequency(String frequency) { this.frequency = frequency; }
 
-    public Integer getDuration() { return duration; }
-    public void setDuration(Integer duration) { this.duration = duration; }
+    public LocalDate getStartDate() { return startDate; }
+    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
 
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
+    public LocalDate getEndDate() { return endDate; }
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+    public String getInstructions() { return instructions; }
+    public void setInstructions(String instructions) { this.instructions = instructions; }
 }

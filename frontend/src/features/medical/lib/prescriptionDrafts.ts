@@ -8,25 +8,18 @@ export function toPrescriptionRequests(items: PrescriptionFormItem[]): Prescript
       dosage: (item.dosage ?? '').trim(),
       route: item.route,
       frequency: (item.frequency ?? '').trim(),
-      duration: item.duration ?? 1,
-      notes: (item.notes ?? '').trim() || undefined,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      instructions: (item.instructions ?? '').trim(),
     }));
 }
 
 export function computeSuggestedRecheckDate(
-  prescriptionDurations: number[],
+  prescriptionEndDates: string[],
   injuryRecoveryDates: string[],
 ): string | undefined {
   const dates: string[] = [...(injuryRecoveryDates ?? []).filter(Boolean)];
-  const validDurations = (prescriptionDurations ?? []).filter((d) => typeof d === 'number' && d > 0);
-
-  if (validDurations.length > 0) {
-    const today = new Date();
-    const maxDuration = Math.max(...validDurations);
-    const recheckDate = new Date(today);
-    recheckDate.setDate(recheckDate.getDate() + maxDuration);
-    dates.push(recheckDate.toISOString().slice(0, 10));
-  }
+  dates.push(...(prescriptionEndDates ?? []).filter(Boolean));
 
   const allDates = dates.sort();
   return allDates.length > 0 ? allDates[allDates.length - 1] : undefined;

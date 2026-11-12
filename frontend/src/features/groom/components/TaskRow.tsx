@@ -1,12 +1,20 @@
-import { Pill } from '@/components/ui';
+import { Button, EntityLink, Pill } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import { cn } from '@/lib/cn';
 import type { TodayTaskItem } from '../types';
+import type { SessionHorse } from '../lib/groupTasks';
+import type { TreatmentPlan } from '@/features/care/types';
 
 /**
  * A Session or vet visit on the checklist, drawn like a routine block: a Session lists every horse the Groom leads in it.
  * The Groom sees it but someone else closes it.
  */
-export function TaskRow({ task, horseNames }: { task: TodayTaskItem; horseNames: string[] }) {
+export function TaskRow({ task, horses, plans, onViewInstructions }: {
+  task: TodayTaskItem;
+  horses: SessionHorse[];
+  plans: Map<number, TreatmentPlan>;
+  onViewInstructions: (horseId: number) => void;
+}) {
   const isCompleted = task.status === 'COMPLETED';
 
   return (
@@ -30,12 +38,27 @@ export function TaskRow({ task, horseNames }: { task: TodayTaskItem; horseNames:
               <Pill tone={task.source === 'WORKOUT' ? 'warning' : 'info'} size="sm">{task.source}</Pill>
             </div>
             <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Horses">
-              {horseNames.map((name) => (
+              {horses.map((horse) => (
                 <li
-                  key={name}
-                  className="inline-flex items-center rounded-full border border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]"
+                  key={horse.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]"
                 >
-                  {name}
+                  <EntityLink href={entityHref('horse', horse.id, 'GROOM', { stallCode: horse.stallCode ?? task.stallCode })}>
+                    {horse.name}
+                  </EntityLink>
+                  {plans.has(horse.id) && (
+                    <Button
+                      type="button"
+                      variant="tertiary"
+                      size="sm"
+                      icon="pill"
+                      aria-label={`View instructions for ${horse.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onViewInstructions(horse.id);
+                      }}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

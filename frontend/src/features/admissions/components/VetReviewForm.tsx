@@ -7,6 +7,7 @@ import type {
   CareScheduleStatus,
   CareType,
   VetReviewResponse,
+  AdmissionDocument,
 } from '../types';
 
 export interface VetReviewFormProps {
@@ -28,6 +29,7 @@ export interface VetReviewFormProps {
   asideTop?: ReactNode;
   onSuccess: (result: VetReviewResponse | CareSchedule, completionKind: 'INITIAL' | 'CARE_SCHEDULE') => void;
   onDirtyChange?: (dirty: boolean) => void;
+  documents?: AdmissionDocument[];
 }
 
 export function VetReviewForm({
@@ -48,6 +50,7 @@ export function VetReviewForm({
   asideTop,
   onSuccess,
   onDirtyChange,
+  documents,
 }: VetReviewFormProps) {
   const variant = careType === 'URGENT' ? 'URGENT_LEGACY' : 'STANDARD';
 
@@ -69,6 +72,7 @@ export function VetReviewForm({
       asideTop={asideTop}
       onSuccess={(result, kind) => onSuccess(result, kind)}
       onDirtyChange={onDirtyChange}
+      documents={documents}
     />
   );
 }

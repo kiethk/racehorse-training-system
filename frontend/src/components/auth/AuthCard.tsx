@@ -4,7 +4,7 @@ import { BrandLogo } from '@/components/ui/BrandLogo';
 
 interface AuthCardProps {
   title: string;
-  description: string;
+  description?: string;
   footer?: ReactNode;
   note?: ReactNode;
   children: ReactNode;
@@ -133,9 +133,11 @@ export function AuthCard({
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
                 {title}
               </h1>
-              <p className="mt-1 text-xs sm:text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                {description}
-              </p>
+              {description && (
+                <p className="mt-1 text-xs sm:text-sm text-[var(--color-text-secondary)] leading-relaxed">
+                  {description}
+                </p>
+              )}
             </div>
 
             {children}

@@ -16,6 +16,7 @@ import { AdmissionInfoSection, AdmissionSideCard, InfoGroupTitle, InfoRow } from
 import { EditAdmissionModal } from './EditAdmissionModal';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { ArrivalPhotosBlock } from '../shared/components/ArrivalPhotosBlock';
 
 const reviewFeedback = [
   { label: 'Groom', field: 'groomFeedback', stage: 0 },
@@ -184,6 +185,7 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
                             {detail.arrivedAt && (
                               <InfoRow label="Checked In At" value={formatDateTime(detail.arrivedAt)} />
                             )}
+                            {detail.arrivedAt && <ArrivalPhotosBlock documents={detail.documents} />}
                             <InfoRow
                               label="Groom Notes"
                               value={detail.groomFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}

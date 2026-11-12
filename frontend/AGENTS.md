@@ -186,8 +186,10 @@ Import from `@/components/ui`.
 | Action button | `Button` (`primary`, `secondary`, `tertiary`, `destructive`, `warning`, `link`) |
 | Icon-only button | `IconButton` (requires `label`) |
 | Link that looks like a button | `LinkButton` |
+| Entity name linking to an available role page | `EntityLink` (`href`, `children`) |
 | Back to the previous screen (top left, above the title) | `BackLink` (`href`, or `onClick`) |
 | Text field, dropdown, multi-line | `FormField` wrapping `Input`, `Select`, `Textarea` |
+| Cloudflare bot protection | `TurnstileWidget` (`siteKey`, verification callbacks, `reset()` ref) |
 | Checkbox or radio | `Checkbox` (`type="radio"` for radios); `ChoiceInput` for a bare one inside a custom option card |
 | File picker | `FileInput` |
 | Search box | `SearchInput` |

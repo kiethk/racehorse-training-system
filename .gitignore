@@ -41,6 +41,7 @@ artifacts/
 ui-reference/
 tutorials/
 docs/
+docs/bmad/
 !backend/docs/
 backend/docs/*
 !backend/docs/CLOUD_DEMO_SEED.md
