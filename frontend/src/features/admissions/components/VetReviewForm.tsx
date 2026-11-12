@@ -17,6 +17,7 @@ export interface VetReviewFormProps {
   careScheduleId?: number | null;
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
+  scheduledDate?: string | null;
   /** PREVENTIVE: the system-booked vaccination visit; it can defer vaccination instead of giving it. */
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   fromIncident?: boolean;
@@ -38,6 +39,7 @@ export function VetReviewForm({
   careScheduleId,
   careType = 'INITIAL',
   scheduleStatus,
+  scheduledDate,
   schedulePurpose,
   fromIncident,
   blockHeldUntil,
@@ -58,6 +60,7 @@ export function VetReviewForm({
       careScheduleId={careScheduleId}
       careType={careType}
       scheduleStatus={scheduleStatus}
+      scheduledDate={scheduledDate}
       schedulePurpose={schedulePurpose}
       fromIncident={fromIncident}
       blockHeldUntil={blockHeldUntil}

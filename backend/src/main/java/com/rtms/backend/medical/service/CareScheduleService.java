@@ -445,6 +445,7 @@ public class CareScheduleService {
         if (!Objects.equals(schedule.getVeterinarianId(), vetId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can start this schedule");
         }
+        validateRoutineScheduleDate(schedule);
 
         schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         return CareScheduleResponse.from(careScheduleRepository.save(schedule));
@@ -497,6 +498,7 @@ public class CareScheduleService {
         if (!Objects.equals(schedule.getVeterinarianId(), vetId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can complete this schedule");
         }
+        validateRoutineScheduleDate(schedule);
 
         validateMandatoryVitalsAndMarkers(request, schedule);
 
@@ -858,6 +860,27 @@ public class CareScheduleService {
         }
 
         return CareScheduleResponse.from(completedSchedule);
+    }
+
+    /**
+     * Ca khám định kỳ (ROUTINE) chỉ được phép bắt đầu hoặc hoàn thành vào đúng ngày hẹn hoặc sau đó.
+     * Chặn các ca khám có ngày hẹn ở tương lai.
+     */
+    private void validateRoutineScheduleDate(CareSchedule schedule) {
+        if (schedule.getCareType() == CareType.ROUTINE) {
+            LocalDate today = LocalDate.now();
+            LocalDate scheduledDate = schedule.getScheduledDate();
+            if (scheduledDate == null && schedule.getScheduledAt() != null) {
+                scheduledDate = schedule.getScheduledAt().toLocalDate();
+            }
+            if (scheduledDate == null && schedule.getRequestedAt() != null) {
+                scheduledDate = schedule.getRequestedAt().toLocalDate();
+            }
+            if (scheduledDate != null && scheduledDate.isAfter(today)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTINE_EXAM_TOO_EARLY",
+                        "Routine examination can only be conducted on or after the scheduled date (" + scheduledDate + ")");
+            }
+        }
     }
 
     /**

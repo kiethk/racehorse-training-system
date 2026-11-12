@@ -45,6 +45,7 @@ import org.springframework.http.HttpStatus;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -273,6 +274,34 @@ class RoutineCadenceTest {
         assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
         verify(schedules, never()).saveAndFlush(any());
         verify(vaccinations).refreshMilestone(horse.getId(), 999L, vet.getId(), CareType.ROUTINE);
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE có ngày hẹn ở tương lai -> bị từ chối 400 ROUTINE_EXAM_TOO_EARLY")
+    void routineExamInTheFutureIsRejected() {
+        CareSchedule exam = routineExam(CareScheduleStatus.SCHEDULED);
+        exam.setScheduledDate(LocalDate.now().plusDays(2));
+        stubCompletion(exam);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+        assertEquals("ROUTINE_EXAM_TOO_EARLY", error.getErrorCode());
+        verify(healthRecords, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE quá hạn (ngày hẹn trong quá khứ) -> được phép hoàn tất")
+    void routineExamOverdueIsAccepted() {
+        CareSchedule exam = routineExam(CareScheduleStatus.SCHEDULED);
+        exam.setScheduledDate(LocalDate.now().minusDays(2));
+        stubCompletion(exam);
+
+        var response = service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+
+        assertEquals(CareScheduleStatus.COMPLETED, response.status());
+        verify(healthRecords).save(any());
     }
 
     // ---- helpers ----

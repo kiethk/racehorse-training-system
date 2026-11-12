@@ -135,6 +135,7 @@ export default function RoutineDetailPage() {
                 careScheduleId={detail.schedule.id}
                 careType={detail.schedule.careType}
                 scheduleStatus={detail.schedule.status}
+                scheduledDate={detail.schedule.scheduledDate ?? detail.schedule.scheduledAt}
                 schedulePurpose={detail.schedule.purpose}
                 fromIncident={Boolean(detail.schedule.sourceIncidentId)}
                 blockHeldUntil={detail.blockHeldUntil}

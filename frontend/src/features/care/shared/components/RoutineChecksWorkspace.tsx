@@ -263,6 +263,9 @@ export function RoutineChecksWorkspace() {
               : 'Unscheduled';
             const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
             const isClosed = cs.status === 'COMPLETED';
+            const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+            const todayIso = new Date().toISOString().slice(0, 10);
+            const isFuture = Boolean(!isClosed && rawDate && rawDate > todayIso);
 
             return (
               <Panel
@@ -286,6 +289,11 @@ export function RoutineChecksWorkspace() {
                         {cs.status === 'COMPLETED' && (
                           <Pill tone="success" size="sm">
                             Completed
+                          </Pill>
+                        )}
+                        {isFuture && (
+                          <Pill tone="neutral" size="sm" icon="clock">
+                            Upcoming
                           </Pill>
                         )}
                         {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
