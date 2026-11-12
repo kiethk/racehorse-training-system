@@ -1394,18 +1394,17 @@ public class CareScheduleService {
     /** Tách `now` thành tham số để test dùng clock cố định. */
     void runLifecycleSweep(LocalDateTime now) {
         LocalTime tod = now.toLocalTime();
-
-        // Rollover chỉ chạy khi qua ngày mới (sau 23:59 hoặc rạng sáng trước 06:00) cho các ca của ngày hôm trước
-        boolean isMidnightSweepWindow = tod.isBefore(LocalTime.of(6, 0)) || !tod.isBefore(LocalTime.of(23, 59));
-        if (isMidnightSweepWindow) {
-            List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
-            for (CareSchedule cs : careScheduleRepository.findRollableEodCandidates(openStatuses, now)) {
-                rollOverEod(cs, now);
-            }
+        if (!tod.isBefore(WORKDAY_START) && tod.isBefore(WORKDAY_END)) {
+            return;
+        }
+        if (tod.isBefore(WORKDAY_END)) {
+            return; // trước 17:00: không rollover/escalate
         }
 
-        // Kiểm tra cảnh báo ca URGENT quá hạn (chạy liên tục trong ngày)
         List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
+        for (CareSchedule cs : careScheduleRepository.findRollableEodCandidates(openStatuses, now)) {
+            rollOverEod(cs, now);
+        }
         for (CareSchedule cs : careScheduleRepository.findStaleUrgentForEscalation(openStatuses, now)) {
             escalateStaleUrgent(cs);
         }
