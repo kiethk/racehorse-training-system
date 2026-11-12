@@ -1,5 +1,7 @@
 'use client';
+import Link from 'next/link';
 import { hydrationStatusLabel } from '@/features/health/lib/hydrationStatus';
+import { useAuth } from '@/context/AuthContext';
 
 import { EmptyState, Icon, MetricCard, Notice, Panel, Pill } from '@/components/ui';
 import { HorseAlertList } from '@/features/training/components/horses/HorseAlertList';
@@ -16,6 +18,8 @@ export function HorseHealthSummary({
   metrics: HorseHealthMetric[];
   preventiveCare: any[];
 }) {
+  const { user } = useAuth();
+  const isManager = user?.role === 'CLUB_MANAGER';
   const latestMetric = metrics[0] || null;
 
   return (
@@ -103,10 +107,24 @@ export function HorseHealthSummary({
                     <div className="flex flex-wrap items-center gap-x-3 text-[12px] text-[var(--color-text-muted)]">
                       <span>Scheduled: {formatDate(item.scheduledDate || item.scheduledAt)}</span>
                       {item.veterinarianName ? (
-                        <span className="flex items-center gap-1 text-[var(--color-text-secondary)] font-medium">
-                          <Icon name="user" size={13} className="text-[var(--color-primary)]" />
-                          {item.veterinarianName}
-                        </span>
+                        isManager && item.veterinarianId ? (
+                          <Link
+                            href={`/manager/accounts?userId=${item.veterinarianId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[var(--color-primary)] hover:underline font-medium"
+                            title={`View account of ${item.veterinarianName}`}
+                          >
+                            <Icon name="user" size={13} className="text-[var(--color-primary)]" />
+                            <span>{item.veterinarianName}</span>
+                            <Icon name="external-link" size={11} className="opacity-70" />
+                          </Link>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[var(--color-text-secondary)] font-medium">
+                            <Icon name="user" size={13} className="text-[var(--color-primary)]" />
+                            <span>{item.veterinarianName}</span>
+                          </span>
+                        )
                       ) : (
                         <span className="text-[var(--color-text-muted)] italic">Unassigned</span>
                       )}
