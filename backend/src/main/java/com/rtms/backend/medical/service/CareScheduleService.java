@@ -365,9 +365,16 @@ public class CareScheduleService {
         return !outranked && overlaps(schedule, start, other);
     }
 
-    /** Lịch hẹn thường trùng ca khẩn cấp quay lại hàng chờ để job xếp giờ khác. Ca INITIAL giữ nguyên Vet đã giao. */
+    /**
+     * Lịch hẹn thường trùng ca khẩn cấp quay lại hàng chờ để job xếp giờ khác. Ca INITIAL giữ nguyên Vet đã giao.
+     * IN_PROGRESS routine exams are also requeued: vet must abandon the exam and handle the emergency first.
+     */
     private void requeueBookingsOverlapping(CareSchedule urgentCase, Long vetId, LocalDateTime slot) {
-        for (CareSchedule booked : careScheduleRepository.findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED)) {
+        List<CareScheduleStatus> requeableStatuses = List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+        List<CareSchedule> candidates = new ArrayList<>();
+        candidates.addAll(careScheduleRepository.findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED));
+        candidates.addAll(careScheduleRepository.findByVeterinarianIdAndStatus(vetId, CareScheduleStatus.IN_PROGRESS));
+        for (CareSchedule booked : candidates) {
             if (booked.getCareType() == CareType.URGENT || !overlaps(urgentCase, slot, booked)) continue;
             if (booked.getCareType() == CareType.ROUTINE) booked.setVeterinarianId(null);
             booked.setScheduledAt(null);
@@ -448,6 +455,7 @@ public class CareScheduleService {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can start this schedule");
         }
         validateRoutineScheduleDate(schedule);
+        validateRoutineExamWindowForStart(schedule);
 
         schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         return CareScheduleResponse.from(careScheduleRepository.save(schedule));
@@ -887,6 +895,21 @@ public class CareScheduleService {
     }
 
     /**
+     * Ca khám định kỳ (ROUTINE) chỉ được phép bấm bắt đầu (Examine) trong khung giờ 13:30 - 15:30.
+     * Sau 15:30, ca nào đã kịp IN_PROGRESS vẫn được phép hoàn tất (completeCareSchedule).
+     */
+    private void validateRoutineExamWindowForStart(CareSchedule schedule) {
+        if (schedule.getCareType() == CareType.ROUTINE) {
+            LocalTime now = LocalTime.now();
+            if (now.isBefore(FarmSchedulePolicy.VET_WINDOW_START) || now.isAfter(FarmSchedulePolicy.VET_WINDOW_END)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTINE_EXAM_OUTSIDE_WINDOW",
+                        "Routine examinations can only be started between " + FarmSchedulePolicy.VET_WINDOW_START
+                                + " and " + FarmSchedulePolicy.VET_WINDOW_END);
+            }
+        }
+    }
+
+    /**
      * D3: khám nhập trại (INITIAL) và tái khám định kỳ (ROUTINE+FOLLOW_UP) bắt buộc ghi đủ
      * 6 chỉ số sinh hiệu trong phạm vi cho phép. D4: INITIAL kết luận BLOCKED phải có ít nhất
      * một marker chấn thương/bệnh lý. Không cho phép thay đổi trạng thái nếu thiếu.
@@ -1195,7 +1218,9 @@ public class CareScheduleService {
             if (request.getHorseId() != null && !Objects.equals(request.getHorseId(), horseId)) {
                 throw new ApiException(HttpStatus.CONFLICT, "HORSE_MISMATCH", "nextSchedule horseId must match the completed examination");
             }
-            if (request.getAdmissionId() != null && !Objects.equals(request.getAdmissionId(), admissionId)) {
+            if (request.getAdmissionId() != null
+                    && !Objects.equals(request.getAdmissionId(), source.getAdmissionId())
+                    && !Objects.equals(request.getAdmissionId(), admissionId)) {
                 throw new ApiException(HttpStatus.CONFLICT, "ADMISSION_MISMATCH", "nextSchedule admissionId must match the completed examination");
             }
         }
@@ -1359,9 +1384,11 @@ public class CareScheduleService {
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     /**
-     * Job 60s: (1) auto-activate ca SCHEDULED đã đến giờ trong 08:00–17:00 — semantics
-     * giống POST /start, không tạo HealthRecord giả; (2) 17:00 EOD rollover INITIAL/ROUTINE
-     * chưa xong sang ngày làm việc kế; (3) URGENT quá hạn — escalate notification, không dời.
+     * Job 60s:
+     * - Midnight EOD rollover (00:00 - 05:00): dời tất cả các ca INITIAL/ROUTINE chưa xong của ngày hôm trước.
+     *   Nếu bác sĩ có xử lý URGENT trong ngày -> URGENT_PREEMPTION, bỏ gán để sáng hôm sau gán đều lại.
+     *   Nếu không có URGENT mà trễ -> TIME_EXCEEDED, giữ nguyên bác sĩ làm tiếp.
+     * - URGENT quá hạn: escalate notification, không bao giờ dời lịch.
      */
     @Transactional
     public void careScheduleLifecycleSweep() {
@@ -1371,33 +1398,20 @@ public class CareScheduleService {
     /** Tách `now` thành tham số để test dùng clock cố định. */
     void runLifecycleSweep(LocalDateTime now) {
         LocalTime tod = now.toLocalTime();
-        if (!tod.isBefore(WORKDAY_START) && tod.isBefore(WORKDAY_END)) {
-            // V2: Khung Routine kết thúc lúc 15:30. Sau 15:30 ca Routine chưa xong dời sang ngày làm việc kế.
-            if (!tod.isBefore(FarmSchedulePolicy.VET_WINDOW_END)) {
-                rollOverRoutineIfPastWindow(now);
+
+        // Rollover chỉ chạy khi qua ngày mới (sau 23:59 hoặc rạng sáng trước 06:00) cho các ca của ngày hôm trước
+        boolean isMidnightSweepWindow = tod.isBefore(LocalTime.of(6, 0)) || !tod.isBefore(LocalTime.of(23, 59));
+        if (isMidnightSweepWindow) {
+            List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
+            for (CareSchedule cs : careScheduleRepository.findRollableEodCandidates(openStatuses, now)) {
+                rollOverEod(cs, now);
             }
-            return;
         }
-        if (tod.isBefore(WORKDAY_END)) {
-            return; // trước 17:00: không rollover/escalate admission
-        }
-        // ASSIGNED_OR_BOOKED (không gồm REQUESTED): rollOverEod giữ veterinarianId, nên đưa
-        // ca chưa ai nhận vào đây sẽ sinh ra SCHEDULED không vet — state app không xử lý được.
+
+        // Kiểm tra cảnh báo ca URGENT quá hạn (chạy liên tục trong ngày)
         List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
-        for (CareSchedule cs : careScheduleRepository.findRollableEodCandidates(openStatuses, now)) {
-            rollOverEod(cs, now);
-        }
         for (CareSchedule cs : careScheduleRepository.findStaleUrgentForEscalation(openStatuses, now)) {
             escalateStaleUrgent(cs);
-        }
-    }
-
-    private void rollOverRoutineIfPastWindow(LocalDateTime now) {
-        LocalDate today = now.toLocalDate();
-        List<CareSchedule> uncompletedRoutines = careScheduleRepository.findByScheduledDateAndCareTypeAndStatusIn(
-                today, CareType.ROUTINE, CareScheduleStatus.ASSIGNED_OR_BOOKED);
-        for (CareSchedule cs : uncompletedRoutines) {
-            rollOverEod(cs, now);
         }
     }
 
@@ -1452,26 +1466,38 @@ public class CareScheduleService {
         cs.setScheduledAt(null);
         cs.setRolloverCount(cs.getRolloverCount() + 1);
 
-        RescheduleReason reason = cs.getCareType() == CareType.ROUTINE && vetHandledUrgentToday(cs.getVeterinarianId(), now.toLocalDate())
+        LocalDate examOriginalDate = cs.getScheduledDate() != null ? cs.getScheduledDate()
+                : (cs.getScheduledAt() != null ? cs.getScheduledAt().toLocalDate() : now.toLocalDate());
+        boolean handledUrgent = vetHandledUrgentToday(cs.getVeterinarianId(), examOriginalDate);
+        RescheduleReason reason = handledUrgent
                 ? RescheduleReason.URGENT_PREEMPTION
                 : RescheduleReason.TIME_EXCEEDED;
         cs.setRescheduleReason(reason);
-        cs.setRescheduleNote("Unfinished by window close — auto-moved to " + slot.format(SWEEP_TIME_FMT)
+        cs.setRescheduleNote("Unfinished by end of day — auto-moved to " + slot.format(SWEEP_TIME_FMT)
                 + (CareScheduleStatus.ACTIVE_EXAM.contains(previous) ? " (was in progress)" : "")
                 + " (reason: " + reason + ")");
 
-        cascadeIfTomorrowFull(cs, slot.toLocalDate());
+        Long previousVetId = cs.getVeterinarianId();
+        // Nếu bị URGENT ngắt trong ngày -> gỡ gán để ngày hôm sau hệ thống tự động gán đều lại cho bác sĩ khác
+        if (handledUrgent) {
+            cs.setVeterinarianId(null);
+            cs.setStatus(CareScheduleStatus.SCHEDULED);
+        } else {
+            cascadeIfTomorrowFull(cs, slot.toLocalDate());
+        }
+
         careScheduleRepository.save(cs);
-        if (cs.getVeterinarianId() == null) return;
+        if (previousVetId == null) return;
         notificationService.sendAssignmentNotification(
-                cs.getVeterinarianId(),
+                previousVetId,
                 NotificationTypes.REFERENCE_CARE_SCHEDULE,
                 cs.getId(),
                 cs.getHorseId(),
                 NotificationTypes.CARE_SCHEDULE_EOD_ROLLED,
                 "Examination rolled over to the next working day",
                 "The " + cs.getCareType() + " examination for " + horseNameOf(cs) + " (schedule #" + cs.getId()
-                        + ") did not finish by window close and was moved to " + slot.format(SWEEP_TIME_FMT) + ".");
+                        + ") did not finish by end of day and was moved to " + slot.format(SWEEP_TIME_FMT)
+                        + (handledUrgent ? " (unassigned due to urgent case preemption)." : "."));
     }
 
     /** URGENT quá hạn: ngựa đang BLOCKED — chỉ escalate, không bao giờ dời lịch im lặng. */
@@ -1694,7 +1720,45 @@ public class CareScheduleService {
             List<User> candidateVets,
             Map<Long, Integer> overdueAppointmentsByVet,
             Map<Long, Integer> scheduledMinutesByVet) {
-        return null;
+        LocalDateTime urgentSlot = LocalDateTime.now();
+        LocalDate today = urgentSlot.toLocalDate();
+
+        // Tầng 2: Nếu không ai rảnh, tìm các bác sĩ đang có ca khám dở (IN_PROGRESS)
+        // Ưu tiên chọn bác sĩ đang làm Routine (để đẩy Routine về SCHEDULED)
+        // Tuyệt đối không chọn bác sĩ đang làm ca URGENT khác
+        List<CareSchedule> activeExams = careScheduleRepository.findByStatusInAndScheduledAtIsNotNull(
+                List.of(CareScheduleStatus.IN_PROGRESS));
+
+        // Nhóm bác sĩ đang làm Routine
+        Set<Long> vetsWithRoutineInProgress = activeExams.stream()
+                .filter(cs -> cs.getCareType() == CareType.ROUTINE && cs.getVeterinarianId() != null)
+                .map(CareSchedule::getVeterinarianId)
+                .collect(Collectors.toSet());
+
+        // Nhóm bác sĩ đang làm URGENT (cần tránh)
+        Set<Long> vetsWithUrgentInProgress = activeExams.stream()
+                .filter(cs -> cs.getCareType() == CareType.URGENT && cs.getVeterinarianId() != null)
+                .map(CareSchedule::getVeterinarianId)
+                .collect(Collectors.toSet());
+
+        List<User> ranked = candidateVets.stream()
+                .filter(v -> !vetsWithUrgentInProgress.contains(v.getId()))
+                .sorted(Comparator
+                        // 1. Ưu tiên bác sĩ đang làm Routine trước (để ngắt Routine)
+                        .comparing((User v) -> !vetsWithRoutineInProgress.contains(v.getId()))
+                        // 2. Ưu tiên bác sĩ có ít ca hơn trong ngày hôm nay
+                        .thenComparingInt((User v) -> countAssignedSchedulesToday(v.getId(), today))
+                        .thenComparing(User::getId))
+                .toList();
+
+        return ranked.isEmpty() ? null : new SlotAssignment(urgentSlot, ranked);
+    }
+
+    private int countAssignedSchedulesToday(Long vetId, LocalDate date) {
+        if (vetId == null) return 0;
+        return careScheduleRepository.findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                vetId, date, CareType.ROUTINE, CareScheduleStatus.BOOKED_OR_ACTIVE).size()
+                + careScheduleRepository.findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED).size();
     }
 
     static boolean isBeyondAssignmentHorizon(CareSchedule schedule, LocalDateTime horizon) {
@@ -1912,24 +1976,18 @@ public class CareScheduleService {
             }
         }
 
+        Map<Long, Integer> dailyCountByVet = new HashMap<>();
+        for (User v : eligibleVets) {
+            dailyCountByVet.put(v.getId(), countAssignedSchedulesToday(v.getId(), slot.toLocalDate()));
+        }
+
         return eligibleVets.stream()
                 .sorted(Comparator
-                        // 1. Deprioritize the vet who created/requested this schedule so other active vets take the visit
-                        .comparing((User v) -> vetCache.creatorVetId != null && Objects.equals(v.getId(), vetCache.creatorVetId))
-                        // 2. Least overdue appointments (penalty for neglected work)
-                        .thenComparingInt((User v) -> overdueAppointmentsByVet.getOrDefault(v.getId(), 0))
-                        // 3. Lowest cumulative workload across horizon (balance overall work)
-                        .thenComparingInt(v -> scheduledMinutesByVet.getOrDefault(v.getId(), 0))
-                        // 4. Lowest number of horses assigned on the slot's day
-                        .thenComparingInt(v -> horsesByVet.getOrDefault(v.getId(), Set.of()).size())
-                        // 5. Lowest minutes booked on the slot's day
-                        .thenComparingInt(v -> minutesByVet.getOrDefault(v.getId(), 0))
-                        // 6. Prefer vet with prior clinical history on this horse, but creator never jumps ahead via history
-                        .thenComparing((User v) -> schedule.getCareType() == CareType.URGENT ? false
-                                : (vetCache.creatorVetId != null && Objects.equals(v.getId(), vetCache.creatorVetId))
-                                        ? true
-                                        : !Boolean.TRUE.equals(vetCache.historyByVet.get(v.getId())))
-                        // 7. Deterministic tie-breaker
+                        // 1. Cân bằng tải: Ưu tiên bác sĩ có ít ca hơn trong ngày hôm nay
+                        .comparingInt((User v) -> dailyCountByVet.getOrDefault(v.getId(), 0))
+                        // 2. Ưu tiên bác sĩ đã yêu cầu/tạo lịch khám này (Continuity of care)
+                        .thenComparing((User v) -> vetCache.creatorVetId != null && !Objects.equals(v.getId(), vetCache.creatorVetId))
+                        // 3. Deterministic tie-breaker
                         .thenComparing(User::getId))
                 .toList();
     }

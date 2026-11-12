@@ -102,7 +102,7 @@ export function FollowUpSection(props: FollowUpSectionProps) {
             </div>
             {suggestedRecheckDate && (
               <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)]">
-                <span>💡 Suggested follow-up: on or after {formatDate(suggestedRecheckDate)} (active medication schedule)</span>
+                <span>Suggested follow-up: on or after {formatDate(suggestedRecheckDate)} (active medication schedule)</span>
               </p>
             )}
             <div className="mt-1.5">

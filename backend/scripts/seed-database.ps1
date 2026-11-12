@@ -73,7 +73,11 @@ $env:PGOPTIONS = $null
 if ($AsOf) {
     $AsOf = ([datetime]::Parse($AsOf)).ToString("yyyy-MM-ddTHH:mm")
     $env:PGOPTIONS = "-c rtms.seed_now=$AsOf"
-    Write-Host "Testing only: seeding as if it were $AsOf (club time)." -ForegroundColor Yellow
+    Write-Host "Seeding as of $AsOf (club time)." -ForegroundColor Yellow
+} else {
+    $nowStr = (Get-Date).ToString("yyyy-MM-ddTHH:mm")
+    $env:PGOPTIONS = "-c rtms.seed_now=$nowStr"
+    Write-Host "Seeding dynamically relative to current time: $nowStr" -ForegroundColor Cyan
 }
 $connection = @('-h', $DbHost, '-p', "$Port", '-U', $User, '-d', $Database, '-X', '-v', 'ON_ERROR_STOP=1')
 

@@ -44,6 +44,8 @@ export default function RoutineDetailPage() {
     }
   }, [scheduleId]);
 
+  const autoStartedRef = useRef(false);
+
   useEffect(() => {
     let active = true;
     Promise.resolve().then(() => {
@@ -53,6 +55,21 @@ export default function RoutineDetailPage() {
       active = false;
     };
   }, [loadDetail]);
+
+  // Auto-start routine exam to transition SCHEDULED -> IN_PROGRESS when vet opens the page
+  useEffect(() => {
+    if (!detail?.schedule || autoStartedRef.current) return;
+    const isFuture = detail.schedule.scheduledDate && detail.schedule.scheduledDate > new Date().toISOString().slice(0, 10);
+    if (detail.schedule.status === 'SCHEDULED' && !isFuture) {
+      autoStartedRef.current = true;
+      admissionsApi.startCareSchedule(scheduleId)
+        .then(() => admissionsApi.getCareScheduleDetail(scheduleId))
+        .then((res) => setDetail(res))
+        .catch((err) => {
+          console.warn('Auto-start routine care schedule skipped/failed:', err);
+        });
+    }
+  }, [detail?.schedule, scheduleId]);
 
   const handleStartExam = useCallback(async () => {
     try {

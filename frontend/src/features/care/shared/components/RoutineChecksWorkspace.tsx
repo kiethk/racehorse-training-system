@@ -267,6 +267,15 @@ export function RoutineChecksWorkspace() {
             const todayIso = new Date().toISOString().slice(0, 10);
             const isFuture = Boolean(!isClosed && rawDate && rawDate > todayIso);
 
+            // Routine window check (13:30 - 15:30)
+            const now = new Date();
+            const currentHourMinutes = now.getHours() * 60 + now.getMinutes();
+            const windowStart = 13 * 60 + 30; // 13:30
+            const windowEnd = 15 * 60 + 30;   // 15:30
+            const isToday = rawDate === todayIso;
+            const isOutsideRoutineWindow = isToday && (currentHourMinutes < windowStart || currentHourMinutes > windowEnd);
+            const canExamine = cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
+
             return (
               <Panel
                 key={cs.id}
@@ -291,9 +300,9 @@ export function RoutineChecksWorkspace() {
                             Completed
                           </Pill>
                         )}
-                        {isFuture && (
-                          <Pill tone="neutral" size="sm" icon="clock">
-                            Upcoming
+                        {cs.status === 'IN_PROGRESS' && (
+                          <Pill tone="info" size="sm" icon="activity">
+                            In Progress
                           </Pill>
                         )}
                         {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
@@ -322,19 +331,27 @@ export function RoutineChecksWorkspace() {
                   </div>
 
                   {/* Right: Action Button */}
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col items-end gap-1">
                     <Button
                       variant={isClosed ? 'secondary' : 'primary'}
                       size="sm"
                       icon={isClosed ? 'file-text' : getScheduleExamAction(cs.status).icon}
+                      disabled={!isClosed && !canExamine}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleOpenSchedule(cs);
+                        if (isClosed || canExamine) {
+                          handleOpenSchedule(cs);
+                        }
                       }}
                       className="transition-all active:scale-[0.97]"
                     >
                       {isClosed ? 'View Record' : getScheduleExamAction(cs.status).label}
                     </Button>
+                    {!isClosed && isOutsideRoutineWindow && cs.status !== 'IN_PROGRESS' && (
+                      <span className="text-[11px] text-[var(--color-text-secondary)] font-medium">
+                        Opens 13:30 – 15:30
+                      </span>
+                    )}
                   </div>
                 </div>
               </Panel>
