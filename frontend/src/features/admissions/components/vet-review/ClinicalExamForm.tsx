@@ -59,6 +59,7 @@ import {
 } from './examVariantConfig';
 import { healthApi } from '@/features/health/services/healthApi';
 import type { HorseBodyRegion, InjuryRecord } from '@/features/health/types';
+import { AdmissionDocumentPanel } from '../../shared/components/AdmissionDocumentPanel';
 import {
   InjuryMarkerPanel,
   buildInjuryMarkerRequests,
@@ -74,6 +75,7 @@ import {
 } from '../../shared/components/AdmissionDetailLayout';
 import type {
   CareType,
+  AdmissionDocument,
   CareSchedule,
   CareScheduleStatus,
   CompleteCareScheduleRequest,
@@ -145,6 +147,7 @@ export interface ClinicalExamFormProps {
   onDirtyChange?: (dirty: boolean) => void;
   prefillFindings?: string | null;
   injuryMarkers?: CreateInjuryMarkerRequest[];
+  documents?: AdmissionDocument[];
 }
 
 export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamFormProps>(
@@ -167,6 +170,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       onDirtyChange,
       prefillFindings,
       injuryMarkers,
+      documents = [],
     } = props;
 
     const config = EXAM_VARIANT_CONFIG[variant];
@@ -178,6 +182,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     const showTier1 = tier1VerdictEnabled(variant, careType);
     const [verdict, setVerdict] = useState<VetReviewDecision>('ACCEPT');
+    const [openDocumentId, setOpenDocumentId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState('');
 
     const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>(careType === 'URGENT' ? 'BLOCKED' : config.defaultDecision);
@@ -747,9 +752,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           if (!rx.frequency.trim()) {
             errors["rx." + rx.id + ".frequency"] = "Frequency is required.";
           }
-          if (!rx.duration || rx.duration < 1) {
-            errors["rx." + rx.id + ".duration"] = "Duration must be at least 1 day.";
-          }
+          if (!rx.startDate) errors["rx." + rx.id + ".startDate"] = "Start date is required.";
+          if (!rx.endDate) errors["rx." + rx.id + ".endDate"] = "End date is required.";
+          else if (rx.startDate && rx.endDate < rx.startDate) errors["rx." + rx.id + ".endDate"] = "End date must be on or after start date.";
         }
       }
 
@@ -956,6 +961,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         setShowApproveConfirm(false);
         onSuccess(result, completionKind, request);
       } catch (cause) {
+        if (cause instanceof ApiError) {
+          toast.error(cause.message);
+        }
         if (config.errorMapping === 'formatted' && cause instanceof ApiError) {
           const errorMsg = `${cause.status === 403 ? 'Permission denied' : cause.status === 409 ? 'Review state conflict' : 'Review failed'} (${cause.status}${cause.errorCode ? ` · ${cause.errorCode}` : ''}): ${cause.message}`;
           setFormError(errorMsg);
@@ -1252,9 +1260,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     };
 
     const renderFollowUps = () => {
-      const activeRxDurations = prescriptions.map((p) => p.duration).filter((d): d is number => typeof d === 'number' && d > 0);
+      const prescriptionEndDates = prescriptions.map((p) => p.endDate).filter(Boolean);
       const activeInjuryRecoveryDates = activeInjuries.map((inj) => inj.expectedRecoveryDate).filter(Boolean) as string[];
-      const suggestedRecheckDate = computeSuggestedRecheckDate(activeRxDurations, activeInjuryRecoveryDates);
+      const suggestedRecheckDate = computeSuggestedRecheckDate(prescriptionEndDates, activeInjuryRecoveryDates);
 
       return (
         <FollowUpSection
@@ -1324,6 +1332,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       return (
         <div>
           <ExamVaccinationSection
+            documents={documents}
+            onViewDocument={setOpenDocumentId}
             horseId={horseId}
             careType={careType}
             purpose={schedulePurpose}
@@ -1420,7 +1430,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         {renderDraftBanner()}
         {renderDraftSaved()}
 
-        <div className={admissionDetailGridClassName}>
+        <div className={openDocumentId == null ? admissionDetailGridClassName : 'grid min-w-0 gap-5'}>
           <div className="min-w-0 space-y-5">
             {renderVitals()}
             {renderSection2()}
@@ -1691,8 +1701,19 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       </form>
     );
 
-    return config.layout === 'split-sticky-decision-panel'
+    const form = config.layout === 'split-sticky-decision-panel'
       ? renderSplitStickyForm()
       : renderStackedForm();
+    return openDocumentId == null ? form : (
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,40%)]">
+        <div className="min-w-0">{form}</div>
+        <AdmissionDocumentPanel
+          documents={documents}
+          documentId={openDocumentId}
+          onSelectDocument={setOpenDocumentId}
+          onClose={() => setOpenDocumentId(null)}
+        />
+      </div>
+    );
   },
 );

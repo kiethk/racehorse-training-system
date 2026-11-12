@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Avatar,
   Button,
@@ -48,6 +49,7 @@ interface TrainerAreaViewData {
  * managed by the logged-in Trainer, with read-only staff assignments and stall statuses.
  */
 export function TrainerStableView() {
+  const stallCode = useSearchParams().get('stall');
   const { user } = useAuth();
   const [areas, setAreas] = useState<Area[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
@@ -58,8 +60,20 @@ export function TrainerStableView() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
+  const appliedStallCode = useRef<string | null>(null);
   // The map (plan + 3D barn) is the default; the cards show the block/groom layout.
   const [layout, setLayout] = useState<'map' | 'cards'>('map');
+  useEffect(() => {
+    if (!stallCode || loading || appliedStallCode.current === stallCode) return;
+    const stall = stalls.find((item) => item.stallCode === stallCode && areas.some((area) => area.id === item.areaId && area.trainerId === user?.userId));
+    if (stall) {
+      appliedStallCode.current = stallCode;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedStall(stall);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLayout('map');
+    }
+  }, [stallCode, loading, stalls, areas, user?.userId]);
   const [specialty, setSpecialty] = useState<{ horseId: number; value: HorseSpecialty } | null>(null);
 
   const loadData = useCallback(async (isRefresh = false) => {

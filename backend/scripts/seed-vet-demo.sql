@@ -381,10 +381,10 @@ BEGIN
         ('Điều trị viêm dạ dày tá tràng',        'Omeprazole paste',    '20 mg/kg',  '1 lần/ngày',  'PO',       '[VET-DEMO] Uống sáng sớm trước ăn 30 phút.'),
         ('Điều trị viêm dạ dày tá tràng',        'Sucralfate',          '1 g',       '2 lần/ngày',  'PO',       '[VET-DEMO] Uống sau ăn 1 giờ, cách thuốc khác 2 giờ.'),
         ('Điều trị nhiễm khuẩn hô hấp trên',     'Doxycycline',         '10 mg/kg',  '2 lần/ngày',  'PO',       '[VET-DEMO] Uống sau ăn, theo dõi tiêu hoá.'),
-        ('Điều trị nhiễm khuẩn hô hấp trên',     'Vitamin B complex',   '10 mL',     '1 lần/ngày',  'IM',       '[VET-DEMO] Tiêm bắp, đổi bên mỗi ngày.'),
+        ('Điều trị nhiễm khuẩn hô hấp trên',     'Vitamin B Complex',   '10 mL',     '1 lần/ngày',  'FEED_ADDITIVE', '[VET-DEMO] Trộn vào thức ăn buổi sáng.'),
         ('Điều trị colic spasmodic',              'Phenylbutazone',      '4.4 mg/kg', '2 lần/ngày',  'PO',       '[VET-DEMO] Uống sau ăn, tối đa 5 ngày liên tục.'),
         ('Điều trị colic spasmodic',              'Omeprazole paste',    '20 mg/kg',  '1 lần/ngày',  'PO',       '[VET-DEMO] Bảo hộ dạ dày trong thời gian dùng Bute.'),
-        ('Điều trị viêm kẽ móng',                 'Gentamicin',          '6.6 mg/kg', '1 lần/ngày',  'IV',       '[VET-DEMO] Tiêm tĩnh mạch chậm, theo dõi thận.'),
+        ('Điều trị viêm kẽ móng',                 'Trimethoprim-Sulfa', '30 mg/kg',  '2 lần/ngày',  'PO',       '[VET-DEMO] Uống sau ăn.'),
         ('Điều trị viêm kẽ móng',                 'Povidone-iodine 10%', 'bôi đủ lượng', '2 lần/ngày', 'TOPICAL','[VET-DEMO] Vệ sinh kẽ móng trước khi bôi.'),
         ('Chăm sóc vết thương đầu gối',           'Meloxicam',           '0.6 mg/kg', '1 lần/ngày',  'PO',       '[VET-DEMO] Giảm đau chống viêm, kèm theo dõi dạ dày.'),
         ('Theo dõi sốt không nguyên nhân',        'Doxycycline',         '10 mg/kg',  '2 lần/ngày',  'PO',       '[VET-DEMO] Đã dùng đủ liệu trình 7 ngày.')

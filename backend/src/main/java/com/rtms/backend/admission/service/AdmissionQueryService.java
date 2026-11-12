@@ -1,6 +1,8 @@
 package com.rtms.backend.admission.service;
+import com.rtms.backend.admission.dto.InitialVetExamResponse;
 import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.admission.enums.AdmissionDocumentType;
+import com.rtms.backend.medical.dto.HorseHealthMetricResponse;
 import com.rtms.backend.medical.entity.CareSchedule;
 
 
@@ -13,7 +15,9 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.security.AuthenticatedUser;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -182,7 +186,7 @@ public class AdmissionQueryService {
     }
 
     public GroomAdmissionQueueResponse getGroomQueue(Long groomId, String candidateName, AdmissionStatus status,
-            java.time.LocalDate submittedFrom, java.time.LocalDate submittedTo, int page, int size) {
+            LocalDate submittedFrom, LocalDate submittedTo, int page, int size) {
         if (page < 0)
             throw new IllegalArgumentException("Page must be zero or greater");
         if (submittedFrom != null && submittedTo != null && submittedFrom.isAfter(submittedTo)) {
@@ -196,18 +200,16 @@ public class AdmissionQueryService {
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         Page<AdmissionApplication> result = admissionApplicationRepository.findGroomQueue(
                 groomId,
-                stableStallRepository.isQuarantineGroom(groomId),
-                AdmissionStatus.GROOM_REVIEW,
                 status != null,
                 status == null ? AdmissionStatus.GROOM_REVIEW : status,
                 !nameFilter.isEmpty(),
                 nameFilter,
                 submittedFrom != null,
-                submittedFrom == null ? java.time.LocalDate.of(1, 1, 1).atStartOfDay()
+                submittedFrom == null ? LocalDate.of(1, 1, 1).atStartOfDay()
                         : submittedFrom.atStartOfDay(),
                 submittedTo != null,
                 submittedTo == null
-                        ? java.time.LocalDate.of(9999, 12, 31).atTime(23, 59, 59, 999_999_000)
+                        ? LocalDate.of(9999, 12, 31).atTime(23, 59, 59, 999_999_000)
                         : submittedTo.plusDays(1).atStartOfDay(),
                 pageable);
         return new GroomAdmissionQueueResponse(
@@ -245,10 +247,16 @@ public class AdmissionQueryService {
         response.setCandidate(candidate);
         response.setDocuments(documents.stream().map(this::toDocumentResponse).toList());
 
+        response.setAssignedGroomId(admission.getAssignedGroomId());
+        response.setAssignedGroomName(admission.getAssignedGroomId() == null ? null
+                : userRepository.findById(admission.getAssignedGroomId()).map(User::getFullName).orElse(null));
+        response.setGroomAssignedAt(admission.getGroomAssignedAt());
+        response.setGroomReviewDueAt(admission.getGroomReviewDueAt());
+        response.setAssignedGroomFull(isAssignedGroomFull(admission));
         response.setGroomId(admission.getGroomId());
         response.setGroomName(admission.getGroomId() == null ? null
                 : userRepository.findById(admission.getGroomId())
-                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
+                        .map(User::getFullName).orElse(null));
         response.setGroomDecision(admission.getGroomDecision());
         response.setGroomFeedback(admission.getGroomFeedback());
         response.setGroomReviewedAt(admission.getGroomReviewedAt());
@@ -258,7 +266,7 @@ public class AdmissionQueryService {
         response.setVeterinarianId(admission.getVeterinarianId());
         response.setVeterinarianName(admission.getVeterinarianId() == null ? null
                 : userRepository.findById(admission.getVeterinarianId())
-                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
+                        .map(User::getFullName).orElse(null));
         response.setVetTrainingDecision(admission.getVetTrainingDecision());
         response.setVetFeedback(admission.getVetFeedback());
         response.setVetReviewedAt(admission.getVetReviewedAt());
@@ -267,7 +275,7 @@ public class AdmissionQueryService {
         response.setTrainerId(trainerId);
         response.setTrainerName(trainerId == null ? null
                 : userRepository.findById(trainerId)
-                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
+                        .map(User::getFullName).orElse(null));
 
         response.setTrainerFeedback(admission.getTrainerFeedback());
         response.setTrainerReviewedAt(admission.getTrainerReviewedAt());
@@ -275,7 +283,7 @@ public class AdmissionQueryService {
         response.setManagerId(admission.getManagerId());
         response.setManagerName(admission.getManagerId() == null ? null
                 : userRepository.findById(admission.getManagerId())
-                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
+                        .map(User::getFullName).orElse(null));
         response.setManagerDecision(admission.getManagerDecision());
         response.setManagerFeedback(admission.getManagerFeedback());
         response.setManagerReviewedAt(admission.getManagerReviewedAt());
@@ -304,7 +312,7 @@ public class AdmissionQueryService {
 
         // Initial vet exam schedule and results for this admission application
         if (careScheduleRepository != null) {
-            careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admission.getId(), com.rtms.backend.medical.enums.CareType.INITIAL)
+            careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admission.getId(), CareType.INITIAL)
                     .ifPresent(schedule -> {
                         response.setInitialExamSchedule(InitialExamScheduleResponse.from(schedule));
                         if (response.getVeterinarianId() == null && schedule.getVeterinarianId() != null) {
@@ -313,14 +321,14 @@ public class AdmissionQueryService {
                         // Populate typed initialVetExam when the INITIAL schedule has a completed health record
                         healthRecordRepository.findByCareScheduleId(schedule.getId())
                                 .ifPresent(hr -> {
-                                    com.rtms.backend.admission.dto.InitialVetExamResponse exam =
-                                            new com.rtms.backend.admission.dto.InitialVetExamResponse();
+                                    InitialVetExamResponse exam =
+                                            new InitialVetExamResponse();
                                     exam.setHealthRecordId(hr.getId());
                                     exam.setVeterinarianId(hr.getVeterinarianId());
                                     exam.setVeterinarianName(
                                             hr.getVeterinarianId() == null ? null
                                                     : userRepository.findById(hr.getVeterinarianId())
-                                                            .map(com.rtms.backend.identity.entity.User::getFullName)
+                                                            .map(User::getFullName)
                                                             .orElse(null));
                                     exam.setExaminedAt(hr.getExaminedAt());
                                     exam.setTrainingDecision(hr.getTrainingDecision());
@@ -329,12 +337,12 @@ public class AdmissionQueryService {
                                     exam.setDiagnosis(hr.getDiagnosis());
                                     exam.setTreatment(hr.getTreatment());
                                     exam.setNotes(hr.getNotes());
-                                    List<com.rtms.backend.medical.dto.HorseHealthMetricResponse> metrics =
+                                    List<HorseHealthMetricResponse> metrics =
                                             horseHealthMetricRepository != null
                                                     ? horseHealthMetricRepository
                                                             .findByHealthRecordIdOrderByRecordedAtAsc(hr.getId())
                                                             .stream()
-                                                            .map(com.rtms.backend.medical.dto.HorseHealthMetricResponse::from)
+                                                            .map(HorseHealthMetricResponse::from)
                                                             .toList()
                                                     : List.of();
                                     exam.setMetrics(metrics);
@@ -345,7 +353,7 @@ public class AdmissionQueryService {
                                 });
                         if (response.getVeterinarianName() == null && response.getVeterinarianId() != null) {
                             response.setVeterinarianName(userRepository.findById(response.getVeterinarianId())
-                                    .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
+                                    .map(User::getFullName).orElse(null));
                         }
                     });
         }
@@ -377,7 +385,7 @@ public class AdmissionQueryService {
                         .orElse(null);
 
         String imageUrl = admissionDocumentRepository.findByAdmissionId(admission.getId()).stream()
-                .filter(d -> com.rtms.backend.admission.enums.AdmissionDocumentType.HORSE_PHOTO
+                .filter(d -> AdmissionDocumentType.HORSE_PHOTO
                         .equals(d.getDocumentType()))
                 .findFirst()
                 .map(this::documentUrl)
@@ -388,7 +396,7 @@ public class AdmissionQueryService {
 
     private AdmissionSummaryResponse summaryResponse(AdmissionApplication admission,
             CandidateHorseProfile candidate, String stallCode, String imageUrl) {
-        return new AdmissionSummaryResponse(
+        AdmissionSummaryResponse response = new AdmissionSummaryResponse(
                 admission.getId(),
                 admission.getStatus(),
                 candidate.getName(),
@@ -400,6 +408,14 @@ public class AdmissionQueryService {
                 imageUrl,
                 admission.getTrainerId(),
                 admission.getTrainerReviewedAt());
+        response.setGroomReviewDueAt(admission.getGroomReviewDueAt());
+        response.setAssignedGroomFull(isAssignedGroomFull(admission));
+        return response;
+    }
+
+    private boolean isAssignedGroomFull(AdmissionApplication admission) {
+        return admission.getAssignedGroomId() != null && stableStallRepository
+                .findGroomIdsWithFreeQuarantineStall(List.of(admission.getAssignedGroomId())).isEmpty();
     }
 
     /** Where a client loads this document from: always this API, which checks the viewer before serving the file. */
@@ -443,9 +459,9 @@ public class AdmissionQueryService {
     public List<AdmissionSummaryResponse> getAdmissionsForVet(Long vetId, AdmissionStatus status) {
         if (careScheduleRepository == null) return List.of();
         Set<Long> assignedIds = careScheduleRepository.findVetAdmissionSchedules(vetId).stream()
-                .map(com.rtms.backend.medical.entity.CareSchedule::getAdmissionId)
+                .map(CareSchedule::getAdmissionId)
                 .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         return admissionApplicationRepository.findAllById(assignedIds).stream()
                 .filter(a -> status == null || a.getStatus() == status)
                 .sorted(OLDEST_FIRST)
@@ -463,16 +479,14 @@ public class AdmissionQueryService {
 
     public List<AdmissionSummaryResponse> getAdmissionsForGroom(Long groomId, AdmissionStatus status) {
         return admissionApplicationRepository.findVisibleToGroom(groomId,
-                        stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW,
-                        status != null, status == null ? AdmissionStatus.GROOM_REVIEW : status).stream()
+                status != null, status == null ? AdmissionStatus.GROOM_REVIEW : status).stream()
                 .map(this::toSummaryResponse)
                 .toList();
     }
 
     /** Server-side read check for grooms; same scope as the queue (see AdmissionApplicationRepository.findGroomQueue). */
     public boolean isVisibleToGroom(Long admissionId, Long groomId) {
-        return admissionApplicationRepository.isVisibleToGroom(admissionId, groomId,
-                stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW);
+        return admissionApplicationRepository.isVisibleToGroom(admissionId, groomId);
     }
 
     /** Removes capacity/final-manager data that is unrelated to a Vet's assigned clinical work. */
@@ -504,13 +518,13 @@ public class AdmissionQueryService {
         String normalizedSearch = search == null ? "" : search.trim();
         String normalizedPill = pill == null ? "" : pill.trim().toUpperCase(Locale.ROOT);
         String normalizedPriority = priority == null ? "" : priority.trim().toUpperCase(Locale.ROOT);
-        Page<com.rtms.backend.medical.entity.CareSchedule> schedulePage = careScheduleRepository.findVetQueuePage(
+        Page<CareSchedule> schedulePage = careScheduleRepository.findVetQueuePage(
                 vetId, !normalizedSearch.isBlank(), normalizedSearch, normalizedPill,
                 admissionStatus, scheduleStatus, careType, normalizedPriority, pageable);
         if (schedulePage.isEmpty()) return Page.empty(pageable);
 
         Set<Long> admissionIds = schedulePage.getContent().stream()
-                .map(com.rtms.backend.medical.entity.CareSchedule::getAdmissionId).collect(Collectors.toSet());
+                .map(CareSchedule::getAdmissionId).collect(Collectors.toSet());
         Map<Long, AdmissionApplication> admissions = admissionApplicationRepository.findAllById(admissionIds).stream()
                 .collect(Collectors.toMap(AdmissionApplication::getId, a -> a));
         Map<Long, CandidateHorseProfile> candidates = candidateHorseProfileRepository.findByAdmissionIdIn(admissionIds).stream()
@@ -567,12 +581,12 @@ public class AdmissionQueryService {
         }).filter(Objects::nonNull).toList();
         long dropped = schedulePage.getNumberOfElements() - items.size();
         long adjustedTotal = Math.max(items.size(), schedulePage.getTotalElements() - dropped);
-        return new org.springframework.data.domain.PageImpl<>(items, pageable, adjustedTotal);
+        return new PageImpl<>(items, pageable, adjustedTotal);
     }
 
     public VetQueueSummaryResponse getVetQueueSummary(Long vetId) {
         if (careScheduleRepository == null) {
-            return new VetQueueSummaryResponse(0, 0, 0, 0, 0);
+            return new VetQueueSummaryResponse(0, 0, 0, 0, 0, 0);
         }
         List<CareScheduleStatus> activeStatuses = CareScheduleStatus.OPEN;
         long total = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
@@ -583,6 +597,7 @@ public class AdmissionQueryService {
         long inProgress = careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.IN_PROGRESS));
         long approved = careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses);
-        return new VetQueueSummaryResponse(total, active, awaiting, inProgress, approved);
+        long reviewed = careScheduleRepository.countReviewedVetQueueItems(vetId);
+        return new VetQueueSummaryResponse(total, active, awaiting, inProgress, approved, reviewed);
     }
 }

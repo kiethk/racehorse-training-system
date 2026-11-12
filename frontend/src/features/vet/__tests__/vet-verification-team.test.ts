@@ -87,6 +87,8 @@ describe('Verification-First Team: Vet Actor Acceptance Tests', () => {
         startDate: '2026-10-23',
         endDate: '2026-10-30',
         instructions: 'Mix with morning sweet feed',
+        status: 'ACTIVE',
+        administeredByRole: 'GROOM',
       };
 
       const plan: TreatmentPlan = {

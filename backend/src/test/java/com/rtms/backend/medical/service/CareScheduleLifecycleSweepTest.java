@@ -135,6 +135,8 @@ class CareScheduleLifecycleSweepTest {
 
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
 
+    @Mock private PrescriptionRepository prescriptionRepository;
+
 
 
     private CareScheduleService service;
@@ -163,7 +165,7 @@ class CareScheduleLifecycleSweepTest {
 
                 preventiveVaccinationService, injuryRecordRepository,
 
-                treatmentPlanRepository, new com.fasterxml.jackson.databind.ObjectMapper());
+                treatmentPlanRepository, prescriptionRepository);
 
         Horse horse = new Horse();
 
@@ -397,12 +399,6 @@ class CareScheduleLifecycleSweepTest {
         assertEquals(LocalDateTime.of(2026, 11, 3, 8, 0), slot);
 
     }
-
-
-
-
-
-
 
     @Test
 

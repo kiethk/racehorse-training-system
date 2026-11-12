@@ -23,6 +23,16 @@ import java.time.LocalDateTime;
 public interface AdmissionApplicationRepository
         extends JpaRepository<AdmissionApplication, Long> {
 
+    List<AdmissionApplication> findByStatusAndAssignedGroomIdIsNullOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
+
+    List<AdmissionApplication> findByStatusAndAssignedGroomIdOrderBySubmittedAtAscIdAsc(AdmissionStatus status, Long groomId);
+
+    List<AdmissionApplication> findByStatusAndGroomReviewDueAtLessThanEqualOrderByGroomReviewDueAtAscIdAsc(
+            AdmissionStatus status, LocalDateTime at);
+
+    @Query("SELECT a.assignedGroomId, COUNT(a) FROM AdmissionApplication a WHERE a.status = :status AND a.assignedGroomId IN :ids GROUP BY a.assignedGroomId")
+    List<Object[]> countPendingByAssignedGroomIds(@Param("ids") List<Long> ids, @Param("status") AdmissionStatus status);
+
     List<AdmissionApplication> findByOwnerId(Long ownerId);
 
     List<AdmissionApplication> findByHorseId(Long horseId);
@@ -49,26 +59,13 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByGroomId(Long groomId);
 
-    /**
-     * Head of the stall queue, locked. SKIP LOCKED: allocation already holds every stall lock, so it
-     * must never wait on an admission another transaction holds (that one locks admission then stalls).
-     */
-    @Query(value = """
-            SELECT * FROM admission_applications
-            WHERE status = 'WAITING_FOR_STALL'
-            ORDER BY created_at ASC, id ASC
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-            """, nativeQuery = true)
-    Optional<AdmissionApplication> findNextWaitingForStallForUpdate();
-
     List<AdmissionApplication> findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
             AdmissionStatus status, LocalDateTime cutoff);
 
     /**
      * What a groom may see (server-side scope shared by the queue, the list and the detail check):
      * <ul>
-     *   <li>quarantine grooms: every admission still in {@code poolStatus} (GROOM_REVIEW) — the review pool;</li>
+     *   <li>admissions in Groom review assigned to this groom;</li>
      *   <li>admissions the groom reviewed;</li>
      *   <li>admissions whose reserved quarantine stall the groom looks after;</li>
      *   <li>admissions whose horse currently stands in a stall the groom looks after.</li>
@@ -82,7 +79,7 @@ public interface AdmissionApplicationRepository
               AND (:filterName = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :candidateName, '%')))
               AND (:filterFrom = false OR a.submittedAt >= :submittedFrom)
               AND (:filterTo = false OR a.submittedAt < :submittedToExclusive)
-              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+              AND ((a.status = GROOM_REVIEW AND a.assignedGroomId = :groomId)
                    OR a.groomId = :groomId
                    OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
                    OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
@@ -90,8 +87,6 @@ public interface AdmissionApplicationRepository
             """)
     Page<AdmissionApplication> findGroomQueue(
             @Param("groomId") Long groomId,
-            @Param("quarantineGroom") boolean quarantineGroom,
-            @Param("poolStatus") AdmissionStatus poolStatus,
             @Param("filterStatus") boolean filterStatus,
             @Param("status") AdmissionStatus status,
             @Param("filterName") boolean filterName,
@@ -114,7 +109,7 @@ public interface AdmissionApplicationRepository
     @Query("""
             SELECT a FROM AdmissionApplication a
             WHERE (:filterStatus = false OR a.status = :status)
-              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+              AND ((a.status = GROOM_REVIEW AND a.assignedGroomId = :groomId)
                    OR a.groomId = :groomId
                    OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
                    OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
@@ -123,15 +118,13 @@ public interface AdmissionApplicationRepository
             """)
     List<AdmissionApplication> findVisibleToGroom(
             @Param("groomId") Long groomId,
-            @Param("quarantineGroom") boolean quarantineGroom,
-            @Param("poolStatus") AdmissionStatus poolStatus,
             @Param("filterStatus") boolean filterStatus,
             @Param("status") AdmissionStatus status);
 
     @Query("""
             SELECT COUNT(a) > 0 FROM AdmissionApplication a
             WHERE a.id = :admissionId
-              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+              AND ((a.status = GROOM_REVIEW AND a.assignedGroomId = :groomId)
                    OR a.groomId = :groomId
                    OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
                    OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
@@ -139,9 +132,7 @@ public interface AdmissionApplicationRepository
             """)
     boolean isVisibleToGroom(
             @Param("admissionId") Long admissionId,
-            @Param("groomId") Long groomId,
-            @Param("quarantineGroom") boolean quarantineGroom,
-            @Param("poolStatus") AdmissionStatus poolStatus);
+            @Param("groomId") Long groomId);
 
     /**
      * Đơn đã sang bước Trainer nhưng chưa được gán ai (chưa có Trainer phù hợp

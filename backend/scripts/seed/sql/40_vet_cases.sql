@@ -197,8 +197,7 @@ BEGIN
     r := pg_temp.record_of(s);
     PERFORM pg_temp.treatment(r, 'Colic management', 'Withhold feed 12 hours, then small soaked feeds, hand walk 10 minutes every 2 hours.',
                               pg_temp.today() - 12, pg_temp.today() - 9, 'COMPLETED',
-                              ARRAY[['Flunixin meglumine', '1.1 mg/kg', 'Once daily', 'IV', 'For 2 days.'],
-                                    ['Butylscopolamine', '0.3 mg/kg', 'Once', 'IV', 'Given at the examination.']]);
+                              ARRAY[['Flunixin Meglumine paste', '1.1 mg/kg', 'Once daily', 'ORAL', 'Oral paste given before feed. For 2 days.']]);
     c := pg_temp.recheck(s, 'VT02', 'COMPLETED', 'ALLOWED', 'Recheck: eating well, normal droppings, gut sounds normal.',
                          'Colic resolved', 'Back to normal feeding, light work for three days.');
     PERFORM pg_temp.book(pg_temp.child_of(c), pg_temp.uid('VT02'));
@@ -215,10 +214,10 @@ BEGIN
                              p_note => 'She is bright and eating well, an early antibiotic response is expected. Recheck before returning to work.',
                              p_image => 'admission-packs/h031-bv-karol/horse-photo.jpg');
     r := pg_temp.record_of(s);
-    PERFORM pg_temp.treatment(r, 'Respiratory infection treatment', 'Full antibiotic course, temperature twice daily, soaked hay.',
+    PERFORM pg_temp.treatment(r, 'Respiratory infection treatment', 'Antibiotic course with feed supplement. Follow the dosage and notes for each medication.',
                               pg_temp.today() - 3, pg_temp.today() + 4, 'ACTIVE',
                               ARRAY[['Doxycycline', '10 mg/kg', 'Twice daily', 'Oral', 'After feed.'],
-                                    ['Vitamin B complex', '10 mL', 'Once daily', 'IM', 'Alternate sides.']]);
+                                    ['Vitamin B Complex', '10 mL', 'Once daily', 'FEED_ADDITIVE', 'Mix into the morning feed.']]);
     PERFORM pg_temp.recheck(s, 'VT03', 'SCHEDULED');
 
     -- 7. SANTIAGO EGA (E02, Trainer trainer3): áp xe móng -> nghỉ; lịch tái khám đã quá giờ mà chưa khám (quá hạn).

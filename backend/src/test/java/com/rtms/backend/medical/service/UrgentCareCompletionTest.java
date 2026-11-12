@@ -83,10 +83,10 @@ class UrgentCareCompletionTest {
                 veterinarianProfileRepository, auditLogRepository, eventPublisher, entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper());
+                mock(PreventiveVaccinationService.class),
+                mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);

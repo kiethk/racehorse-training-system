@@ -21,16 +21,23 @@ export interface TaskBlock {
   evidence: CompletionEvidence[];
 }
 
+/** A horse on a single row, with the stall it is in so the name can link to its record. */
+export interface SessionHorse {
+  id: number;
+  name: string;
+  stallCode?: string | null;
+}
+
 /**
  * A workout or vet visit: managed by someone else, shown as its own row. Workouts of one Session share a row,
- * so `horseNames` lists every horse the Groom leads in it; `task` is the first of them.
+ * so `horses` lists every horse the Groom leads in it; `task` is the first of them.
  */
 export interface SingleTask {
   kind: 'single';
   key: string;
   startTime: string;
   task: TodayTaskItem;
-  horseNames: string[];
+  horses: SessionHorse[];
 }
 
 export type ChecklistEntry = TaskBlock | SingleTask;
@@ -53,10 +60,11 @@ export function groupTasks(items: TodayTaskItem[]): ChecklistEntry[] {
     } else if (item.source === 'WORKOUT') {
       const key = `WORKOUT|${item.startTime}|${item.endTime ?? ''}|${item.title}`;
       const session = sessions.get(key);
+      const horse = { id: item.horseId, name: item.horseName, stallCode: item.stallCode };
       if (session) {
-        session.horseNames.push(item.horseName);
+        session.horses.push(horse);
       } else {
-        const created: SingleTask = { kind: 'single', key, startTime: item.startTime, task: item, horseNames: [item.horseName] };
+        const created: SingleTask = { kind: 'single', key, startTime: item.startTime, task: item, horses: [horse] };
         sessions.set(key, created);
         singles.push(created);
       }
@@ -66,11 +74,11 @@ export function groupTasks(items: TodayTaskItem[]): ChecklistEntry[] {
         key: `${item.source}-${item.refId}`,
         startTime: item.startTime,
         task: item,
-        horseNames: [item.horseName],
+        horses: [{ id: item.horseId, name: item.horseName, stallCode: item.stallCode }],
       });
     }
   }
-  singles.forEach((single) => single.horseNames.sort((a, b) => a.localeCompare(b)));
+  singles.forEach((single) => single.horses.sort((a, b) => a.name.localeCompare(b.name)));
 
   const blockEntries: TaskBlock[] = [...blocks.entries()].map(([key, tasks]) => {
     const sorted = [...tasks].sort((a, b) => a.horseName.localeCompare(b.horseName));

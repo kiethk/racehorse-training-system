@@ -252,6 +252,8 @@ INSERT INTO seed_check VALUES
  $q$ SELECT p.completion_id FROM groom_task_completion_photos p
      WHERE NOT EXISTS (SELECT 1 FROM admission_documents d WHERE d.file_url = p.image_key) $q$),
 -- ---------------- Dược lâm sàng (Track 0: catalog + đơn thuốc + severity D4)
+('Treatment plan instructions stored as JSON',
+ $q$ SELECT id FROM treatment_plans WHERE BTRIM(instructions) LIKE '[%' $q$),
 ('Health condition severity outside the MILD/MODERATE/SEVERE/CRITICAL vocabulary',
  $q$ SELECT id FROM health_conditions
      WHERE UPPER(severity) NOT IN ('MILD', 'MODERATE', 'SEVERE', 'CRITICAL') $q$),
@@ -259,10 +261,15 @@ INSERT INTO seed_check VALUES
  $q$ SELECT id FROM prescriptions
      WHERE status NOT IN ('ACTIVE', 'COMPLETED', 'DISCONTINUED')
         OR administered_by_role NOT IN ('GROOM', 'VETERINARIAN') $q$),
-('Injectable prescription (IV/IM) not assigned to the veterinarian (B5)',
+('Injection route in a treatment-plan prescription (vaccination excluded)',
  $q$ SELECT id FROM prescriptions
-     WHERE UPPER(COALESCE(route, '')) IN ('IV', 'IM', 'INJECTION_IV', 'INJECTION_IM')
-       AND administered_by_role <> 'VETERINARIAN' $q$);
+     WHERE preventive_protocol_id IS NULL
+       AND (
+           UPPER(BTRIM(COALESCE(route, ''))) IN ('IV', 'IM', 'SC', 'SQ', 'INJECTION_IV', 'INJECTION_IM')
+           OR UPPER(BTRIM(COALESCE(route, ''))) LIKE '%INTRAVENOUS%'
+           OR UPPER(BTRIM(COALESCE(route, ''))) LIKE '%INTRAMUSCULAR%'
+           OR UPPER(BTRIM(COALESCE(route, ''))) LIKE '%SUBCUTANEOUS%'
+       ) $q$);
 
 DO $$
 DECLARE

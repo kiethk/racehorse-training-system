@@ -257,19 +257,29 @@ class AuthServiceRefreshTest {
     void testChangePassword_Success() {
         User user = new User();
         user.setId(5L);
+        user.setEmail("user5@test.com");
         user.setPasswordHash("hashed_old");
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        user.setRole(role);
 
         when(userRepository.findById(5L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("OldPassword@123", "hashed_old")).thenReturn(true);
         when(passwordEncoder.matches("NewPassword@456", "hashed_old")).thenReturn(false);
         when(passwordEncoder.encode("NewPassword@456")).thenReturn("hashed_new");
+        when(userRepository.saveAndFlush(user)).thenReturn(user);
+        when(jwtUtil.generateToken(5L, "user5@test.com", "CLUB_MANAGER")).thenReturn("new_access_token");
 
         ChangePasswordRequest request = new ChangePasswordRequest("OldPassword@123", "NewPassword@456");
-        authService.changePassword(5L, request);
+        AuthService.LoginResult result = authService.changePassword(5L, request);
 
+        assertNotNull(result);
+        assertEquals("new_access_token", result.token());
+        assertNotNull(result.refreshToken());
         assertEquals("hashed_new", user.getPasswordHash());
-        verify(userRepository).save(user);
+        verify(userRepository).saveAndFlush(user);
         verify(refreshTokenRepository).revokeAllActiveTokensByUser(eq(user), any(LocalDateTime.class));
+        verify(refreshTokenRepository).save(any(RefreshToken.class));
     }
 
     @Test

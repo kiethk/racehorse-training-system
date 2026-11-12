@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Notice } from '@/components/ui/Notice';
+import { Pill } from '@/components/ui/StatusBadge';
+import { ReviewDue } from '../shared/components/ReviewDue';
 import { admissionsApi } from '../services/api';
 import type { AdmissionStatus, GroomQueueFilters, GroomQueueResponse } from '../types';
 import { AdmissionListLayout } from '../shared/components/AdmissionListLayout';
@@ -14,7 +16,6 @@ import { AdmissionTable } from '../shared/components/AdmissionTable';
 const statuses: { value: AdmissionStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
   { value: 'GROOM_REVIEW', label: 'Groom review' },
-  { value: 'WAITING_FOR_STALL', label: 'Waiting for stall' },
   { value: 'WAITING_FOR_ARRIVAL', label: 'Waiting for arrival' },
   { value: 'ARRIVAL_EXPIRED', label: 'Arrival expired' },
   { value: 'VET_REVIEW', label: 'Vet review' },
@@ -124,6 +125,16 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
       <AdmissionTable
         admissions={applications}
         detailHref={(id) => `/groom/admissions/${id}${toQuery(applied)}`}
+        extraColumns={[{
+          id: 'review-due',
+          header: 'Review due',
+          render: (admission) => admission.status === 'GROOM_REVIEW' ? (
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <ReviewDue dueAt={admission.groomReviewDueAt} />
+              {admission.assignedGroomFull && <Pill tone="warning" size="sm">Full</Pill>}
+            </span>
+          ) : null,
+        }]}
         searchable={false}
         loading={loading}
         emptyTitle={total > 0 ? 'No matching applications' : 'No applications'}

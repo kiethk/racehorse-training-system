@@ -14,8 +14,9 @@ import { isImageDocument, isPdfDocument } from '../lib/documentKind';
 import { AdmissionDocumentPreview } from './AdmissionDocumentPreview';
 import { AdmissionImageThumbnail, AdmissionPdfThumbnail } from './AdmissionDocumentThumbnail';
 
-const documentNames: Record<string, string> = {
+export const documentNames: Record<string, string> = {
   HORSE_PHOTO: 'Horse photo',
+  ARRIVAL_PHOTO: 'Arrival photo',
   REGISTRATION_DOCUMENT: 'Registration document',
   PEDIGREE_CERTIFICATE: 'Pedigree certificate',
   VACCINATION_RECORD: 'Vaccination record',

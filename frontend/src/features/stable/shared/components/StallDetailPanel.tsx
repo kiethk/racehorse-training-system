@@ -6,7 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Button, EmptyState, HorseAvatar, Icon, IconButton, Panel, Pill } from '@/components/ui';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import type { HorseSpecialty } from '@/features/horses/types';
-import { formatDate, formatEnumLabel, formatLocalDateIso } from '@/lib/display';
+import { formatDate, formatEnumLabel } from '@/lib/display';
+import { isPlanActiveToday } from '@/features/care/lib/isPlanActiveToday';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import type { TreatmentPlan } from '@/features/care/types';
 import { MedicationInstructionModal } from '@/features/care/components/MedicationInstructionModal';
@@ -93,12 +94,7 @@ export function StallDetailPanel({
     };
   }, [horseId]);
 
-  const todayStr = formatLocalDateIso();
-  const hasActiveTreatment = Boolean(
-    activePlan &&
-      activePlan.status === 'ACTIVE' &&
-      (!activePlan.endDate || activePlan.endDate >= todayStr),
-  );
+  const hasActiveTreatment = Boolean(activePlan && isPlanActiveToday(activePlan));
 
   if (!stall) {
     return (
@@ -369,7 +365,8 @@ export function StallDetailPanel({
           stallCode={stall.stallCode}
           diagnosis={activePlan.diagnosis}
           veterinarianName={activePlan.veterinarianName}
-          instructions={activePlan.instructions}
+          prescriptions={activePlan.prescriptions ?? []}
+          notes={activePlan.instructions}
           endDate={activePlan.endDate ? formatDate(activePlan.endDate) : null}
         />
       )}

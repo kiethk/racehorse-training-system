@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Panel, SectionTitle, Icon, Pill, LinkButton } from '@/components/ui';
+import { EntityLink, Panel, SectionTitle, Icon, Pill, LinkButton } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import { formatDate } from '@/lib/display';
 import type { PendingAdmissionActionDto, UrgentIncidentActionDto } from '../../types';
 
@@ -19,9 +20,9 @@ export function ManagerActionCenter({
 
   if (!hasPendingApprovals && !hasIncidentAlerts) {
     return (
-      <Panel padded className="py-3 px-4 border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-950/10">
-        <div className="flex items-center gap-2.5 text-xs text-emerald-800 dark:text-emerald-300">
-          <Icon name="check" size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+      <Panel padded className="py-3 px-4 border-[var(--color-success)] bg-[var(--color-success-soft)]">
+        <div className="flex items-center gap-2.5 text-xs text-[var(--color-success)]">
+          <Icon name="check" size={16} className="text-[var(--color-success)] shrink-0" />
           <span className="font-medium">
             All Clear — No pending managerial sign-offs or urgent incidents.
           </span>
@@ -41,7 +42,7 @@ export function ManagerActionCenter({
             <div className="flex items-center justify-between pb-1">
               <div className="flex items-center gap-2">
                 <SectionTitle>Action Center</SectionTitle>
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500/20 px-1 text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-warning-soft)] px-1 text-[11px] font-bold text-[var(--color-warning)]">
                   {pendingAdmissions.length}
                 </span>
               </div>
@@ -57,17 +58,20 @@ export function ManagerActionCenter({
                     <span
                       className={
                         admission.isArrivalOverdueOrExpiring
-                          ? 'h-2 w-2 rounded-full bg-rose-500 shrink-0'
-                          : 'h-2 w-2 rounded-full bg-amber-500 shrink-0'
+                          ? 'h-2 w-2 rounded-full bg-[var(--color-danger)] shrink-0'
+                          : 'h-2 w-2 rounded-full bg-[var(--color-warning)] shrink-0'
                       }
                     />
                     <div className="min-w-0 flex items-center gap-1.5">
-                      <span className="font-semibold text-xs text-[var(--color-text-primary)] truncate">
+                      <EntityLink
+                        href={entityHref('admission', admission.admissionId, 'CLUB_MANAGER')}
+                        className="font-semibold text-xs text-[var(--color-text-primary)] truncate"
+                      >
                         {admission.candidateHorseName}
-                      </span>
+                      </EntityLink>
                       {admission.ownerName && (
                         <span className="text-[11px] text-[var(--color-text-muted)] truncate hidden sm:inline">
-                          ({admission.ownerName})
+                          (<EntityLink href={entityHref('owner', admission.ownerId, 'CLUB_MANAGER')}>{admission.ownerName}</EntityLink>)
                         </span>
                       )}
                     </div>
@@ -103,7 +107,7 @@ export function ManagerActionCenter({
             <div className="flex items-center justify-between pb-1">
               <div className="flex items-center gap-2">
                 <SectionTitle>Urgent Health Incidents</SectionTitle>
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500/20 px-1 text-[11px] font-bold text-rose-700 dark:text-rose-400">
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-danger-soft)] px-1 text-[11px] font-bold text-[var(--color-danger)]">
                   {urgentIncidents.length}
                 </span>
               </div>
@@ -127,17 +131,17 @@ export function ManagerActionCenter({
                       <span
                         className={
                           isCritical
-                            ? 'h-2 w-2 rounded-full bg-rose-500 shrink-0'
-                            : 'h-2 w-2 rounded-full bg-amber-500 shrink-0'
+                            ? 'h-2 w-2 rounded-full bg-[var(--color-danger)] shrink-0'
+                            : 'h-2 w-2 rounded-full bg-[var(--color-warning)] shrink-0'
                         }
                       />
                       <div className="min-w-0 flex items-center gap-2">
-                        <Link
-                          href={`/manager/horses/${incident.horseId}`}
-                          className="font-semibold text-xs text-[var(--color-text-primary)] hover:text-[var(--color-primary)] hover:underline truncate"
+                        <EntityLink
+                          href={entityHref('horse', incident.horseId, 'CLUB_MANAGER')}
+                          className="font-semibold text-xs text-[var(--color-text-primary)] truncate"
                         >
                           {incident.horseName}
-                        </Link>
+                        </EntityLink>
                         <span className="text-[11px] text-[var(--color-text-secondary)] truncate">
                           {incident.title}
                         </span>

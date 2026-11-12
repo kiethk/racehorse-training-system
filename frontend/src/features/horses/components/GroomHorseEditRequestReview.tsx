@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyState, HorseAvatar, Icon, ListSkeleton, Panel, Pill, SectionTitle, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Button, EmptyState, EntityLink, HorseAvatar, Icon, ListSkeleton, Panel, Pill, SectionTitle, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import { cn } from '@/lib/cn';
 import { displayError, formatDate, formatDateTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
@@ -16,7 +17,7 @@ import { DocumentSlotGrid } from './DocumentSlotGrid';
 import { EditRequestStatusBadge } from './GroomHorseEditRequestsView';
 import type { HorseDocumentSlot, HorseEditRequest } from '../types';
 
-function HeaderValue({ label, value }: { label: string; value: string }) {
+function HeaderValue({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <span className="mb-0.5 block text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">{label}</span>
@@ -38,7 +39,7 @@ function RequestHeader({ request }: { request: HorseEditRequest }) {
         </h1>
         <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 min-[480px]:grid-cols-2 lg:grid-cols-4">
           <HeaderValue label="Request ID" value={`#${request.id}`} />
-          <HeaderValue label="Owner" value={request.ownerName ? `${request.ownerName} (#${request.ownerId})` : `#${request.ownerId}`} />
+          <HeaderValue label="Owner" value={<EntityLink href={entityHref('owner', request.ownerId, 'GROOM')}>{request.ownerName ? `${request.ownerName} (#${request.ownerId})` : `#${request.ownerId}`}</EntityLink>} />
           <HeaderValue label="UELN" value={request.horseRegistrationNumber || 'Not recorded'} />
           <HeaderValue label="Submitted" value={formatDate(request.createdAt)} />
         </div>
@@ -236,7 +237,7 @@ export function GroomHorseEditRequestReview({ requestId }: { requestId: number }
           <AdmissionSideCard title="Decision">
             <InfoRow label="Status" value={<EditRequestStatusBadge status={request.status} />} />
             {request.reviewedAt && <InfoRow label="Reviewed" value={formatDateTime(request.reviewedAt)} />}
-            {request.reviewerName && <InfoRow label="Reviewed by" value={request.reviewerName} />}
+            {request.reviewerName && <InfoRow label="Reviewed by" value={<EntityLink href={request.reviewerId ? entityHref('user', request.reviewerId, 'GROOM') : null}>{request.reviewerName}</EntityLink>} />}
             <InfoRow label="Feedback" value={request.reviewFeedback || 'Not recorded'} />
           </AdmissionSideCard>
         )}

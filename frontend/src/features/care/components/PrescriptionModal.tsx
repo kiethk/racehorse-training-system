@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Button, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
 import { careService } from '../services/careService';
 import { displayError, formatLocalDateIso } from '@/lib/display';
+import { toast } from '@/lib/toast';
 
 interface PrescriptionModalProps {
   open: boolean;
@@ -39,7 +40,7 @@ export function PrescriptionModal({
   const [medicationName, setMedicationName] = useState('');
   const [dosage, setDosage] = useState('');
   const [frequency, setFrequency] = useState('Once daily');
-  const [route, setRoute] = useState('Oral');
+  const [route, setRoute] = useState('ORAL');
   const [startDate, setStartDate] = useState(() => formatLocalDateIso());
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
@@ -93,7 +94,9 @@ export function PrescriptionModal({
 
       onSuccess();
     } catch (err) {
-      setError(displayError(err, 'Failed to add prescription.'));
+      const message = displayError(err, 'Failed to add prescription.');
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -154,11 +157,9 @@ export function PrescriptionModal({
               }}
               disabled={loading}
             >
-              <option value="Oral">Oral</option>
-              <option value="Intravenous (IV)">Intravenous (IV)</option>
-              <option value="Intramuscular (IM)">Intramuscular (IM)</option>
-              <option value="Topical">Topical</option>
-              <option value="Subcutaneous (SC)">Subcutaneous (SC)</option>
+              <option value="ORAL">Oral</option>
+              <option value="TOPICAL">Topical</option>
+              <option value="FEED_ADDITIVE">Feed additive</option>
             </Select>
           </FormField>
         </div>

@@ -27,6 +27,9 @@ export const horseEditRequestService = {
   latest: async (horseId: number): Promise<HorseEditRequest | null> =>
     (await apiGet<ApiResponse<HorseEditRequest | null>>(`/api/owner/horses/${horseId}/edit-requests/latest`)).data,
 
+  listForOwner: async (horseId: number): Promise<HorseEditRequest[]> =>
+    (await apiGet<ApiResponse<HorseEditRequest[]>>(`/api/owner/horses/${horseId}/edit-requests`)).data,
+
   submit: async (horseId: number, changes: HorseEditFields, uploads: HorseEditUpload[]): Promise<HorseEditRequest> => {
     const body = new FormData();
     body.append('changes', new Blob([JSON.stringify(changes)], { type: 'application/json' }));

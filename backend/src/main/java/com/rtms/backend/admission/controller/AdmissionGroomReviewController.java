@@ -17,8 +17,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admissions")
@@ -63,12 +67,13 @@ public class AdmissionGroomReviewController {
         return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
     }
 
-    @PostMapping("/{id}/arrival-confirmation")
+    @PostMapping(value = "/{id}/arrival-confirmation", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW')")
     public ApiResponse<AdmissionDetailResponse> confirmArrival(
             @PathVariable Long id,
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        AdmissionApplication admission = admissionGroomReviewService.confirmArrival(id, currentUser.getUserId());
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        AdmissionApplication admission = admissionGroomReviewService.confirmArrival(id, currentUser.getUserId(), files);
         return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
     }
 

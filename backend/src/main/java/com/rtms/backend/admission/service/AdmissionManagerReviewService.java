@@ -183,7 +183,6 @@ public class AdmissionManagerReviewService {
         admissionGroomReviewService.notifyGroomAssigned(admission, regularStall,
                 horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");
         admissionNotificationService.notifyOwnerApproved(admission, horse, regularStall);
-        admissionGroomReviewService.allocateWaitingAdmissions();
 
         if (auditLogService != null) {
             auditLogService.recordDomainEvent(DomainAuditEvent.builder()
@@ -264,7 +263,6 @@ public class AdmissionManagerReviewService {
         admission = admissionApplicationRepository.save(admission);
         admissionNotificationService.notifyOwnerRejected(
                 admission, horse.getName(), "Club Manager Final Review", feedback);
-        admissionGroomReviewService.allocateWaitingAdmissions();
 
         if (auditLogService != null) {
             auditLogService.recordDomainEvent(DomainAuditEvent.builder()
