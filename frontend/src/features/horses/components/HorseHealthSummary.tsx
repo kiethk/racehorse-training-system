@@ -102,7 +102,9 @@ export function HorseHealthSummary({
                   </span>
                   <div>
                     <span className="font-semibold text-[var(--color-text-primary)] block">
-                      {item.careType || item.description || 'Preventive Check'}
+                      {item.purpose === 'PREVENTIVE'
+                        ? 'PREVENTIVE'
+                        : item.careType || item.description || 'Care Schedule'}
                     </span>
                     <div className="flex flex-wrap items-center gap-x-3 text-[12px] text-[var(--color-text-muted)]">
                       <span>Scheduled: {formatDate(item.scheduledDate || item.scheduledAt)}</span>
