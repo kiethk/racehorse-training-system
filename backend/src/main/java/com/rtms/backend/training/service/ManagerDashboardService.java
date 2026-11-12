@@ -11,7 +11,7 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.entity.Area;
@@ -212,12 +212,12 @@ public class ManagerDashboardService {
             );
         }).toList();
 
-        // 4. Urgent Incidents: status in (REPORTED, IN_REVIEW) and severity in (HIGH, CRITICAL)
+        // 4. Urgent Incidents: status in (REPORTED, IN_REVIEW) and incident type TRAUMA
         List<IncidentStatus> openStatuses = List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW);
-        List<IncidentSeverity> urgentSeverities = List.of(IncidentSeverity.HIGH, IncidentSeverity.CRITICAL);
+        List<IncidentType> urgentTypes = List.of(IncidentType.TRAUMA);
 
         long openIncidents = horseIncidentReportRepository.countByStatusIn(openStatuses);
-        long criticalUrgentIncidents = horseIncidentReportRepository.countByStatusInAndSeverityIn(openStatuses, urgentSeverities);
+        long criticalUrgentIncidents = horseIncidentReportRepository.countByStatusInAndIncidentTypeIn(openStatuses, urgentTypes);
 
         IncidentSummary incidentSummary = new IncidentSummary(
                 openIncidents,
@@ -225,7 +225,7 @@ public class ManagerDashboardService {
         );
 
         List<HorseIncidentReport> urgentIncidentEntities =
-                horseIncidentReportRepository.findUrgentIncidents(openStatuses, urgentSeverities);
+                horseIncidentReportRepository.findUrgentIncidents(openStatuses, urgentTypes);
 
         // Batch resolve horses and reporters
         Set<Long> incidentHorseIds = urgentIncidentEntities.stream().map(HorseIncidentReport::getHorseId).collect(Collectors.toSet());
@@ -245,7 +245,7 @@ public class ManagerDashboardService {
                     horse != null ? horse.getName() : "Horse #" + inc.getHorseId(),
                     inc.getTitle(),
                     inc.getDescription(),
-                    inc.getSeverity() != null ? inc.getSeverity().name() : "HIGH",
+                    inc.getIncidentType() != null ? inc.getIncidentType().name() : "TRAUMA",
                     inc.getStatus().name(),
                     inc.getReportedAt(),
                     inc.getReportedById(),

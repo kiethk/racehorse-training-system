@@ -79,7 +79,7 @@ export default function UrgentCasesPage() {
     [urgentCases],
   );
   const criticalCount = useMemo(
-    () => urgentCases.filter((c) => c.severity === 'CRITICAL' && c.status !== 'COMPLETED').length,
+    () => urgentCases.filter((c) => c.incidentType === 'TRAUMA' && c.status !== 'COMPLETED').length,
     [urgentCases],
   );
 
@@ -268,11 +268,11 @@ export default function UrgentCasesPage() {
                             {item.horseName}
                           </span>
                           <Pill
-                            tone={item.severity === 'CRITICAL' ? 'danger' : 'warning'}
+                            tone={item.incidentType === 'TRAUMA' ? 'danger' : 'warning'}
                             size="sm"
                             icon="alert-triangle"
                           >
-                            {item.severity}
+                            {item.incidentType}
                           </Pill>
                           <Pill
                             tone={

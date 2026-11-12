@@ -9,7 +9,7 @@ import { formatDateTime } from '@/lib/display';
 import { incidentApi } from '../services/incidentService';
 import { assignedVetLabel } from '../lib/assignedVet';
 import {
-  INCIDENT_SEVERITY_MAP,
+  INCIDENT_TYPE_MAP,
   INCIDENT_STATUS_MAP,
   formatIncidentReportedAt,
 } from '../lib/incidentDisplay';
@@ -26,7 +26,7 @@ export function IncidentDetailModal({ report, horseName, onClose }: IncidentDeta
   if (!report) return null;
 
   const statusCfg = INCIDENT_STATUS_MAP[report.status] || { tone: 'neutral', label: report.status };
-  const severityCfg = INCIDENT_SEVERITY_MAP[report.severity] || { tone: 'neutral', label: report.severity };
+  const severityCfg = INCIDENT_TYPE_MAP[report.incidentType] || { tone: 'neutral', label: report.incidentType };
   const imgSrc = incidentApi.imageSrc(report);
   const vetLabel = assignedVetLabel(report);
 

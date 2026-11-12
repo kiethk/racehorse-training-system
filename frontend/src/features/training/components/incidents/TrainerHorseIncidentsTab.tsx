@@ -7,7 +7,7 @@ import { formatDateTime } from '@/lib/display';
 import { incidentApi } from '@/features/groom/services/incidentService';
 import { assignedVetLabel } from '@/features/groom/lib/assignedVet';
 import type { IncidentReport, IncidentStatus } from '@/features/groom/types';
-import { INCIDENT_SEVERITY_MAP } from '@/features/groom/lib/incidentDisplay';
+import { INCIDENT_TYPE_MAP } from '@/features/groom/lib/incidentDisplay';
 import { ReportIncidentDialog } from './ReportIncidentDialog';
 
 const STATUS_MAP: Record<
@@ -89,7 +89,7 @@ export function TrainerHorseIncidentsTab({
         <div className="space-y-3">
           {reports.map((report) => {
             const statusConfig = STATUS_MAP[report.status] ?? { tone: 'neutral', label: report.status };
-            const severityConfig = INCIDENT_SEVERITY_MAP[report.severity] ?? { tone: 'neutral', label: report.severity };
+            const severityConfig = INCIDENT_TYPE_MAP[report.incidentType] ?? { tone: 'neutral', label: report.incidentType };
             const imgPath = incidentApi.imageSrc(report);
 
             return (

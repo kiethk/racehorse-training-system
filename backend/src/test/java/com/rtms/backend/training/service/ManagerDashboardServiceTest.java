@@ -11,7 +11,7 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.entity.Area;
@@ -164,7 +164,7 @@ class ManagerDashboardServiceTest {
 
         // 4. Urgent Incidents
         when(horseIncidentReportRepository.countByStatusIn(anyList())).thenReturn(4L);
-        when(horseIncidentReportRepository.countByStatusInAndSeverityIn(anyList(), anyList())).thenReturn(1L);
+        when(horseIncidentReportRepository.countByStatusInAndIncidentTypeIn(anyList(), anyList())).thenReturn(1L);
 
         HorseIncidentReport incident = new HorseIncidentReport();
         setField(incident, "id", 301L);
@@ -172,7 +172,7 @@ class ManagerDashboardServiceTest {
         incident.setReportedById(501L);
         incident.setTitle("Colic symptoms observed");
         incident.setDescription("Horse showing signs of abdominal discomfort");
-        incident.setSeverity(IncidentSeverity.HIGH);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now().minusHours(2));
 
@@ -227,6 +227,6 @@ class ManagerDashboardServiceTest {
         assertEquals(1, response.urgentIncidents().size());
         assertEquals("Pegasus", response.urgentIncidents().get(0).horseName());
         assertEquals("Dr. Emily Vet", response.urgentIncidents().get(0).reporterName());
-        assertEquals("HIGH", response.urgentIncidents().get(0).severity());
+        assertEquals("TRAUMA", response.urgentIncidents().get(0).incidentType());
     }
 }

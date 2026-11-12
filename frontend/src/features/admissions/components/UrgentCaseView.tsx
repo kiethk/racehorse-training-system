@@ -15,7 +15,7 @@ import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
 import { displayError, formatDateTime } from '@/lib/display';
 import { ClinicalExamForm, type ClinicalExamFormHandle } from './vet-review/ClinicalExamForm';
-import { INCIDENT_SEVERITY_MAP } from '@/features/groom/lib/incidentDisplay';
+import { INCIDENT_TYPE_MAP } from '@/features/groom/lib/incidentDisplay';
 import { ApiError } from '@/services/api';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import type {
@@ -209,8 +209,8 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           <div className="flex items-center justify-between">
             <dt className="text-[var(--color-text-muted)]">Severity</dt>
             <dd>
-              <Pill tone={urgentCase.severity === 'CRITICAL' ? 'danger' : 'warning'}>
-                {urgentCase.severity}
+              <Pill tone={urgentCase.incidentType === 'TRAUMA' ? 'danger' : 'warning'}>
+                {urgentCase.incidentType}
               </Pill>
             </dd>
           </div>
@@ -245,7 +245,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         scheduledAt={urgentCase.reportedAt}
         horseName={urgentCase.horseName}
         horseId={urgentCase.horseId}
-        severity={urgentCase.severity}
+        severity={urgentCase.incidentType}
         action={
           urgentCase.status === 'SCHEDULED' && (
             <Button
@@ -324,7 +324,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             {showAdditional && (
               <div className="mt-3 space-y-3">
                 {additionalReports.map((report) => {
-                  const severity = INCIDENT_SEVERITY_MAP[report.severity];
+                  const severity = INCIDENT_TYPE_MAP[report.incidentType];
                   return (
                     <div
                       key={report.id}

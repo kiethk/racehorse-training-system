@@ -123,16 +123,6 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND (cs.scheduledDate IS NOT NULL OR cs.scheduledAt IS NOT NULL)")
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
 
-    /** D1 auto-activate: mọi ca SCHEDULED đã đến giờ (job chạy trong 08:00–17:00). */
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE CareSchedule cs SET cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.IN_PROGRESS, "
-            + "cs.updatedAt = :now "
-            + "WHERE cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED "
-            + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
-            + "com.rtms.backend.medical.enums.CareType.ROUTINE, "
-            + "com.rtms.backend.medical.enums.CareType.URGENT) "
-            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
-    int autoActivateDueSchedules(@Param("now") LocalDateTime now);
 
     /** D1 EOD rollover: INITIAL/ROUTINE chưa hoàn tất còn nằm ở giờ đã qua. */
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "

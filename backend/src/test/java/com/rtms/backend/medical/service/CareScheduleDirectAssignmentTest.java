@@ -21,7 +21,7 @@ import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
@@ -279,7 +279,7 @@ class CareScheduleDirectAssignmentTest {
         incident.setGroomId(8L);
         incident.setHorseId(99L);
         incident.setTitle("Acute lameness");
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now());
         when(incidents.findByIdForUpdate(incidentId)).thenReturn(Optional.of(incident));
@@ -320,7 +320,7 @@ class CareScheduleDirectAssignmentTest {
         incident.setHorseId(99L);
         incident.setTitle("Acute lameness");
         incident.setDescription("Horse cannot bear weight on the left foreleg.");
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now());
         when(incidents.findByIdForUpdate(700L)).thenReturn(Optional.of(incident));

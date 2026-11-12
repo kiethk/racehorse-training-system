@@ -14,13 +14,11 @@ import { ImageLightbox } from '@/components/ui/ImageLightbox';
 import { incidentApi } from '../services/incidentService';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { Horse, StableStall } from '@/features/stable/types';
-import type { IncidentReport, IncidentSeverity } from '../types';
+import type { IncidentReport, IncidentType } from '../types';
 
-const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string; hint: string; tone: string }[] = [
-  { value: 'LOW', label: 'Low', hint: 'Vet checks at the next routine slot. The horse keeps training.', tone: 'text-[var(--color-text-secondary)]' },
-  { value: 'MEDIUM', label: 'Medium', hint: 'Vet checks at the next routine slot. The horse keeps training.', tone: 'text-[var(--color-info)]' },
-  { value: 'HIGH', label: 'High', hint: 'Vet called now, even from another exam. The horse stops training and leaves its group.', tone: 'text-[var(--color-warning)]' },
-  { value: 'CRITICAL', label: 'Critical', hint: 'Vet called now, even from another exam. The horse stops training and leaves its group.', tone: 'text-[var(--color-danger)] font-semibold' },
+const INCIDENT_TYPE_OPTIONS: { value: IncidentType; label: string; hint: string; tone: string }[] = [
+  { value: 'PROBLEM', label: 'Problem', hint: 'Vet checks at the next routine slot. The horse keeps training.', tone: 'text-[var(--color-info)]' },
+  { value: 'TRAUMA', label: 'Trauma', hint: 'Vet called now, even from another exam. The horse stops training and leaves its group.', tone: 'text-[var(--color-danger)] font-semibold' },
 ];
 
 export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {}) {
@@ -34,7 +32,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
   const [horseId, setHorseId] = useState<number | ''>('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [severity, setSeverity] = useState<IncidentSeverity>('MEDIUM');
+  const [severity, setSeverity] = useState<IncidentType>('PROBLEM');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [viewingPreview, setViewingPreview] = useState(false);
@@ -128,7 +126,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
         horseId: Number(horseId),
         title: title.trim(),
         description: description.trim(),
-        severity,
+        incidentType: severity,
       });
 
       // Step 2: attach the image when one was selected.
@@ -218,10 +216,10 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
             {/* Severity */}
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Severity <span className="text-[var(--color-danger)]">*</span>
+                Incident Type <span className="text-[var(--color-danger)]">*</span>
               </label>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {SEVERITY_OPTIONS.map((opt) => (
+                {INCIDENT_TYPE_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
                     className={`flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-md)] border p-2.5 transition-colors ${
@@ -245,7 +243,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                 ))}
               </div>
 
-              {(severity === 'HIGH' || severity === 'CRITICAL') && (
+              {severity === 'TRAUMA' && (
                 <div className="mt-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-xs text-[var(--color-danger)]">
                   <div className="font-semibold flex items-center gap-1.5">
                     <Icon name="alert-triangle" size={14} />

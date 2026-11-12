@@ -441,11 +441,11 @@ function Marker({
                 {!readOnly && onUpdate ? (
                   <div className="space-y-1">
                     <label className="block text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
-                      Ghi chú lâm sàng / Note:
+                      Clinical note:
                     </label>
                     <Textarea
                       rows={2}
-                      placeholder="Nhập ghi chú chấn thương..."
+                      placeholder="Enter clinical observation..."
                       value={injury.description || ''}
                       onChange={(e) => onUpdate(injury.id, { description: e.target.value })}
                       className="w-full resize-none rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-[10px] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)]"
@@ -460,11 +460,6 @@ function Marker({
                       <p className="leading-snug">{injury.description}</p>
                     </div>
                   )
-                )}
-                {injury.severity && (
-                  <div>
-                    Severity: <strong>{injury.severity}</strong>
-                  </div>
                 )}
                 {injury.status && (
                   <div>

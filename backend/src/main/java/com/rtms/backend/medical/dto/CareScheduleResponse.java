@@ -29,18 +29,10 @@ public record CareScheduleResponse(
         LocalDateTime requestedAt,
         RescheduleReason rescheduleReason,
         String rescheduleNote,
-        int rolloverCount,
-        /** D1 cờ dẫn xuất: IN_PROGRESS quá 30 phút so với scheduled_at (không phải trạng thái DB). */
-        boolean overdue,
-        /** D2 thời điểm ca khám bị tạm dừng do ưu tiên ca cấp cứu khác (legacy null). */
-        LocalDateTime pausedFrom
+        int rolloverCount
 ) {
     public static CareScheduleResponse from(CareSchedule cs) {
         if (cs == null) return null;
-        // AD-022: OVERDUE is a real status; the flag mirrors it for clients that only read the boolean.
-        boolean overdue = CareScheduleStatus.ACTIVE_EXAM.contains(cs.getStatus())
-                && cs.getScheduledAt() != null
-                && java.time.LocalDateTime.now().isAfter(cs.getScheduledAt().plusMinutes(30));
         LocalDate date = cs.getScheduledDate();
         if (date == null && cs.getScheduledAt() != null) {
             date = cs.getScheduledAt().toLocalDate();
@@ -67,9 +59,7 @@ public record CareScheduleResponse(
                 cs.getRequestedAt(),
                 cs.getRescheduleReason(),
                 cs.getRescheduleNote(),
-                cs.getRolloverCount(),
-                overdue,
-                null
+                cs.getRolloverCount()
         );
     }
 }
