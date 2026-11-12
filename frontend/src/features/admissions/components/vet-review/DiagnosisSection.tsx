@@ -20,6 +20,9 @@ export interface DiagnosisSectionProps {
   setAbnormalFindings: Dispatch<SetStateAction<string>>;
   fieldErrors: Record<string, string>;
   setFieldErrors: Dispatch<SetStateAction<Record<string, string>>>;
+  /** Markers placed in this exam session force abnormal findings, so "healthy" is locked. */
+  normalLocked?: boolean;
+  onLockedNormalAttempt?: () => void;
 }
 
 export function DiagnosisSection(props: DiagnosisSectionProps) {
@@ -27,10 +30,15 @@ export function DiagnosisSection(props: DiagnosisSectionProps) {
     isUrgent, isFormDisabled, diagnosis, setDiagnosis,
     examMode, setExamMode, structuredDiagnosis, setStructuredDiagnosis,
     abnormalFindings, setAbnormalFindings, fieldErrors, setFieldErrors,
+    normalLocked = false, onLockedNormalAttempt,
   } = props;
 
   function switchMode(mode: 'NORMAL' | 'ABNORMAL') {
     if (mode === examMode) return;
+    if (mode === 'NORMAL' && normalLocked) {
+      onLockedNormalAttempt?.();
+      return;
+    }
     setExamMode(mode);
     if (mode === 'ABNORMAL' && structuredDiagnosis === 'Clinically healthy') {
       setStructuredDiagnosis('Minor clinical condition');

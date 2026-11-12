@@ -10,7 +10,7 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.incident.dto.CreateIncidentReportRequest;
 import com.rtms.backend.incident.dto.HandleIncidentRequest;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
@@ -86,9 +86,9 @@ public class HorseIncidentReportService {
                 request.getHorseId(),
                 request.getTitle().trim(),
                 request.getDescription().trim(),
-                request.getSeverity()));
+                request.getIncidentType()));
 
-        boolean serious = saved.getSeverity() == IncidentSeverity.HIGH || saved.getSeverity() == IncidentSeverity.CRITICAL;
+        boolean serious = saved.getIncidentType() == IncidentType.TRAUMA;
 
         CareSchedule openCase = careScheduleService.findOpenIncidentCase(horse.getId()).orElse(null);
         boolean escalate = serious && openCase != null && openCase.getCareType() == CareType.ROUTINE

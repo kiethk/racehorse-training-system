@@ -121,7 +121,7 @@ export function ManagerActionCenter({
 
             <div className="space-y-1.5 pt-1">
               {urgentIncidents.map((incident) => {
-                const isCritical = incident.severity === 'CRITICAL';
+                const isCritical = incident.incidentType === 'TRAUMA';
                 return (
                   <div
                     key={`inc-${incident.incidentId}`}

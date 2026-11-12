@@ -835,6 +835,13 @@ class AdmissionVetReviewWorkflowTest {
         when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
         when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
 
+        com.rtms.backend.medical.entity.HorseBodyRegion bodyRegion = new com.rtms.backend.medical.entity.HorseBodyRegion();
+        bodyRegion.setId(1L);
+        bodyRegion.setCode("foreleg_right");
+        bodyRegion.setDisplayName("Right forelimb");
+        when(entityManager.find(com.rtms.backend.medical.entity.HorseBodyRegion.class, 1L))
+                .thenReturn(bodyRegion);
+
         CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
         req.setFindings("Findings");
         req.setDiagnosis("Diagnosis");
@@ -852,7 +859,7 @@ class AdmissionVetReviewWorkflowTest {
 
         verify(injuryRepo).save(argThat(ir ->
                 ir.getHorseId().equals(horseId)
-                        && "Tendon strain".equals(ir.getInjuryType())
+                        && "Right forelimb".equals(ir.getInjuryType())
                         && "MODERATE".equals(ir.getSeverity())));
     }
 
@@ -869,9 +876,7 @@ class AdmissionVetReviewWorkflowTest {
 
     private InjuryMarkerRequest injuryMarker() {
         InjuryMarkerRequest marker = new InjuryMarkerRequest();
-        marker.setInjuryType("Tendon strain");
         marker.setBodyRegionId(1L);
-        marker.setSeverity("MODERATE");
         marker.setDescription("Superficial digital flexor tendon, right fore");
         marker.setDiagnosedAt(LocalDateTime.now());
         return marker;

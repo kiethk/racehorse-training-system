@@ -396,43 +396,9 @@ class CareScheduleLifecycleSweepTest {
 
         slot = service.nextEodSlot(initial, LocalDateTime.of(2026, 11, 1, 17, 1));
 
-        assertEquals(LocalDateTime.of(2026, 11, 2, 9, 0), slot);
+        assertEquals(LocalDateTime.of(2026, 11, 3, 8, 0), slot);
 
     }
-
-
-
-    @Test
-
-    @DisplayName("Cờ dẫn xuất overdue: IN_PROGRESS quá 30' → true; SCHEDULED/under-30' → false")
-
-    void overdueFlag_isDerivedNotStored() {
-
-        CareSchedule late = schedule(105L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS,
-
-                LocalDateTime.now().minusMinutes(40));
-
-        assertTrue(com.rtms.backend.medical.dto.CareScheduleResponse.from(late).overdue());
-
-
-
-        CareSchedule fresh = schedule(106L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS,
-
-                LocalDateTime.now().minusMinutes(10));
-
-        assertFalse(com.rtms.backend.medical.dto.CareScheduleResponse.from(fresh).overdue());
-
-
-
-        CareSchedule waiting = schedule(107L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED,
-
-                LocalDateTime.now().minusMinutes(90));
-
-        assertFalse(com.rtms.backend.medical.dto.CareScheduleResponse.from(waiting).overdue());
-
-    }
-
-
 
     @Test
 

@@ -148,7 +148,7 @@ export function HorseFitnessTrendView({
             ? `${reportingAlert.description}\nRecorded value: ${reportingAlert.metricValue} (Threshold: ${reportingAlert.thresholdValue})`
             : ''
         }
-        initialSeverity={reportingAlert?.severity === 'DANGER' ? 'CRITICAL' : 'HIGH'}
+        initialSeverity={'TRAUMA'}
         open={reportingAlert !== null}
         onClose={() => setReportingAlert(null)}
         onSuccess={onReported}

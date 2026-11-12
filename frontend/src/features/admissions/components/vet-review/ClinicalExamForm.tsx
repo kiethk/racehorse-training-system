@@ -9,6 +9,7 @@ import {
   useState,
   type FormEvent,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
 import { z } from 'zod';
 import { VitalsSection } from './VitalsSection';
@@ -38,6 +39,8 @@ import {
   type VaccinationDraft,
 } from '@/features/care/components/preventive/ExamVaccinationSection';
 import { randomizeUrgentVitals, pickFindingScenario } from './urgentSimulation';
+import { applyMarkerCoupling, markerCouplingEnabled } from './decisionCoupling';
+import { markerZoneLabel } from '@/features/vet/lib/injuryZones';
 import {
   emptyMetrics,
   metricConfigs,
@@ -200,6 +203,11 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const [markers, setMarkers] = useState<InjuryMarker[]>([]);
     const [bodyRegions, setBodyRegions] = useState<HorseBodyRegion[]>([]);
     const [anatomyTab, setAnatomyTab] = useState<'form' | 'anatomy3d'>('form');
+    /** True when a marker placed in this session is the reason the decision is BLOCKED. */
+    const [blockedByMarker, setBlockedByMarker] = useState(false);
+    const [showMarkerBlockDialog, setShowMarkerBlockDialog] = useState(false);
+    const markerCoupling = markerCouplingEnabled(variant, careType);
+    const allowLocked = markerCoupling && blockedByMarker && markers.length > 0;
 
     const show3DTab =
       (variant === 'STANDARD' && careType === 'INITIAL' && trainingDecision === 'BLOCKED') ||
@@ -214,6 +222,40 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const [abnormalFindings, setAbnormalFindings] = useState('');
     const [findings, setFindings] = useState('');
     const [diagnosis, setDiagnosis] = useState('');
+
+    // Keeps the coupling step synchronous: the wrapper reads this ref instead of state.
+    const markersRef = useRef<InjuryMarker[]>([]);
+
+    useEffect(() => {
+      markersRef.current = markers;
+    }, [markers]);
+
+    /** setMarkers wrapper that runs the marker-to-decision coupling (see decisionCoupling.ts). */
+    const setMarkersWithCoupling = useCallback(
+      (action: SetStateAction<InjuryMarker[]>) => {
+        const prev = markersRef.current;
+        const next = typeof action === 'function' ? action(prev) : action;
+        markersRef.current = next;
+        setMarkers(next);
+        if (!markerCoupling) return;
+        const result = applyMarkerCoupling(prev.length, next.length, trainingDecision, blockedByMarker);
+        if (result.autoSwitch === 'TO_BLOCKED') {
+          setTrainingDecision('BLOCKED');
+          setBlockedByMarker(true);
+          if (!followUpDate) setFollowUpDate(businessDateFromToday(7));
+          if (examMode === 'NORMAL') {
+            setExamMode('ABNORMAL');
+            setStructuredDiagnosis((prevD) =>
+              prevD === 'Clinically healthy' ? 'Minor clinical condition' : prevD,
+            );
+          }
+        } else if (result.autoSwitch === 'TO_ALLOWED') {
+          setTrainingDecision('ALLOWED');
+          setBlockedByMarker(false);
+        }
+      },
+      [markerCoupling, trainingDecision, blockedByMarker, followUpDate, examMode],
+    );
 
     const [metrics, setMetrics] = useState<Record<MetricField, string>>(emptyMetrics);
 
@@ -246,6 +288,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       followUpIdempotencyKey?: string;
       markers?: InjuryMarker[];
       resolvedConditionIds?: number[];
+      blockedByMarker?: boolean;
       timestamp: string;
     } | null>(() => {
       if (!config.draft || typeof window === 'undefined') return null;
@@ -308,7 +351,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             setMarkers((prev) =>
               prev.length > 0
                 ? prev
-                : injuries.map((inj, idx) => {
+                : injuries.map((inj) => {
                     const worldPos = resolveInjuryWorldPosition(inj);
                     const normal =
                       inj.normalX != null && inj.normalY != null && inj.normalZ != null
@@ -322,10 +365,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                       position: worldPos,
                       normal,
                       zoneId: inj.zoneId ?? undefined,
-                      injuryType: inj.injuryType || `Injury ${idx + 1}`,
                       bodyRegionId: inj.bodyRegionId ?? null,
-                      severity: inj.severity || 'MODERATE',
-                      description: inj.description ?? undefined,
+                      description: inj.description || inj.injuryType || '',
                     };
                   }),
             );
@@ -419,6 +460,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (availableDraft.resolvedConditionIds) {
         setResolvedConditionIds(availableDraft.resolvedConditionIds);
       }
+      if (availableDraft.blockedByMarker !== undefined) {
+        setBlockedByMarker(availableDraft.blockedByMarker);
+      }
       setDraftSavedTime(availableDraft.timestamp);
       setAvailableDraft(null);
     };
@@ -459,6 +503,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           followUpIdempotencyKey,
           markers,
           resolvedConditionIds,
+          blockedByMarker,
           timestamp,
         };
         localStorage.setItem(draftStorageKey, JSON.stringify(payload));
@@ -488,6 +533,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       followUpIdempotencyKey,
       markers,
       resolvedConditionIds,
+      blockedByMarker,
     ]);
 
     const handleClearDraft = () => {
@@ -510,6 +556,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       setScheduleFollowUp(false);
       setFollowUpDate(defaultFollowUpDate);
       setMarkers([]);
+      setBlockedByMarker(false);
       setResolvedConditionIds([]);
       setVerdict('ACCEPT');
       setRejectReason('');
@@ -746,20 +793,15 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (
         variant === 'STANDARD' &&
         careType === 'INITIAL' &&
-        trainingDecision === 'BLOCKED'
+        trainingDecision === 'BLOCKED' &&
+        markers.length === 0
       ) {
-        if (markers.length === 0) {
-          errors.injuryMarkers =
-            'An injury or condition record is required when blocking a newly admitted horse.';
-        } else {
-          for (const m of markers) {
-            if (!m.injuryType.trim()) {
-              errors[`injuryType:${m.id}`] = 'Injury type is required.';
-            }
-            if (m.bodyRegionId == null) {
-              errors[`bodyRegionId:${m.id}`] = 'Body region is required.';
-            }
-          }
+        errors.injuryMarkers =
+          'An injury or condition record is required when blocking a newly admitted horse.';
+      }
+      for (const m of markers) {
+        if (!m.description?.trim()) {
+          errors[`description:${m.id}`] = 'Clinical note is required.';
         }
       }
 
@@ -1016,6 +1058,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
               setAbnormalFindings={setAbnormalFindings}
               fieldErrors={fieldErrors}
               setFieldErrors={setFieldErrors}
+              normalLocked={allowLocked}
+              onLockedNormalAttempt={() => setShowMarkerBlockDialog(true)}
             />
           </div>
         );
@@ -1117,6 +1161,13 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             followUpDate={followUpDate}
             setFollowUpDate={setFollowUpDate}
             businessDateFromToday={businessDateFromToday}
+            allowLocked={allowLocked}
+            markerNotice={
+              allowLocked
+                ? 'Injury marker placed — training decision set to BLOCKED.'
+                : null
+            }
+            onLockedAllowAttempt={() => setShowMarkerBlockDialog(true)}
           />
         );
       }
@@ -1274,7 +1325,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           </p>
           <InjuryMarkerPanel
             markers={markers}
-            setMarkers={setMarkers}
+            setMarkers={setMarkersWithCoupling}
             bodyRegions={bodyRegions}
             readOnly={isFormDisabled}
             fieldErrors={fieldErrors}
@@ -1613,6 +1664,34 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             loading={submitting}
             onConfirm={() => executeSubmit()}
             onCancel={() => setShowApproveConfirm(false)}
+          />
+        )}
+
+        {allowLocked && (
+          <ConfirmDialog
+            open={showMarkerBlockDialog}
+            title="Training cannot be allowed"
+            description={
+              <div className="space-y-2 text-sm">
+                <p>
+                  {markers.length} injury marker{markers.length === 1 ? ' is' : 's are'} placed on
+                  the 3D model:
+                </p>
+                <ul className="list-disc pl-5 text-xs">
+                  {markers.map((marker) => (
+                    <li key={marker.id}>{markerZoneLabel(bodyRegions, marker) ?? 'Unspecified'}</li>
+                  ))}
+                </ul>
+                <p className="text-xs font-medium text-[var(--color-warning)]">
+                  A horse with marked injuries must stay BLOCKED. Remove all markers in Section 3
+                  before allowing training.
+                </p>
+              </div>
+            }
+            confirmLabel="Keep BLOCKED"
+            cancelLabel="Close"
+            onConfirm={() => setShowMarkerBlockDialog(false)}
+            onCancel={() => setShowMarkerBlockDialog(false)}
           />
         )}
       </form>

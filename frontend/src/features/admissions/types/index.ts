@@ -215,7 +215,7 @@ export interface UrgentAssignmentAlert {
   reportedByName: string | null;
   reportedByRole?: string | null;
   reportedAt: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  incidentType: 'PROBLEM' | 'TRAUMA';
   title: string;
   description: string;
   imageUrl: string | null;
@@ -233,7 +233,7 @@ export interface UrgentCaseReport {
   reportedByName: string | null;
   reportedByRole: string | null;
   reportedAt: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  incidentType: 'PROBLEM' | 'TRAUMA';
   title: string;
   description: string;
   imageUrl: string | null;
@@ -262,9 +262,6 @@ export interface CareSchedule {
   requestedAt?: string | null;
   rescheduleReason?: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'URGENT_PREEMPTION' | 'TIME_EXCEEDED' | 'PEER_OFFLOAD' | 'OTHER' | null;
   rescheduleNote?: string | null;
-  /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
-  overdue?: boolean;
-  pausedFrom?: string | null;
 }
 
 export type CareScheduleResponse = CareSchedule;
@@ -335,10 +332,10 @@ export interface CompleteCareScheduleRequest {
 }
 
 export interface CreateInjuryMarkerRequest {
-  injuryType: string;
+  injuryType?: string;
   bodyRegionId: number;
-  severity: string;
-  description?: string;
+  severity?: string;
+  description: string;
   diagnosedAt: string;
   positionX?: number | null;
   positionY?: number | null;
@@ -350,7 +347,6 @@ export interface CreateInjuryMarkerRequest {
   normalX?: number | null;
   normalY?: number | null;
   normalZ?: number | null;
-  meshName?: string | null;
 }
 
 export interface VetAdmissionQueueItem {
