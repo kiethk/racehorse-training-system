@@ -1608,7 +1608,19 @@ public class CareScheduleService {
     }
 
     public void assignRequestedSchedule(CareSchedule schedule) {
-        assignRequestedSchedule(schedule, schedule.getRequestedById());
+        assignRequestedSchedule(schedule, schedule.getRequestedById(), false);
+    }
+
+    @Transactional
+    public void assignPendingSchedulesForHorse(Long horseId) {
+        if (horseId == null) return;
+        List<CareSchedule> pending = careScheduleRepository.findByHorseIdAndStatusIn(
+                horseId, List.of(CareScheduleStatus.SCHEDULED));
+        for (CareSchedule schedule : pending) {
+            if (schedule.getVeterinarianId() == null) {
+                assignRequestedSchedule(schedule, schedule.getRequestedById(), true);
+            }
+        }
     }
 
     /**
@@ -1617,11 +1629,15 @@ public class CareScheduleService {
      *                     if other vets are unavailable or at daily quota.
      */
     void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId) {
+        assignRequestedSchedule(schedule, creatorVetId, false);
+    }
+
+    void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId, boolean ignoreHorizon) {
         if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) return;
         if (schedule.getVeterinarianId() != null && (schedule.getScheduledDate() != null || schedule.getScheduledAt() != null)) return;
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime horizon = now.plusDays(ASSIGNMENT_HORIZON_DAYS);
-        if (isBeyondAssignmentHorizon(schedule, horizon)) return;
+        if (!ignoreHorizon && isBeyondAssignmentHorizon(schedule, horizon)) return;
 
         // Keep the global lock order admission -> horse -> schedule (same as lockClinicalSchedule)
         // so concurrent Vet actions and auto-assignment cannot deadlock.
