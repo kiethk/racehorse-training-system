@@ -56,6 +56,15 @@ BEGIN
 
         UPDATE care_schedule SET scheduled_at = NULL WHERE care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE';
 
+        -- Dời các ca Preventive đã hoàn tất hôm nay về hôm qua để hôm nay không bị tràn quota (> 3)
+        UPDATE care_schedule
+           SET scheduled_date = pg_temp.today() - 1,
+               completed_at = (pg_temp.today() - 1) + TIME '14:20'
+         WHERE veterinarian_id = pg_temp.uid('VT01')
+           AND purpose = 'PREVENTIVE'
+           AND status = 'COMPLETED'
+           AND scheduled_date = pg_temp.today();
+
         -- Lấy các ca Routine lâm sàng (purpose != 'PREVENTIVE') hôm nay của VT01 đang SCHEDULED
         SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_routine_ids
           FROM (SELECT id FROM care_schedule
