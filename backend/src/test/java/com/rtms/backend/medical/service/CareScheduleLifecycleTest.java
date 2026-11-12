@@ -7,7 +7,9 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import java.time.LocalDate;
 
 
 import com.rtms.backend.config.ApiException;
@@ -87,6 +89,23 @@ class CareScheduleLifecycleTest {
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertEquals("INVALID_STATUS", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("startCareSchedule rejects future ROUTINE schedule with 400 ROUTINE_EXAM_TOO_EARLY")
+    void testStart_futureRoutineSchedule_throwsBadRequest() {
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setScheduledDate(LocalDate.now().plusDays(2));
+        when(userRepository.findById(assignedVet.getId())).thenReturn(Optional.of(assignedVet));
+        when(careScheduleRepository.findById(schedule.getId())).thenReturn(Optional.of(schedule));
+        when(horseRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(new Horse()));
+        when(careScheduleRepository.findByIdForUpdate(schedule.getId())).thenReturn(Optional.of(schedule));
+
+        ApiException ex = assertThrows(ApiException.class, () ->
+                careScheduleService.startCareSchedule(schedule.getId(), assignedVet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("ROUTINE_EXAM_TOO_EARLY", ex.getErrorCode());
     }
 
     @Test

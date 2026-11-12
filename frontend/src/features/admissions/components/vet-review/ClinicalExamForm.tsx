@@ -130,6 +130,7 @@ export interface ClinicalExamFormProps {
   careScheduleId?: number | null;
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
+  scheduledDate?: string | null;
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   /** The visit was opened by an incident report, so Follow-up rules do not apply. */
   fromIncident?: boolean;
@@ -160,6 +161,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       careScheduleId,
       careType = 'INITIAL',
       scheduleStatus,
+      scheduledDate,
       schedulePurpose,
       fromIncident,
       blockHeldUntil,
@@ -382,11 +384,16 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const rawScheduled = scheduledDate ? scheduledDate.slice(0, 10) : null;
+    const isFutureRoutine = careType === 'ROUTINE' && Boolean(rawScheduled && rawScheduled > todayIso);
+
     // Care Scheduling: SCHEDULED and IN_PROGRESS exams are open and directly editable.
     const isGated =
-      scheduleStatus != null &&
-      scheduleStatus !== 'SCHEDULED' &&
-      scheduleStatus !== 'IN_PROGRESS';
+      (scheduleStatus != null &&
+        scheduleStatus !== 'SCHEDULED' &&
+        scheduleStatus !== 'IN_PROGRESS') ||
+      isFutureRoutine;
     // A visit opened by an incident report needs a Follow-up only when the horse stays blocked.
     const followUpRequired = !fromIncident || trainingDecision === 'BLOCKED';
     const followUpActive = scheduleFollowUp || followUpRequired;
@@ -818,6 +825,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
+      if (isFutureRoutine && rawScheduled) {
+        setFormError(
+          `This routine check is scheduled for ${formatDate(rawScheduled)}. It can only be completed on or after the scheduled date.`,
+        );
+        return;
+      }
       const openStatuses = ['SCHEDULED', 'IN_PROGRESS'];
       if (scheduleStatus && !openStatuses.includes(scheduleStatus)) {
         setFormError(
@@ -1449,6 +1462,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                 </h3>
               </div>
 
+              {isFutureRoutine && rawScheduled && (
+                <Notice tone="warning">
+                  This routine check is scheduled for <strong>{formatDate(rawScheduled)}</strong>. It can only be completed on or after the scheduled date.
+                </Notice>
+              )}
+
               {showTier1 && (
                 <div className="space-y-3 border-b border-[var(--color-border)] pb-4">
                   <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
@@ -1681,6 +1700,11 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const renderStackedForm = () => (
       <form onSubmit={handleFormSubmit} noValidate className="space-y-6">
         {renderFormError()}
+        {isFutureRoutine && rawScheduled && (
+          <Notice tone="warning">
+            This routine check is scheduled for <strong>{formatDate(rawScheduled)}</strong>. It can only be completed on or after the scheduled date.
+          </Notice>
+        )}
         {renderVitals()}
         {renderSection2()}
         {renderInjuryMarkers()}
@@ -1692,6 +1716,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             type="submit"
             variant="primary"
             loading={submitting}
+            disabled={submitting || startingExam || isGated}
             icon="check"
             className="w-full transition-all active:scale-[0.97] sm:w-auto"
           >

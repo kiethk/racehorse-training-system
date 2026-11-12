@@ -294,6 +294,59 @@ class AdmissionVetReviewWorkflowTest {
     }
 
     @Test
+    @DisplayName("Ca ROUTINE trên ngựa đã APPROVED: gửi kèm admissionId cũ không bị lỗi 409 ADMISSION_MISMATCH")
+    void completeCareSchedule_routineWithApprovedAdmission_success() {
+        Long scheduleId = 101L;
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setStatus(AdmissionStatus.APPROVED);
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(admissionRepository.findById(admissionId)).thenReturn(Optional.of(admission));
+        when(admissionRepository.findByIdForUpdate(admissionId)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        when(healthRecordRepository.save(any(HealthRecord.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings("Routine check clear");
+        req.setDiagnosis("Good condition");
+        req.setTrainingDecision(TrainingDecision.ALLOWED);
+        req.setMetrics(List.of(fullMetric()));
+
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setDescription("Next check");
+        next.setScheduledDate(LocalDate.now().plusDays(14).toString());
+        next.setAdmissionId(admissionId);
+        req.setNextSchedule(next);
+
+        CareScheduleResponse res = careScheduleService.completeCareSchedule(scheduleId, req, vetId);
+
+        assertNotNull(res);
+        assertEquals(CareScheduleStatus.COMPLETED, schedule.getStatus());
+    }
+
+    @Test
     @DisplayName("Vet Queue is filtered server-side by assigned veterinarian")
     void getVetQueue_filteredByAssignedVet() {
         Long vetId = 15L;
