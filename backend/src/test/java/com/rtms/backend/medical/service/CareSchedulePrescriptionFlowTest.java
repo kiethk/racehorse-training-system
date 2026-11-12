@@ -17,6 +17,7 @@ import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.MedicationRoute;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -222,19 +223,54 @@ class CareSchedulePrescriptionFlowTest {
     }
 
     @Test
-    @DisplayName("D4: severity ngoài MILD/MODERATE/SEVERE/CRITICAL bị chặn trước khi khóa ca")
-    void injuryMarkerWithLegacySeverity_isRejected() {
+    @DisplayName("Coupling marker => BLOCKED: ca ROUTINE có marker mà chọn ALLOWED bị chặn 400")
+    void injuryMarkersWithAllowedDecisionOnRoutineExam_isRejected() {
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setPurpose(CareSchedulePurpose.FOLLOW_UP);
+        schedule.setSourceIncidentId(5L);
+        when(careScheduleRepository.findById(100L)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(schedule));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+
         CompleteCareScheduleRequest req = baseRequest();
         com.rtms.backend.medical.dto.InjuryMarkerRequest marker = new com.rtms.backend.medical.dto.InjuryMarkerRequest();
-        marker.setInjuryType("TENDON");
         marker.setBodyRegionId(1L);
-        marker.setSeverity("LOW");
-        marker.setDescription("old vocabulary");
+        marker.setDescription("Swelling over the left forelimb");
         req.setInjuryMarkers(List.of(marker));
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.completeCareSchedule(100L, req, 20L));
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        verify(careScheduleRepository, never()).findByIdForUpdate(any());
+        assertEquals("MARKERS_BLOCK_TRAINING", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("3D marker chỉ gửi vị trí (bodyRegionId, zoneId) + ghi chú (description) vẫn lưu thành công")
+    void injuryMarkerWithPositionAndNoteOnly_persistsNoteDirectly() {
+        stubCompletion();
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
+        com.rtms.backend.medical.entity.HorseBodyRegion region = new com.rtms.backend.medical.entity.HorseBodyRegion();
+        region.setId(5L);
+        region.setCode("foreleg_left");
+        region.setDisplayName("Left forelimb");
+        when(entityManager.find(com.rtms.backend.medical.entity.HorseBodyRegion.class, 5L)).thenReturn(region);
+
+        CompleteCareScheduleRequest req = baseRequest();
+        com.rtms.backend.medical.dto.InjuryMarkerRequest marker = new com.rtms.backend.medical.dto.InjuryMarkerRequest();
+        marker.setBodyRegionId(5L);
+        marker.setZoneId("foreleg_left");
+        marker.setDescription("Swelling and heat over left superficial digital flexor tendon");
+        req.setInjuryMarkers(List.of(marker));
+
+        service.completeCareSchedule(100L, req, 20L);
+
+        ArgumentCaptor<InjuryRecord> captor = ArgumentCaptor.forClass(InjuryRecord.class);
+        verify(injuryRecordRepository).save(captor.capture());
+        InjuryRecord saved = captor.getValue();
+        assertEquals(5L, saved.getBodyRegionId());
+        assertEquals("foreleg_left", saved.getZoneId());
+        assertEquals("Swelling and heat over left superficial digital flexor tendon", saved.getDescription());
+        assertEquals("Left forelimb", saved.getInjuryType());
+        assertEquals("MODERATE", saved.getSeverity());
     }
 }

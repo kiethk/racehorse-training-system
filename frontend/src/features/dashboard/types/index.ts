@@ -133,7 +133,7 @@ export interface UrgentIncidentActionDto {
   horseName: string;
   title: string;
   description: string;
-  severity: string;
+  incidentType: string;
   status: string;
   reportedAt: string;
   reportedById: number;

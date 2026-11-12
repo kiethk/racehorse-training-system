@@ -1,6 +1,6 @@
 package com.rtms.backend.notification.dto;
 
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.training.enums.TrainingDecision;
 
@@ -19,7 +19,7 @@ public record UrgentAssignmentAlert(
         String reportedByName,
         String reportedByRole,
         LocalDateTime reportedAt,
-        IncidentSeverity severity,
+        IncidentType incidentType,
         String title,
         String description,
         String imageUrl,
@@ -43,7 +43,7 @@ public record UrgentAssignmentAlert(
             Long reportedById,
             String reportedByName,
             LocalDateTime reportedAt,
-            IncidentSeverity severity,
+            IncidentType incidentType,
             String title,
             String description,
             String imageUrl,
@@ -65,7 +65,7 @@ public record UrgentAssignmentAlert(
                 reportedByName,
                 null,
                 reportedAt,
-                severity,
+                incidentType,
                 title,
                 description,
                 imageUrl,

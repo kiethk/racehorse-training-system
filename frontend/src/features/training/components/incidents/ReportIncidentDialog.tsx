@@ -5,24 +5,22 @@ import { Button, FormField, Input, Modal, Notice, Select, Textarea } from '@/com
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { incidentApi } from '@/features/groom/services/incidentService';
-import type { IncidentSeverity } from '@/features/groom/types';
+import type { IncidentType } from '@/features/groom/types';
 
 interface ReportIncidentDialogProps {
   horseId: number;
   horseName?: string;
   initialTitle?: string;
   initialDescription?: string;
-  initialSeverity?: IncidentSeverity;
+  initialSeverity?: IncidentType;
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
 }
 
-const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string }[] = [
-  { value: 'LOW', label: 'Low — Next routine vet slot, keeps training' },
-  { value: 'MEDIUM', label: 'Medium — Next routine vet slot, keeps training' },
-  { value: 'HIGH', label: 'High — Vet called now, stops training and leaves its group' },
-  { value: 'CRITICAL', label: 'Critical — Vet called now, stops training and leaves its group' },
+const INCIDENT_TYPE_OPTIONS: { value: IncidentType; label: string }[] = [
+  { value: 'PROBLEM', label: 'Problem — Next routine vet slot, keeps training' },
+  { value: 'TRAUMA', label: 'Trauma — Vet called now, stops training and leaves its group' },
 ];
 
 export function ReportIncidentDialog({
@@ -30,14 +28,14 @@ export function ReportIncidentDialog({
   horseName,
   initialTitle = '',
   initialDescription = '',
-  initialSeverity = 'MEDIUM',
+  initialSeverity = 'PROBLEM',
   open,
   onClose,
   onSuccess,
 }: ReportIncidentDialogProps) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
-  const [severity, setSeverity] = useState<IncidentSeverity>(initialSeverity);
+  const [severity, setSeverity] = useState<IncidentType>(initialSeverity);
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +69,7 @@ export function ReportIncidentDialog({
         horseId,
         title: title.trim(),
         description: description.trim(),
-        severity,
+        incidentType: severity,
       });
 
       if (file) {
@@ -127,9 +125,9 @@ export function ReportIncidentDialog({
         <FormField label="Severity level" required>
           <Select
             value={severity}
-            onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
+            onChange={(e) => setSeverity(e.target.value as IncidentType)}
           >
-            {SEVERITY_OPTIONS.map((opt) => (
+            {INCIDENT_TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

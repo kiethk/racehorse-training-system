@@ -1,6 +1,6 @@
 package com.rtms.backend.incident.dto;
 
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,7 +17,7 @@ public class CreateIncidentReportRequest {
     @NotBlank(message = "Description is required")
     private String description;
 
-    private IncidentSeverity severity;
+    private IncidentType incidentType;
 
     public Long getHorseId() {
         return horseId;
@@ -44,11 +44,11 @@ public class CreateIncidentReportRequest {
     }
 
 
-    public IncidentSeverity getSeverity() {
-        return severity;
+    public IncidentType getIncidentType() {
+        return incidentType;
     }
 
-    public void setSeverity(IncidentSeverity severity) {
-        this.severity = severity;
+    public void setIncidentType(IncidentType incidentType) {
+        this.incidentType = incidentType;
     }
 }

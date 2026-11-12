@@ -264,8 +264,8 @@ export function UrgentP1Overlay({ alerts, onOpenCase, onSnooze }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Pill size="md" tone={targetAlert.severity === 'CRITICAL' ? 'danger' : 'warning'}>
-              {targetAlert.severity} PRIORITY
+            <Pill size="md" tone={targetAlert.incidentType === 'TRAUMA' ? 'danger' : 'warning'}>
+              {targetAlert.incidentType} PRIORITY
             </Pill>
           </div>
         </div>

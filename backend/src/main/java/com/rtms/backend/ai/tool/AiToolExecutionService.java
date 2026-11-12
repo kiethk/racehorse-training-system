@@ -2036,7 +2036,7 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
             item.put("incidentTitle", r.getTitle());
             item.put("horseName", horseName);
             item.put("reporterName", groomName);
-            item.put("severity", r.getSeverity());
+            item.put("incidentType", r.getIncidentType());
             item.put("detailedDescription", r.getDescription());
             item.put("imageUrl", r.getImageUrl() != null ? r.getImageUrl() : "");
             String repHandler = "Chưa tiếp nhận";
@@ -2497,7 +2497,7 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("horseName", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
                 item.put("title", r.getTitle());
-                item.put("severity", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
+                item.put("incidentType", r.getIncidentType() != null ? r.getIncidentType().name() : "PROBLEM");
                 item.put("imageUrl", r.getImageUrl() != null ? r.getImageUrl() : "");
                 String groomHandler = "Chưa tiếp nhận";
                 if (r.getHandledById() != null && userRepository != null) {

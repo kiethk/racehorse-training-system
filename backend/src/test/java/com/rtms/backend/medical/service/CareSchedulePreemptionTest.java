@@ -10,7 +10,7 @@ import com.rtms.backend.identity.entity.VeterinarianProfile;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
@@ -132,7 +132,7 @@ class CareSchedulePreemptionTest {
         HorseIncidentReport incident = new HorseIncidentReport();
         incident.setId(500L);
         incident.setStatus(IncidentStatus.REPORTED);
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(incident));
 
         CareSchedule urgent = urgentRequest(999L, 500L);
@@ -249,7 +249,7 @@ class CareSchedulePreemptionTest {
         CareSchedule booked = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
         booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -268,7 +268,7 @@ class CareSchedulePreemptionTest {
         CareSchedule booked = activeExam(10L, 1L, 101L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
         booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         service.assignRequestedSchedule(urgentRequest(999L, 500L));
 
@@ -288,7 +288,7 @@ class CareSchedulePreemptionTest {
         CareSchedule booked = activeExam(11L, 1L, 102L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
         booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -308,7 +308,7 @@ class CareSchedulePreemptionTest {
         CareSchedule otherUrgent = activeExam(11L, 1L, 102L, CareType.URGENT, CareScheduleStatus.SCHEDULED);
         otherUrgent.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(otherUrgent));
-        report(IncidentSeverity.CRITICAL);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -327,7 +327,7 @@ class CareSchedulePreemptionTest {
         when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
                 current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(stale, current) : List.of(stale));
         when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -347,7 +347,7 @@ class CareSchedulePreemptionTest {
         when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
                 current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(forgotten, current) : List.of(forgotten));
         when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -376,11 +376,11 @@ class CareSchedulePreemptionTest {
         return vet;
     }
 
-    private HorseIncidentReport report(IncidentSeverity severity) {
+    private HorseIncidentReport report(IncidentType severity) {
         HorseIncidentReport report = new HorseIncidentReport();
         report.setId(500L);
         report.setStatus(IncidentStatus.REPORTED);
-        report.setSeverity(severity);
+        report.setIncidentType(severity);
         when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(report));
         return report;
     }
