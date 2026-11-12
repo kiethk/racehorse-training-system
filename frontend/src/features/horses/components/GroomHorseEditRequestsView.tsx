@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, DataTable, EmptyState, HorseAvatar, LinkButton, ListSkeleton, Notice, Pill } from '@/components/ui';
+import { Button, DataTable, EmptyState, EntityLink, HorseAvatar, LinkButton, ListSkeleton, Notice, Pill, Tabs } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import { displayError, formatDate } from '@/lib/display';
 import { AdmissionListLayout } from '@/features/admissions/shared/components/AdmissionListLayout';
@@ -29,9 +30,8 @@ export function EditRequestStatusBadge({ status }: { status: HorseEditRequestSta
   return <Pill tone={EDIT_STATUS_TONE[status]} size="sm">{EDIT_STATUS_LABEL[status]}</Pill>;
 }
 
-const statuses: { value: HorseEditRequestStatus | ''; label: string }[] = [
+const historyStatuses: { value: HorseEditRequestStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
-  { value: 'PENDING', label: 'Groom review' },
   { value: 'APPROVED', label: 'Approved' },
   { value: 'REJECTED', label: 'Rejected' },
   { value: 'CANCELLED', label: 'Cancelled' },
@@ -45,7 +45,6 @@ interface Filters {
 }
 
 const emptyFilters: Filters = { search: '', status: '', from: '', to: '' };
-const initialFilters: Filters = { ...emptyFilters, status: 'PENDING' };
 
 function changeSummary(request: HorseEditRequest): string {
   const fields = diffFields(request.original, request.requested).length;
@@ -59,8 +58,9 @@ function changeSummary(request: HorseEditRequest): string {
 /** Change requests for horses in the groom's stalls; same layout as the groom admission list. */
 export function GroomHorseEditRequestsView() {
   const router = useRouter();
-  const [draft, setDraft] = useState<Filters>(initialFilters);
-  const [applied, setApplied] = useState<Filters>(initialFilters);
+  const [tab, setTab] = useState<'pending' | 'history'>('pending');
+  const [draft, setDraft] = useState<Filters>(emptyFilters);
+  const [applied, setApplied] = useState<Filters>(emptyFilters);
   const [items, setItems] = useState<HorseEditRequest[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,14 +69,13 @@ export function GroomHorseEditRequestsView() {
     setLoading(true);
     setError(null);
     try {
-      // Status filters on the server; search and dates filter the (already scoped) list here.
-      setItems(await horseEditRequestService.listForGroom(applied.status || undefined));
+      setItems(await horseEditRequestService.listForGroom());
     } catch (cause) {
       setError(displayError(cause, 'Unable to load change requests.'));
     } finally {
       setLoading(false);
     }
-  }, [applied.status]);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -86,13 +85,21 @@ export function GroomHorseEditRequestsView() {
   const rows = useMemo(() => {
     const term = applied.search.trim().toLowerCase();
     return (items ?? []).filter((item) => {
+      if (tab === 'pending' && item.status !== 'PENDING') return false;
+      if (tab === 'history' && (item.status === 'PENDING' || (applied.status && item.status !== applied.status))) return false;
       const day = item.createdAt.slice(0, 10);
       if (applied.from && day < applied.from) return false;
       if (applied.to && day > applied.to) return false;
       if (!term) return true;
       return `${item.horseName ?? ''} ${item.ownerName ?? ''} ${item.horseRegistrationNumber ?? ''}`.toLowerCase().includes(term);
     });
-  }, [items, applied]);
+  }, [items, applied, tab]);
+
+  const changeTab = (next: string) => {
+    setTab(next as 'pending' | 'history');
+    setDraft((current) => ({ ...current, status: '' }));
+    setApplied((current) => ({ ...current, status: '' }));
+  };
 
   const columns: DataTableColumn<HorseEditRequest>[] = [
     {
@@ -103,16 +110,20 @@ export function GroomHorseEditRequestsView() {
         <div className="flex min-w-0 items-center gap-3">
           <HorseAvatar name={item.horseName ?? `Horse #${item.horseId}`} image={`/api/horses/${item.horseId}/photo`} size={32} rounded="md" />
           <div className="min-w-0">
-            <span className="block truncate font-semibold">{item.horseName ?? `Horse #${item.horseId}`}</span>
+            <EntityLink href={entityHref('horse', item.horseId, 'GROOM')} className="block truncate font-semibold">{item.horseName ?? `Horse #${item.horseId}`}</EntityLink>
             <span className="block truncate text-xs text-[var(--color-text-muted)]">{item.horseRegistrationNumber || 'UELN not recorded'}</span>
           </div>
         </div>
       ),
     },
     { id: 'status', header: 'Status', sortValue: (item) => item.status, render: (item) => <EditRequestStatusBadge status={item.status} /> },
-    { id: 'owner', header: 'Owner', sortValue: (item) => item.ownerName ?? '', render: (item) => item.ownerName ?? `#${item.ownerId}` },
+    { id: 'owner', header: 'Owner', sortValue: (item) => item.ownerName ?? '', render: (item) => <EntityLink href={entityHref('owner', item.ownerId, 'GROOM')}>{item.ownerName ?? `#${item.ownerId}`}</EntityLink> },
     { id: 'changes', header: 'Changes', render: changeSummary },
     { id: 'submitted', header: 'Submitted', sortValue: (item) => new Date(item.createdAt), render: (item) => formatDate(item.createdAt) },
+    ...(tab === 'history' ? [
+      { id: 'reviewer', header: 'Reviewer', sortValue: (item: HorseEditRequest) => item.reviewerName ?? '', render: (item: HorseEditRequest) => <EntityLink href={item.reviewerId ? entityHref('user', item.reviewerId, 'GROOM') : null}>{item.reviewerName ?? '—'}</EntityLink> },
+      { id: 'reviewed', header: 'Reviewed', sortValue: (item: HorseEditRequest) => item.reviewedAt ? new Date(item.reviewedAt) : new Date(0), render: (item: HorseEditRequest) => item.reviewedAt ? formatDate(item.reviewedAt) : '—' },
+    ] satisfies DataTableColumn<HorseEditRequest>[] : []),
     {
       id: 'actions',
       header: 'Action',
@@ -140,6 +151,7 @@ export function GroomHorseEditRequestsView() {
   const filtered = (items?.length ?? 0) > 0;
   return (
     <AdmissionListLayout title={title} >
+      <Tabs tabs={[{ id: 'pending', label: 'Pending' }, { id: 'history', label: 'History' }]} active={tab} onChange={changeTab} />
       <AdmissionFilterBar
         search={draft.search}
         searchLabel="Search"
@@ -148,7 +160,7 @@ export function GroomHorseEditRequestsView() {
         onApply={() => setApplied({ ...draft, search: draft.search.trim() })}
         onClear={() => { setDraft(emptyFilters); setApplied(emptyFilters); }}
       >
-        <FilterSelect label="Status" value={draft.status} onChange={(status) => setDraft({ ...draft, status })} options={statuses} />
+        {tab === 'history' && <FilterSelect label="Status" value={draft.status} onChange={(status) => setDraft({ ...draft, status })} options={historyStatuses} />}
         <FilterDateRange
           from={draft.from}
           to={draft.to}
@@ -160,6 +172,7 @@ export function GroomHorseEditRequestsView() {
       {error && <Notice tone="error">{error}</Notice>}
 
       <DataTable
+        key={`${tab}:${applied.status}:${applied.search}:${applied.from}:${applied.to}`}
         rows={rows}
         columns={columns}
         getRowKey={(item) => item.id}
@@ -168,9 +181,6 @@ export function GroomHorseEditRequestsView() {
         loading={loading}
         pageSize={10}
         emptyTitle={filtered ? 'No matching change requests' : 'No change requests'}
-        emptyDescription={filtered
-          ? 'Change the filters or clear them to see other requests.'
-          : 'Requests from owners of horses in your stalls will appear here.'}
       />
     </AdmissionListLayout>
   );

@@ -26,15 +26,18 @@ import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
+import com.rtms.backend.medical.entity.Prescription;
 import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
+import com.rtms.backend.medical.event.PrescriptionCreatedEvent;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.dto.UrgentAssignmentAlert;
 import com.rtms.backend.notification.service.NotificationService;
@@ -58,11 +61,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import com.rtms.backend.event.ClinicalRecordCreatedEvent;
 import com.rtms.backend.event.InitialExamCompletedEvent;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
@@ -110,7 +112,7 @@ public class CareScheduleService {
     private final PreventiveVaccinationService preventiveVaccinationService;
     private final InjuryRecordRepository injuryRecordRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final PrescriptionRepository prescriptionRepository;
 
     public CareScheduleService(
             CareScheduleRepository careScheduleRepository,
@@ -130,7 +132,7 @@ public class CareScheduleService {
             PreventiveVaccinationService preventiveVaccinationService,
             InjuryRecordRepository injuryRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+            PrescriptionRepository prescriptionRepository) {
         this.careScheduleRepository = careScheduleRepository;
         this.horseRepository = horseRepository;
         this.healthRecordRepository = healthRecordRepository;
@@ -148,7 +150,7 @@ public class CareScheduleService {
         this.preventiveVaccinationService = preventiveVaccinationService;
         this.injuryRecordRepository = injuryRecordRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
-        this.objectMapper = objectMapper;
+        this.prescriptionRepository = prescriptionRepository;
     }
 
     @Transactional
@@ -475,6 +477,7 @@ public class CareScheduleService {
                 }
             }
         }
+        validatePrescriptions(request.getPrescriptions());
 
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
 
@@ -635,7 +638,7 @@ public class CareScheduleService {
         if (!vaccinations.isEmpty()) {
             preventiveVaccinationService.record(savedRecord.getId(), vaccinations);
         }
-        persistPrescriptionInstructions(request.getPrescriptions(), horse, savedRecord, request);
+        persistPrescriptions(request.getPrescriptions(), horse, savedRecord, request);
 
         // Persist injury markers captured on the 3D model (T4).
         if (request.getInjuryMarkers() != null) {
@@ -756,7 +759,7 @@ public class CareScheduleService {
         }
 
         if (isIncidentCase(schedule)) {
-            List<HorseIncidentReport> openIncidents = new java.util.ArrayList<>(
+            List<HorseIncidentReport> openIncidents = new ArrayList<>(
                     incidentReportRepository.findByHorseIdAndStatusIn(
                             horse.getId(),
                             List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW)
@@ -771,7 +774,7 @@ public class CareScheduleService {
                 });
             }
 
-            java.util.Set<Long> recipients = new java.util.HashSet<>();
+            Set<Long> recipients = new HashSet<>();
             for (HorseIncidentReport inc : openIncidents) {
                 inc.setStatus(IncidentStatus.RESOLVED);
                 inc.setHandledById(vetId);
@@ -930,57 +933,59 @@ public class CareScheduleService {
         }
     }
 
-    /**
-     * Track 0 (ROADMAP v3.0): serialize đơn thuốc Vet kê thành JSON snake_case
-     * và lưu vào treatment_plans.instructions. Không lưu bảng prescriptions,
-     * không validate catalog/withdrawal, không phát event.
-     */
-    private void persistPrescriptionInstructions(List<PrescriptionItemRequest> prescriptions, Horse horse,
+    private void validatePrescriptions(List<PrescriptionItemRequest> prescriptions) {
+        if (prescriptions == null || prescriptions.isEmpty()) return;
+        Set<String> seen = new HashSet<>();
+        for (PrescriptionItemRequest item : prescriptions) {
+            String medicationName = item.getMedicationName().trim();
+            if (!seen.add(medicationName.toLowerCase(Locale.ROOT))) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "DUPLICATE_MEDICATION",
+                        "Medication " + medicationName + " is already prescribed in this examination");
+            }
+            if (item.getRoute() != null && item.getRoute().isInjection()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INJECTION_NOT_ALLOWED",
+                        "Treatment plans cannot contain injections");
+            }
+        }
+    }
+
+    /** Lưu nguyên tử plan + đơn trong transaction hoàn tất ca khám (Luồng 1). */
+    private void persistPrescriptions(List<PrescriptionItemRequest> prescriptions, Horse horse,
             HealthRecord record, CompleteCareScheduleRequest request) {
         if (prescriptions == null || prescriptions.isEmpty()) return;
-
-        LocalDate today = LocalDate.now();
-        LocalDate planStart = today;
-        LocalDate planEnd = prescriptions.stream()
-                .map(item -> today.plusDays(item.getDuration()))
-                .max(LocalDate::compareTo)
-                .orElse(today);
-
-        List<LinkedHashMap<String, Object>> items = new ArrayList<>();
-        for (PrescriptionItemRequest item : prescriptions) {
-            LinkedHashMap<String, Object> json = new LinkedHashMap<>();
-            json.put("medication_name", item.getMedicationName());
-            json.put("dosage", item.getDosage());
-            json.put("frequency", item.getFrequency());
-            json.put("route", item.getRoute().name());
-            json.put("duration", item.getDuration());
-            json.put("notes", item.getNotes() != null ? item.getNotes() : "");
-            items.add(json);
-        }
-
-        String jsonInstructions;
-        try {
-            jsonInstructions = objectMapper.writeValueAsString(items);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "RX_SERIALIZATION_FAILED",
-                    "Failed to serialize prescription instructions");
-        }
-
-        String generalCare = request.getGeneralCareInstructions() != null
-                && !request.getGeneralCareInstructions().isBlank()
-                        ? request.getGeneralCareInstructions().trim()
-                        : (request.getTreatment() != null && !request.getTreatment().isBlank()
-                                ? request.getTreatment().trim()
-                                : "Follow dosage and instructions on each prescription.");
-
         TreatmentPlan plan = new TreatmentPlan();
         plan.setHealthRecordId(record.getId());
         plan.setTreatmentName("Treatment course (" + prescriptions.size() + " medications)");
-        plan.setInstructions(jsonInstructions);
-        plan.setStartDate(planStart);
-        plan.setEndDate(planEnd);
+        String instructions = request.getGeneralCareInstructions() != null && !request.getGeneralCareInstructions().isBlank()
+                ? request.getGeneralCareInstructions().trim()
+                : (request.getTreatment() != null && !request.getTreatment().isBlank()
+                        ? request.getTreatment().trim()
+                        : "Follow dosage and instructions on each prescription.");
+        plan.setInstructions(instructions);
+        plan.setStartDate(prescriptions.stream().map(PrescriptionItemRequest::getStartDate)
+                .min(LocalDate::compareTo).orElse(LocalDate.now()));
+        plan.setEndDate(prescriptions.stream().map(PrescriptionItemRequest::getEndDate)
+                .max(LocalDate::compareTo).orElse(null));
         plan.setStatus("ACTIVE");
-        treatmentPlanRepository.save(plan);
+        TreatmentPlan savedPlan = treatmentPlanRepository.save(plan);
+
+        List<Long> rxIds = new ArrayList<>();
+        for (PrescriptionItemRequest item : prescriptions) {
+            Prescription rx = new Prescription();
+            rx.setTreatmentPlanId(savedPlan.getId());
+            rx.setMedicationName(item.getMedicationName().trim());
+            rx.setDosage(item.getDosage());
+            rx.setFrequency(item.getFrequency());
+            rx.setRoute(item.getRoute().name());
+            rx.setStartDate(item.getStartDate());
+            rx.setEndDate(item.getEndDate());
+            rx.setInstructions(item.getInstructions());
+            rx.setStatus("ACTIVE");
+            rx.setAdministeredByRole(item.getRoute().requiresVeterinarian() ? "VETERINARIAN" : "GROOM");
+            rxIds.add(prescriptionRepository.save(rx).getId());
+        }
+        eventPublisher.publishEvent(new PrescriptionCreatedEvent(
+                record.getCareScheduleId(), record.getId(), horse.getId(), rxIds));
     }
 
     /**
@@ -1185,7 +1190,7 @@ public class CareScheduleService {
         if (requestedAt == null && request.getScheduledDate() != null && !request.getScheduledDate().isBlank()) {
             try {
                 requestedAt = LocalDate.parse(request.getScheduledDate()).atTime(14, 0);
-            } catch (java.time.format.DateTimeParseException ex) {
+            } catch (DateTimeParseException ex) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "scheduledDate must use ISO format yyyy-MM-dd");
             }
         }
@@ -1327,8 +1332,8 @@ public class CareScheduleService {
     private static final LocalTime WORKDAY_END = LocalTime.of(17, 0);
     /** AD-022: an exam still open 30 minutes past its appointment time becomes OVERDUE. */
     static final int OVERDUE_GRACE_MINUTES = 30;
-    private static final java.time.format.DateTimeFormatter SWEEP_TIME_FMT =
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter SWEEP_TIME_FMT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     /**
      * Job 60s: (1) auto-activate ca SCHEDULED đã đến giờ trong 08:00–17:00 — semantics

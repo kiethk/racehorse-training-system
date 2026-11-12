@@ -16,11 +16,17 @@ import type { AdmissionDetailResponse } from '../types';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionInfoSection, AdmissionSideCard, InfoGroupTitle, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { ArrivalPhotosBlock } from '../shared/components/ArrivalPhotosBlock';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { ManagerTrainerAssessmentTab } from '../shared/components/ManagerTrainerAssessmentTab';
 import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
+import { ManagerGroomReassignment } from './ManagerGroomReassignment';
+import { GroomAssignmentHistory } from './GroomAssignmentHistory';
+import { ReviewDue } from '../shared/components/ReviewDue';
 import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
 
 function datetime(value: string | null) {
@@ -80,15 +86,13 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     setReopening(true);
     setError(null);
     try {
-      const updated = await admissionsApi.reopenExpiredArrival(admissionId);
+      await admissionsApi.reopenExpiredArrival(admissionId);
       await load();
-      toast.success('Arrival window reopened', updated.status === 'WAITING_FOR_ARRIVAL'
-        ? `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved again.`
-        : 'The admission is queued and gets the next free quarantine stall automatically.');
+      toast.success('Admission reopened for Groom review');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Unable to reopen the arrival window.';
       setError(message);
-      toast.error('Arrival window not reopened', message);
+      toast.error(message);
     } finally {
       setReopening(false);
     }
@@ -166,19 +170,15 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
       <AdmissionInfoSection title="Owner & Intake Details">
         <InfoRow
           label="Owner"
-          value={
-            detail.ownerName
-              ? `${detail.ownerName}${detail.ownerId != null ? ` (#${detail.ownerId})` : ''}`
-              : detail.ownerId != null
-                ? `#${detail.ownerId}`
-                : '—'
-          }
+          value={<EntityLink href={detail.ownerId != null ? entityHref('owner', detail.ownerId, 'CLUB_MANAGER') : null}>
+            {detail.ownerName ? `${detail.ownerName}${detail.ownerId != null ? ` (#${detail.ownerId})` : ''}` : detail.ownerId != null ? `#${detail.ownerId}` : '—'}
+          </EntityLink>}
         />
         <InfoRow label="Owner Email" value={detail.ownerEmail} />
         <InfoRow label="Owner Phone" value={detail.ownerPhone} />
         <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
           <InfoRow label="Submitted At" value={datetime(detail.submittedAt)} />
-          <InfoRow label="Quarantine Stall" value={detail.quarantineStallCode} />
+          <InfoRow label="Quarantine Stall" value={<EntityLink href={detail.quarantineStallCode ? entityHref('stall', detail.quarantineStallCode, 'CLUB_MANAGER') : null}>{detail.quarantineStallCode}</EntityLink>} />
           <InfoRow
             label="Arrival Status"
             value={
@@ -208,11 +208,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         />
         <InfoRow
           label="Examining Vet"
-          value={
-            detail.veterinarianName ??
-            detail.initialVetExam?.veterinarianName ??
-            (detail.veterinarianId ? `#${detail.veterinarianId}` : null)
-          }
+          value={<EntityLink href={detail.veterinarianId ? entityHref('user', detail.veterinarianId, 'CLUB_MANAGER') : null}>
+            {detail.veterinarianName ?? detail.initialVetExam?.veterinarianName ?? (detail.veterinarianId ? `#${detail.veterinarianId}` : null)}
+          </EntityLink>}
         />
         {(detail.vetFeedback || detail.initialVetExam?.diagnosis) && (
           <InfoRow
@@ -235,7 +233,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
           />
           <InfoRow
             label="Assigned Trainer"
-            value={detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : null)}
+            value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'CLUB_MANAGER') : null}>{detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : null)}</EntityLink>}
           />
           {detail.trainerFeedback && (
             <InfoRow label="Trainer Notes" value={detail.trainerFeedback} />
@@ -279,7 +277,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
             <InfoGroupTitle>Groom Review</InfoGroupTitle>
             <InfoRow
               label="Reviewed by"
-              value={detail.groomName ?? (detail.groomId ? `#${detail.groomId}` : 'Assigned Groom')}
+              value={<EntityLink href={detail.groomId ? entityHref('user', detail.groomId, 'CLUB_MANAGER') : null}>{detail.groomName ?? (detail.groomId ? `#${detail.groomId}` : 'Assigned Groom')}</EntityLink>}
             />
             <InfoRow label="Decision" value={detail.groomDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.groomReviewedAt)} />
@@ -292,11 +290,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
             <InfoGroupTitle>Veterinarian Review</InfoGroupTitle>
             <InfoRow
               label="Examined by"
-              value={
-                detail.veterinarianName ??
-                detail.initialVetExam?.veterinarianName ??
-                (detail.veterinarianId ? `#${detail.veterinarianId}` : 'Assigned Veterinarian')
-              }
+              value={<EntityLink href={detail.veterinarianId ? entityHref('user', detail.veterinarianId, 'CLUB_MANAGER') : null}>
+                {detail.veterinarianName ?? detail.initialVetExam?.veterinarianName ?? (detail.veterinarianId ? `#${detail.veterinarianId}` : 'Assigned Veterinarian')}
+              </EntityLink>}
             />
             <InfoRow label="Training Decision" value={currentTrainingDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.vetReviewedAt)} />
@@ -309,7 +305,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
             <InfoGroupTitle>Trainer Readiness Assessment</InfoGroupTitle>
             <InfoRow
               label="Assessed by"
-              value={detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : 'Assigned Trainer')}
+              value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'CLUB_MANAGER') : null}>{detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : 'Assigned Trainer')}</EntityLink>}
             />
             <InfoRow label="Assessed At" value={datetime(detail.trainerReviewedAt)} />
             {detail.trainerFeedback && <InfoRow label="Assessment Notes" value={detail.trainerFeedback} />}
@@ -359,7 +355,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                   trainerName={detail.trainerName}
                 />
               )}
-              {activeTab === 'history' && renderHistory()}
+              {activeTab === 'history' && (<div className="space-y-5">{renderHistory()}<GroomAssignmentHistory admissionId={admissionId} /></div>)}
             </div>
           </div>
         )}
@@ -367,18 +363,17 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
           <>
             <AdmissionSideCard title="Admission at a glance">
               <InfoRow label="Current status" value={<AdmissionStatusBadge status={detail.status} size="sm" />} />
-              {detail.quarantineStallCode && <InfoRow label="Quarantine stall" value={detail.quarantineStallCode} />}
+              {detail.quarantineStallCode && <InfoRow label="Quarantine stall" value={<EntityLink href={entityHref('stall', detail.quarantineStallCode, 'CLUB_MANAGER')}>{detail.quarantineStallCode}</EntityLink>} />}
               <InfoRow
                 label="Assigned Groom"
-                value={detail.groomName ?? (detail.groomId ? `#${detail.groomId}` : 'Unassigned')}
+                value={<EntityLink href={detail.assignedGroomId != null ? `/manager/accounts?userId=${detail.assignedGroomId}` : null}>{detail.assignedGroomName ?? (detail.assignedGroomId != null ? `#${detail.assignedGroomId}` : 'Unassigned')}</EntityLink>}
               />
+              <InfoRow label="Review due" value={<ReviewDue dueAt={detail.groomReviewDueAt} />} />
               <InfoRow
                 label="Examining Vet"
-                value={
-                  detail.veterinarianName ??
-                  detail.initialVetExam?.veterinarianName ??
-                  (detail.veterinarianId ? `#${detail.veterinarianId}` : 'Pending assignment')
-                }
+                value={<EntityLink href={detail.veterinarianId ? entityHref('user', detail.veterinarianId, 'CLUB_MANAGER') : null}>
+                  {detail.veterinarianName ?? detail.initialVetExam?.veterinarianName ?? (detail.veterinarianId ? `#${detail.veterinarianId}` : 'Pending assignment')}
+                </EntityLink>}
               />
               {currentTrainingDecision && (
                 <InfoRow
@@ -392,7 +387,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
               )}
               <InfoRow
                 label="Head Trainer"
-                value={detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : 'Unassigned')}
+                value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'CLUB_MANAGER') : null}>{detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : 'Unassigned')}</EntityLink>}
               />
               {detail.arrivedAt && (
                 <InfoRow
@@ -404,6 +399,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                   }
                 />
               )}
+              {detail.arrivedAt && <ArrivalPhotosBlock documents={detail.documents} />}
               {trainerUnassigned && (
                 <Notice tone="warning" title="No Head Trainer assigned yet">
                   No eligible Head Trainer is available. The system retries automatically. Check that at
@@ -412,9 +408,10 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
               )}
             </AdmissionSideCard>
 
+            {detail.status === 'GROOM_REVIEW' && <ManagerGroomReassignment key={detail.groomAssignedAt} detail={detail} onSuccess={load} />}
+
             {detail.status === 'ARRIVAL_EXPIRED' && (
               <AdmissionSideCard title="Arrival window expired" tone="warning">
-                <p className="text-[var(--color-text-secondary)]">The quarantine reservation was released. Reopening attempts to reserve an available quarantine stall and starts a new 14-day window.</p>
                 <Button type="button" className="w-full" loading={reopening} onClick={() => void reopenExpiredArrival()}>Reopen arrival window</Button>
               </AdmissionSideCard>
             )}

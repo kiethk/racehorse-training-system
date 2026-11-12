@@ -1,14 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'INJECTION_IV' | 'INJECTION_IM' | 'FEED_ADDITIVE';
+export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'FEED_ADDITIVE';
 
 export interface PrescriptionItemRequest {
   medicationName: string;
   dosage: string;
   route: MedicationRoute;
   frequency: string;
-  duration: number;
-  notes?: string;
+  startDate: string;
+  endDate: string;
+  instructions: string;
 }
 
 export interface PrescriptionFormItem {
@@ -17,8 +18,9 @@ export interface PrescriptionFormItem {
   dosage: string;
   route: MedicationRoute;
   frequency: string;
-  duration: number;
-  notes: string;
+  startDate: string;
+  endDate: string;
+  instructions: string;
 }
 
 export interface PrescriptionSectionProps {

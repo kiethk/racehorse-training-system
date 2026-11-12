@@ -16,7 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-/** Owner side of horse edit requests: submit, see the latest one, cancel while pending. */
+/** Owner side of horse edit requests: submit, view history, cancel while pending. */
 @RestController
 @RequestMapping("/api/owner/horses/{horseId}/edit-requests")
 public class OwnerHorseEditRequestController {
@@ -45,6 +45,14 @@ public class OwnerHorseEditRequestController {
             @PathVariable Long horseId,
             @AuthenticationPrincipal AuthenticatedUser owner) {
         return ApiResponse.success(service.latestForOwner(owner.getUserId(), horseId));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('HORSE_EDIT_REQUEST_CREATE') and principal.role == 'HORSE_OWNER'")
+    public ApiResponse<List<HorseEditRequestResponse>> list(
+            @PathVariable Long horseId,
+            @AuthenticationPrincipal AuthenticatedUser owner) {
+        return ApiResponse.success(service.listForOwner(owner.getUserId(), horseId));
     }
 
     @PostMapping("/{requestId}/cancel")

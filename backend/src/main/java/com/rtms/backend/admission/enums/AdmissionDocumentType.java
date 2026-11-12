@@ -2,6 +2,7 @@ package com.rtms.backend.admission.enums;
 
 public enum AdmissionDocumentType {
     HORSE_PHOTO,
+    ARRIVAL_PHOTO,
     REGISTRATION_DOCUMENT,
     PEDIGREE_CERTIFICATE,
     VACCINATION_RECORD,

@@ -13,7 +13,7 @@ const IMAGE_EXTENSION = /\.(jpe?g|png|webp)$/i;
  * (PDF or unknown) and keeps the regular document preview.
  */
 export function isImageDocument(document: DocumentLike): boolean {
-  if (document.documentType === 'HORSE_PHOTO') return true;
+  if (document.documentType === 'HORSE_PHOTO' || document.documentType === 'ARRIVAL_PHOTO') return true;
   const name = document.originalFileName ?? document.fileUrl.split('?')[0];
   return IMAGE_EXTENSION.test(name);
 }

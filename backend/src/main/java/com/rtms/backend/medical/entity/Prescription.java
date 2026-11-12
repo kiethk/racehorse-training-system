@@ -51,9 +51,6 @@ public class Prescription {
     @Column(name = "preventive_protocol_id")
     private Long preventiveProtocolId;
 
-    @Column(name = "withdrawal_days", nullable = false)
-    private Integer withdrawalDays = 0;
-
     /** ACTIVE đang chạy / COMPLETED hết liệu trình / DISCONTINUED ngưng sớm (A1 contract). */
     @Column(name = "status", nullable = false)
     private String status = "ACTIVE";
@@ -157,14 +154,6 @@ public class Prescription {
 
     public void setPreventiveProtocolId(Long preventiveProtocolId) {
         this.preventiveProtocolId = preventiveProtocolId;
-    }
-
-    public Integer getWithdrawalDays() {
-        return withdrawalDays != null ? withdrawalDays : 0;
-    }
-
-    public void setWithdrawalDays(Integer withdrawalDays) {
-        this.withdrawalDays = withdrawalDays != null ? withdrawalDays : 0;
     }
 
     public String getStatus() {

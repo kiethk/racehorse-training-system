@@ -1,12 +1,14 @@
-import { Button, Icon, Pill, ProtectedImage } from '@/components/ui';
+import { Button, EntityLink, Icon, Pill, ProtectedImage } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import { cn } from '@/lib/cn';
 import type { TaskBlock as TaskBlockData } from '../lib/groupTasks';
+import type { TreatmentPlan } from '@/features/care/types';
 
 /**
  * One routine duty at one time for every horse that has it, completed in one action. A block of one horse
  * looks the same, so the checklist stays uniform.
  */
-export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onComplete: (block: TaskBlockData) => void }) {
+export function TaskBlock({ block, onComplete, plans, onViewInstructions }: { block: TaskBlockData; onComplete: (block: TaskBlockData) => void; plans: Map<number, TreatmentPlan>; onViewInstructions: (horseId: number) => void }) {
   const finished = block.pending.length === 0;
 
   return (
@@ -45,7 +47,8 @@ export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onCompl
                     )}
                   >
                     {done && <Icon name="check" size={12} />}
-                    {task.horseName}
+                    <EntityLink href={entityHref('horse', task.horseId, 'GROOM', { stallCode: task.stallCode })}>{task.horseName}</EntityLink>
+                    {plans.has(task.horseId) && <Button type="button" variant="tertiary" size="sm" icon="pill" aria-label={`View instructions for ${task.horseName}`} onClick={(event) => { event.stopPropagation(); onViewInstructions(task.horseId); }} />}
                   </li>
                 );
               })}
@@ -67,7 +70,13 @@ export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onCompl
           {block.evidence.map((evidence) => (
             <div key={evidence.completionId} className="space-y-2">
               {block.evidence.length > 1 && (
-                <p className="text-xs text-[var(--color-text-muted)]">{evidence.horseNames.join(', ')}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {evidence.horseNames.map((name, index) => {
+                    const matches = block.tasks.filter((task) => task.horseName === name);
+                    const task = matches.length === 1 ? matches[0] : null;
+                    return <span key={`${name}-${index}`}>{index > 0 && ', '}<EntityLink href={task ? entityHref('horse', task.horseId, 'GROOM', { stallCode: task.stallCode }) : null}>{name}</EntityLink></span>;
+                  })}
+                </p>
               )}
               {evidence.note && (
                 <p className="whitespace-pre-wrap break-words text-xs text-[var(--color-text-primary)]">

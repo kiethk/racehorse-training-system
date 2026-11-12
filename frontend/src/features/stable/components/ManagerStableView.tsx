@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button, ConfirmDialog, EmptyState, FilterBar, IconButton, LinkButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SearchInput, SegmentedControl, Tabs } from '@/components/ui';
 import type { Area, AreaType, StableStall } from '../types';
@@ -26,6 +26,7 @@ export function ManagerStableView() {
 
 function ManagerStableContent() {
   const searchParams = useSearchParams();
+  const stallCode = searchParams.get('stall');
   const targetAreaId = searchParams.get('areaId') ? Number(searchParams.get('areaId')) : null;
   const targetStallId = searchParams.get('stallId') ? Number(searchParams.get('stallId')) : null;
   const targetStallCode = searchParams.get('stallCode')?.trim() || null;
@@ -43,10 +44,22 @@ function ManagerStableContent() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
+  const appliedStallCode = useRef<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   // Cards hold the drag-and-drop staffing; the map shows the same (draft) state as a plan or 3D barn.
   const [layout, setLayout] = useState<'cards' | 'map'>('cards');
+  useEffect(() => {
+    if (!stallCode || !data || appliedStallCode.current === stallCode) return;
+    const stall = data.stalls.find((item) => item.stallCode === stallCode);
+    if (!stall) return;
+    appliedStallCode.current = stallCode;
+    const area = data.areas.find((item) => item.id === stall.areaId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (area) setActiveTab(area.type);
+    setSelectedStall(stall);
+    setLayout('map');
+  }, [stallCode, data]);
   const count = data && draft ? editCount(data, draft) : 0;
   const dirty = count > 0;
   const busy = loading || saving || creating || deleting;
@@ -117,6 +130,7 @@ function ManagerStableContent() {
       if (stall) {
         const area = data.areas.find((a) => a.id === stall.areaId);
         if (area && area.type !== activeTab) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setActiveTab(area.type);
         }
         setSelectedStall(stall);
@@ -169,7 +183,7 @@ function ManagerStableContent() {
   }, [search, data, horses, targetStallId, targetStallCode]);
 
   const displayed = useMemo(() => {
-    let list = attentionOnly ? views.filter(v => v.attention > 0) : views;
+    const list = attentionOnly ? views.filter(v => v.attention > 0) : views;
     const q = search.trim().toLowerCase();
     if (!q || !data) return list;
     return list.filter(v => {

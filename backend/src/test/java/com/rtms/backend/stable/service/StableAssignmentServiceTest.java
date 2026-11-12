@@ -1,6 +1,7 @@
 package com.rtms.backend.stable.service;
 
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.admission.service.GroomAssignmentTriggers;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.*;
 import com.rtms.backend.identity.repository.*;
@@ -29,7 +30,7 @@ class StableAssignmentServiceTest {
     EntityManager em;
     StableAssignmentService service;
     AreaTrainerAssignmentPolicy trainerPolicy;
-    com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
+    GroomAssignmentTriggers admissionAllocation;
     List<Area> allAreas;
     List<StableStall> allStalls;
     List<User> staff;
@@ -54,7 +55,7 @@ class StableAssignmentServiceTest {
         when(stalls.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
         when(profiles.findById(anyLong())).thenReturn(Optional.empty());
         trainerPolicy = mock(AreaTrainerAssignmentPolicy.class);
-        admissionAllocation = mock(com.rtms.backend.admission.service.AdmissionGroomReviewService.class);
+        admissionAllocation = mock(GroomAssignmentTriggers.class);
         service = new StableAssignmentService(areas, stalls, users, profiles, horses, workouts, em, trainerPolicy,
                 admissionAllocation);
     }
@@ -102,6 +103,7 @@ class StableAssignmentServiceTest {
     }
     @Test void quarantineGroomHasNoTrainer() {
         apply(groom(10, 1, 200L));
+        verify(admissionAllocation).reassignLostQuarantineAfterCommit();
         verify(profiles).save(argThat(p -> p.getUserId() == 200L && p.getTrainerId() == null));
     }
     @Test void regularGroomRequiresTrainer() {

@@ -7,6 +7,8 @@ import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 import { Icon } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
@@ -611,7 +613,7 @@ export function VetAdmissionQueue() {
       <InfoRow label="Priority" value={selectedRow ? getPriorityBadge(selectedRow.careSchedule?.careType, selectedRow.careSchedule?.purpose).label : 'Standard'} />
       <InfoRow label="Schedule" value={currentActiveSchedule ? getScheduleStatusDisplay(currentActiveSchedule.status).label : 'Not scheduled'} />
       <InfoRow label="Quarantine stall" value={detail.quarantineStallCode || 'Not assigned'} />
-      <InfoRow label="Trainer" value={detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')} />
+      <InfoRow label="Trainer" value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'VETERINARIAN') : null}>{detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')}</EntityLink>} />
       {(currentActiveSchedule?.scheduledDate || currentActiveSchedule?.scheduledAt) && (
         <InfoRow label="Scheduled" value={formatDate((currentActiveSchedule.scheduledDate || currentActiveSchedule.scheduledAt)!)} />
       )}
@@ -637,6 +639,7 @@ export function VetAdmissionQueue() {
           options={[
             { value: 'ACTIVE', label: 'Active', count: summary.active ?? summary.total },
             { value: 'APPROVED', label: 'Approved', count: summary.approved ?? 0 },
+            { value: 'REVIEWED', label: 'Reviewed', count: summary.reviewed ?? 0 },
           ]}
         />
         <Button type="button" onClick={handleRefresh} disabled={loading} icon="refresh" variant="secondary" size="sm" className="transition-all active:scale-[0.98]">
@@ -710,8 +713,10 @@ export function VetAdmissionQueue() {
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <HorseAvatar name={row.candidateName} image={row.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                          {row.candidateName}
+                        <div className="truncate">
+                          <EntityLink href={row.horseId ? entityHref('horse', row.horseId, 'VETERINARIAN') : null} className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                            {row.candidateName}
+                          </EntityLink>
                         </div>
                         {((status && status !== 'SCHEDULED' && status !== 'IN_PROGRESS') ||
                           Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) ||
@@ -805,7 +810,7 @@ export function VetAdmissionQueue() {
             />
           ) : (
             <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm font-semibold text-[var(--color-text-primary)]">
-              {selectedRow?.candidateName ?? 'Loading admission'}
+              <EntityLink href={selectedRow?.horseId ? entityHref('horse', selectedRow.horseId, 'VETERINARIAN') : null}>{selectedRow?.candidateName ?? 'Loading admission'}</EntityLink>
             </div>
           )}
           pipeline={detail ? <AdmissionPipeline detail={detail} /> : <DetailSkeleton />}
@@ -934,6 +939,7 @@ export function VetAdmissionQueue() {
                         asideTop={examDetailsCard}
                         onSuccess={handleReviewSuccess}
                         onDirtyChange={handleDirtyChange}
+                        documents={documents}
                       />
                     ) : (
                       <div className="p-8 text-center text-[var(--color-text-muted)]">

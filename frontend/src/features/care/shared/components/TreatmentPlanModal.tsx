@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Button, Checkbox, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
 import { careService } from '@/features/care/services/careService';
 import { displayError, formatLocalDateIso } from '@/lib/display';
+import { toast } from '@/lib/toast';
 
 interface TreatmentPlanModalProps {
   open: boolean;
@@ -47,7 +48,7 @@ export function TreatmentPlanModal({
   const [medicationName, setMedicationName] = useState('');
   const [dosage, setDosage] = useState('');
   const [frequency, setFrequency] = useState('Once daily');
-  const [route, setRoute] = useState('Oral');
+  const [route, setRoute] = useState('ORAL');
   const [prescriptionInstructions, setPrescriptionInstructions] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -99,19 +100,21 @@ export function TreatmentPlanModal({
             instructions: prescriptionInstructions.trim() || undefined,
           });
         } catch (rxErr) {
-          setError(
-            displayError(
-              rxErr,
-              'Treatment plan was created, but initial prescription failed. Please add the prescription manually.',
-            ),
+          const message = displayError(
+            rxErr,
+            'Treatment plan was created, but initial prescription failed. Please add the prescription manually.',
           );
+          setError(message);
+          toast.error(message);
           return;
         }
       }
 
       onSuccess();
     } catch (err) {
-      setError(displayError(err, 'Failed to create treatment plan.'));
+      const message = displayError(err, 'Failed to create treatment plan.');
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -219,10 +222,9 @@ export function TreatmentPlanModal({
 
                 <FormField label="Route">
                   <Select value={route} onChange={(e) => setRoute(e.target.value)} disabled={loading}>
-                    <option value="Oral">Oral</option>
-                    <option value="Intravenous (IV)">Intravenous (IV)</option>
-                    <option value="Intramuscular (IM)">Intramuscular (IM)</option>
-                    <option value="Topical">Topical</option>
+                    <option value="ORAL">Oral</option>
+                    <option value="TOPICAL">Topical</option>
+                    <option value="FEED_ADDITIVE">Feed additive</option>
                   </Select>
                 </FormField>
               </div>

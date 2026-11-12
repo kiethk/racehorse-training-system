@@ -285,7 +285,6 @@ public class AdmissionReviewService {
         admissionNotificationService.notifyManagersOfAdmissionRejection(admission, horseName,
                 "Veterinary Clinical Review", reason);
 
-        admissionGroomReviewService.allocateWaitingAdmissions();
 
         if (auditLogService != null) {
             auditLogService.recordDomainEvent(DomainAuditEvent.builder()

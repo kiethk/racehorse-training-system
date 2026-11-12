@@ -71,8 +71,8 @@ describe('groupTasks', () => {
 
     assert.equal(entries.length, 2);
     const first = entries[0] as SingleTask;
-    assert.deepEqual(first.horseNames, ['Eagle', 'Nausicaa', 'Si Renesme']);
-    assert.deepEqual((entries[1] as SingleTask).horseNames, ['Other']);
+    assert.deepEqual(first.horses.map((horse) => horse.name), ['Eagle', 'Nausicaa', 'Si Renesme']);
+    assert.deepEqual((entries[1] as SingleTask).horses.map((horse) => horse.name), ['Other']);
   });
 
   it('shows each completion once with the horses it covered, and skips completions without evidence', () => {

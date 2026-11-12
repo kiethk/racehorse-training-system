@@ -24,7 +24,7 @@ export interface CreateOwnerAdmissionRequest {
 export type AdmissionDocumentType =
   | 'HORSE_PHOTO' | 'REGISTRATION_DOCUMENT' | 'PEDIGREE_CERTIFICATE'
   | 'VACCINATION_RECORD' | 'DEWORMING_RECORD' | 'HEALTH_CERTIFICATE'
-  | 'PREVIOUS_MEDICAL_RECORD' | 'PREVIOUS_INJURY_RECORD';
+  | 'PREVIOUS_MEDICAL_RECORD' | 'PREVIOUS_INJURY_RECORD' | 'ARRIVAL_PHOTO';
 
 export interface AdmissionDocumentUpload {
   file: File;

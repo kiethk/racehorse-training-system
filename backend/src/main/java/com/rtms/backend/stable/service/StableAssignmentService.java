@@ -1,6 +1,7 @@
 package com.rtms.backend.stable.service;
 
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.admission.service.GroomAssignmentTriggers;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.GroomProfile;
 import com.rtms.backend.identity.entity.User;
@@ -37,13 +38,13 @@ public class StableAssignmentService {
     private final TrainingGroupService workouts;
     private final EntityManager em;
     private final AreaTrainerAssignmentPolicy trainerPolicy;
-    private final com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
+    private final GroomAssignmentTriggers groomAssignmentTriggers;
 
     public StableAssignmentService(AreaRepository areas, StableStallRepository stalls,
                                    UserRepository users, GroomProfileRepository profiles,
                                    HorseRepository horses, TrainingGroupService workouts, EntityManager em,
                                    AreaTrainerAssignmentPolicy trainerPolicy,
-                                   com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation) {
+                                   GroomAssignmentTriggers groomAssignmentTriggers) {
         this.areas = areas;
         this.stalls = stalls;
         this.users = users;
@@ -52,7 +53,7 @@ public class StableAssignmentService {
         this.workouts = workouts;
         this.em = em;
         this.trainerPolicy = trainerPolicy;
-        this.admissionAllocation = admissionAllocation;
+        this.groomAssignmentTriggers = groomAssignmentTriggers;
     }
 
     public List<AreaTrainerChangeCheck> getTrainerAssignmentChecks() { return trainerPolicy.checks(); }
@@ -240,10 +241,8 @@ public class StableAssignmentService {
             profile.setTrainerId(area != null && area.getType() == AreaType.REGULAR ? finalTrainer.get(area.getId()) : null);
             profiles.save(profile);
         }
-        // Only stalls with a groom count as admission capacity, so a newly staffed block can
-        // let queued admissions in straight away instead of waiting for the scheduler.
         if (!affectedGrooms.isEmpty()) {
-            admissionAllocation.allocateWaitingAdmissions();
+            groomAssignmentTriggers.reassignLostQuarantineAfterCommit();
         }
         return new StableAssignmentResponse(changedAreas, changedStalls, changedWorkouts, "Assignments updated successfully");
     }

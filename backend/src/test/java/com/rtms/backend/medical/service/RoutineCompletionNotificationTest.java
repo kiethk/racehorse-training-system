@@ -29,9 +29,11 @@ import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
@@ -96,7 +98,7 @@ class RoutineCompletionNotificationTest {
                 mock(PreventiveVaccinationService.class),
                 injuryRecordRepository,
                 treatmentPlanRepository,
-                new com.fasterxml.jackson.databind.ObjectMapper()
+                mock(PrescriptionRepository.class)
         );
 
         horse = new Horse();
@@ -157,7 +159,7 @@ class RoutineCompletionNotificationTest {
                 eq(50L),
                 eq(NotificationTypes.CARE_SCHEDULE_ROUTINE_COMPLETED),
                 eq("Routine Examination Completed: Wild Cherry"),
-                org.mockito.ArgumentMatchers.contains("Cleared for training (ALLOWED)")
+                ArgumentMatchers.contains("Cleared for training (ALLOWED)")
         );
     }
 
@@ -197,8 +199,8 @@ class RoutineCompletionNotificationTest {
         service.completeCareSchedule(200L, req, 10L);
 
         verify(injuryRecordRepository).save(oldInjury);
-        org.junit.jupiter.api.Assertions.assertEquals("RECOVERED", oldInjury.getStatus());
-        org.junit.jupiter.api.Assertions.assertEquals("COMPLETED", plan.getStatus());
+        Assertions.assertEquals("RECOVERED", oldInjury.getStatus());
+        Assertions.assertEquals("COMPLETED", plan.getStatus());
 
         verify(notifications).sendAssignmentNotification(
                 eq(trainerId),
@@ -207,7 +209,7 @@ class RoutineCompletionNotificationTest {
                 eq(50L),
                 eq(NotificationTypes.CARE_SCHEDULE_ROUTINE_COMPLETED),
                 eq("Routine Examination Completed: Wild Cherry"),
-                org.mockito.ArgumentMatchers.contains("Cleared for training (ALLOWED)")
+                ArgumentMatchers.contains("Cleared for training (ALLOWED)")
         );
     }
 }

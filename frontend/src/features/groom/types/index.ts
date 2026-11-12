@@ -8,6 +8,7 @@ export interface TodayTaskItem {
   endTime: string | null;
   horseId: number;
   horseName: string;
+  stallCode?: string | null;
   title: string;
   note: string | null;
   status: TaskStatus;

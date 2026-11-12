@@ -15,17 +15,19 @@ describe('Track 0: Medical Prescription Drafts (ROADMAP v3.0)', () => {
         dosage: '4.4 mg/kg',
         route: 'ORAL',
         frequency: 'BID',
-        duration: 5,
-        notes: 'With grain feed',
+        startDate: '2026-11-01',
+        endDate: '2026-11-06',
+        instructions: 'With grain feed',
       },
       {
         id: '2',
         medicationName: 'Flunixin Meglumine',
         dosage: '1.1 mg/kg',
-        route: 'INJECTION_IV',
+        route: 'TOPICAL',
         frequency: 'ONCE',
-        duration: 3,
-        notes: '',
+        startDate: '2026-11-01',
+        endDate: '2026-11-04',
+        instructions: '',
       },
     ];
 
@@ -35,11 +37,11 @@ describe('Track 0: Medical Prescription Drafts (ROADMAP v3.0)', () => {
     assert.strictEqual(result[0].dosage, '4.4 mg/kg');
     assert.strictEqual(result[0].route, 'ORAL');
     assert.strictEqual(result[0].frequency, 'BID');
-    assert.strictEqual(result[0].duration, 5);
-    assert.strictEqual(result[0].notes, 'With grain feed');
+    assert.strictEqual(result[0].endDate, '2026-11-06');
+    assert.strictEqual(result[0].instructions, 'With grain feed');
 
     // Blank notes become undefined
-    assert.strictEqual(result[1].notes, undefined);
+    assert.strictEqual(result[1].instructions, '');
   });
 
   it('toPrescriptionRequests filters out items with empty medicationName', () => {
@@ -50,8 +52,9 @@ describe('Track 0: Medical Prescription Drafts (ROADMAP v3.0)', () => {
         dosage: '10ml',
         route: 'ORAL',
         frequency: 'SID',
-        duration: 1,
-        notes: '',
+        startDate: '2026-11-01',
+        endDate: '2026-11-02',
+        instructions: '',
       },
       {
         id: '2',
@@ -59,8 +62,9 @@ describe('Track 0: Medical Prescription Drafts (ROADMAP v3.0)', () => {
         dosage: '4 mg/kg',
         route: 'ORAL',
         frequency: 'SID',
-        duration: 7,
-        notes: '',
+        startDate: '2026-11-01',
+        endDate: '2026-11-08',
+        instructions: '',
       },
     ];
 
@@ -74,8 +78,8 @@ describe('Track 0: Medical Prescription Drafts (ROADMAP v3.0)', () => {
     assert.strictEqual(recheck, undefined);
   });
 
-  it('computeSuggestedRecheckDate returns date when valid prescription durations exist', () => {
-    const recheck = computeSuggestedRecheckDate([5, 10], []);
+  it('computeSuggestedRecheckDate returns date when prescription end dates exist', () => {
+    const recheck = computeSuggestedRecheckDate(['2026-11-06', '2026-11-11'], []);
     assert.ok(recheck !== undefined);
     assert.match(recheck, /^\d{4}-\d{2}-\d{2}$/);
   });

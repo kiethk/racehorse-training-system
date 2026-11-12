@@ -23,6 +23,7 @@ export interface OwnerRegistrationRequest {
   password: string;
   phone?: string;
   address?: string;
+  captchaToken: string;
 }
 
 export interface OwnerRegistrationResponse {
