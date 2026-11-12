@@ -609,7 +609,8 @@ public class CareScheduleService {
         record.setRecordType(schedule.getCareType().name());
         record.setExaminedAt(now);
         record.setFindings(request.getFindings().trim());
-        record.setDiagnosis(request.getDiagnosis().trim());
+        com.rtms.backend.medical.enums.ClinicalDiagnosis cd = com.rtms.backend.medical.enums.ClinicalDiagnosis.fromString(request.getDiagnosis());
+        record.setDiagnosis(cd != null ? cd.getDisplayName() : request.getDiagnosis().trim());
         record.setTreatment(request.getTreatment() != null ? request.getTreatment().trim() : null);
         // Bệnh án ghi kết quả thực tế: ca bị giữ chặn thì ngựa vẫn BLOCKED dù Vet chọn ALLOWED.
         record.setTrainingDecision(preservedForOtherExam ? TrainingDecision.BLOCKED : request.getTrainingDecision());

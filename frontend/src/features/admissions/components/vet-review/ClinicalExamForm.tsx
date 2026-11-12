@@ -799,11 +799,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         errors.injuryMarkers =
           'An injury or condition record is required when blocking a newly admitted horse.';
       }
-      for (const m of markers) {
-        if (!m.description?.trim()) {
-          errors[`description:${m.id}`] = 'Clinical note is required.';
-        }
-      }
+      // Injury marker notes are optional: default to zone/region label if empty
+      // No validation error required for m.description
 
       if (config.vaccination && horseId != null) {
         const doseErrors = validateVaccinationDrafts(vaccinationDrafts);

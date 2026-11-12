@@ -90,10 +90,37 @@ export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
       )}
 
       {trainingDecision === 'BLOCKED' && (
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 space-y-1.5 animate-in fade-in duration-200">
-          <label htmlFor="field-restriction-details" className="block text-xs font-bold text-[var(--color-warning)]">
-            Assessment note <span className="text-[var(--color-danger)]">*</span>
-          </label>
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 space-y-2 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between">
+            <label htmlFor="field-restriction-details" className="block text-xs font-bold text-[var(--color-warning)]">
+              Assessment note <span className="text-[var(--color-danger)]">*</span>
+            </label>
+            <span className="text-[11px] text-[var(--color-text-secondary)]">Click preset to quick-insert:</span>
+          </div>
+          {/* Quick-Chips for common clinical restrictions */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { label: 'Stall Rest', text: 'Strict box rest for 7 days; cold hosing twice daily.' },
+              { label: 'Hand Walking', text: 'Box rest with controlled hand-walking 15 mins daily only.' },
+              { label: 'Light Trot Only', text: 'Light walking/trotting under saddle; no canter or galloping.' },
+              { label: 'Medical Isolation', text: 'Quarantine isolation with daily temperature and health monitoring.' },
+              { label: 'Paddock Turnout', text: 'Individual paddock turnout permitted; avoid strenuous work.' },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => {
+                  setRestrictionDetails(preset.text);
+                  if (fieldErrors.restrictionDetails) {
+                    setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
+                  }
+                }}
+                className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-primary)] shadow-sm hover:border-[var(--color-warning)] hover:bg-[var(--color-surface-hover)] active:scale-[0.97] transition-all"
+              >
+                + {preset.label}
+              </button>
+            ))}
+          </div>
           <Textarea
             id="field-restriction-details"
             rows={3}
