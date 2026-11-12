@@ -50,11 +50,6 @@ public class PreventiveCareService {
     private final UserRepository users;
 
     public PreventiveCareService(CareScheduleRepository schedules, HorseRepository horses,
-            CareScheduleService care, AdmissionApplicationRepository admissions) {
-        this(schedules, horses, care, admissions, null);
-    }
-
-    public PreventiveCareService(CareScheduleRepository schedules, HorseRepository horses,
             CareScheduleService care, AdmissionApplicationRepository admissions, UserRepository users) {
         this.schedules = schedules;
         this.horses = horses;

@@ -26,12 +26,13 @@ class PreventiveCareServiceTest {
     @Mock HorseRepository horses;
     @Mock CareScheduleService care;
     @Mock com.rtms.backend.admission.repository.AdmissionApplicationRepository admissions;
+    @Mock com.rtms.backend.identity.repository.UserRepository users;
     private final AuthenticatedUser vet = new AuthenticatedUser(7L, "vet@example.com", "VETERINARIAN");
 
     @Test
     void legacyCompletionCannotBypassUnifiedStateMachine() {
         ApiException error = assertThrows(ApiException.class, () ->
-                new PreventiveCareService(schedules, horses, care, admissions)
+                new PreventiveCareService(schedules, horses, care, admissions, users)
                     .recordCompletion(1L, new CompletePreventiveCareScheduleRequest(), vet));
         assertEquals(HttpStatus.GONE, error.getStatus());
         verifyNoInteractions(schedules, horses, care);
@@ -43,7 +44,7 @@ class PreventiveCareServiceTest {
             CreatePreventiveCareScheduleRequest request = new CreatePreventiveCareScheduleRequest();
             request.setCareType(type);
             assertThrows(ApiException.class, () ->
-                    new PreventiveCareService(schedules, horses, care, admissions).createSchedule(request, vet));
+                    new PreventiveCareService(schedules, horses, care, admissions, users).createSchedule(request, vet));
         }
         verifyNoInteractions(care, schedules);
     }
@@ -66,7 +67,7 @@ class PreventiveCareServiceTest {
         CreatePreventiveCareScheduleRequest request = new CreatePreventiveCareScheduleRequest();
         request.setHorseId(2L);
         request.setCareType("ROUTINE_EXAM");
-        assertSame(schedule, new PreventiveCareService(schedules, horses, care, admissions).createSchedule(request, vet));
+        assertSame(schedule, new PreventiveCareService(schedules, horses, care, admissions, users).createSchedule(request, vet));
         verify(care).createNextSchedule(argThat(r -> r.getCareType() == CareType.ROUTINE
                 && Long.valueOf(99L).equals(r.getSourceScheduleId())
                 && r.getIdempotencyKey() != null
