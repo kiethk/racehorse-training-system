@@ -95,7 +95,7 @@ export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
             <label htmlFor="field-restriction-details" className="block text-xs font-bold text-[var(--color-warning)]">
               Assessment note <span className="text-[var(--color-danger)]">*</span>
             </label>
-            <span className="text-[11px] text-[var(--color-text-secondary)]">Click preset to quick-insert:</span>
+            
           </div>
           {/* Quick-Chips for common clinical restrictions */}
           <div className="flex flex-wrap gap-1.5">

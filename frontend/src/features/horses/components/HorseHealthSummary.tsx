@@ -100,9 +100,17 @@ export function HorseHealthSummary({
                     <span className="font-semibold text-[var(--color-text-primary)] block">
                       {item.careType || item.description || 'Preventive Check'}
                     </span>
-                    <span className="text-[12px] text-[var(--color-text-muted)]">
-                      Scheduled: {formatDate(item.scheduledDate || item.scheduledAt)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-x-3 text-[12px] text-[var(--color-text-muted)]">
+                      <span>Scheduled: {formatDate(item.scheduledDate || item.scheduledAt)}</span>
+                      {item.veterinarianName ? (
+                        <span className="flex items-center gap-1 text-[var(--color-text-secondary)] font-medium">
+                          <Icon name="user" size={13} className="text-[var(--color-primary)]" />
+                          {item.veterinarianName}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--color-text-muted)] italic">Unassigned</span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <Pill

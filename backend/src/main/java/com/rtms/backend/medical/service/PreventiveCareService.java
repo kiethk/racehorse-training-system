@@ -16,6 +16,8 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
@@ -26,9 +28,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Legacy route adapter: all work is stored and scheduled through CareSchedule.
@@ -43,13 +47,20 @@ public class PreventiveCareService {
     private final HorseRepository horses;
     private final CareScheduleService care;
     private final AdmissionApplicationRepository admissions;
+    private final UserRepository users;
 
     public PreventiveCareService(CareScheduleRepository schedules, HorseRepository horses,
             CareScheduleService care, AdmissionApplicationRepository admissions) {
+        this(schedules, horses, care, admissions, null);
+    }
+
+    public PreventiveCareService(CareScheduleRepository schedules, HorseRepository horses,
+            CareScheduleService care, AdmissionApplicationRepository admissions, UserRepository users) {
         this.schedules = schedules;
         this.horses = horses;
         this.care = care;
         this.admissions = admissions;
+        this.users = users;
     }
 
     @Transactional
@@ -179,7 +190,7 @@ public class PreventiveCareService {
         return saved;
     }
 
-    public List<CareSchedule> getSchedulesByHorse(Long horseId, AuthenticatedUser user) {
+    public List<CareScheduleResponse> getSchedulesByHorse(Long horseId, AuthenticatedUser user) {
         if ("HORSE_OWNER".equals(user.getRole())) {
             Horse horse = horses.findById(horseId).orElseThrow(() ->
                     new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found"));
@@ -187,7 +198,20 @@ public class PreventiveCareService {
                 throw new AccessDeniedException("You can only view schedules for horses you own");
             }
         }
-        return schedules.findByHorseIdOrderByScheduledAtAsc(horseId);
+        List<CareSchedule> list = schedules.findByHorseIdOrderByScheduledAtAsc(horseId);
+        Set<Long> vetIds = list.stream()
+                .map(CareSchedule::getVeterinarianId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> vetNames = users != null && !vetIds.isEmpty()
+                ? users.findAllById(vetIds).stream()
+                        .filter(u -> u.getId() != null && u.getFullName() != null)
+                        .collect(Collectors.toMap(User::getId, User::getFullName))
+                : Map.of();
+
+        return list.stream()
+                .map(cs -> CareScheduleResponse.from(cs, cs.getVeterinarianId() != null ? vetNames.get(cs.getVeterinarianId()) : null))
+                .toList();
     }
 
     public HealthRecord recordCompletion(Long id, CompletePreventiveCareScheduleRequest request, AuthenticatedUser user) {
