@@ -203,12 +203,12 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
                       htmlFor={`marker-note-${marker.id}`}
                       className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
                     >
-                      Clinical note <span className="text-[var(--color-danger)]">*</span>
+                      Clinical note (Optional)
                     </label>
                     <Input
                       id={`marker-note-${marker.id}`}
                       type="text"
-                      placeholder="Enter clinical observation, swelling, pain response, wound details…"
+                      placeholder="Optional: enter specific details or leave blank to use region name"
                       value={marker.description || ''}
                       disabled={readOnly}
                       onChange={(e) => handleUpdateMarker(marker.id, { description: e.target.value })}

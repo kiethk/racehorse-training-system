@@ -13,6 +13,7 @@ public record CareScheduleResponse(
         Long id,
         Long horseId,
         Long veterinarianId,
+        String veterinarianName,
         Long admissionId,
         Long sourceIncidentId,
         CareType careType,
@@ -32,6 +33,10 @@ public record CareScheduleResponse(
         int rolloverCount
 ) {
     public static CareScheduleResponse from(CareSchedule cs) {
+        return from(cs, null);
+    }
+
+    public static CareScheduleResponse from(CareSchedule cs, String vetName) {
         if (cs == null) return null;
         LocalDate date = cs.getScheduledDate();
         if (date == null && cs.getScheduledAt() != null) {
@@ -43,6 +48,7 @@ public record CareScheduleResponse(
                 cs.getId(),
                 cs.getHorseId(),
                 cs.getVeterinarianId(),
+                vetName,
                 cs.getAdmissionId(),
                 cs.getSourceIncidentId(),
                 cs.getCareType(),
