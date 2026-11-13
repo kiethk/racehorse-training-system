@@ -14,7 +14,6 @@ import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
-import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
@@ -34,15 +33,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class HorseIncidentReportService {
-
-    /** Ca chưa khám. */
-    private static final Set<CareScheduleStatus> NOT_EXAMINED =
-            Set.of(CareScheduleStatus.SCHEDULED);
 
     private final HorseIncidentReportRepository incidentReportRepository;
     private final HorseRepository horseRepository;
@@ -73,7 +67,8 @@ public class HorseIncidentReportService {
 
     /**
      * Mức độ quyết định ca khám: LOW, MEDIUM thành ca ROUTINE, ngựa vẫn tập. HIGH, CRITICAL thành ca URGENT và chặn tập.
-     * Mỗi ngựa chỉ có một ca sự cố đang mở: báo cáo mới gắn vào ca đó, ca ROUTINE chưa khám thì nhường chỗ cho ca URGENT.
+     * Mỗi ngựa chỉ có một ca sự cố đang mở: báo cáo mới gắn vào ca đó. Ca ROUTINE đang khám mà gặp TRAUMA thì
+     * tạm dừng (vẫn mở, giữ Vet để khám tiếp sau) và mở ca URGENT song song.
      */
     @Transactional
     public HorseIncidentReport createReport(CreateIncidentReportRequest request, AuthenticatedUser currentUser) {
@@ -91,18 +86,21 @@ public class HorseIncidentReportService {
         boolean serious = saved.getIncidentType() == IncidentType.TRAUMA;
 
         CareSchedule openCase = careScheduleService.findOpenIncidentCase(horse.getId()).orElse(null);
-        boolean escalate = serious && openCase != null && openCase.getCareType() == CareType.ROUTINE
-                && NOT_EXAMINED.contains(openCase.getStatus());
+        boolean escalate = serious && openCase != null && openCase.getCareType() == CareType.ROUTINE;
 
         CareSchedule target = openCase;
-        if (openCase == null || escalate) {
-            target = createCase(horse, saved, serious);
+        if (escalate) {
+            // Tạm dừng trước khi gán ca URGENT: Vet đang khám không bị coi là bận, và ca này không bị offload.
+            careScheduleService.interruptForUrgent(openCase);
+            target = createCase(horse, saved, serious, openCase.getId());
+        } else if (openCase == null) {
+            target = createCase(horse, saved, serious, null);
         }
         if (escalate) {
             List<HorseIncidentReport> moved = incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(openCase.getId());
-            moved.forEach(report -> report.setCareScheduleId(saved.getCareScheduleId()));
+            Long newCaseId = target.getId();
+            moved.forEach(report -> report.setCareScheduleId(newCaseId));
             incidentReportRepository.saveAll(moved);
-            careScheduleService.cancelSupersededCase(openCase);
         }
         saved.setCareScheduleId(target.getId());
         incidentReportRepository.save(saved);
@@ -111,9 +109,9 @@ public class HorseIncidentReportService {
         return saved;
     }
 
-    private CareSchedule createCase(Horse horse, HorseIncidentReport report, boolean serious) {
+    private CareSchedule createCase(Horse horse, HorseIncidentReport report, boolean serious, Long supersededCaseId) {
         Long caseId = careScheduleService.createSchedule(horse.getId(), serious ? CareType.URGENT : CareType.ROUTINE,
-                report.getDescription(), null, report.getId()).id();
+                report.getDescription(), null, report.getId(), supersededCaseId).id();
         report.setCareScheduleId(caseId);
         return careScheduleRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Incident case was not created"));

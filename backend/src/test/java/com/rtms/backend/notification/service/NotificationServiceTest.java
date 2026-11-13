@@ -87,6 +87,23 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("Rollover lần 2 vẫn báo: dedupSuffix tách key, notificationType giữ nguyên")
+    void sendAssignmentNotification_dedupSuffixSeparatesRepeatedRollovers() {
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
+        Notification first = notificationService.sendAssignmentNotification(
+                15L, NotificationTypes.REFERENCE_CARE_SCHEDULE, 9L, 3L,
+                NotificationTypes.CARE_SCHEDULE_EOD_ROLLED, "Rolled", "Moved", "1").orElseThrow();
+        Notification second = notificationService.sendAssignmentNotification(
+                15L, NotificationTypes.REFERENCE_CARE_SCHEDULE, 9L, 3L,
+                NotificationTypes.CARE_SCHEDULE_EOD_ROLLED, "Rolled", "Moved", "2").orElseThrow();
+
+        assertEquals("15:CARE_SCHEDULE_9:CARE_SCHEDULE_EOD_ROLLED:1", first.getDeduplicationKey());
+        assertEquals("15:CARE_SCHEDULE_9:CARE_SCHEDULE_EOD_ROLLED:2", second.getDeduplicationKey());
+        assertEquals(NotificationTypes.CARE_SCHEDULE_EOD_ROLLED, second.getNotificationType());
+    }
+
+    @Test
     @DisplayName("Deduplication: Trả về thông báo cũ nếu key đã tồn tại, không lưu trùng")
     void deduplication_returnsExistingWhenKeyExists() {
         String dedupKey = "15:ADMISSION_2:VET_INITIAL_EXAM";

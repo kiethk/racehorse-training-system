@@ -13,7 +13,6 @@ import java.time.LocalDate;
 
 
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

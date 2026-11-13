@@ -148,12 +148,12 @@ class HorseIncidentReportRoutingTest {
 
         assertEquals(100L, report.getCareScheduleId());
         assertEquals(IncidentStatus.IN_REVIEW, report.getStatus());
-        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong());
+        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong(), any());
     }
 
     @Test
-    @DisplayName("HIGH khi ca ROUTINE chưa khám: hủy ca đó, báo cáo cũ sang ca URGENT mới")
-    void seriousReportReplacesAnUnexaminedRoutineCase() {
+    @DisplayName("HIGH khi ca ROUTINE chưa khám: tạm dừng ca đó (giữ Vet), báo cáo cũ sang ca URGENT mới")
+    void seriousReportPausesTheRoutineCase() {
         CareSchedule routine = schedule(100L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED, VET_ID);
         when(careScheduleService.findOpenIncidentCase(HORSE_ID)).thenReturn(Optional.of(routine));
         HorseIncidentReport earlier = storedReport(routine, IncidentStatus.IN_REVIEW, VET_ID);
@@ -161,7 +161,8 @@ class HorseIncidentReportRoutingTest {
 
         HorseIncidentReport report = service.createReport(request(IncidentType.TRAUMA), groom);
 
-        verify(careScheduleService).cancelSupersededCase(routine);
+        verify(careScheduleService).interruptForUrgent(routine);
+        verify(careScheduleService).createSchedule(eq(HORSE_ID), eq(CareType.URGENT), any(), isNull(), anyLong(), eq(100L));
         assertEquals(200L, report.getCareScheduleId());
         assertEquals(200L, earlier.getCareScheduleId());
         assertEquals(21L, earlier.getHandledById());
@@ -169,16 +170,18 @@ class HorseIncidentReportRoutingTest {
     }
 
     @Test
-    @DisplayName("HIGH khi Vet đang khám ca ROUTINE: gắn vào ca đó và không tự ý chặn tập")
-    void seriousReportJoinsARoutineExamInProgress() {
+    @DisplayName("HIGH khi Vet đang khám ca ROUTINE: vẫn tách ca URGENT, ca Routine giữ nguyên để khám tiếp")
+    void seriousReportPausesARoutineExamInProgress() {
         CareSchedule routine = schedule(100L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS, VET_ID);
         when(careScheduleService.findOpenIncidentCase(HORSE_ID)).thenReturn(Optional.of(routine));
+        HorseIncidentReport earlier = storedReport(routine, IncidentStatus.IN_REVIEW, VET_ID);
+        stubCreatedCase(CareType.URGENT, 200L, 21L);
 
         HorseIncidentReport report = service.createReport(request(IncidentType.TRAUMA), groom);
 
-        assertEquals(100L, report.getCareScheduleId());
-        verify(careScheduleService, never()).cancelSupersededCase(any());
-        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong());
+        verify(careScheduleService).interruptForUrgent(routine);
+        assertEquals(200L, report.getCareScheduleId());
+        assertEquals(200L, earlier.getCareScheduleId());
         verify(trainingDecisions, never()).block(any(), anyString());
     }
 
@@ -191,7 +194,7 @@ class HorseIncidentReportRoutingTest {
         HorseIncidentReport report = service.createReport(request(IncidentType.TRAUMA), groom);
 
         assertEquals(100L, report.getCareScheduleId());
-        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong());
+        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong(), any());
     }
 
     @Test
@@ -293,7 +296,7 @@ class HorseIncidentReportRoutingTest {
         CareSchedule created = schedule(id, type, CareScheduleStatus.SCHEDULED, vetId);
         CareScheduleResponse response = mock(CareScheduleResponse.class);
         when(response.id()).thenReturn(id);
-        when(careScheduleService.createSchedule(eq(HORSE_ID), eq(type), anyString(), isNull(), anyLong())).thenReturn(response);
+        when(careScheduleService.createSchedule(eq(HORSE_ID), eq(type), anyString(), isNull(), anyLong(), any())).thenReturn(response);
         when(schedules.findById(id)).thenReturn(Optional.of(created));
         return created;
     }

@@ -28,7 +28,6 @@ import com.rtms.backend.training.service.TrainingDecisionService;
 
 
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
 import jakarta.persistence.EntityManager;
@@ -43,6 +42,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -493,17 +493,83 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("AD-022: cancelCareSchedule abolished — follow-up examinations are protected by absence of cancel API")
-    void testCancel_lastPendingExamOfBlockedHorse_rejected() {
-        // Under AD-022, cancelCareSchedule is removed entirely. The LAST_FOLLOW_UP
-        // vulnerability no longer exists because neither Vet nor Manager can delete exams.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
+    @DisplayName("Ca ROUTINE bị ca khẩn cấp chen ngang: về SCHEDULED, giữ Vet, báo Vet khám tiếp")
+    void interruptingARoutineVisitKeepsTheVet() {
+        urgentSchedule.setCareType(CareType.ROUTINE);
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        urgentSchedule.setScheduledAt(LocalDateTime.now().minusHours(1));
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+
+        careScheduleService.interruptForUrgent(urgentSchedule);
+
+        assertEquals(CareScheduleStatus.SCHEDULED, urgentSchedule.getStatus());
+        assertEquals(vet.getId(), urgentSchedule.getVeterinarianId());
+        assertNull(urgentSchedule.getScheduledAt());
+        verify(notificationService).sendAssignmentNotification(eq(vet.getId()),
+                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE), eq(urgentSchedule.getId()), eq(horse.getId()),
+                eq(NotificationTypes.CARE_SCHEDULE_PAUSED), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("Ngựa đang có ca IN_PROGRESS: không mở được ca thứ hai (tránh resolve oan báo cáo TRAUMA)")
+    void testStartCareSchedule_rejectsASecondExamOnTheSameHorse() {
+        when(userRepository.findById(vet.getId())).thenReturn(Optional.of(vet));
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(horseRepository.findByIdForUpdate(horse.getId())).thenReturn(Optional.of(horse));
+        when(careScheduleRepository.findByIdForUpdate(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(careScheduleRepository.existsByHorseIdAndStatus(horse.getId(), CareScheduleStatus.IN_PROGRESS))
+                .thenReturn(true);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> careScheduleService.startCareSchedule(urgentSchedule.getId(), vet.getId()));
+
+        assertEquals(HttpStatus.CONFLICT, error.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, urgentSchedule.getStatus());
+        verify(careScheduleRepository, never()).save(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Ngựa đang khám ca khác: không complete được ca SCHEDULED (complete nhận cả SCHEDULED)")
+    void testCompleteCareSchedule_rejectsWhenAnotherExamRuns() {
+        urgentSchedule.setStatus(CareScheduleStatus.SCHEDULED);
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(horseRepository.findByIdForUpdate(horse.getId())).thenReturn(Optional.of(horse));
+        when(careScheduleRepository.findByIdForUpdate(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(careScheduleRepository.existsByHorseIdAndStatus(horse.getId(), CareScheduleStatus.IN_PROGRESS))
+                .thenReturn(true);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> careScheduleService.completeCareSchedule(urgentSchedule.getId(),
+                        completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.CONFLICT, error.getStatus());
+        assertEquals("HORSE_EXAM_IN_PROGRESS", error.getErrorCode());
+        verify(healthRecordRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("AD-022: duplicate booking cancellation abolished — reschedule used instead")
     void testCancel_blockedHorseWithAnotherPendingExam_allowed() {
         assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
+    }
+
+    @Test
+    @DisplayName("Ngựa INACTIVE: ca IN_PROGRESS còn mở cũng bị đóng báo cáo, không chỉ ca SCHEDULED")
+    void closingIncidentCasesForInactiveHorseIncludesTheExamInProgress() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        incident.setCareScheduleId(urgentSchedule.getId());
+        when(incidentReportRepository.findByHorseIdAndStatusIn(horse.getId(),
+                List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW))).thenReturn(List.of(incident));
+        when(careScheduleRepository.findByHorseIdAndStatusIn(horse.getId(),
+                List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of(urgentSchedule));
+
+        careScheduleService.closeOpenIncidentCasesForHorse(horse.getId(), "Horse left the club");
+
+        assertEquals(IncidentStatus.DISMISSED, incident.getStatus());
+        assertNull(incident.getCareScheduleId());
+        assertTrue(incident.getHandlerNote().contains("Horse left the club"));
+        verify(incidentReportRepository).saveAll(anyList());
     }
 
     private void stubCompletion() {

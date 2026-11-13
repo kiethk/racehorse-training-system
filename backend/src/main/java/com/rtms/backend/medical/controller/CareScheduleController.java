@@ -1,6 +1,5 @@
 package com.rtms.backend.medical.controller;
 import com.rtms.backend.common.dto.ApiResponse;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import com.rtms.backend.medical.dto.CareScheduleDetailResponse;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
@@ -118,15 +117,6 @@ public class CareScheduleController {
             @Valid @RequestBody CompleteCareScheduleRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(careScheduleService.completeCareSchedule(id, request, currentUser.getUserId()));
-    }
-
-    @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('CLUB_MANAGER') or principal.role == 'CLUB_MANAGER'")
-    public ApiResponse<CareScheduleResponse> cancel(
-            @PathVariable Long id,
-            @Valid @RequestBody CancelCareScheduleRequest request,
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(careScheduleService.cancelCareSchedule(id, request, currentUser.getUserId()));
     }
 
     @PostMapping("/create-next")

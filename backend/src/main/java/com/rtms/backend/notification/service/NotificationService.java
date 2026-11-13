@@ -106,6 +106,22 @@ public class NotificationService {
             String title,
             String message) {
 
+        return sendAssignmentNotification(recipientId, referenceType, referenceId, horseId,
+                notificationType, title, message, null);
+    }
+
+    /** `dedupSuffix` tách các lần lặp hợp lệ của cùng một loại trên cùng bản ghi (ví dụ rollover lần 2, 3). */
+    @Transactional
+    public Optional<Notification> sendAssignmentNotification(
+            Long recipientId,
+            String referenceType,
+            Long referenceId,
+            Long horseId,
+            String notificationType,
+            String title,
+            String message,
+            String dedupSuffix) {
+
         if (recipientId == null) {
             return Optional.empty();
         }
@@ -113,7 +129,8 @@ public class NotificationService {
         String eventType = notificationType != null && !notificationType.isBlank()
                 ? notificationType
                 : "ASSIGNMENT";
-        String dedupKey = Notification.buildDeduplicationKey(recipientId, referenceType, referenceId, eventType);
+        String dedupKey = Notification.buildDeduplicationKey(recipientId, referenceType, referenceId,
+                dedupSuffix == null || dedupSuffix.isBlank() ? eventType : eventType + ":" + dedupSuffix);
 
         return createNotification(recipientId, title, message, eventType, referenceType, referenceId, dedupKey);
     }
