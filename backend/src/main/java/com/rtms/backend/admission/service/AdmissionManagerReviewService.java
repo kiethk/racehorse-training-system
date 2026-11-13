@@ -14,6 +14,7 @@ import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
@@ -41,6 +42,7 @@ public class AdmissionManagerReviewService {
     private final GroomProfileRepository groomProfileRepository;
     private final AdmissionNotificationService admissionNotificationService;
     private final AuditLogService auditLogService;
+    private final CareScheduleService careScheduleService;
 
     @Autowired
     public AdmissionManagerReviewService(
@@ -52,7 +54,8 @@ public class AdmissionManagerReviewService {
             PreventiveStatusService preventiveStatusService,
             GroomProfileRepository groomProfileRepository,
             AdmissionNotificationService admissionNotificationService,
-            AuditLogService auditLogService) {
+            AuditLogService auditLogService,
+            CareScheduleService careScheduleService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.stableStallRepository = stableStallRepository;
         this.horseRepository = horseRepository;
@@ -62,6 +65,7 @@ public class AdmissionManagerReviewService {
         this.groomProfileRepository = groomProfileRepository;
         this.admissionNotificationService = admissionNotificationService;
         this.auditLogService = auditLogService;
+        this.careScheduleService = careScheduleService;
     }
 
     public AdmissionManagerReviewService(
@@ -75,7 +79,7 @@ public class AdmissionManagerReviewService {
             AdmissionNotificationService admissionNotificationService) {
         this(admissionApplicationRepository, stableStallRepository, horseRepository,
              careScheduleRepository, admissionGroomReviewService, preventiveStatusService,
-             groomProfileRepository, admissionNotificationService, null);
+             groomProfileRepository, admissionNotificationService, null, null);
     }
 
     @Transactional
@@ -179,6 +183,10 @@ public class AdmissionManagerReviewService {
         // 6. Phác đồ bắt buộc mà khám nhập trại chưa tiêm, cũng chưa có sổ cũ: hẹn tiêm ngay hôm sau.
         preventiveStatusService.upsertMilestone(horse.getId(), "preventive:approval:" + admission.getId(),
                 managerId, LocalDate.now().plusDays(1));
+
+        if (careScheduleService != null) {
+            careScheduleService.assignPendingSchedulesForHorse(horse.getId());
+        }
 
         admissionGroomReviewService.notifyGroomAssigned(admission, regularStall,
                 horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");

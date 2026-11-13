@@ -633,7 +633,8 @@ public class CareScheduleService {
         record.setRecordType(schedule.getCareType().name());
         record.setExaminedAt(now);
         record.setFindings(request.getFindings().trim());
-        record.setDiagnosis(request.getDiagnosis().trim());
+        com.rtms.backend.medical.enums.ClinicalDiagnosis cd = com.rtms.backend.medical.enums.ClinicalDiagnosis.fromString(request.getDiagnosis());
+        record.setDiagnosis(cd != null ? cd.getDisplayName() : request.getDiagnosis().trim());
         record.setTreatment(request.getTreatment() != null ? request.getTreatment().trim() : null);
         // Bệnh án ghi kết quả thực tế: ca bị giữ chặn thì ngựa vẫn BLOCKED dù Vet chọn ALLOWED.
         record.setTrainingDecision(preservedForOtherExam ? TrainingDecision.BLOCKED : request.getTrainingDecision());
@@ -1376,18 +1377,17 @@ public class CareScheduleService {
     /** Tách `now` thành tham số để test dùng clock cố định. */
     void runLifecycleSweep(LocalDateTime now) {
         LocalTime tod = now.toLocalTime();
-
-        // Rollover chỉ chạy khi qua ngày mới (sau 23:59 hoặc rạng sáng trước 06:00) cho các ca của ngày hôm trước
-        boolean isMidnightSweepWindow = tod.isBefore(LocalTime.of(6, 0)) || !tod.isBefore(LocalTime.of(23, 59));
-        if (isMidnightSweepWindow) {
-            List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
-            for (CareSchedule cs : careScheduleRepository.findRollableEodCandidates(openStatuses, now)) {
-                rollOverEod(cs, now);
-            }
+        if (!tod.isBefore(WORKDAY_START) && tod.isBefore(WORKDAY_END)) {
+            return;
+        }
+        if (tod.isBefore(WORKDAY_END)) {
+            return; // trước 17:00: không rollover/escalate
         }
 
-        // Kiểm tra cảnh báo ca URGENT quá hạn (chạy liên tục trong ngày)
         List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
+        for (CareSchedule cs : careScheduleRepository.findRollableEodCandidates(openStatuses, now)) {
+            rollOverEod(cs, now);
+        }
         for (CareSchedule cs : careScheduleRepository.findStaleUrgentForEscalation(openStatuses, now)) {
             escalateStaleUrgent(cs);
         }
@@ -1592,7 +1592,19 @@ public class CareScheduleService {
     }
 
     public void assignRequestedSchedule(CareSchedule schedule) {
-        assignRequestedSchedule(schedule, schedule.getRequestedById());
+        assignRequestedSchedule(schedule, schedule.getRequestedById(), false);
+    }
+
+    @Transactional
+    public void assignPendingSchedulesForHorse(Long horseId) {
+        if (horseId == null) return;
+        List<CareSchedule> pending = careScheduleRepository.findByHorseIdAndStatusIn(
+                horseId, List.of(CareScheduleStatus.SCHEDULED));
+        for (CareSchedule schedule : pending) {
+            if (schedule.getVeterinarianId() == null) {
+                assignRequestedSchedule(schedule, schedule.getRequestedById(), true);
+            }
+        }
     }
 
     /**
@@ -1601,15 +1613,15 @@ public class CareScheduleService {
      *                     if other vets are unavailable or at daily quota.
      */
     void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId) {
-        assignRequestedSchedule(schedule, creatorVetId, null);
+        assignRequestedSchedule(schedule, creatorVetId, false);
     }
 
-    void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId, Long excludeFromOffload) {
+    void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId, boolean ignoreHorizon) {
         if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) return;
         if (schedule.getVeterinarianId() != null && (schedule.getScheduledDate() != null || schedule.getScheduledAt() != null)) return;
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime horizon = now.plusDays(ASSIGNMENT_HORIZON_DAYS);
-        if (isBeyondAssignmentHorizon(schedule, horizon)) return;
+        if (!ignoreHorizon && isBeyondAssignmentHorizon(schedule, horizon)) return;
 
         // Keep the global lock order admission -> horse -> schedule (same as lockClinicalSchedule)
         // so concurrent Vet actions and auto-assignment cannot deadlock.

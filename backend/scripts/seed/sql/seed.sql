@@ -14,6 +14,7 @@
 \ir 30_admissions.sql
 \ir 40_vet_cases.sql
 \ir 45_preventive.sql
+\ir 46_showcase_vt02_vt03.sql
 \ir 50_training.sql
 \ir 60_groom.sql
 \ir 65_vitals.sql

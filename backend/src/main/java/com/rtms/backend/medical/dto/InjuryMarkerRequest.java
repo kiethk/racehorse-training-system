@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 public class InjuryMarkerRequest {
     @NotNull
     private Long bodyRegionId;
-    @NotBlank
     private String description;
     private LocalDateTime diagnosedAt;
     private BigDecimal positionX;
