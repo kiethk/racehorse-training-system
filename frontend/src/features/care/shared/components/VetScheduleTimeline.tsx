@@ -126,7 +126,9 @@ export function VetScheduleTimeline() {
   }, [todaySchedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
-    if (item.careType === 'INITIAL') {
+    if (item.status === 'COMPLETED') {
+      router.push(`/veterinarian/records?scheduleId=${item.id}&back=schedule`);
+    } else if (item.careType === 'INITIAL') {
       router.push(`/veterinarian/admissions?scheduleId=${item.id}`);
     } else if (item.purpose === 'PREVENTIVE') {
       router.push(`/veterinarian/preventive-care?horseId=${item.horseId}`);
@@ -420,7 +422,7 @@ export function VetScheduleTimeline() {
                       {/* Right: Action Button */}
                       <div className="shrink-0 flex flex-col items-end gap-1">
                         <Button
-                          variant={isCompleted ? 'secondary' : 'primary'}
+                          variant={isCompleted || cs.status === 'IN_PROGRESS' ? 'secondary' : 'primary'}
                           size="sm"
                           icon={examAction.icon}
                           disabled={!isCompleted && !canExamine}

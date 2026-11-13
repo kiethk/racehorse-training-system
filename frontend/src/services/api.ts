@@ -156,6 +156,8 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   const finalOptions = { ...options };
   const headers = new Headers(options.headers || {});
   
+  headers.set('X-Client-Time', new Date().toISOString());
+
   if (accessToken && !isAuthEndpoint) {
     headers.set('Authorization', `Bearer ${accessToken}`);
   }

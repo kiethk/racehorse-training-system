@@ -147,7 +147,7 @@ export function VetTodayAgenda({
                     )}
 
                     <Button
-                      variant={schedule.status === "COMPLETED" ? "secondary" : "primary"}
+                      variant={schedule.status === "COMPLETED" || schedule.status === "IN_PROGRESS" ? "secondary" : "primary"}
                       size="sm"
                       icon={action.icon}
                       onClick={(event) => {

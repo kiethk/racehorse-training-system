@@ -4,18 +4,42 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 /**
- * Đồng hồ dùng chung cho mọi luật theo giờ của huấn luyện (buổi đã bắt đầu, đã kết thúc, hôm nay còn khe không). Có bean riêng để
- * test đặt được giờ cố định thay vì chờ đồng hồ thật.
- * (The shared clock behind every time-based training rule (a Session has started, has ended, is there room today). A bean of its
- * own lets tests fix the time instead of waiting for the real clock.)
+ * Đồng hồ dùng chung cho toàn bộ hệ thống.
+ * Tự động đồng bộ theo giờ từ Client (qua header X-Client-Time) nếu có,
+ * hoặc fallback về giờ hệ thống (Asia/Ho_Chi_Minh).
  */
 @Configuration
 public class ClockConfig {
 
     @Bean
     public Clock clock() {
-        return Clock.systemDefaultZone();
+        return new DynamicClientClock(ClientTimeContext.DEFAULT_ZONE);
+    }
+
+    public static class DynamicClientClock extends Clock {
+        private final ZoneId zone;
+
+        public DynamicClientClock(ZoneId zone) {
+            this.zone = zone != null ? zone : ClientTimeContext.DEFAULT_ZONE;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new DynamicClientClock(zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return ClientTimeContext.now().atZone(zone).toInstant();
+        }
     }
 }

@@ -342,7 +342,7 @@ export function RoutineChecksWorkspace() {
                   {/* Right: Action Button */}
                   <div className="shrink-0 flex flex-col items-end gap-1">
                     <Button
-                      variant={isClosed ? 'secondary' : 'primary'}
+                      variant={isClosed || cs.status === 'IN_PROGRESS' ? 'secondary' : 'primary'}
                       size="sm"
                       icon={isClosed ? 'file-text' : getScheduleExamAction(cs.status).icon}
                       disabled={!isClosed && !canExamine}

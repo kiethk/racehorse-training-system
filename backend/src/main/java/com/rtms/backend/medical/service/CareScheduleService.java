@@ -1,4 +1,5 @@
 package com.rtms.backend.medical.service;
+import com.rtms.backend.config.ClientTimeContext;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
@@ -875,7 +876,7 @@ public class CareScheduleService {
      */
     private void validateRoutineScheduleDate(CareSchedule schedule) {
         if (schedule.getCareType() == CareType.ROUTINE) {
-            LocalDate today = LocalDate.now();
+            LocalDate today = ClientTimeContext.today();
             LocalDate scheduledDate = schedule.getScheduledDate();
             if (scheduledDate == null && schedule.getScheduledAt() != null) {
                 scheduledDate = schedule.getScheduledAt().toLocalDate();
@@ -896,7 +897,7 @@ public class CareScheduleService {
      */
     private void validateRoutineExamWindowForStart(CareSchedule schedule) {
         if (schedule.getCareType() == CareType.ROUTINE && schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE) {
-            LocalTime now = LocalTime.now();
+            LocalTime now = ClientTimeContext.time();
             if (now.isBefore(FarmSchedulePolicy.VET_WINDOW_START) || now.isAfter(FarmSchedulePolicy.VET_WINDOW_END)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTINE_EXAM_OUTSIDE_WINDOW",
                         "Routine examinations can only be started between " + FarmSchedulePolicy.VET_WINDOW_START
