@@ -112,14 +112,11 @@ export function HorseHealthSummary({
                         isManager && item.veterinarianId ? (
                           <Link
                             href={`/manager/accounts?userId=${item.veterinarianId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-[var(--color-primary)] hover:underline font-medium"
                             title={`View account of ${item.veterinarianName}`}
                           >
                             <Icon name="user" size={13} className="text-[var(--color-primary)]" />
                             <span>{item.veterinarianName}</span>
-                            <Icon name="external-link" size={11} className="opacity-70" />
                           </Link>
                         ) : (
                           <span className="flex items-center gap-1 text-[var(--color-text-secondary)] font-medium">
