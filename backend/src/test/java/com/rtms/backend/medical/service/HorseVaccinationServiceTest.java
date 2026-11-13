@@ -6,9 +6,13 @@ import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.HorseVaccinationRequest;
 import com.rtms.backend.medical.dto.HorseVaccinationResult;
+import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.ProtocolCategory;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.PreventiveProtocolRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
@@ -43,6 +47,7 @@ class HorseVaccinationServiceTest {
     @Mock HealthRecordRepository healthRecords;
     @Mock PreventiveVaccinationService vaccinations;
     @Mock PreventiveStatusService preventiveStatus;
+    @Mock CareScheduleRepository careSchedules;
 
     private HorseVaccinationService service;
     private Horse horse;
@@ -82,6 +87,31 @@ class HorseVaccinationServiceTest {
         verify(vaccinations).record(eq(501L), argThat(doses -> doses.size() == 2
                 && doses.stream().allMatch(d -> d.administeredOn().equals(TODAY))));
         verify(preventiveStatus).upsertMilestone(5L, "preventive:501", 20L, TODAY);
+    }
+
+    @Test
+    void completingAVaccinationClosesTheActivePreventiveScheduleAndLinksTheRecord() {
+        CareSchedule active = new CareSchedule();
+        active.setId(77L);
+        active.setHorseId(5L);
+        active.setPurpose(CareSchedulePurpose.PREVENTIVE);
+        active.setStatus(CareScheduleStatus.SCHEDULED);
+        active.setScheduledDate(TODAY);
+        when(careSchedules.findFirstByHorseIdAndPurposeAndStatusIn(
+                5L, CareSchedulePurpose.PREVENTIVE, CareScheduleStatus.OPEN)).thenReturn(Optional.of(active));
+
+        HorseVaccinationService withSchedules = new HorseVaccinationService(protocols, horses, healthRecords,
+                vaccinations, preventiveStatus, careSchedules,
+                Clock.fixed(TODAY.atTime(9, 0).atZone(ZONE).toInstant(), ZONE));
+
+        withSchedules.record(5L, request(null, dose(1L)), 20L);
+
+        assertEquals(CareScheduleStatus.COMPLETED, active.getStatus());
+        assertNotNull(active.getCompletedAt());
+        ArgumentCaptor<HealthRecord> saved = ArgumentCaptor.forClass(HealthRecord.class);
+        verify(healthRecords).save(saved.capture());
+        assertEquals(77L, saved.getValue().getCareScheduleId());
+        verify(careSchedules).save(active);
     }
 
     @Test

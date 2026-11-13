@@ -356,9 +356,9 @@ export function RoutineChecksWorkspace() {
                     >
                       {isClosed ? 'View Record' : getScheduleExamAction(cs.status).label}
                     </Button>
-                    {!isClosed && isOutsideRoutineWindow && cs.status !== 'IN_PROGRESS' && (
-                      <span className="text-[11px] text-[var(--color-text-secondary)] font-medium">
-                        Opens 13:30 – 15:30
+                    {!isClosed && !canExamine && cs.status !== 'IN_PROGRESS' && (
+                      <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                        {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
                       </span>
                     )}
                   </div>

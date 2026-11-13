@@ -39,7 +39,9 @@ public class ClockConfig {
 
         @Override
         public Instant instant() {
-            return ClientTimeContext.now().atZone(zone).toInstant();
+            // Client time is captured as a wall-clock value in the farm's zone. Always
+            // convert from that zone so withZone() changes the display zone, not the instant.
+            return ClientTimeContext.now().atZone(ClientTimeContext.DEFAULT_ZONE).toInstant();
         }
     }
 }

@@ -5,6 +5,7 @@ import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.config.ClientTimeContext;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -33,6 +34,7 @@ import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
 import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -293,9 +295,17 @@ class RoutineCadenceTest {
         verify(healthRecords, never()).save(any());
     }
 
+    @AfterEach
+    void clearClientTime() {
+        ClientTimeContext.clear();
+    }
+
     @Test
     @DisplayName("Ca ROUTINE quá hạn (ngày hẹn trong quá khứ) -> được phép hoàn tất")
     void routineExamOverdueIsAccepted() {
+        // The exam window follows the client clock; pin it inside 13:30-15:30 so this
+        // test stays deterministic when the suite runs outside the window.
+        ClientTimeContext.set(LocalDateTime.now().withHour(14).withMinute(0).withSecond(0).withNano(0));
         CareSchedule exam = routineExam(CareScheduleStatus.SCHEDULED);
         exam.setScheduledDate(LocalDate.now().minusDays(2));
         stubCompletion(exam);

@@ -16,6 +16,7 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.config.ClientTimeContext;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.enums.CareType;
@@ -126,7 +127,7 @@ public class PreventiveCareService {
         if (request.getScheduledDate() != null) {
             requestedAt = request.getScheduledDate().atTime(14, 0);
         }
-        if (requestedAt == null || !requestedAt.isAfter(LocalDateTime.now())) {
+        if (requestedAt == null || !requestedAt.isAfter(ClientTimeContext.now())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "Requested schedule time must be in the future");
         }
 

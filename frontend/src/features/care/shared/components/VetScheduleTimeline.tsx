@@ -436,9 +436,9 @@ export function VetScheduleTimeline() {
                         >
                           {examAction.label}
                         </Button>
-                        {!isCompleted && isOutsideRoutineWindow && cs.status !== 'IN_PROGRESS' && (
-                          <span className="text-[11px] text-[var(--color-text-secondary)] font-medium">
-                            Opens 13:30 – 15:30
+                        {!isCompleted && !canExamine && cs.status !== 'IN_PROGRESS' && (
+                          <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                            {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
                           </span>
                         )}
                       </div>
@@ -524,14 +524,18 @@ export function VetScheduleTimeline() {
                             : (cs.careType === 'INITIAL' ? 'Admission' : 'Routine');
                           const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
 
-                          // Block ROUTINE SCHEDULED outside 13:30–15:30 window
+                          // Block ROUTINE SCHEDULED before its date or outside 13:30–15:30.
+                          // IN_PROGRESS (Continue) and preventive visits stay open.
                           const _now = new Date();
+                          const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+                          const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+                          const isFuture = Boolean(cs.status !== 'COMPLETED' && rawDate && rawDate > todayIso);
                           const _minNow = _now.getHours() * 60 + _now.getMinutes();
                           const isRoutineBlocked =
                             cs.careType === 'ROUTINE' &&
                             cs.purpose !== 'PREVENTIVE' &&
                             cs.status === 'SCHEDULED' &&
-                            (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+                            (isFuture || _minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
 
                           return (
                             <div
@@ -546,7 +550,9 @@ export function VetScheduleTimeline() {
                                 }
                               }}
                               className={`p-2 rounded-[var(--radius-sm)] border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text} ${isRoutineBlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02] hover:shadow-xs'}`}
-                              title={isRoutineBlocked ? `Routine exam window: 13:30 – 15:30` : `#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
+                              title={isRoutineBlocked
+                                ? (isFuture ? 'This routine examination is scheduled for a later date.' : 'Routine exam window: 13:30 – 15:30')
+                                : `#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
                             >
                               <div className="flex items-center justify-between text-xs font-bold">
                                 <span>{timeStr}</span>
@@ -563,8 +569,8 @@ export function VetScheduleTimeline() {
                                 {horseName}
                               </p>
                               {isRoutineBlocked && (
-                                <p className="text-[9px] mt-1 font-semibold text-[var(--color-text-muted)]">
-                                  Opens 13:30 – 15:30
+                                <p className="text-xs mt-1 font-semibold text-[var(--color-text-muted)]">
+                                  {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
                                 </p>
                               )}
                             </div>

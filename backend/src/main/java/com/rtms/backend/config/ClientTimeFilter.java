@@ -13,6 +13,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 
+/**
+ * Demo support: the frontend sends the device clock in {@code X-Client-Time} so changing the
+ * OS clock and pressing F5 is enough for time-based rules. Treat this as a demo-only feature;
+ * do not expose it to untrusted clients in production without an explicit guard.
+ */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ClientTimeFilter extends OncePerRequestFilter {

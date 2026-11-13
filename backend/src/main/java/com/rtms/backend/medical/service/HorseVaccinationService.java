@@ -51,18 +51,6 @@ public class HorseVaccinationService {
     @Autowired
     public HorseVaccinationService(PreventiveProtocolRepository protocols, HorseRepository horses,
             HealthRecordRepository healthRecords, PreventiveVaccinationService vaccinations,
-            PreventiveStatusService preventiveStatus, CareScheduleRepository careSchedules) {
-        this(protocols, horses, healthRecords, vaccinations, preventiveStatus, careSchedules, Clock.systemDefaultZone());
-    }
-
-    HorseVaccinationService(PreventiveProtocolRepository protocols, HorseRepository horses,
-            HealthRecordRepository healthRecords, PreventiveVaccinationService vaccinations,
-            PreventiveStatusService preventiveStatus, Clock clock) {
-        this(protocols, horses, healthRecords, vaccinations, preventiveStatus, null, clock);
-    }
-
-    HorseVaccinationService(PreventiveProtocolRepository protocols, HorseRepository horses,
-            HealthRecordRepository healthRecords, PreventiveVaccinationService vaccinations,
             PreventiveStatusService preventiveStatus, CareScheduleRepository careSchedules, Clock clock) {
         this.protocols = protocols;
         this.horses = horses;
@@ -71,6 +59,12 @@ public class HorseVaccinationService {
         this.preventiveStatus = preventiveStatus;
         this.careSchedules = careSchedules;
         this.clock = clock;
+    }
+
+    HorseVaccinationService(PreventiveProtocolRepository protocols, HorseRepository horses,
+            HealthRecordRepository healthRecords, PreventiveVaccinationService vaccinations,
+            PreventiveStatusService preventiveStatus, Clock clock) {
+        this(protocols, horses, healthRecords, vaccinations, preventiveStatus, null, clock);
     }
 
     @Transactional
