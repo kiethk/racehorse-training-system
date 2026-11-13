@@ -348,12 +348,13 @@ export function VetScheduleTimeline() {
                 const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
                 const isFuture = Boolean(!isCompleted && rawDate && rawDate > todayIso);
                 const _minNow = _now.getHours() * 60 + _now.getMinutes();
+                const isPreventive = cs.purpose === 'PREVENTIVE';
                 const isOutsideRoutineWindow =
                   cs.careType === 'ROUTINE' &&
-                  cs.purpose !== 'PREVENTIVE' &&
+                  !isPreventive &&
                   cs.status === 'SCHEDULED' &&
                   (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
-                const canExamine = cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
+                const canExamine = isPreventive || cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
 
                 return (
                   <Panel
