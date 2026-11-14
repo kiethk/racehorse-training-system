@@ -211,7 +211,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
                 id: 'documents',
                 label: 'Documents',
                 count: detail.documents.length,
-                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+                content: <AdmissionDocumentsSection documents={detail.documents} />,
               },
             ]}
           />

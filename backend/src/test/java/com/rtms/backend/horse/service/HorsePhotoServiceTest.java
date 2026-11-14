@@ -102,7 +102,7 @@ class HorsePhotoServiceTest {
 
         assertTrue(result.isEmpty());
         verify(documentRepo, never()).findByAdmissionIdInAndDocumentType(any(), any());
-        verify(storage, never()).load(any());
+        verify(storage, never()).load(any(), any());
     }
 
     @Test
@@ -166,16 +166,16 @@ class HorsePhotoServiceTest {
                 .thenReturn(List.of(photo(200L, 100L, "local:horse.jpg")));
 
         Resource fakeResource = new ByteArrayResource(new byte[]{1, 2, 3});
-        when(storage.load("local:horse.jpg")).thenReturn(fakeResource);
+        when(storage.load("local:horse.jpg", null)).thenReturn(fakeResource);
         when(storage.mediaType("local:horse.jpg", null)).thenReturn(MediaType.IMAGE_JPEG);
 
-        HorsePhotoService.PhotoResult result = service.resolvePhoto(5L);
+        HorsePhotoService.PhotoResult result = service.resolvePhoto(5L, null);
 
         assertSame(fakeResource, result.resource());
         assertEquals(MediaType.IMAGE_JPEG, result.mediaType());
 
         // storage.load and storage.mediaType each called exactly once with the same key
-        verify(storage, times(1)).load("local:horse.jpg");
+        verify(storage, times(1)).load("local:horse.jpg", null);
         verify(storage, times(1)).mediaType("local:horse.jpg", null);
         // document lookup is not duplicated
         verify(admissionRepo, times(1)).findByHorseIdIn(any());
@@ -191,10 +191,10 @@ class HorsePhotoServiceTest {
                 .thenReturn(List.of(photo(200L, 100L, "local:horse-uuid")));
 
         Resource fakeResource = new ByteArrayResource(new byte[]{1, 2, 3});
-        when(storage.load("local:horse-uuid")).thenReturn(fakeResource);
+        when(storage.load("local:horse-uuid", null)).thenReturn(fakeResource);
         when(storage.mediaType("local:horse-uuid", null)).thenReturn(MediaType.APPLICATION_OCTET_STREAM);
 
-        HorsePhotoService.PhotoResult result = service.resolvePhoto(5L);
+        HorsePhotoService.PhotoResult result = service.resolvePhoto(5L, null);
 
         assertSame(fakeResource, result.resource());
         assertEquals(MediaType.IMAGE_JPEG, result.mediaType());
@@ -206,10 +206,10 @@ class HorsePhotoServiceTest {
         when(admissionRepo.findByHorseIdIn(List.of(99L))).thenReturn(List.of());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.resolvePhoto(99L));
+                () -> service.resolvePhoto(99L, null));
 
         assertEquals(404, ex.getStatusCode().value());
-        verify(storage, never()).load(any());
+        verify(storage, never()).load(any(), any());
         verify(storage, never()).mediaType(any(), any());
     }
 
@@ -222,10 +222,10 @@ class HorsePhotoServiceTest {
                 .thenReturn(List.of());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.resolvePhoto(7L));
+                () -> service.resolvePhoto(7L, null));
 
         assertEquals(404, ex.getStatusCode().value());
-        verify(storage, never()).load(any());
+        verify(storage, never()).load(any(), any());
     }
 
     @Test
@@ -239,10 +239,10 @@ class HorsePhotoServiceTest {
         when(editDocuments.findFirstByHorseIdAndDocumentTypeAndCurrentTrue(10L, AdmissionDocumentType.HORSE_PHOTO))
                 .thenReturn(java.util.Optional.of(edited));
         Resource bytes = new ByteArrayResource(new byte[]{1});
-        when(storage.load("local:edited.png")).thenReturn(bytes);
+        when(storage.load("local:edited.png", null)).thenReturn(bytes);
         when(storage.mediaType("local:edited.png")).thenReturn(MediaType.IMAGE_PNG);
 
-        HorsePhotoService.PhotoResult result = service.resolvePhoto(10L);
+        HorsePhotoService.PhotoResult result = service.resolvePhoto(10L, null);
 
         assertSame(bytes, result.resource());
         verifyNoInteractions(admissionRepo, documentRepo);

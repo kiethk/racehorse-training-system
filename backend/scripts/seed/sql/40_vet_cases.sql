@@ -92,7 +92,7 @@ END $$ LANGUAGE plpgsql;
 
 DO $$
 DECLARE
-    s BIGINT; r BIGINT; c BIGINT; v_injury BIGINT; v_new BIGINT; v_dup BIGINT;
+    s BIGINT; r BIGINT; c BIGINT; v_injury BIGINT; v_new BIGINT;
 BEGIN
     -- 1. EAGLE ATENA (A02, Groom groom1): khập khiễng sau buổi phi sáng nay, Thú y vet1 đang khám (IN_PROGRESS).
     --    Groom báo thêm lần hai, báo cáo đó gắn vào cùng ca khẩn cấp. Ngựa bị chặn tập, plan đang chạy bị hủy.
@@ -241,17 +241,15 @@ BEGIN
             'ACTIVE', 0.4500, 0.0500, 0.5200, pg_temp.at(-10, TIME '08:15'), pg_temp.at(-10, TIME '08:15'));
     PERFORM pg_temp.recheck(s, 'VT03', 'SCHEDULED');
 
-    -- 8. AG NOBEL EMIR (A07): xây xát nhẹ, Groom báo trùng hai lần; Manager bác báo cáo trùng (DISMISSED), ca khẩn cấp
-    --    khám xong đóng báo cáo còn lại. (A scrape reported twice; the manager dismisses the duplicate.)
+    -- 8. AG NOBEL EMIR (A07): xây xát nhẹ, Groom báo hai lần. Như trên app, báo cáo thứ hai gắn vào ca đang mở và
+    --    theo Vet của ca; khám xong thì cả hai báo cáo cùng RESOLVED.
+    --    (A scrape reported twice: like the app, the second report joins the open case and both resolve with it.)
     s := pg_temp.urgent_case('H007', 'GR03', pg_temp.at(-15, TIME '10:20'), 'Scrape on the left hip',
                              'Hair rubbed off and a small scrape on the left hip, probably from the stall wall.', 'TRAUMA', 'VT01',
                              'SCHEDULED', p_image => 'admission-packs/h007-ag-nobel-emir/horse-photo.jpg');
-    v_dup := pg_temp.report_incident(pg_temp.hid('H007'), pg_temp.uid('GR03'), pg_temp.at(-15, TIME '10:35'),
-                                     'Scrape on the left hip', 'Same scrape on the left hip, reporting again.', 'TRAUMA', NULL);
-    UPDATE horse_incident_reports SET status = 'DISMISSED', handled_by_id = pg_temp.uid('ADMIN'),
-                                      handled_at = pg_temp.at(-15, TIME '10:50'),
-                                      handler_note = 'Duplicate of the report sent at 10:20, the vet is already on this case.'
-     WHERE id = v_dup;
+    PERFORM pg_temp.report_incident(pg_temp.hid('H007'), pg_temp.uid('GR03'), pg_temp.at(-15, TIME '10:35'),
+                                    'Scrape on the left hip', 'Same scrape on the left hip, it looks a little deeper now.',
+                                    'TRAUMA', NULL);
     PERFORM pg_temp.complete_care(s, pg_temp.at(-15, TIME '11:00'),
         p_findings => 'Superficial abrasion 3 x 2 cm on the left hip, no swelling, sound.', p_diagnosis => 'Skin abrasion',
         p_decision => 'ALLOWED', p_treatment => 'Cleaned, antiseptic spray.', p_symptoms => 'Small scrape, no lameness',

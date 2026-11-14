@@ -171,9 +171,11 @@ export function PdfViewer({
 
   useEffect(() => {
     void renderAllPages();
+    // The map object never changes, only its entries, so the one captured here is the one to clean up.
+    const renderTasks = renderTasksRef.current;
     return () => {
-      renderTasksRef.current.forEach((task) => task.cancel());
-      renderTasksRef.current.clear();
+      renderTasks.forEach((task) => task.cancel());
+      renderTasks.clear();
     };
   }, [renderAllPages]);
 

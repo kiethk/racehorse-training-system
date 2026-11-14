@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
+import { fileVariantUrl, type FileVariant } from '@/lib/fileVariant';
 import { useProtectedFileUrl } from '@/lib/protectedFile';
 import { ImageLightbox } from './ImageLightbox';
 import { Skeleton } from './Skeleton';
@@ -11,14 +12,18 @@ interface ProtectedImageProps {
   src: string;
   alt: string;
   className?: string;
+  /** Copy shown on the page: THUMB for small tiles (up to 128 px), PREVIEW (default) for larger images. */
+  size?: FileVariant;
   /** Wraps the image in a control that opens it full size directly in a lightbox preview. */
   openOnClick?: boolean;
 }
 
 /** An image stored by the backend. Use this instead of <img> for any file served by a protected endpoint. */
-export function ProtectedImage({ src, alt, className, openOnClick = false }: ProtectedImageProps) {
-  const { url, failed } = useProtectedFileUrl(src);
+export function ProtectedImage({ src, alt, className, size = 'PREVIEW', openOnClick = false }: ProtectedImageProps) {
+  const { url, failed } = useProtectedFileUrl(fileVariantUrl(src, size));
   const [viewing, setViewing] = useState(false);
+  // The original is only downloaded once the lightbox opens; the copy on the page stands in until it arrives.
+  const { url: originalUrl } = useProtectedFileUrl(viewing ? src : null);
 
   if (failed) {
     return <p className="text-xs italic text-[var(--color-text-muted)]">The image could not be loaded.</p>;
@@ -43,7 +48,7 @@ export function ProtectedImage({ src, alt, className, openOnClick = false }: Pro
       </button>
       {viewing && (
         <ImageLightbox
-          images={[{ src: url, alt }]}
+          images={[{ src: originalUrl ?? url, alt }]}
           index={0}
           onIndexChange={() => undefined}
           onClose={() => setViewing(false)}

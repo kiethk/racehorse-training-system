@@ -3,6 +3,7 @@ package com.rtms.backend.admission.controller;
 import com.rtms.backend.admission.entity.AdmissionDocument;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.admission.service.AdmissionQueryService;
 import com.rtms.backend.admission.service.OwnerAdmissionService;
 import org.springframework.core.io.Resource;
@@ -31,13 +32,14 @@ public class AdmissionDocumentDownloadController {
     @GetMapping("/{id}/documents/{documentId}/file")
     @PreAuthorize("hasAuthority('ADMISSION_DOCUMENT_VIEW')")
     public ResponseEntity<Resource> download(@PathVariable Long id, @PathVariable Long documentId,
+            @RequestParam(required = false) FileVariant size,
             @AuthenticationPrincipal AuthenticatedUser viewer) {
         if ("VETERINARIAN".equals(viewer.getRole())) {
             admissionQueryService.assertVetAssignedOrManager(id, viewer);
         }
         AdmissionDocument document = service.getDocumentForViewer(id, documentId, viewer);
         // Local and cloud files are both streamed from here, so the checks above always apply.
-        Resource file = storage.load(document.getFileUrl());
+        Resource file = storage.load(document.getFileUrl(), size);
         String filename = document.getOriginalFileName() == null
                 ? "admission-document-" + documentId
                 : document.getOriginalFileName();

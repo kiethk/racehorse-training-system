@@ -1,5 +1,6 @@
 package com.rtms.backend.identity.controller;
 
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.identity.dto.LoginResponse;
 import com.rtms.backend.identity.dto.UpdateMyProfileRequest;
@@ -30,8 +31,9 @@ public class MyProfileController {
     }
 
     @GetMapping("/avatar")
-    public ResponseEntity<Resource> avatar(@AuthenticationPrincipal AuthenticatedUser actor) {
-        var photo = profiles.avatar(actor.getUserId());
+    public ResponseEntity<Resource> avatar(@AuthenticationPrincipal AuthenticatedUser actor,
+            @RequestParam(required = false) FileVariant size) {
+        var photo = profiles.avatar(actor.getUserId(), size);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(photo.mediaType())
                 .header("X-Content-Type-Options", "nosniff").body(photo.resource());
     }

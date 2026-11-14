@@ -1,5 +1,6 @@
 package com.rtms.backend.stable.controller;
 
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.stable.dto.CreateGroomDailyTaskRequest;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
@@ -92,8 +93,9 @@ public class GroomDailyTaskController {
     public ResponseEntity<Resource> completionPhoto(
             @PathVariable Long completionId,
             @PathVariable int index,
+            @RequestParam(required = false) FileVariant size,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        Resource file = taskService.loadCompletionPhoto(completionId, index, currentUser);
+        Resource file = taskService.loadCompletionPhoto(completionId, index, currentUser, size);
         return ResponseEntity.ok()
                 .contentType(taskService.completionPhotoMediaType(completionId, index, currentUser))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=task-completion-" + completionId + "-" + index)

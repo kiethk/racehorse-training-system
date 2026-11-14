@@ -44,13 +44,15 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
   MANAGER_REVIEW, APPROVED, bị Groom từ chối, bị Manager từ chối rồi nộp lại và được duyệt. Mỗi đơn có đủ ảnh và PDF.
   Có ngựa bị Thú y cho tạm nghỉ ngay lúc nhập trại, và ngựa có bố là một ngựa khác trong trại (phả hệ liên kết).
 - **Thú y:** khám nhập trại; tiêm phòng / tẩy giun định kỳ theo phác đồ (gồm một lần hoãn tiêm, tiêm từ "To do", một lịch
-  quá giờ chưa khám); sự cố do Groom báo ở mọi trạng thái (đang khám, vừa giao, đã xong, báo trùng bị bác).
+  quá giờ chưa khám); sự cố do Groom báo ở mọi trạng thái (đang khám, vừa giao, đã xong, báo hai lần gắn chung một ca).
   Còn có: ngựa đang tạm nghỉ chờ tái khám (có lịch đã quá hạn), chuỗi tái khám tự động +14 ngày, Manager hủy lịch tái khám
   thừa, chấn thương (kể cả bản bị hiệu chỉnh), phác đồ điều trị ACTIVE / COMPLETED / CANCELLED.
 - **Sinh hiệu:** Thú y đo mỗi ngựa một lần mỗi tuần, mỗi ngựa một ngày riêng, đôi khi lệch nhẹ. Ngựa đang tạm nghỉ được
   đo hằng ngày với số đo bất thường tới khi khỏi; ngựa có buổi tập mệt thì chiều hôm đó nhịp tim cao.
 - **Huấn luyện:** 3 Trainer, mỗi người có bài tập và khóa riêng. Khóa có nhiều kiểu: một bài lặp lại, nhiều bài xoay vòng,
-  toàn bài khác nhau, khóa chưa ai học. Ngựa được chia vào các Training Group (tối đa 6 ngựa); ngựa đang bị chặn tập không nằm trong nhóm nào. Mỗi nhóm chạy nối tiếp các khóa trong khoảng 13 tuần lịch sử: Group
+  toàn bài khác nhau, khóa chưa ai học. Ngựa được chia vào các Training Group (tối đa 6 ngựa) theo sở trường cự ly, và nhóm đặt tên theo sở trường đó
+  ("Sprint Group", "Sprint & Mile Group", "Mile Group", "Stayer Group"...): ngựa trong nhóm chạy tốt ở cự ly sở trường và đuối
+  ở cự ly khác, nên có cùng huy hiệu; ngựa đang bị chặn tập không nằm trong nhóm nào. Mỗi nhóm chạy nối tiếp các khóa trong khoảng 13 tuần lịch sử: Group
   Plan COMPLETED / ACTIVE và một plan UPCOMING xếp hàng sau plan đang chạy. Trạng thái theo đồng hồ: Session hết giờ là HELD, dù
   đã ghi kết quả hay chưa. Có sẵn các kịch bản demo: Session đã HELD còn thiếu kết quả (nhãn "Needs result"), ngựa vào giữa
   khóa, ngựa bị hủy riêng một buổi, ngựa "không chạy", Session bị hủy vì mưa, plan bị bỏ giữa chừng, ngựa bị chặn tập ra khỏi

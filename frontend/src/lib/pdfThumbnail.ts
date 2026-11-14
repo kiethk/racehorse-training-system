@@ -3,6 +3,7 @@
 import './pdfPolyfill';
 import { useEffect, useState } from 'react';
 import { apiGetBlob } from '@/services/api';
+import { withDownloadSlot } from './protectedFile';
 
 type PdfJs = typeof import('pdfjs-dist');
 
@@ -63,7 +64,11 @@ export function usePdfFirstPage(source: string | null, width = 240): { url: stri
     if (!source) return;
     const controller = new AbortController();
     let objectUrl: string | undefined;
-    apiGetBlob(source, controller.signal)
+    // Shares the download cap with photos; a thumbnail that is gone before its turn never starts.
+    withDownloadSlot(async () => {
+      controller.signal.throwIfAborted();
+      return apiGetBlob(source, controller.signal);
+    })
       .then((pdf) => renderPdfFirstPage(pdf, width, controller.signal))
       .then((png) => {
         if (controller.signal.aborted) return;
