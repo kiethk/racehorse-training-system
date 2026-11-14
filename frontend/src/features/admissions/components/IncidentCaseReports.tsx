@@ -23,6 +23,7 @@ export function IncidentCaseReports({ title, reports }: { title: string; reports
               {report.imageUrl && (
                 <div className="group relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
                   <ProtectedImage
+                    size="THUMB"
                     src={report.imageUrl}
                     alt={`Report: ${report.title}`}
                     openOnClick

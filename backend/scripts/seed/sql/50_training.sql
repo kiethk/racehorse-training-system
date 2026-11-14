@@ -21,6 +21,8 @@
 -- =====================================================================
 
 CREATE TEMP TABLE seed_plan_cancel (plan_id BIGINT PRIMARY KEY);
+-- Sở trường (cự ly) của mỗi nhóm, chọn lúc gom nhóm. (Each group's distance specialty, chosen when the group is formed.)
+CREATE TEMP TABLE seed_group_bands (group_id BIGINT PRIMARY KEY, bands TEXT[] NOT NULL);
 
 -- Ngày các buổi tập: từ p_start, lấy ngày có thứ nằm trong p_days, đủ p_total buổi.
 -- (Session dates: from p_start, keep days whose weekday is in p_days, until p_total sessions.)
@@ -66,30 +68,15 @@ CREATE FUNCTION pg_temp.band(p_meters NUMERIC) RETURNS TEXT AS $$
                 WHEN p_meters < 2400 THEN 'MIDDLE' ELSE 'STAYER' END
 $$ LANGUAGE sql IMMUTABLE;
 
--- Sở trường của một nhóm: ngựa trong nhóm chạy tốt ở các cự ly này và đuối ở cự ly khác, nên cùng nhóm thì cùng huy hiệu. Chỉ
--- chọn trong các cự ly nhóm đã chạy ít nhất 4 buổi trong 90 ngày (khung tính huy hiệu), để mọi con đủ 3 buổi; xoay vòng theo thứ
--- tự tạo nhóm: cự ly chạy nhiều nhất, cự ly thứ hai, hoặc cả hai. Nhóm chạy quá ít thì lấy cự ly chạy nhiều nhất.
--- (A group's specialty: its horses run well at these distances and struggle at the others, so horses of one group earn the same
--- badges. Chosen among the distances the group ran at least 4 times in the 90-day badge window, so every horse has 3; in turn by
--- group creation order: the most-run distance, the second, or both. A group that ran too little takes its most-run distance.)
-CREATE FUNCTION pg_temp.group_bands(p_group BIGINT) RETURNS TEXT[] AS $$
-    WITH ran AS (
-        SELECT pg_temp.band(sub.target_distance_meters) AS band, count(*) AS n
-          FROM training_sessions s
-          JOIN course_runs p ON p.id = s.course_run_id
-          JOIN exercises sub ON sub.id = s.exercise_id
-         WHERE p.group_id = p_group AND s.status = 'HELD' AND sub.category <> 'RECOVERY'
-           AND s.session_date >= pg_temp.today() - 90
-         GROUP BY 1),
-    -- Cự ly đủ 4 buổi; nhóm chạy quá ít thì lấy cự ly chạy nhiều nhất. (Distances with 4 runs; else the most-run one.)
-    enough AS (SELECT * FROM ran WHERE n >= 4
-               UNION ALL
-               SELECT * FROM (SELECT * FROM ran ORDER BY n DESC, band LIMIT 1) top WHERE NOT EXISTS (SELECT 1 FROM ran WHERE n >= 4)),
-    ranked AS (SELECT band, row_number() OVER (ORDER BY n DESC, band) AS rk, count(*) OVER () AS total FROM enough),
-    turn AS (SELECT (SELECT count(*) FROM training_groups g WHERE g.id < p_group) % 3 AS k)
-    SELECT ARRAY(SELECT band FROM ranked, turn
-                  WHERE CASE turn.k WHEN 0 THEN rk = 1 WHEN 1 THEN rk = LEAST(2, total) ELSE rk <= 2 END)
-$$ LANGUAGE sql STABLE;
+-- Tên nhóm theo sở trường, vì Trainer gom ngựa theo cự ly sở trường: {SPRINT} -> "Sprint Group",
+-- {MIDDLE,STAYER} -> "Middle Distance & Stayer Group". (Group name from its specialty, since a Trainer groups horses by the
+-- distance they are best at.)
+CREATE FUNCTION pg_temp.specialty_name(p_bands TEXT[]) RETURNS TEXT AS $$
+    SELECT string_agg(CASE b WHEN 'SPRINT' THEN 'Sprint' WHEN 'MILE' THEN 'Mile'
+                             WHEN 'MIDDLE' THEN 'Middle Distance' ELSE 'Stayer' END, ' & '
+                      ORDER BY array_position(ARRAY['SPRINT', 'MILE', 'MIDDLE', 'STAYER'], b)) || ' Group'
+      FROM unnest(p_bands) b
+$$ LANGUAGE sql IMMUTABLE;
 
 -- Nhận xét của Trainer theo điểm. (The Trainer's note for a rating.)
 CREATE FUNCTION pg_temp.feedback(p_rating INT) RETURNS TEXT AS $$
@@ -201,13 +188,17 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 
 -- Chia các ngựa đã cho thành các nhóm tối đa 6 ngựa; seed chủ ý rải Groom khác nhau vào mỗi nhóm cho dữ liệu đa dạng (luật không bắt buộc). Ngựa đang bị chặn tập bỏ qua.
--- (Splits the horses into groups of at most 6; the seed deliberately spreads grooms across a group for variety, the rules do not require it. Horses blocked right now are skipped.)
-CREATE FUNCTION pg_temp.make_groups(p_trainer TEXT, p_prefix TEXT, p_horses TEXT[]) RETURNS BIGINT[] AS $$
+-- Nhóm thứ i có sở trường p_specialties[i] (các cự ly cách nhau dấu phẩy, ví dụ 'SPRINT,MILE') và tên theo sở trường đó.
+-- Chọn cự ly nhóm chạy đủ nhiều (từ 4 buổi trong 90 ngày) để mọi con có huy hiệu.
+-- (Splits the horses into groups of at most 6; the seed deliberately spreads grooms across a group for variety, the rules do not require it. Horses blocked right now are skipped.
+-- Group i gets specialty p_specialties[i] (comma-separated bands, e.g. 'SPRINT,MILE') and is named after it. Pick distances the
+-- group runs often enough (4 times in 90 days) so every horse earns the badge.)
+CREATE FUNCTION pg_temp.make_groups(p_trainer TEXT, p_specialties TEXT[], p_horses TEXT[]) RETURNS BIGINT[] AS $$
 DECLARE
     v_trainer BIGINT := pg_temp.uid(p_trainer);
     v_groups BIGINT[] := '{}';
     v_created TIMESTAMP := pg_temp.at(-92, TIME '09:00');
-    v_k TEXT; v_horse BIGINT; v_groom BIGINT; v_group BIGINT; v_placed BOOLEAN;
+    v_k TEXT; v_horse BIGINT; v_groom BIGINT; v_group BIGINT; v_placed BOOLEAN; v_bands TEXT[];
 BEGIN
     FOREACH v_k IN ARRAY p_horses LOOP
         v_horse := pg_temp.hid(v_k);
@@ -228,9 +219,14 @@ BEGIN
             END LOOP;
         END IF;
         IF NOT v_placed THEN
+            v_bands := string_to_array(p_specialties[COALESCE(array_length(v_groups, 1), 0) + 1], ',');
+            IF v_bands IS NULL THEN
+                RAISE EXCEPTION 'Trainer % needs more groups than the % specialties given', p_trainer, array_length(p_specialties, 1);
+            END IF;
             INSERT INTO training_groups (trainer_id, name, created_at, updated_at)
-            VALUES (v_trainer, p_prefix || ' ' || (COALESCE(array_length(v_groups, 1), 0) + 1), v_created, v_created)
+            VALUES (v_trainer, pg_temp.specialty_name(v_bands), v_created, v_created)
             RETURNING id INTO v_group;
+            INSERT INTO seed_group_bands (group_id, bands) VALUES (v_group, v_bands);
             v_groups := v_groups || v_group;
             INSERT INTO training_group_members (group_id, horse_id, groom_id, joined_at) VALUES (v_group, v_horse, v_groom, v_created);
             PERFORM pg_temp.audit(v_trainer, 'Create Training Group', 'TrainingGroup', v_group,
@@ -462,8 +458,6 @@ DECLARE
     r RECORD;
     x RECORD;
 BEGIN
-    CREATE TEMP TABLE seed_group_bands ON COMMIT DROP AS
-        SELECT g.id AS group_id, pg_temp.group_bands(g.id) AS bands FROM training_groups g;
     FOR r IN SELECT w.id, w.horse_id, w.session_id, s.exercise_id, s.course_run_id AS plan_id, b.bands,
                     w.recovery_heart_rate >= 118 AS fatigue,
                     (SELECT count(*) FROM training_sessions o WHERE o.course_run_id = s.course_run_id
@@ -501,6 +495,8 @@ END $$ LANGUAGE plpgsql;
 
 DO $$
 DECLARE
+    v_tr01 BIGINT[];
+    v_tr02 BIGINT[];
     v_groups BIGINT[];
     v_plan BIGINT;
     v_horse BIGINT;
@@ -553,7 +549,7 @@ BEGIN
                            ARRAY['Tempo Canter', 'Short Sprint Repeats', 'Stretch and Walk'], 45);
 
 
-    -- Trainer1, an early group that ran two plans and was then Disbanded; its horses go into the Morning groups below on 3 Aug.
+    -- Trainer1, an early group that ran two plans and was then Disbanded; its horses go into the specialty groups below.
     -- (Disbanded group: no members, no unfinished plan, past plans keep the group. Built first because a horse is in one group only.)
     DECLARE
         v_old BIGINT; v_k TEXT; v_h BIGINT; v_g BIGINT; v_gone TIMESTAMP := pg_temp.at(-91, TIME '09:30');
@@ -561,6 +557,8 @@ BEGIN
     BEGIN
         INSERT INTO training_groups (trainer_id, name, created_at, updated_at)
         VALUES (v_trainer, 'Foundation Group', pg_temp.at(-125, TIME '09:00'), pg_temp.at(-125, TIME '09:00')) RETURNING id INTO v_old;
+        -- Nhóm ngựa mới nhập trại, chưa rõ sở trường. (A newcomers' group, no specialty known yet.)
+        INSERT INTO seed_group_bands (group_id, bands) VALUES (v_old, '{}');
         PERFORM pg_temp.audit(v_trainer, 'Create Training Group', 'TrainingGroup', v_old,
                               'Trainer created a new training group', pg_temp.at(-125, TIME '09:00'), 'POST', '/api/training-groups');
         FOREACH v_k IN ARRAY ARRAY['H001','H004','H007'] LOOP
@@ -583,37 +581,36 @@ BEGIN
     END;
 
     -- ----------------------------------------------------------------- groups and their courses
-    v_groups := pg_temp.make_groups('TR01', 'Morning Group',
+    -- Mỗi nhóm một sở trường khác nhau trong số cự ly các khóa của Trainer chạy nhiều.
+    -- (Each group a different specialty among the distances the Trainer's courses run most.)
+    v_tr01 := pg_temp.make_groups('TR01', ARRAY['SPRINT', 'SPRINT,MILE', 'MILE'],
         ARRAY['H001','H002','H003','H004','H005','H006','H007','H008','H009','H010','H011','H012','H013','H014','H015','H016','H017','H018']);
-    PERFORM pg_temp.run_timeline('TR01', v_groups,
+    PERFORM pg_temp.run_timeline('TR01', v_tr01,
         ARRAY['Novice Foundation', 'Sprint Acceleration', 'Classic Endurance', 'Championship Trial Protocol', 'Recovery Maintenance'],
         1, 2);
 
-    v_groups := pg_temp.make_groups('TR02', 'Track Group',
+    v_tr02 := pg_temp.make_groups('TR02', ARRAY['MILE', 'SPRINT,MILE', 'SPRINT'],
         ARRAY['H019','H020','H021','H022','H023','H024','H025','H026','H027','H028','H029','H030','H031','H032','H033','H034','H035','H036']);
-    PERFORM pg_temp.run_timeline('TR02', v_groups, ARRAY['Distance Builder', 'Speed Sharpening', 'Starting Stall Basics'], 2, NULL);
+    PERFORM pg_temp.run_timeline('TR02', v_tr02, ARRAY['Distance Builder', 'Speed Sharpening', 'Starting Stall Basics'], 2, NULL);
 
-    v_groups := pg_temp.make_groups('TR03', 'Arabian Group', ARRAY['H037','H038','H039','H040','H041','H042']);
+    v_groups := pg_temp.make_groups('TR03', ARRAY['STAYER', 'MIDDLE,STAYER', 'MIDDLE'],
+        ARRAY['H037','H038','H039','H040','H041','H042']);
     PERFORM pg_temp.run_timeline('TR03', v_groups, ARRAY['Arabian Endurance Base', 'Pace Variation'], NULL, NULL);
 
     -- ----------------------------------------------------------------- demo scenarios
     -- Trainer1, group 1, second course: one horse did not actually run in the third Session.
-    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
-     WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 1' ORDER BY p.start_date OFFSET 1 LIMIT 1;
-    SELECT horse_id INTO v_horse FROM training_group_members m JOIN training_groups g ON g.id = m.group_id
-     WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 1' ORDER BY m.id LIMIT 1;
+    SELECT p.id INTO v_plan FROM course_runs p WHERE p.group_id = v_tr01[1] ORDER BY p.start_date OFFSET 1 LIMIT 1;
+    SELECT horse_id INTO v_horse FROM training_group_members m WHERE m.group_id = v_tr01[1] ORDER BY m.id LIMIT 1;
     IF v_plan IS NOT NULL AND v_horse IS NOT NULL THEN PERFORM pg_temp.did_not_run(v_plan, v_horse, 3); END IF;
 
     -- Trainer1, group 2, second course: heavy rain cancelled the fourth Session for the whole group.
-    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
-     WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 2' ORDER BY p.start_date OFFSET 1 LIMIT 1;
+    SELECT p.id INTO v_plan FROM course_runs p WHERE p.group_id = v_tr01[2] ORDER BY p.start_date OFFSET 1 LIMIT 1;
     IF v_plan IS NOT NULL THEN PERFORM pg_temp.cancel_session(v_plan, 4); END IF;
 
     -- Trainer1, group 3, running course: the Trainer rests one horse for its next Session only.
-    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
-     WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 3' AND p.status = 'ACTIVE' ORDER BY p.start_date LIMIT 1;
-    SELECT horse_id INTO v_horse FROM training_group_members m JOIN training_groups g ON g.id = m.group_id
-     WHERE g.trainer_id = pg_temp.uid('TR01') AND g.name = 'Morning Group 3' ORDER BY m.id LIMIT 1;
+    SELECT p.id INTO v_plan FROM course_runs p
+     WHERE p.group_id = v_tr01[3] AND p.status = 'ACTIVE' ORDER BY p.start_date LIMIT 1;
+    SELECT horse_id INTO v_horse FROM training_group_members m WHERE m.group_id = v_tr01[3] ORDER BY m.id LIMIT 1;
     IF v_plan IS NOT NULL AND v_horse IS NOT NULL THEN
         PERFORM pg_temp.cancel_workout(v_plan, v_horse, (SELECT idx FROM (
             SELECT row_number() OVER (ORDER BY session_date, start_time) idx, session_date, start_time, status
@@ -636,8 +633,7 @@ BEGIN
                     ORDER BY s2.session_date DESC, s2.start_time DESC LIMIT 1 OFFSET 3);
 
     -- Trainer2, group 1, second course: dropped part-way (Cancel plan after the fourth Session).
-    SELECT p.id INTO v_plan FROM course_runs p JOIN training_groups g ON g.id = p.group_id
-     WHERE g.trainer_id = pg_temp.uid('TR02') AND g.name = 'Track Group 1' ORDER BY p.start_date OFFSET 1 LIMIT 1;
+    SELECT p.id INTO v_plan FROM course_runs p WHERE p.group_id = v_tr02[1] ORDER BY p.start_date OFFSET 1 LIMIT 1;
     IF v_plan IS NOT NULL THEN
         PERFORM pg_temp.cancel_plan(v_plan, (SELECT session_date + end_time FROM (
             SELECT session_date, end_time, row_number() OVER (ORDER BY session_date, start_time) idx

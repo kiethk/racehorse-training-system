@@ -1,6 +1,7 @@
 package com.rtms.backend.identity.service;
 
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.identity.dto.LoginResponse;
 import com.rtms.backend.identity.dto.UpdateMyProfileRequest;
 import com.rtms.backend.identity.entity.User;
@@ -62,10 +63,10 @@ public class MyProfileService {
     }
 
     @Transactional(readOnly = true)
-    public Photo avatar(Long userId) {
+    public Photo avatar(Long userId, FileVariant size) {
         String key = activeUser(userId, false).getAvatarUrl();
         if (key == null || key.isBlank()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No profile photo");
-        return new Photo(storage.load(key), storage.mediaType(key));
+        return new Photo(storage.load(key, size), storage.mediaType(key));
     }
 
     private User activeUser(Long id, boolean lock) {

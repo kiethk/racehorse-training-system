@@ -1,5 +1,6 @@
 package com.rtms.backend.horse.controller;
 
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.horse.dto.HorseResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
@@ -67,7 +68,7 @@ class HorsePhotoEndpointTest {
                 .thenThrow(new AccessDeniedException("Access denied: You do not own this horse."));
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
-                () -> controller.getPhoto(horseId, unauthOwner));
+                () -> controller.getPhoto(horseId, null, unauthOwner));
 
         assertTrue(ex.getMessage().contains("Access denied"));
 
@@ -86,10 +87,10 @@ class HorsePhotoEndpointTest {
 
         Resource mockResource = new ByteArrayResource("fake-image-bytes".getBytes());
         MediaType expectedMediaType = MediaType.IMAGE_JPEG;
-        when(photoService.resolvePhoto(horseId))
+        when(photoService.resolvePhoto(horseId, null))
                 .thenReturn(new HorsePhotoService.PhotoResult(mockResource, expectedMediaType));
 
-        ResponseEntity<Resource> response = controller.getPhoto(horseId, validOwner);
+        ResponseEntity<Resource> response = controller.getPhoto(horseId, null, validOwner);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedMediaType, response.getHeaders().getContentType());
@@ -97,7 +98,7 @@ class HorsePhotoEndpointTest {
         assertEquals("nosniff", response.getHeaders().getFirst("X-Content-Type-Options"));
 
         verify(horseService, times(1)).getHorseById(horseId, validOwner);
-        verify(photoService, times(1)).resolvePhoto(horseId);
+        verify(photoService, times(1)).resolvePhoto(horseId, null);
     }
 
     @Test
@@ -111,14 +112,31 @@ class HorsePhotoEndpointTest {
 
         Resource mockResource = new ByteArrayResource("fake-png-bytes".getBytes());
         MediaType expectedMediaType = MediaType.IMAGE_PNG;
-        when(photoService.resolvePhoto(horseId))
+        when(photoService.resolvePhoto(horseId, null))
                 .thenReturn(new HorsePhotoService.PhotoResult(mockResource, expectedMediaType));
 
-        ResponseEntity<Resource> response = controller.getPhoto(horseId, manager);
+        ResponseEntity<Resource> response = controller.getPhoto(horseId, null, manager);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedMediaType, response.getHeaders().getContentType());
         assertSame(mockResource, response.getBody());
+    }
+
+    @Test
+    @DisplayName("GET /api/horses/{id}/photo?size=THUMB: the requested size reaches the photo service, access is still checked")
+    void getPhoto_withSize_passesTheSizeOnAfterTheAccessCheck() {
+        Long horseId = 300L;
+        AuthenticatedUser manager = new AuthenticatedUser(9L, "manager@test.com", "CLUB_MANAGER");
+        when(horseService.getHorseById(eq(horseId), eq(manager))).thenReturn(createHorse(horseId, 1L));
+        Resource thumb = new ByteArrayResource("small".getBytes());
+        when(photoService.resolvePhoto(horseId, FileVariant.THUMB))
+                .thenReturn(new HorsePhotoService.PhotoResult(thumb, MediaType.IMAGE_JPEG));
+
+        ResponseEntity<Resource> response = controller.getPhoto(horseId, FileVariant.THUMB, manager);
+
+        assertSame(thumb, response.getBody());
+        verify(horseService).getHorseById(horseId, manager);
+        verify(photoService).resolvePhoto(horseId, FileVariant.THUMB);
     }
 
     @Test

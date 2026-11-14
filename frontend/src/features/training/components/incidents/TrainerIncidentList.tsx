@@ -15,6 +15,7 @@ import {
   INCIDENT_STATUS_MAP,
   formatIncidentReportedAt,
   incidentHorseName,
+  incidentVetText,
 } from '@/features/groom/lib/incidentDisplay';
 import type { IncidentReport, IncidentStatus } from '@/features/groom/types';
 
@@ -83,14 +84,14 @@ export function TrainerIncidentList() {
     {
       id: 'veterinarian',
       header: 'Veterinarian',
-      render: (report) =>
-        report.handlerName && report.status !== 'DISMISSED' ? (
-          report.handlerName
+      render: (report) => {
+        const vet = incidentVetText(report);
+        return report.handlerName && vet ? (
+          vet
         ) : (
-          <span className="italic text-[var(--color-text-muted)]">
-            {report.status === 'REPORTED' ? 'Awaiting assignment' : '—'}
-          </span>
-        ),
+          <span className="italic text-[var(--color-text-muted)]">{vet ?? '—'}</span>
+        );
+      },
       sortValue: (report) => report.handlerName ?? '',
     },
     {

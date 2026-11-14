@@ -38,6 +38,7 @@ export { ProtectedImage } from './ProtectedImage';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export { PageSection, ScreenLayout } from './ScreenLayout';
 export { ScoreScale } from './ScoreScale';
+export { SearchCombobox, type SearchComboboxOption } from './SearchCombobox';
 export { FilterChips, SegmentedControl, type SegmentOption } from './SegmentedControl';
 export { SelectableCard } from './SelectableCard';
 export { Skeleton } from './Skeleton';

@@ -68,7 +68,6 @@ export function DocumentSlotGrid({ slots, chosen, onChoose, onlyTypes }: Documen
             uploadedAt: preview.updatedAt ?? '',
           }}
           label={documentTypeLabel(preview.documentType)}
-          fileUrl={preview.fileUrl}
           onClose={() => setPreview(null)}
         />
       )}

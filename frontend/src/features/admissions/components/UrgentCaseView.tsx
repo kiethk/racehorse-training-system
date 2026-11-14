@@ -279,6 +279,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           {urgentCase.imageUrl && (
             <div className="group relative h-28 w-28 sm:h-32 sm:w-32 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
               <ProtectedImage
+                size="THUMB"
                 src={urgentCase.imageUrl}
                 alt="Urgent case report incident photo"
                 openOnClick
@@ -333,6 +334,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       {report.imageUrl && (
                         <div className="group relative h-20 w-20 sm:h-22 sm:w-22 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
                           <ProtectedImage
+                            size="THUMB"
                             src={report.imageUrl}
                             alt={`Report: ${report.title}`}
                             openOnClick

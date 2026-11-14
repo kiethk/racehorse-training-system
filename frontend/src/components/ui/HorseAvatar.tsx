@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { fileVariantUrl } from '@/lib/fileVariant';
 import { useProtectedFileUrl } from '@/lib/protectedFile';
 
 interface HorseAvatarProps {
@@ -14,7 +15,8 @@ interface HorseAvatarProps {
 export function HorseAvatar({ name, image, size = 36, rounded = 'sm' }: HorseAvatarProps) {
   const radius = rounded === 'md' ? 'rounded-[var(--radius-md)]' : 'rounded-[var(--radius-sm)]';
   const [failedImage, setFailedImage] = useState<string | null>(null);
-  const { url } = useProtectedFileUrl(image);
+  // Avatars are at most 128 px, so the small copy is enough.
+  const { url } = useProtectedFileUrl(fileVariantUrl(image, 'THUMB'));
 
   if (!image || !url || failedImage === image) {
     return (

@@ -89,6 +89,7 @@ export function TaskBlock({ block, onComplete, plans, onViewInstructions }: { bl
                   {evidence.photoUrls.map((url, index) => (
                     <li key={url} className="w-28">
                       <ProtectedImage
+                        size="THUMB"
                         src={url}
                         alt={`Photo ${index + 1} for ${block.title} at ${block.startTime.substring(0, 5)}`}
                         openOnClick

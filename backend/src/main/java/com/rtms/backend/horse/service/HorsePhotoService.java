@@ -6,6 +6,7 @@ import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -127,14 +128,14 @@ public class HorsePhotoService {
      *
      * @throws ResponseStatusException 404 when no HORSE_PHOTO exists for this horse.
      */
-    public PhotoResult resolvePhoto(Long horseId) {
+    public PhotoResult resolvePhoto(Long horseId, FileVariant size) {
         var edited = editDocuments.findFirstByHorseIdAndDocumentTypeAndCurrentTrue(horseId, AdmissionDocumentType.HORSE_PHOTO);
         if (edited.isPresent()) {
             String key = edited.get().getFileUrl();
-            return new PhotoResult(storage.load(key), storage.mediaType(key));
+            return new PhotoResult(storage.load(key, size), storage.mediaType(key));
         }
         AdmissionDocument photo = findPhotoDocument(horseId);
-        Resource resource = storage.load(photo.getFileUrl());
+        Resource resource = storage.load(photo.getFileUrl(), size);
         MediaType mediaType = storage.mediaType(photo.getFileUrl(), photo.getOriginalFileName());
         if (mediaType == null || MediaType.APPLICATION_OCTET_STREAM.equals(mediaType)) {
             mediaType = MediaType.IMAGE_JPEG;
