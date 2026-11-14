@@ -5,6 +5,7 @@ import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -36,16 +37,13 @@ public class CareSchedule {
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
 
-    @Column(name = "request_fingerprint", length = 64)
-    private String requestFingerprint;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "care_type", nullable = false, length = 50)
     private CareType careType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private CareScheduleStatus status = CareScheduleStatus.REQUESTED;
+    private CareScheduleStatus status = CareScheduleStatus.SCHEDULED;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -58,8 +56,11 @@ public class CareSchedule {
     @Column(name = "reschedule_note", columnDefinition = "TEXT")
     private String rescheduleNote;
 
-    @Column(name = "paused_from")
-    private LocalDateTime pausedFrom;
+    @Column(name = "scheduled_date")
+    private LocalDate scheduledDate;
+
+    @Column(name = "rollover_count", nullable = false)
+    private int rolloverCount = 0;
 
     @Column(name = "requested_at")
     private LocalDateTime requestedAt;
@@ -88,7 +89,7 @@ public class CareSchedule {
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
-        if (status == null) status = CareScheduleStatus.REQUESTED;
+        if (status == null) status = CareScheduleStatus.SCHEDULED;
         if (purpose == null) purpose = CareSchedulePurpose.FOLLOW_UP;
         if (durationMinutes <= 0) durationMinutes = 30;
         createdAt = now;
@@ -125,9 +126,6 @@ public class CareSchedule {
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
 
-    public String getRequestFingerprint() { return requestFingerprint; }
-    public void setRequestFingerprint(String requestFingerprint) { this.requestFingerprint = requestFingerprint; }
-
     public CareType getCareType() { return careType; }
     public void setCareType(CareType careType) { this.careType = careType; }
 
@@ -143,14 +141,22 @@ public class CareSchedule {
     public String getRescheduleNote() { return rescheduleNote; }
     public void setRescheduleNote(String rescheduleNote) { this.rescheduleNote = rescheduleNote; }
 
-    public LocalDateTime getPausedFrom() { return pausedFrom; }
-    public void setPausedFrom(LocalDateTime pausedFrom) { this.pausedFrom = pausedFrom; }
+    public LocalDate getScheduledDate() { return scheduledDate; }
+    public void setScheduledDate(LocalDate scheduledDate) { this.scheduledDate = scheduledDate; }
+
+    public int getRolloverCount() { return rolloverCount; }
+    public void setRolloverCount(int rolloverCount) { this.rolloverCount = rolloverCount; }
 
     public LocalDateTime getRequestedAt() { return requestedAt; }
     public void setRequestedAt(LocalDateTime requestedAt) { this.requestedAt = requestedAt; }
 
     public LocalDateTime getScheduledAt() { return scheduledAt; }
-    public void setScheduledAt(LocalDateTime scheduledAt) { this.scheduledAt = scheduledAt; }
+    public void setScheduledAt(LocalDateTime scheduledAt) {
+        this.scheduledAt = scheduledAt;
+        if (scheduledAt != null && this.scheduledDate == null) {
+            this.scheduledDate = scheduledAt.toLocalDate();
+        }
+    }
 
     public int getDurationMinutes() { return durationMinutes; }
     public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }

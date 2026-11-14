@@ -1,7 +1,8 @@
+import { getSynchronizedNow } from '../../../lib/clockSync.ts';
 import type { CareSchedule } from '@/features/admissions/types';
 
-export function getMinRoutineDate(): string {
-  const now = new Date();
+export function getMinRoutineDate(baseDate?: Date): string {
+  const now = new Date((baseDate ?? getSynchronizedNow()).getTime());
   // Backend CareScheduleService sets scheduled time to 14:00 on scheduledDate.
   // If local time is past 13:45, a same-day schedule would be rejected with 400 INVALID_DATE.
   if (now.getHours() > 13 || (now.getHours() === 13 && now.getMinutes() >= 45)) {
@@ -49,7 +50,12 @@ export function filterRoutineSchedules(
 ): CareSchedule[] {
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
-  return schedules.filter((s) => {
+  const filtered = schedules.filter((s) => {
+    // Exclude preventive care: Routine Checks strictly handles clinical routine & follow-up exams
+    if (s.purpose === 'PREVENTIVE') {
+      return false;
+    }
+
     if (statusFilter !== 'ALL' && s.status !== statusFilter) {
       return false;
     }
@@ -70,5 +76,14 @@ export function filterRoutineSchedules(
       desc.includes(normalizedSearch) ||
       idStr.includes(normalizedSearch)
     );
+  });
+
+  return filtered.sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return (b.id || 0) - (a.id || 0);
   });
 }

@@ -28,6 +28,10 @@ interface ProgressBarProps {
   size?: keyof typeof sizeHeight;
   /** Accessible name, e.g. "Course progress". */
   label: string;
+  /** A tick on the bar at this amount (same scale as `max`), e.g. the passing level. Ignored when `segments` is given. */
+  marker?: number;
+  /** Hover text of the marker. */
+  markerLabel?: string;
   /** Stacked parts that share the bar (for a distribution). Their widths are proportional to `max`. */
   segments?: ProgressSegment[];
   className?: string;
@@ -40,6 +44,8 @@ export function ProgressBar({
   tone = 'primary',
   size = 'md',
   label,
+  marker,
+  markerLabel,
   segments,
   className,
 }: ProgressBarProps) {
@@ -67,7 +73,7 @@ export function ProgressBar({
   }
 
   const ratio = Math.max(0, Math.min(1, value / (max || 1)));
-  return (
+  const bar = (
     <div
       role="progressbar"
       aria-label={label}
@@ -82,6 +88,18 @@ export function ProgressBar({
           toneFill[tone],
         )}
         style={{ transform: `scaleX(${ratio})` }}
+      />
+    </div>
+  );
+  if (marker === undefined) return bar;
+
+  return (
+    <div className="relative">
+      {bar}
+      <span
+        title={markerLabel}
+        className="absolute -bottom-1 -top-1 w-0.5 -translate-x-1/2 rounded-full bg-[var(--color-text-primary)]"
+        style={{ left: `${Math.max(0, Math.min(1, marker / (max || 1))) * 100}%` }}
       />
     </div>
   );

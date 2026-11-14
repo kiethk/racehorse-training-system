@@ -1,10 +1,11 @@
 package com.rtms.backend.horse.service;
 import com.rtms.backend.config.GlobalExceptionHandler;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 
 
 import com.rtms.backend.horse.dto.CreateHorseRequest;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.stable.enums.StallStatus;
@@ -30,6 +31,7 @@ import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 
@@ -45,41 +47,43 @@ public class HorseService {
 
     private final HorseRepository horseRepository;
     private final StableStallRepository stableStallRepository;
-    private final GroupWorkoutSyncService workoutService;
+    private final TrainingGroupService workoutService;
     private final AreaRepository areaRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final GroomDailyTaskRepository groomDailyTaskRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
+    private final CareScheduleService careScheduleService;
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        GroupWorkoutSyncService workoutService,
+                        TrainingGroupService workoutService,
                         AreaRepository areaRepository) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        GroupWorkoutSyncService workoutService,
+                        TrainingGroupService workoutService,
                         AreaRepository areaRepository,
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
                         NotificationService notificationService) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
-                careScheduleRepository, groomDailyTaskRepository, notificationService, null);
+                careScheduleRepository, groomDailyTaskRepository, notificationService, null, null);
     }
 
     @Autowired
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        GroupWorkoutSyncService workoutService,
+                        TrainingGroupService workoutService,
                         AreaRepository areaRepository,
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
                         NotificationService notificationService,
-                        AuditLogService auditLogService) {
+                        AuditLogService auditLogService,
+                        CareScheduleService careScheduleService) {
         this.horseRepository = horseRepository;
         this.stableStallRepository = stableStallRepository;
         this.workoutService = workoutService;
@@ -88,6 +92,7 @@ public class HorseService {
         this.groomDailyTaskRepository = groomDailyTaskRepository;
         this.notificationService = notificationService;
         this.auditLogService = auditLogService;
+        this.careScheduleService = careScheduleService;
     }
 
     /** Giữ chữ ký 3 tham số cho các lời gọi đã có. */
@@ -241,8 +246,7 @@ public class HorseService {
                 return horse;                      // vốn đã không ở chuồng nào
             }
 
-            // Buổi tập tương lai thành "chưa phân công". Không có người phụ
-            // trách thì không thể vướng BR-09, nên hàm này không ném lỗi.
+            // Buổi tập tương lai thành "chưa phân công".
             workoutService.reassignFutureWorkoutsToGroom(horseId, null);
 
             stableStallRepository.findById(horse.getCurrentStallId()).ifPresent(oldStall -> {
@@ -275,7 +279,7 @@ public class HorseService {
         //
         // Chuồng mới có thể do Groom khác phụ trách. Không đồng bộ thì buổi tập
         // vẫn treo ở Groom của chuồng CŨ.
-        // Gọi TRƯỚC khi ghi, để vướng BR-09 thì rollback toàn bộ.
+        // Gọi TRƯỚC khi ghi, để lỗi thì rollback toàn bộ.
         if (!stallId.equals(horse.getCurrentStallId())) {
             workoutService.reassignFutureWorkoutsToGroom(horseId, newStall.getGroomId());
         }
@@ -358,22 +362,16 @@ public class HorseService {
             // 3.2. Leave the training group: not-yet-started Workouts are cancelled, the group carries on without it.
             workoutService.exitAnyGroup(horseId);
 
-            // 3.4. Cancel pending and scheduled medical appointments
-            if (careScheduleRepository != null) {
-                List<CareSchedule> pendingCares = careScheduleRepository.findByHorseIdAndStatusIn(
-                        horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
-                if (!pendingCares.isEmpty()) {
-                    for (CareSchedule cs : pendingCares) {
-                        cs.setStatus(CareScheduleStatus.CANCELLED);
-                        cs.setCancelReason("Horse marked INACTIVE: " + effectiveReason);
-                    }
-                    careScheduleRepository.saveAll(pendingCares);
-                }
+            // Tự động đóng báo cáo sự cố chưa khám rồi chuyển CANCELLED các lịch chưa diễn ra của ngựa.
+            if (careScheduleService != null) {
+                careScheduleService.closeOpenIncidentCasesForHorse(horseId, "Horse marked INACTIVE: " + effectiveReason);
             }
-
-            // 3.5. Block training
-            horse.setTrainingDecision(TrainingDecision.BLOCKED);
-            horse.setTrainingDecisionReason(effectiveReason);
+            if (careScheduleRepository != null) {
+                careScheduleRepository.cancelOpenSchedulesIfUnreferenced(horseId,
+                        List.of(CareScheduleStatus.SCHEDULED),
+                        "Horse marked INACTIVE: " + effectiveReason,
+                        LocalDateTime.now());
+            }
 
             // 3.6. Clean uncompleted groom daily tasks
             if (groomDailyTaskRepository != null) {
@@ -422,8 +420,10 @@ public class HorseService {
                 workoutService.reassignFutureWorkoutsToGroom(horseId, regularStall.getGroomId());
             }
 
-            horse.setTrainingDecision(TrainingDecision.ALLOWED);
-            horse.setTrainingDecisionReason(null);
+            // Quyết định tập giữ nguyên qua INACTIVE: chỉ Vet mới mở được lệnh chặn.
+            if (careScheduleService != null) {
+                careScheduleService.scheduleFollowUpIfBlocked(horse, currentUser.getUserId());
+            }
         }
 
         // 4. Update status, statusReason, and statusReasonCode

@@ -23,7 +23,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -65,7 +65,7 @@ class UrgentCareCompletionTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
     @Mock private NotificationService notificationService;
-    @Mock private GroupWorkoutSyncService workoutService;
+    @Mock private TrainingGroupService workoutService;
 
     private CareScheduleService careScheduleService;
 
@@ -83,11 +83,10 @@ class UrgentCareCompletionTest {
                 veterinarianProfileRepository, auditLogRepository, eventPublisher, entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
+                mock(PreventiveVaccinationService.class),
+                mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -118,17 +117,15 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("createSchedule URGENT: chặn tập, ghi lý do mặc định, hủy buổi tập tương lai")
-    void testCreateUrgentSchedule_blocksAndCancelsTraining() {
+    @DisplayName("createSchedule URGENT không tự chặn tập: báo cáo sự cố quyết định việc đó")
+    void testCreateUrgentSchedule_leavesTrainingDecisionToTheReport() {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
 
         careScheduleService.createSchedule(10L, CareType.URGENT, null, LocalDateTime.now(), 30L);
 
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
-        assertFalse(horse.canTrain());
-        verify(workoutService).exitAnyGroup(10L);
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+        verify(workoutService, never()).exitAnyGroup(10L);
     }
 
     @Test
@@ -353,7 +350,7 @@ class UrgentCareCompletionTest {
         when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
                 .thenReturn(java.util.List.of(incident, merged));
 
-        var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
+        var reports = careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), vet.getId());
 
         assertEquals(java.util.List.of(30L, 31L), reports.stream().map(r -> r.id()).toList());
     }
@@ -367,7 +364,7 @@ class UrgentCareCompletionTest {
                 .thenReturn(java.util.List.of());
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
-        var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
+        var reports = careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), vet.getId());
 
         assertEquals(1, reports.size());
         assertEquals(incident.getId(), reports.get(0).id());
@@ -379,7 +376,7 @@ class UrgentCareCompletionTest {
         when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
 
         ApiException error = assertThrows(ApiException.class,
-                () -> careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), 999L));
+                () -> careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), 999L));
 
         assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
         verify(incidentReportRepository, never()).findByCareScheduleIdOrderByReportedAtAsc(anyLong());
@@ -496,56 +493,17 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("Không cho Manager hủy lần khám cuối cùng của ngựa đang bị chặn tập (409 LAST_FOLLOW_UP)")
+    @DisplayName("AD-022: cancelCareSchedule abolished — follow-up examinations are protected by absence of cancel API")
     void testCancel_lastPendingExamOfBlockedHorse_rejected() {
-        horse.setTrainingDecision(TrainingDecision.BLOCKED);
-        CareSchedule recheck = new CareSchedule();
-        recheck.setId(200L);
-        recheck.setHorseId(horse.getId());
-        recheck.setCareType(CareType.ROUTINE);
-        recheck.setStatus(CareScheduleStatus.SCHEDULED);
-
-        when(careScheduleRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(recheck));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(manager()));
-        when(horseRepository.findById(horse.getId())).thenReturn(Optional.of(horse));
-        when(careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(
-                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(200L)))
-                .thenReturn(false);
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Vet on leave");
-
-        ApiException ex = assertThrows(ApiException.class,
-                () -> careScheduleService.cancelCareSchedule(200L, req, 1L));
-
-        assertEquals("LAST_FOLLOW_UP", ex.getErrorCode());
-        assertEquals(CareScheduleStatus.SCHEDULED, recheck.getStatus());
-        verify(careScheduleRepository, never()).save(any());
+        // Under AD-022, cancelCareSchedule is removed entirely. The LAST_FOLLOW_UP
+        // vulnerability no longer exists because neither Vet nor Manager can delete exams.
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
-    @DisplayName("Hủy được nếu ngựa bị chặn nhưng còn lần khám khác đang chờ")
+    @DisplayName("AD-022: duplicate booking cancellation abolished — reschedule used instead")
     void testCancel_blockedHorseWithAnotherPendingExam_allowed() {
-        horse.setTrainingDecision(TrainingDecision.BLOCKED);
-        CareSchedule recheck = new CareSchedule();
-        recheck.setId(200L);
-        recheck.setHorseId(horse.getId());
-        recheck.setCareType(CareType.ROUTINE);
-        recheck.setStatus(CareScheduleStatus.SCHEDULED);
-
-        when(careScheduleRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(recheck));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(manager()));
-        when(horseRepository.findById(horse.getId())).thenReturn(Optional.of(horse));
-        when(careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(
-                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(200L)))
-                .thenReturn(true);
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Duplicate booking");
-
-        careScheduleService.cancelCareSchedule(200L, req, 1L);
-
-        assertEquals(CareScheduleStatus.CANCELLED, recheck.getStatus());
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     private void stubCompletion() {

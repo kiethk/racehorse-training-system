@@ -10,7 +10,9 @@ export function getNotificationHref(item: NotificationItem, role: Role | undefin
     if (item.notificationType === 'CARE_SCHEDULE_URGENT_ASSIGNED') {
       return `/veterinarian/urgent/${refId}`;
     }
-    if (item.notificationType === 'ROUTINE_ASSIGNED') {
+    if (item.notificationType === 'ROUTINE_ASSIGNED'
+      || item.notificationType === 'CARE_SCHEDULE_PAUSED'
+      || item.notificationType === 'CARE_SCHEDULE_CANCELLED') {
       return '/veterinarian/routine';
     }
     if (item.notificationType === 'ADMISSION_VET_ASSIGNED') {
@@ -59,12 +61,16 @@ export function getNotificationHref(item: NotificationItem, role: Role | undefin
 
   // 3. Huấn luyện viên
   if (role === 'HEAD_TRAINER') {
+    if (item.notificationType === 'HORSE_TRAINING_ALLOWED' && refId) {
+      // referenceId là Horse ID (xem CareScheduleService), route tới chi tiết ngựa.
+      return `/trainer/horses/${refId}`;
+    }
     return `/trainer/schedule`;
   }
 
   // 4. Groom
   if (role === 'GROOM') {
-    return `/groom/tasks`;
+    return item.notificationType === 'URGENT_CASE_CLOSED' ? `/groom/incidents` : `/groom/tasks`;
   }
 
   return null;

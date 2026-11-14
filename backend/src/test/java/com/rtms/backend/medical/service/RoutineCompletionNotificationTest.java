@@ -17,7 +17,6 @@ import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
@@ -27,12 +26,14 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
@@ -75,7 +76,7 @@ class RoutineCompletionNotificationTest {
             hr.setId(99L);
             return hr;
         });
-        GroupWorkoutSyncService groupSync = mock(GroupWorkoutSyncService.class);
+        TrainingGroupService groupSync = mock(TrainingGroupService.class);
 
         TrainingDecisionService trainingDecisionService = new TrainingDecisionService(horses, schedules, groupSync);
 
@@ -96,7 +97,6 @@ class RoutineCompletionNotificationTest {
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
                 injuryRecordRepository,
-                mock(ClinicalMedicationRepository.class),
                 treatmentPlanRepository,
                 mock(PrescriptionRepository.class)
         );
@@ -159,7 +159,7 @@ class RoutineCompletionNotificationTest {
                 eq(50L),
                 eq(NotificationTypes.CARE_SCHEDULE_ROUTINE_COMPLETED),
                 eq("Routine Examination Completed: Wild Cherry"),
-                org.mockito.ArgumentMatchers.contains("Cleared for training (ALLOWED)")
+                ArgumentMatchers.contains("Cleared for training (ALLOWED)")
         );
     }
 
@@ -199,8 +199,8 @@ class RoutineCompletionNotificationTest {
         service.completeCareSchedule(200L, req, 10L);
 
         verify(injuryRecordRepository).save(oldInjury);
-        org.junit.jupiter.api.Assertions.assertEquals("RECOVERED", oldInjury.getStatus());
-        org.junit.jupiter.api.Assertions.assertEquals("COMPLETED", plan.getStatus());
+        Assertions.assertEquals("RECOVERED", oldInjury.getStatus());
+        Assertions.assertEquals("COMPLETED", plan.getStatus());
 
         verify(notifications).sendAssignmentNotification(
                 eq(trainerId),
@@ -209,7 +209,7 @@ class RoutineCompletionNotificationTest {
                 eq(50L),
                 eq(NotificationTypes.CARE_SCHEDULE_ROUTINE_COMPLETED),
                 eq("Routine Examination Completed: Wild Cherry"),
-                org.mockito.ArgumentMatchers.contains("Cleared for training (ALLOWED)")
+                ArgumentMatchers.contains("Cleared for training (ALLOWED)")
         );
     }
 }

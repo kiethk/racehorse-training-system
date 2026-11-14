@@ -77,6 +77,12 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
         msg = 'A veterinarian may only schedule preventive care for an active horse.';
       } else if (code === 'FORBIDDEN' || raw.includes('FORBIDDEN') || status === 403) {
         msg = 'You do not have permission to schedule preventive care for this horse.';
+      } else if (
+        code === 'PREVENTIVE_ALREADY_SCHEDULED' ||
+        raw.includes('PREVENTIVE_ALREADY_SCHEDULED') ||
+        raw.includes('active preventive care visit')
+      ) {
+        msg = 'This horse already has an active preventive care visit. Please complete or reschedule that visit instead.';
       } else if (code === 'IDEMPOTENCY_CONFLICT' || raw.includes('IDEMPOTENCY_CONFLICT') || status === 409 || raw.includes('already exists')) {
         msg = 'A care schedule of this type already exists for this horse on the selected date.';
       } else if (

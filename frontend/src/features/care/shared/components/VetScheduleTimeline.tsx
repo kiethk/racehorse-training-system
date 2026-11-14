@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
+import { getScheduleExamAction, getScheduleStatusDisplay } from '@/features/care/lib/scheduleStatusDisplay';
 import { Icon } from '@/components/ui/Icon';
 import { FilterChips, Select, Input, PageHeader, Notice, Tabs } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
@@ -13,29 +14,14 @@ import { useAuth } from '@/context/AuthContext';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
 import { formatDate, formatLocalDateIso } from '@/lib/display';
+import { useSynchronizedClock } from '@/lib/clockSync';
 import type { CareSchedule, CareType, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
 import {
-  WORKDAY_START,
-  WORKDAY_LEN,
-  VET_WINDOW_START,
-  VET_WINDOW_END,
-  computeTimelinePosition,
-  formatClockLabel,
   getCareTypeTone,
   getMondayOf,
   getWeekDates,
-  isOutsideWorkday,
-  assignTimelineLanes,
-  timelineRulerMarks,
 } from '@/features/schedule/utils/timelineUtils';
-
-/** "14:00" from a backend LocalDateTime string, on the 24-hour clock. */
-function clockLabel(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : formatClockLabel(d.getHours() * 60 + d.getMinutes());
-}
 
 export function VetScheduleTimeline() {
   const router = useRouter();
@@ -50,8 +36,29 @@ export function VetScheduleTimeline() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
+  const lastSystemDateRef = useRef<string>(formatLocalDateIso());
+
+  // Auto-align selectedDate ONLY when the operating system's current date actually changes
+  useEffect(() => {
+    const currentTodayIso = formatLocalDateIso(currentClock);
+    const previousSystemDate = lastSystemDateRef.current;
+
+    if (previousSystemDate !== currentTodayIso) {
+      lastSystemDateRef.current = currentTodayIso;
+      setSelectedDate((prev) => {
+        // If user was viewing what was previously "today", advance them to the new "today"
+        if (prev === previousSystemDate) {
+          return currentTodayIso;
+        }
+        return prev;
+      });
+    }
+  }, [currentClock]);
+
   // Filters (Urgent excluded by rule)
-  const [careTypeFilter, setCareTypeFilter] = useState<CareType | 'ALL'>('ALL');
+  const [careTypeFilter, setCareTypeFilter] = useState<CareType | 'PREVENTIVE' | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
 
   const mondayIso = useMemo(() => getMondayOf(selectedDate), [selectedDate]);
@@ -101,47 +108,52 @@ export function VetScheduleTimeline() {
   const horseMap = useMemo(() => new Map(horses.map((h) => [h.id, h])), [horses]);
   const stallMap = useMemo(() => new Map(stalls.map((s) => [s.id, s.stallCode])), [stalls]);
 
+  // Today's schedules strictly matched by selectedDate to avoid any flash/leak when switching from week view
+  const todaySchedules = useMemo(() => {
+    return schedules.filter((s) => {
+      const dateIso = s.scheduledDate || (s.scheduledAt ? s.scheduledAt.split('T')[0] : null);
+      return dateIso === selectedDate;
+    });
+  }, [schedules, selectedDate]);
+
   // Sorted and filtered schedules for Today view
   const filteredSchedules = useMemo(() => {
-    return schedules
-      .filter((s) => (careTypeFilter === 'ALL' ? true : s.careType === careTypeFilter))
+    return todaySchedules
+      .filter((s) => {
+        if (careTypeFilter === 'ALL') return true;
+        if (careTypeFilter === 'INITIAL') return s.careType === 'INITIAL';
+        if (careTypeFilter === 'PREVENTIVE') return s.careType === 'ROUTINE' && s.purpose === 'PREVENTIVE';
+        if (careTypeFilter === 'ROUTINE') return s.careType === 'ROUTINE' && s.purpose !== 'PREVENTIVE';
+        return s.careType === careTypeFilter;
+      })
       .filter((s) => (statusFilter === 'ALL' ? true : s.status === statusFilter))
       .sort((a, b) => new Date(a.scheduledAt || 0).getTime() - new Date(b.scheduledAt || 0).getTime());
-  }, [schedules, careTypeFilter, statusFilter]);
+  }, [todaySchedules, careTypeFilter, statusFilter]);
 
-  // Quick stats
+  // Quick stats computed specifically for today's selectedDate
   const stats = useMemo(() => {
     let initial = 0;
     let routine = 0;
+    let preventive = 0;
 
-    for (const s of schedules) {
+    for (const s of todaySchedules) {
       if (s.careType === 'INITIAL') initial++;
-      if (s.careType === 'ROUTINE') routine++;
+      if (s.careType === 'ROUTINE') {
+        if (s.purpose === 'PREVENTIVE') preventive++;
+        else routine++;
+      }
     }
 
-    return { total: schedules.length, initial, routine };
-  }, [schedules]);
-
-  // Overlapping cases get separate lanes so every block stays visible and clickable.
-  const blockLanes = useMemo(
-    () =>
-      assignTimelineLanes(
-        schedules
-          .filter((s) => s.scheduledAt)
-          .map((s) => {
-            const d = new Date(s.scheduledAt as string);
-            const start = d.getHours() * 60 + d.getMinutes();
-            return { id: s.id, start, end: start + (s.durationMinutes || 30) };
-          }),
-      ),
-    [schedules],
-  );
-  const laneHeight = blockLanes.lanes === 1 ? 56 : 44;
-  const trackHeight = 8 + blockLanes.lanes * laneHeight + (blockLanes.lanes - 1) * 4;
+    return { total: todaySchedules.length, initial, routine, preventive };
+  }, [todaySchedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
-    if (item.careType === 'INITIAL') {
+    if (item.status === 'COMPLETED') {
+      router.push(`/veterinarian/records?scheduleId=${item.id}&back=schedule`);
+    } else if (item.careType === 'INITIAL') {
       router.push(`/veterinarian/admissions?scheduleId=${item.id}`);
+    } else if (item.purpose === 'PREVENTIVE') {
+      router.push(`/veterinarian/preventive-care?horseId=${item.horseId}`);
     } else if (item.careType === 'ROUTINE') {
       router.push(`/veterinarian/routine/${item.id}`);
     } else {
@@ -163,7 +175,6 @@ export function VetScheduleTimeline() {
     <div className="space-y-6">
       {/* Top Header & Navigation */}
       <PageHeader
-        eyebrow="Clinical Schedule"
         title="Veterinary Schedule"
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -244,98 +255,58 @@ export function VetScheduleTimeline() {
       {/* View: TODAY */}
       {view === 'today' && (
         <div className="space-y-6">
-          {/* Visual Timeline Bar (08:00 - 17:00, routine window highlighted) */}
-          <Panel padded className="space-y-3">
-            {/* Ruler */}
-            <div className="relative h-5 border-b border-[var(--color-border)] text-xs font-mono text-[var(--color-text-muted)]">
-              {timelineRulerMarks().map((mark) => (
-                <span
-                  key={mark.minutes}
-                  className={`absolute ${
-                    mark.percent === 0 ? 'left-0' : mark.percent === 100 ? 'right-0' : '-translate-x-1/2'
-                  }`}
-                  style={mark.percent !== 0 && mark.percent !== 100 ? { left: `${mark.percent}%` } : undefined}
-                >
-                  {mark.label}
-                </span>
-              ))}
-            </div>
-
-            {/* Routine window indicator strip */}
-            <div className="relative h-6" aria-label="Routine examination window">
-              <div
-                className="absolute inset-y-0 flex items-center justify-center gap-1.5 truncate rounded-[var(--radius-xs)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] px-2 text-xs font-semibold text-[var(--color-warning)] shadow-2xs"
-                style={{
-                  left: `${((VET_WINDOW_START - WORKDAY_START) / WORKDAY_LEN) * 100}%`,
-                  width: `${((VET_WINDOW_END - VET_WINDOW_START) / WORKDAY_LEN) * 100}%`,
-                }}
-              >
-                <Icon name="clock" size={12} className="shrink-0" />
-                <span className="truncate">
-                  Routine {formatClockLabel(VET_WINDOW_START)} – {formatClockLabel(VET_WINDOW_END)}
-                </span>
-              </div>
-            </div>
-
-            {/* Timeline track with blocks (no urgent) */}
-            <div
-              className="relative w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] overflow-hidden"
-              style={{ height: `${trackHeight}px` }}
-            >
-              {/* Routine window band */}
-              <div
-                aria-hidden
-                className="absolute inset-y-0 border-x border-[var(--color-warning)]/60 bg-[var(--color-warning-soft)]/30"
-                style={{
-                  left: `${((VET_WINDOW_START - WORKDAY_START) / WORKDAY_LEN) * 100}%`,
-                  width: `${((VET_WINDOW_END - VET_WINDOW_START) / WORKDAY_LEN) * 100}%`,
-                }}
-              />
-              {schedules.map((cs) => {
-                if (!cs.scheduledAt) return null;
-                const { leftPercent, widthPercent } = computeTimelinePosition(
-                  cs.scheduledAt,
-                  cs.durationMinutes || 30
-                );
-                const tone = getCareTypeTone(cs.careType, cs.purpose);
-                const horse = horseMap.get(cs.horseId);
-                const horseName = horse?.name || `Horse #${cs.horseId}`;
-                const offHours = isOutsideWorkday(cs.scheduledAt);
-                const lane = blockLanes.laneOf.get(cs.id) ?? 0;
-                const blockLabel = `#${cs.id} · ${tone.label} - ${horseName} (${clockLabel(cs.scheduledAt)})${offHours ? ' · outside 08:00-17:00' : ''} · Open case`;
-
-                return (
-                  <div
-                    key={cs.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={blockLabel}
-                    title={blockLabel}
-                    onClick={() => handleOpenSchedule(cs)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleOpenSchedule(cs);
-                      }
-                    }}
-                    style={{
-                      left: `${leftPercent}%`,
-                      width: `${widthPercent}%`,
-                      top: `${4 + lane * (laneHeight + 4)}px`,
-                      height: `${laneHeight}px`,
-                    }}
-                    className={`absolute flex flex-col justify-center overflow-hidden rounded border px-2 py-0.5 cursor-pointer shadow-sm transition-transform hover:scale-[1.02] hover:ring-1 hover:ring-[var(--color-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text}`}
-                  >
-                    <div className="flex items-center gap-1 truncate text-xs font-bold">
-                      <Icon name={offHours ? 'flag' : tone.icon} size={12} className="shrink-0" />
-                      {horseName}
-                    </div>
-                    <div className="truncate text-xs opacity-80">
-                      {clockLabel(cs.scheduledAt)} · {cs.durationMinutes || 30}m
-                    </div>
+          {/* Capacity Overview Bar */}
+          <Panel padded className="border border-[var(--color-border)] bg-[var(--color-surface)]">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-6">
+                <div>
+                  <div className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                    Routine Care Bucket
                   </div>
-                );
-              })}
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                      {stats.routine}/3
+                    </span>
+                    <Pill tone={stats.routine >= 3 ? 'warning' : 'neutral'} size="sm">
+                      Window 13:30 – 15:30
+                    </Pill>
+                  </div>
+                </div>
+
+                <div className="hidden sm:block h-8 w-px bg-[var(--color-border)]" />
+
+                <div>
+                  <div className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                    Preventive Care Bucket
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                      {stats.preventive}/3
+                    </span>
+                    <Pill tone="neutral" size="sm">
+                      Daytime Intake
+                    </Pill>
+                  </div>
+                </div>
+
+                <div className="hidden sm:block h-8 w-px bg-[var(--color-border)]" />
+
+                <div>
+                  <div className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                    Admission Exams
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                      {stats.initial}/2
+                    </span>
+                    <Pill tone="neutral" size="sm">
+                      Daytime Intake
+                    </Pill>
+                  </div>
+                </div>
+              </div>
+
+  
             </div>
           </Panel>
 
@@ -344,11 +315,12 @@ export function VetScheduleTimeline() {
             <FilterChips
               label="Care type"
               value={careTypeFilter}
-              onChange={(v) => setCareTypeFilter(v as CareType | 'ALL')}
+              onChange={(v) => setCareTypeFilter(v as CareType | 'PREVENTIVE' | 'ALL')}
               options={[
                 { value: 'ALL', label: 'All', count: schedules.length },
                 { value: 'INITIAL', label: 'Admission', count: stats.initial },
                 { value: 'ROUTINE', label: 'Routine', count: stats.routine },
+                { value: 'PREVENTIVE', label: 'Preventive', count: stats.preventive },
               ]}
             />
 
@@ -361,8 +333,8 @@ export function VetScheduleTimeline() {
                 <option value="ALL">All Statuses</option>
                 <option value="SCHEDULED">Scheduled</option>
                 <option value="IN_PROGRESS">In Progress</option>
-                <option value="PAUSED">Paused</option>
                 <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
               </Select>
             </div>
           </div>
@@ -389,90 +361,108 @@ export function VetScheduleTimeline() {
                 const horse = horseMap.get(cs.horseId);
                 const horseName = horse?.name || `Horse #${cs.horseId}`;
                 const stallCode = horse?.currentStallId ? stallMap.get(horse.currentStallId) : 'Unassigned';
-                const tone = getCareTypeTone(cs.careType, cs.purpose);
-                const timeStr = cs.scheduledAt ? clockLabel(cs.scheduledAt) : 'Unscheduled';
+                const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
                 const isCompleted = cs.status === 'COMPLETED';
+                const statusDisplay = getScheduleStatusDisplay(cs.status);
+                const examAction = getScheduleExamAction(cs.status);
+
+                // Routine window check (13:30 - 15:30) for ROUTINE non-preventive
+                const _now = currentClock;
+                const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+                const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+                const isFuture = Boolean(!isCompleted && rawDate && rawDate > todayIso);
+                const _minNow = _now.getHours() * 60 + _now.getMinutes();
+                const isPreventive = cs.purpose === 'PREVENTIVE';
+                const isOutsideRoutineWindow =
+                  cs.careType === 'ROUTINE' &&
+                  !isPreventive &&
+                  cs.status === 'SCHEDULED' &&
+                  (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+                const canExamine = isPreventive || cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
 
                 return (
                   <Panel
                     key={cs.id}
                     padded
-                    onClick={() => handleOpenSchedule(cs)}
-                    className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                    onClick={() => {
+                      if (isCompleted || canExamine) {
+                        handleOpenSchedule(cs);
+                      }
+                    }}
+                    className={`border border-[var(--color-border)] transition-all duration-200 ease-out ${
+                      isCompleted || canExamine
+                        ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]'
+                        : 'cursor-not-allowed opacity-80'
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       {/* Left: Avatar + Details */}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                              {horseName}
-                            </span>
+                          <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                            {horseName}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                               {tone.label}
                             </Pill>
-                            <Pill
-                              tone={
-                                cs.status === 'COMPLETED'
-                                  ? 'success'
-                                  : cs.status === 'PAUSED'
-                                  ? 'warning'
-                                  : cs.status === 'IN_PROGRESS'
-                                  ? 'primary'
-                                  : 'neutral'
-                              }
-                              size="sm"
-                            >
-                              {cs.status === 'SCHEDULED'
-                                ? 'Scheduled'
-                                : cs.status === 'PAUSED'
-                                ? 'Paused'
-                                : cs.status === 'IN_PROGRESS'
-                                ? 'In Progress'
-                                : 'Completed'}
-                            </Pill>
+                            {cs.status !== 'SCHEDULED' && (
+                              <Pill tone={statusDisplay.tone} icon={statusDisplay.icon} size="sm">
+                                {statusDisplay.label}
+                              </Pill>
+                            )}
+                            {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
+                              <Pill tone="warning" size="sm">
+                                Rolled {cs.rolloverCount}x
+                              </Pill>
+                            )}
+                            {cs.rescheduleReason === 'PEER_OFFLOAD' && (
+                              <Pill tone="neutral" size="sm">
+                                Transferred
+                              </Pill>
+                            )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                             <span className="inline-flex items-center gap-1">
-                              <Icon name="clock" size={12} className="text-[var(--color-primary)]" />
-                              <strong>{timeStr}</strong>
+                              <Icon name="building" size={12} className="text-[var(--color-primary)]" />
+                              <span>Stall <strong>{stallCode}</strong></span>
                             </span>
-                            <span>·</span>
-                            <span className="inline-flex items-center gap-1">
-                              <Icon name="building" size={12} />
-                              <span>Stall: <strong>{stallCode}</strong></span>
-                            </span>
+                            {cs.careType === 'INITIAL' && (
+                              <>
+                                <span>·</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <Icon name="calendar" size={12} className="text-[var(--color-text-muted)]" />
+                                  <span>Daytime Intake</span>
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       {/* Right: Action Button */}
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex flex-col items-end gap-1">
                         <Button
-                          variant={isCompleted ? 'secondary' : 'primary'}
+                          variant={isCompleted || cs.status === 'IN_PROGRESS' ? 'secondary' : 'primary'}
                           size="sm"
-                          icon={
-                            isCompleted
-                              ? 'file-text'
-                              : cs.status === 'IN_PROGRESS'
-                              ? 'activity'
-                              : 'chevron-right'
-                          }
+                          icon={examAction.icon}
+                          disabled={!isCompleted && !canExamine}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenSchedule(cs);
+                            if (isCompleted || canExamine) {
+                              handleOpenSchedule(cs);
+                            }
                           }}
                           className="transition-all active:scale-[0.97]"
                         >
-                          {isCompleted
-                            ? 'View Record'
-                            : cs.status === 'PAUSED'
-                            ? 'Continue (Paused)'
-                            : cs.status === 'IN_PROGRESS'
-                            ? 'Continue Exam'
-                            : 'Start Exam'}
+                          {examAction.label}
                         </Button>
+                        {!isCompleted && !canExamine && cs.status !== 'IN_PROGRESS' && (
+                          <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                            {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Panel>
@@ -490,9 +480,6 @@ export function VetScheduleTimeline() {
             <span className="text-[var(--color-text-primary)]">
               Week of {formatDate(mondayIso)} – {formatDate(weekDays[6])}
             </span>
-            <span className="text-xs text-[var(--color-text-muted)]">
-              Showing non-urgent clinical exams for the week
-            </span>
           </div>
 
           {loading ? (
@@ -500,7 +487,10 @@ export function VetScheduleTimeline() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
               {weekDays.map((dayIso) => {
-                const daySchedules = schedules.filter((s) => s.scheduledAt?.startsWith(dayIso));
+                const daySchedules = schedules.filter((s) => (s.scheduledDate ? s.scheduledDate === dayIso : s.scheduledAt?.startsWith(dayIso)));
+                const routineClinical = daySchedules.filter((s) => s.careType === 'ROUTINE' && s.purpose !== 'PREVENTIVE').length;
+                const prevCount = daySchedules.filter((s) => s.careType === 'ROUTINE' && s.purpose === 'PREVENTIVE').length;
+                const admissionCount = daySchedules.filter((s) => s.careType === 'INITIAL').length;
                 const isToday = dayIso === formatLocalDateIso();
                 const [year, month, day] = dayIso.split('-').map(Number);
                 const dayDate = new Date(year, month - 1, day);
@@ -516,20 +506,29 @@ export function VetScheduleTimeline() {
                     }`}
                   >
                     {/* Day Column Header */}
-                    <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2 mb-2">
-                      <div>
-                        <span className="text-xs font-bold text-[var(--color-text-primary)] block">
-                          {dayLabel}
-                        </span>
-                        {isToday && (
-                          <span className="text-[10px] font-semibold text-[var(--color-primary)] uppercase tracking-wide">
-                            Today
+                    <div className="border-b border-[var(--color-border)] pb-2 mb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-[var(--color-text-primary)] block">
+                            {dayLabel}
                           </span>
-                        )}
+                          {isToday && (
+                            <span className="text-[10px] font-semibold text-[var(--color-primary)] uppercase tracking-wide">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                        <Pill tone={daySchedules.length > 0 ? 'primary' : 'neutral'} size="sm">
+                          {daySchedules.length}
+                        </Pill>
                       </div>
-                      <Pill tone={daySchedules.length > 0 ? 'primary' : 'neutral'} size="sm">
-                        {daySchedules.length}
-                      </Pill>
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] font-medium">
+                        <span>R: {routineClinical}/3</span>
+                        <span>·</span>
+                        <span>P: {prevCount}/3</span>
+                        <span>·</span>
+                        <span>A: {admissionCount}/2</span>
+                      </div>
                     </div>
 
                     {/* Day Column Body */}
@@ -542,31 +541,60 @@ export function VetScheduleTimeline() {
                         daySchedules.map((cs) => {
                           const horse = horseMap.get(cs.horseId);
                           const horseName = horse?.name || `Horse #${cs.horseId}`;
-                          const timeStr = cs.scheduledAt ? clockLabel(cs.scheduledAt) : '';
-                          const tone = getCareTypeTone(cs.careType, cs.purpose);
+                          const timeStr = cs.status === 'COMPLETED'
+                            ? 'Completed'
+                            : (cs.careType === 'INITIAL' ? 'Admission' : 'Routine');
+                          const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
+
+                          // Block ROUTINE SCHEDULED before its date or outside 13:30–15:30.
+                          // IN_PROGRESS (Continue) and preventive visits stay open.
+                          const _now = currentClock;
+                          const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+                          const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+                          const isFuture = Boolean(cs.status !== 'COMPLETED' && rawDate && rawDate > todayIso);
+                          const _minNow = _now.getHours() * 60 + _now.getMinutes();
+                          const isRoutineBlocked =
+                            cs.careType === 'ROUTINE' &&
+                            cs.purpose !== 'PREVENTIVE' &&
+                            cs.status === 'SCHEDULED' &&
+                            (isFuture || _minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
 
                           return (
                             <div
                               key={cs.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => handleOpenSchedule(cs)}
+                              role={isRoutineBlocked ? undefined : 'button'}
+                              tabIndex={isRoutineBlocked ? undefined : 0}
+                              onClick={() => { if (!isRoutineBlocked) handleOpenSchedule(cs); }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
+                                if (!isRoutineBlocked && (e.key === 'Enter' || e.key === ' ')) {
                                   e.preventDefault();
                                   handleOpenSchedule(cs);
                                 }
                               }}
-                              className={`p-2 rounded-[var(--radius-sm)] border cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text}`}
-                              title={`#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
+                              className={`p-2 rounded-[var(--radius-sm)] border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text} ${isRoutineBlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02] hover:shadow-xs'}`}
+                              title={isRoutineBlocked
+                                ? (isFuture ? 'This routine examination is scheduled for a later date.' : 'Routine exam window: 13:30 – 15:30')
+                                : `#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
                             >
                               <div className="flex items-center justify-between text-xs font-bold">
                                 <span>{timeStr}</span>
-                                <span className="text-[10px] uppercase font-semibold">{tone.label}</span>
+                                <div className="flex items-center gap-1">
+                                  {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
+                                    <span className="text-[9px] px-1 rounded bg-[var(--color-warning-subtle)] text-[var(--color-warning-strong)] font-bold">
+                                      Rolled
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] uppercase font-semibold">{tone.label}</span>
+                                </div>
                               </div>
                               <p className="text-xs truncate font-medium mt-1 text-[var(--color-text-primary)]">
                                 {horseName}
                               </p>
+                              {isRoutineBlocked && (
+                                <p className="text-xs mt-1 font-semibold text-[var(--color-text-muted)]">
+                                  {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
+                                </p>
+                              )}
                             </div>
                           );
                         })

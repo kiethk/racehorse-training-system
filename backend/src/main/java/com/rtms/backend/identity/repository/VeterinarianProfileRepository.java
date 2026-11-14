@@ -6,4 +6,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface VeterinarianProfileRepository extends JpaRepository<VeterinarianProfile, Long> {
+
+    boolean existsByLicenseNumber(String licenseNumber);
+
+    boolean existsByLicenseNumberAndUserIdNot(String licenseNumber, Long userId);
 }

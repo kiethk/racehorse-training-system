@@ -2,13 +2,16 @@
 
 import React, { Suspense, useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Html } from '@react-three/drei';
+import { OrbitControls, useGLTF, Html, Bvh } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 
 import {
-  zoneForPoint,
   zoneById,
+  zoneForRegionKey,
+  regionKeyForNormalized,
+  normalizeScenePoint,
+  regionKeyLabel,
   resolveInjuryWorldPosition,
   resolveInjuryNormal,
   isNormalizedPoint,
@@ -70,7 +73,7 @@ function HorseModel({
     onReady?.();
   }, [onReady]);
 
-  const transform = useMemo(() => {
+  const { transform, runtimeBounds } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(scene);
     const size = new THREE.Vector3();
     box.getSize(size);
@@ -82,12 +85,18 @@ function HorseModel({
     const scale = targetHeight / height;
 
     return {
-      scale,
-      position: [
-        -center.x * scale,
-        -box.min.y * scale - 1.3,
-        -center.z * scale,
-      ] as [number, number, number],
+      transform: {
+        scale,
+        position: [
+          -center.x * scale,
+          -box.min.y * scale - 1.3,
+          -center.z * scale,
+        ] as [number, number, number],
+      },
+      runtimeBounds: {
+        min: { x: box.min.x, y: box.min.y, z: box.min.z },
+        max: { x: box.max.x, y: box.max.y, z: box.max.z },
+      },
     };
   }, [scene]);
 
@@ -97,9 +106,13 @@ function HorseModel({
 
     const hitPoint = event.point;
     let normal: [number, number, number] = [0, 1, 0];
+    let faceNormal: { x: number; y: number; z: number } | null = null;
+    let offsetNormal = new THREE.Vector3(0, 1, 0);
     if (event.face && event.object) {
       const normalMatrix = new THREE.Matrix3().getNormalMatrix(event.object.matrixWorld);
       const worldNormal = event.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+      offsetNormal = worldNormal;
+      faceNormal = { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z };
       normal = resolveInjuryNormal(
         [
           Number(worldNormal.x.toFixed(4)),
@@ -112,18 +125,32 @@ function HorseModel({
       normal = resolveInjuryNormal(undefined, [hitPoint.x, hitPoint.y, hitPoint.z]);
     }
 
+    // Normal offset 1mm (0.001) to eliminate Z-fighting on surface hit
+    const normalOffset = 0.001;
+    const snappedWorldPoint = hitPoint.clone().add(offsetNormal.clone().multiplyScalar(normalOffset));
+
+    // The local point lives in glTF scene space (runtime-transform inverse).
+    // Classify it against the RUNTIME bounding box of the same transform —
+    // MODEL_BOUNDS holds mesh accessor bounds (~100x larger here because the
+    // glTF applies scale 0.01) and would misclassify nearly every hit.
     const local = {
-      x: (hitPoint.x - transform.position[0]) / transform.scale,
-      y: (hitPoint.y - transform.position[1]) / transform.scale,
-      z: (hitPoint.z - transform.position[2]) / transform.scale,
+      x: (snappedWorldPoint.x - transform.position[0]) / transform.scale,
+      y: (snappedWorldPoint.y - transform.position[1]) / transform.scale,
+      z: (snappedWorldPoint.z - transform.position[2]) / transform.scale,
     };
-    const zoneId = zoneForPoint(local);
+    // Canonical 8-region key (head/neck/back/abdomen/foreleg/hindleg L-R) so the
+    // click result matches the Body region catalog and Select options 1:1.
+    // The raw face normal refines spine vs chest/belly on trunk hits.
+    const zoneId = regionKeyForNormalized(
+      normalizeScenePoint(local, runtimeBounds),
+      faceNormal,
+    );
 
     onPointerHit?.({
       position: [
-        Number(hitPoint.x.toFixed(4)),
-        Number(hitPoint.y.toFixed(4)),
-        Number(hitPoint.z.toFixed(4)),
+        Number(snappedWorldPoint.x.toFixed(4)),
+        Number(snappedWorldPoint.y.toFixed(4)),
+        Number(snappedWorldPoint.z.toFixed(4)),
       ],
       normal,
       zoneId,
@@ -192,7 +219,7 @@ function snapToHorseSurface(
     if (found.point.distanceTo(pos) >= SNAP_RADIUS) continue;
     const normalMatrix = new THREE.Matrix3().getNormalMatrix(found.hit.object.matrixWorld);
     const worldNormal = found.hit.face!.normal.clone().applyMatrix3(normalMatrix).normalize();
-    const surfacePoint = found.point.clone().addScaledVector(worldNormal, 0.02);
+    const surfacePoint = found.point.clone().addScaledVector(worldNormal, 0.001);
     if (!best || surfacePoint.distanceTo(pos) < best.point.distanceTo(pos)) {
       best = { point: surfacePoint, normal: worldNormal };
     }
@@ -276,43 +303,30 @@ function Marker({
 
     tagWrapperRef.current.style.display = 'block';
 
-    // Multi-directional side detection:
-    // Determine whether the marker is facing the camera or occluded by the horse's solid body
-    const mx = markerWorldPos.current.x;
-    const my = markerWorldPos.current.y;
-    const mz = markerWorldPos.current.z;
-    const cx = camera.position.x;
-    const cy = camera.position.y;
-    const cz = camera.position.z;
-
-    // Top of the horse (withers, spine, crest, head top) is visible from almost all angles above ground
-    const isTop = my > 0.35 && cy > -0.5;
-
-    let isOppositeSide = false;
-    if (!isTop) {
-      // Lateral flank check:
-      // Marker on left flank (mx > 0.08) dims only when camera orbits to far right (cx < -0.6)
-      // Marker on right flank (mx < -0.08) dims only when camera orbits to far left (cx > 0.6)
-      if (mx > 0.08 && cx < -0.6) {
-        isOppositeSide = true;
-      } else if (mx < -0.08 && cx > 0.6) {
-        isOppositeSide = true;
-      }
-
-      // Longitudinal check (front head/chest vs rear rump):
-      // In urgent-horse.glb: +Z is Front/Nose, -Z is Rear/Tail
-      if (mz > 0.5 && cz < -1.6) {
-        isOppositeSide = true;
-      } else if (mz < -0.5 && cz > 1.6) {
-        isOppositeSide = true;
+    // Occlusion raycast: check if horse body is between camera and marker
+    let isOccluded = false;
+    if (horseGroupRef?.current) {
+      const origin = camera.position;
+      const dir = markerWorldPos.current.clone().sub(origin);
+      const dist = dir.length();
+      if (dist > 0.05) {
+        dir.normalize();
+        raycaster.current.set(origin, dir);
+        raycaster.current.near = 0.1;
+        raycaster.current.far = Math.max(0.1, dist - 0.005);
+        const hits = raycaster.current.intersectObject(horseGroupRef.current, true);
+        isOccluded = hits.length > 0;
       }
     }
 
-    tagWrapperRef.current.style.opacity = isOppositeSide ? '0.2' : '1';
-    tagWrapperRef.current.style.pointerEvents = isOppositeSide ? 'none' : 'auto';
+    tagWrapperRef.current.style.opacity = isOccluded ? '0.25' : '1';
+    tagWrapperRef.current.style.pointerEvents = isOccluded ? 'none' : 'auto';
   });
 
-  const label = injury.label || (injury.zoneId && zoneById(injury.zoneId)?.label) || 'INJURY';
+  const label =
+    injury.label ||
+    regionKeyLabel(injury.zoneId) ||
+    'INJURY';
   const hasDetail = Boolean(
     injury.severity ||
       injury.status ||
@@ -427,11 +441,11 @@ function Marker({
                 {!readOnly && onUpdate ? (
                   <div className="space-y-1">
                     <label className="block text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
-                      Ghi chú lâm sàng / Note:
+                      Clinical note:
                     </label>
                     <Textarea
                       rows={2}
-                      placeholder="Nhập ghi chú chấn thương..."
+                      placeholder="Enter clinical observation..."
                       value={injury.description || ''}
                       onChange={(e) => onUpdate(injury.id, { description: e.target.value })}
                       className="w-full resize-none rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-[10px] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)]"
@@ -446,11 +460,6 @@ function Marker({
                       <p className="leading-snug">{injury.description}</p>
                     </div>
                   )
-                )}
-                {injury.severity && (
-                  <div>
-                    Severity: <strong>{injury.severity}</strong>
-                  </div>
                 )}
                 {injury.status && (
                   <div>
@@ -486,7 +495,9 @@ function Fallback2D({ injuries }: { injuries: InjuryMarkerData[] }) {
   const H = 200;
   const counts: Record<string, number> = {};
   const pts = injuries.map((inj) => {
-    const zone = (inj.zoneId && zoneById(inj.zoneId)) || undefined;
+    // Region keys (canonical or legacy) translate back to a geometry zone for anchoring.
+    const geoZone = inj.zoneId ? zoneForRegionKey(inj.zoneId) : undefined;
+    const zone = (geoZone && zoneById(geoZone)) || undefined;
     const anchor = zone ? zone.anchor : null;
     if (zone) counts[zone.id] = (counts[zone.id] || 0) + 1;
     const idx = zone ? counts[zone.id] - 1 : 0;
@@ -545,19 +556,23 @@ export default function UrgentHorseInjuryViewer({
       <div className="relative h-[420px] w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]">
         <Canvas
           camera={{ position: [3.2, 1.6, 3.2], fov: 45 }}
-          gl={{ powerPreference: 'high-performance', antialias: true }}
+          frameloop="demand"
+          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2)]}
+          gl={{ powerPreference: 'high-performance', antialias: true, stencil: false, depth: true }}
         >
           <ambientLight intensity={1.2} />
           <directionalLight position={[6, 12, 6]} intensity={1.8} />
           <directionalLight position={[-6, 6, -6]} intensity={0.8} />
           <Suspense fallback={null}>
-            <HorseModel
+            <Bvh firstHitOnly>
+              <HorseModel
               groupRef={horseGroupRef}
               isAddMode={isAddMode}
               readOnly={readOnly}
               onPointerHit={onPointerHit}
               onReady={handleModelReady}
             />
+            </Bvh>
             {(markersReady ? injuries : []).map((injury) => (
               <Marker
                 key={injury.id}
@@ -571,7 +586,7 @@ export default function UrgentHorseInjuryViewer({
             ))}
             <gridHelper args={[14, 28, '#0d9488', '#1e293b']} position={[0, -1.3, 0]} />
           </Suspense>
-          <OrbitControls enableDamping minDistance={1.2} maxDistance={9} />
+          <OrbitControls makeDefault enableDamping minDistance={1.2} maxDistance={9} />
         </Canvas>
       </div>
     </ViewerErrorBoundary>

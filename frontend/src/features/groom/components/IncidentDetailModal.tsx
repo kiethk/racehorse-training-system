@@ -9,7 +9,7 @@ import { formatDateTime } from '@/lib/display';
 import { incidentApi } from '../services/incidentService';
 import { assignedVetLabel } from '../lib/assignedVet';
 import {
-  INCIDENT_SEVERITY_MAP,
+  INCIDENT_TYPE_MAP,
   INCIDENT_STATUS_MAP,
   formatIncidentReportedAt,
 } from '../lib/incidentDisplay';
@@ -26,7 +26,7 @@ export function IncidentDetailModal({ report, horseName, onClose }: IncidentDeta
   if (!report) return null;
 
   const statusCfg = INCIDENT_STATUS_MAP[report.status] || { tone: 'neutral', label: report.status };
-  const severityCfg = INCIDENT_SEVERITY_MAP[report.severity] || { tone: 'neutral', label: report.severity };
+  const severityCfg = INCIDENT_TYPE_MAP[report.incidentType] || { tone: 'neutral', label: report.incidentType };
   const imgSrc = incidentApi.imageSrc(report);
   const vetLabel = assignedVetLabel(report);
 
@@ -79,7 +79,16 @@ export function IncidentDetailModal({ report, horseName, onClose }: IncidentDeta
           />
         )}
 
-        {report.handlerNote && (
+        {report.handlerNote && report.status === 'DISMISSED' && (
+          <div className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-xs">
+            <div className="font-medium text-[var(--color-text-primary)]">
+              Closed {report.handledAt ? `(${formatDateTime(report.handledAt)})` : ''}
+            </div>
+            <p className="mt-1.5 whitespace-pre-wrap text-[var(--color-text-secondary)]">{report.handlerNote}</p>
+          </div>
+        )}
+
+        {report.handlerNote && report.status !== 'DISMISSED' && (
           <div className="rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-3 text-xs">
             <div className="flex items-center gap-1.5 font-medium text-[var(--color-success)]">
               <Icon name="stethoscope" size={14} />

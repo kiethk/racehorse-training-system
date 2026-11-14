@@ -72,21 +72,35 @@ UPDATE horse_incident_reports
 SET description = regexp_replace(regexp_replace(description, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g')
 WHERE description LIKE '%;%';
 
-UPDATE race_registrations
-SET selection_reason = regexp_replace(regexp_replace(selection_reason, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
-WHERE selection_reason LIKE '%;%';
+-- Guarded: V202611081100 drops race_registrations table.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables
+               WHERE table_schema = 'public' AND table_name = 'race_registrations') THEN
+        UPDATE race_registrations
+        SET selection_reason = regexp_replace(regexp_replace(selection_reason, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
+        WHERE selection_reason LIKE '%;%';
 
-UPDATE race_registrations
-SET manager_feedback = regexp_replace(regexp_replace(manager_feedback, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
-WHERE manager_feedback LIKE '%;%';
+        UPDATE race_registrations
+        SET manager_feedback = regexp_replace(regexp_replace(manager_feedback, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
+        WHERE manager_feedback LIKE '%;%';
+    END IF;
+END $$;
 
 UPDATE treatment_plans
 SET instructions = regexp_replace(regexp_replace(instructions, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
 WHERE instructions LIKE '%;%';
 
-UPDATE care_schedule
-SET cancel_reason = regexp_replace(regexp_replace(cancel_reason, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
-WHERE cancel_reason LIKE '%;%';
+-- Guarded: V202611042100 drops care_schedule.cancel_reason earlier on a fresh database.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'care_schedule' AND column_name = 'cancel_reason') THEN
+        UPDATE care_schedule
+        SET cancel_reason = regexp_replace(regexp_replace(cancel_reason, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
+        WHERE cancel_reason LIKE '%;%';
+    END IF;
+END $$;
 
 UPDATE care_schedule
 SET description = regexp_replace(regexp_replace(description, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
@@ -104,9 +118,18 @@ UPDATE courses
 SET target_goal = regexp_replace(regexp_replace(target_goal, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
 WHERE target_goal LIKE '%;%';
 
-UPDATE subjects
-SET description = regexp_replace(regexp_replace(description, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
-WHERE description LIKE '%;%';
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subjects') THEN
+        UPDATE subjects
+        SET description = regexp_replace(regexp_replace(description, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
+        WHERE description LIKE '%;%';
+    ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'exercises') THEN
+        UPDATE exercises
+        SET description = regexp_replace(regexp_replace(description, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
+        WHERE description LIKE '%;%';
+    END IF;
+END $$;
 
 UPDATE health_conditions
 SET description = regexp_replace(regexp_replace(description, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g')

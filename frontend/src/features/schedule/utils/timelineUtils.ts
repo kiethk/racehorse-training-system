@@ -89,7 +89,7 @@ export interface CareTypeTone {
   bg: string;
   border: string;
   text: string;
-  pillTone: 'danger' | 'info' | 'neutral' | 'primary';
+  pillTone: 'danger' | 'info' | 'neutral' | 'primary' | 'warning';
   icon: 'alert-triangle' | 'stethoscope' | 'clock' | 'pill' | 'clipboard';
   label: string;
 }
@@ -98,7 +98,11 @@ export interface CareTypeTone {
  * Single source of truth for examination tags across the vet screens.
  * `purpose` refines ROUTINE into Preventive / Follow-up; INITIAL is the admission exam.
  */
-export function getCareTypeTone(careType: CareType, purpose?: string | null): CareTypeTone {
+export function getCareTypeTone(
+  careType: CareType,
+  purpose?: string | null,
+  sourceIncidentId?: number | null,
+): CareTypeTone {
   switch (careType) {
     case 'URGENT':
       return {
@@ -120,6 +124,16 @@ export function getCareTypeTone(careType: CareType, purpose?: string | null): Ca
       };
     case 'ROUTINE':
     default:
+      if (sourceIncidentId) {
+        return {
+          bg: 'bg-[var(--color-warning-soft)]',
+          border: 'border-[var(--color-warning)]',
+          text: 'text-[var(--color-warning)]',
+          pillTone: 'warning',
+          icon: 'alert-triangle',
+          label: 'Incident Case',
+        };
+      }
       if (purpose === 'PREVENTIVE') {
         return {
           bg: 'bg-[var(--color-primary-soft)]',
@@ -130,22 +144,12 @@ export function getCareTypeTone(careType: CareType, purpose?: string | null): Ca
           label: 'Preventive',
         };
       }
-      if (purpose === 'FOLLOW_UP') {
-        return {
-          bg: 'bg-[var(--color-surface-muted)]',
-          border: 'border-[var(--color-border-strong)]',
-          text: 'text-[var(--color-text-secondary)]',
-          pillTone: 'neutral',
-          icon: 'clipboard',
-          label: 'Follow-up',
-        };
-      }
       return {
         bg: 'bg-[var(--color-surface-muted)]',
         border: 'border-[var(--color-border-strong)]',
         text: 'text-[var(--color-text-secondary)]',
         pillTone: 'neutral',
-        icon: 'clock',
+        icon: 'clipboard',
         label: 'Routine',
       };
   }

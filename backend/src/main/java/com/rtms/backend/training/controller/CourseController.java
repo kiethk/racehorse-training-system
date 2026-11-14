@@ -1,5 +1,6 @@
 package com.rtms.backend.training.controller;
 
+import com.rtms.backend.training.dto.CourseResponse;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.training.dto.CourseDetailResponse;
 import com.rtms.backend.training.dto.CreateCourseRequest;
@@ -25,10 +26,10 @@ public class CourseController {
 
     @PreAuthorize("hasAuthority('COURSE_VIEW')")
     @GetMapping
-    public ApiResponse<List<Course>> getAllCourses(
+    public ApiResponse<List<CourseResponse>> getAllCourses(
             @RequestParam(required = false) Long trainerId,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(courseService.getAllCourses(trainerId, currentUser));
+        return ApiResponse.success(courseService.getAllCourses(trainerId, currentUser).stream().map(CourseResponse::of).toList());
     }
 
     @PreAuthorize("hasAuthority('COURSE_VIEW')")

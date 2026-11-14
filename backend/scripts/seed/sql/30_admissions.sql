@@ -29,18 +29,19 @@ DECLARE
 BEGIN
     LOOP
         SELECT * INTO c FROM care_schedule
-         WHERE horse_id = p_horse AND purpose = 'FOLLOW_UP' AND care_type = 'ROUTINE' AND status IN ('REQUESTED', 'SCHEDULED')
+         WHERE horse_id = p_horse AND purpose = 'FOLLOW_UP' AND care_type = 'ROUTINE' AND status = 'SCHEDULED'
          ORDER BY requested_at LIMIT 1;
         EXIT WHEN c.id IS NULL;
-        IF c.status = 'REQUESTED' THEN
+        IF c.veterinarian_id IS NULL THEN
             v_assign := GREATEST(c.created_at, c.requested_at - INTERVAL '14 days');
             EXIT WHEN v_assign > v_limit;
             PERFORM pg_temp.book(c.id, p_vet);
             SELECT * INTO c FROM care_schedule WHERE id = c.id;
         END IF;
         IF (SELECT training_decision FROM horses WHERE id = p_horse) = 'BLOCKED' THEN
-            EXIT WHEN c.scheduled_at + INTERVAL '25 minutes' > v_limit;
-            PERFORM pg_temp.complete_care(c.id, c.scheduled_at + INTERVAL '25 minutes',
+            v_slot := COALESCE(c.scheduled_at, c.scheduled_date::timestamp + time '14:00');
+            EXIT WHEN v_slot + INTERVAL '25 minutes' > v_limit;
+            PERFORM pg_temp.complete_care(c.id, v_slot + INTERVAL '25 minutes',
                 p_findings => 'Recheck: the problem noted at the last visit has resolved, gait, temperature and appetite normal.',
                 p_diagnosis => 'Recovered, fit to resume training', p_decision => 'ALLOWED',
                 p_notes => 'Cleared to return to normal work.',
@@ -49,6 +50,9 @@ BEGIN
             v_assign := c.updated_at + INTERVAL '1 day';
             EXIT WHEN v_assign > v_limit OR v_assign >= c.scheduled_at;
             PERFORM pg_temp.cancel_care(c.id, 'Horse recovered at the previous recheck, no further rechecks needed.', v_assign);
+            -- AD-022: ngua da khoi (ALLOWED) -> ket thuc chuoi tai kham dot ngot;
+            -- ca hen ke tiep (c) da duoc xep gio va giu nguyen lam lich dinh ky.
+            EXIT;
         END IF;
     END LOOP;
 END $$ LANGUAGE plpgsql;
@@ -76,12 +80,13 @@ DECLARE
     v_visits INT := 0;
     v_hr BIGINT;
     v_rest seed_block;
+    v_slot TIMESTAMP;
 BEGIN
     LOOP
         SELECT * INTO m FROM care_schedule
-         WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status IN ('REQUESTED', 'SCHEDULED');
+         WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED';
         EXIT WHEN m.id IS NULL;
-        IF m.status = 'REQUESTED' THEN
+        IF m.veterinarian_id IS NULL THEN
             v_assign := GREATEST(m.created_at, m.requested_at - INTERVAL '14 days');
             EXIT WHEN v_assign > v_limit;
             -- Lần tiêm thứ hai ghi từ "To do" trước khi lịch được xếp. (Second round recorded from "To do".)
@@ -125,15 +130,16 @@ BEGIN
             PERFORM pg_temp.book(m.id, p_vet, v_block);
             SELECT * INTO m FROM care_schedule WHERE id = m.id;
         END IF;
-        v_done := m.scheduled_at + make_interval(mins => pg_temp.rndi('pv' || m.id, 18, 28));
+        v_slot := COALESCE(m.scheduled_at, m.scheduled_date::timestamp + time '14:00');
+        v_done := v_slot + make_interval(mins => pg_temp.rndi('pv' || m.id, 18, 28));
         EXIT WHEN v_done > v_limit;
-        EXIT WHEN p_leave_overdue AND m.scheduled_at > pg_temp.clock() - INTERVAL '4 days';
-        IF pg_temp.blocked_at(p_horse, m.scheduled_at) THEN
+        EXIT WHEN p_leave_overdue AND v_slot > pg_temp.clock() - INTERVAL '4 days';
+        IF pg_temp.blocked_at(p_horse, v_slot) THEN
             -- Ngựa bị chặn sau khi lịch đã xếp: Manager dời ca tiêm tới sau đợt nghỉ (CareRescheduleService: lịch về
             -- REQUESTED ở ngày mới). (Blocked after booking: the manager moves the visit after the rest period.)
-            SELECT * INTO v_rest FROM seed_block WHERE horse_id = p_horse AND from_ts <= m.scheduled_at
+            SELECT * INTO v_rest FROM seed_block WHERE horse_id = p_horse AND from_ts <= v_slot
              ORDER BY from_ts DESC LIMIT 1;
-            UPDATE care_schedule SET status = 'REQUESTED', veterinarian_id = NULL, scheduled_at = NULL,
+            UPDATE care_schedule SET status = 'SCHEDULED', veterinarian_id = NULL, scheduled_at = NULL,
                                      requested_at = (COALESCE(v_rest.to_ts, pg_temp.clock())::DATE + 1) + TIME '14:00',
                                      reschedule_reason = 'UNDER_TREATMENT', reschedule_note = 'Vaccinate after the rest period.',
                                      updated_at = v_rest.from_ts
@@ -288,9 +294,9 @@ BEGIN
             PERFORM pg_temp.notify(v_vet, 'ADMISSION', v_adm, 'ADMISSION_VET_ASSIGNED', 'New horse assignment',
                                    'You have been assigned to candidate horse ' || hs.name
                                    || ' for initial admission examination in quarantine.', v_t);
-            -- Hai ca đang chờ khám: một ca chiều nay, một ca chiều mai. (Two pending intake exams: this and tomorrow afternoon.)
-            v_slot := pg_temp.book(v_sched, v_vet, CASE a.horse_k WHEN 'H043' THEN pg_temp.at(0, TIME '13:30')
-                                                                 WHEN 'H044' THEN pg_temp.at(1, TIME '14:00') END);
+            -- Hai ca đang chờ khám: một ca sáng nay, một ca sáng mai. (Two pending intake exams: this and tomorrow morning.)
+            v_slot := pg_temp.book(v_sched, v_vet, CASE a.horse_k WHEN 'H043' THEN pg_temp.at(0, TIME '10:30')
+                                                                 WHEN 'H044' THEN pg_temp.at(1, TIME '10:30') END);
         END IF;
 
         -- 4. Thú y khám nhập trại (trừ hai đơn còn đang chờ khám). (Intake exam, except the two still waiting.)
@@ -386,11 +392,11 @@ BEGIN
                                       'Club Manager approved application #' || v_adm || ' and allocated regular stable stall',
                                       v_t, 'POST', '/api/admissions/' || v_adm || '/manager-review');
             ELSE
-                IF EXISTS (SELECT 1 FROM care_schedule WHERE horse_id = v_horse AND status IN ('REQUESTED', 'IN_PROGRESS')) THEN
-                    RAISE EXCEPTION 'Admission % cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS', a.k;
+                IF EXISTS (SELECT 1 FROM care_schedule WHERE horse_id = v_horse AND status = 'IN_PROGRESS') THEN
+                    RAISE EXCEPTION 'Admission % cannot be rejected while veterinary care is IN_PROGRESS', a.k;
                 END IF;
-                UPDATE care_schedule SET status = 'CANCELLED', cancel_reason = 'Admission rejected by manager', updated_at = v_t
-                 WHERE horse_id = v_horse AND status = 'SCHEDULED';
+                DELETE FROM care_schedule
+                 WHERE horse_id = v_horse AND status IN ('SCHEDULED', 'PAUSED', 'DELAYED', 'OVERDUE');
                 UPDATE stable_stalls SET status = 'AVAILABLE', updated_at = v_t WHERE id = v_q;
                 UPDATE horses SET current_status = 'REJECTED', current_stall_id = NULL, updated_at = v_t WHERE id = v_horse;
                 UPDATE admission_applications

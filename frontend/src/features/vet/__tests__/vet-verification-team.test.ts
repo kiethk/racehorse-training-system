@@ -17,35 +17,21 @@ describe('Verification-First Team: Vet Actor Acceptance Tests', () => {
     function resolveVetListFilter(
       role: string,
       currentUserId: number,
-      status: string | null,
-      requestedVetId: number | null
+      _status: string | null,
+      _requestedVetId: number | null
     ): number | null {
-      let veterinarianId = requestedVetId;
       if (role === 'VETERINARIAN') {
-        if (status === 'REQUESTED') {
-          if (veterinarianId != null && veterinarianId !== currentUserId) {
-            veterinarianId = currentUserId;
-          }
-        } else {
-          veterinarianId = currentUserId;
-        }
+        return currentUserId;
       }
-      return veterinarianId;
+      return _requestedVetId;
     }
 
-    test('allows VETERINARIAN to view unassigned queue when status is REQUESTED and vetId is null', () => {
-      const resolved = resolveVetListFilter('VETERINARIAN', 101, 'REQUESTED', null);
-      assert.equal(resolved, null, 'Unassigned REQUESTED schedules must have veterinarianId = null');
-    });
-
-    test('restricts VETERINARIAN from querying other vet ID when status is REQUESTED', () => {
-      const resolved = resolveVetListFilter('VETERINARIAN', 101, 'REQUESTED', 999);
-      assert.equal(resolved, 101, 'Querying another vet ID must be forced to current vet ID');
-    });
-
-    test('strictly enforces current vet ID when status is SCHEDULED or IN_PROGRESS', () => {
+    test('strictly enforces current vet ID for VETERINARIAN regardless of query param', () => {
       const scheduledResolved = resolveVetListFilter('VETERINARIAN', 101, 'SCHEDULED', null);
       assert.equal(scheduledResolved, 101, 'SCHEDULED status must enforce current vet ID');
+
+      const otherVetResolved = resolveVetListFilter('VETERINARIAN', 101, 'SCHEDULED', 999);
+      assert.equal(otherVetResolved, 101, 'Querying another vet ID must be forced to current vet ID');
 
       const inProgressResolved = resolveVetListFilter('VETERINARIAN', 101, 'IN_PROGRESS', null);
       assert.equal(inProgressResolved, 101, 'IN_PROGRESS status must enforce current vet ID');
@@ -101,6 +87,8 @@ describe('Verification-First Team: Vet Actor Acceptance Tests', () => {
         startDate: '2026-10-23',
         endDate: '2026-10-30',
         instructions: 'Mix with morning sweet feed',
+        status: 'ACTIVE',
+        administeredByRole: 'GROOM',
       };
 
       const plan: TreatmentPlan = {

@@ -1,14 +1,16 @@
 package com.rtms.backend.stable.service;
 
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.admission.service.GroomAssignmentTriggers;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.*;
 import com.rtms.backend.identity.repository.*;
 import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.entity.*;
 import com.rtms.backend.stable.enums.AreaType;
+import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.*;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.*;
 import org.springframework.http.HttpStatus;
@@ -24,11 +26,11 @@ class StableAssignmentServiceTest {
     UserRepository users;
     GroomProfileRepository profiles;
     HorseRepository horses;
-    GroupWorkoutSyncService workouts;
+    TrainingGroupService workouts;
     EntityManager em;
     StableAssignmentService service;
     AreaTrainerAssignmentPolicy trainerPolicy;
-    com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
+    GroomAssignmentTriggers admissionAllocation;
     List<Area> allAreas;
     List<StableStall> allStalls;
     List<User> staff;
@@ -36,7 +38,7 @@ class StableAssignmentServiceTest {
     @BeforeEach void setup() {
         areas = mock(AreaRepository.class); stalls = mock(StableStallRepository.class);
         users = mock(UserRepository.class); profiles = mock(GroomProfileRepository.class);
-        horses = mock(HorseRepository.class); workouts = mock(GroupWorkoutSyncService.class);
+        horses = mock(HorseRepository.class); workouts = mock(TrainingGroupService.class);
         em = mock(EntityManager.class);
         Query query = mock(Query.class);
         when(em.createNativeQuery(anyString())).thenReturn(query);
@@ -53,7 +55,7 @@ class StableAssignmentServiceTest {
         when(stalls.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
         when(profiles.findById(anyLong())).thenReturn(Optional.empty());
         trainerPolicy = mock(AreaTrainerAssignmentPolicy.class);
-        admissionAllocation = mock(com.rtms.backend.admission.service.AdmissionGroomReviewService.class);
+        admissionAllocation = mock(GroomAssignmentTriggers.class);
         service = new StableAssignmentService(areas, stalls, users, profiles, horses, workouts, em, trainerPolicy,
                 admissionAllocation);
     }
@@ -101,6 +103,7 @@ class StableAssignmentServiceTest {
     }
     @Test void quarantineGroomHasNoTrainer() {
         apply(groom(10, 1, 200L));
+        verify(admissionAllocation).reassignLostQuarantineAfterCommit();
         verify(profiles).save(argThat(p -> p.getUserId() == 200L && p.getTrainerId() == null));
     }
     @Test void regularGroomRequiresTrainer() {
@@ -152,6 +155,12 @@ class StableAssignmentServiceTest {
         status(HttpStatus.CONFLICT, () -> apply(groom(1, 1, null)));
         verifyNoInteractions(workouts);
     }
+    @Test void reservedBlockCannotBeCleared() {
+        owner(1, 1, 200L);
+        block(1, 1).get(0).setStatus(StallStatus.RESERVED);
+        status(HttpStatus.CONFLICT, () -> apply(groom(1, 1, null)));
+        verifyNoInteractions(workouts);
+    }
     @Test void emptyBlockCanBeCleared() {
         owner(1, 1, 200L); apply(groom(1, 1, null));
         assertTrue(block(1, 1).stream().allMatch(s -> s.getGroomId() == null));
@@ -169,7 +178,7 @@ class StableAssignmentServiceTest {
     }
     @Test void genuineWorkoutConflictDoesNotWriteAssignments() {
         when(horses.findByCurrentStallIdIn(anyList())).thenReturn(List.of(occupied(101, 50)));
-        when(workouts.reassignFutureWorkoutsToGrooms(anyMap())).thenThrow(new IllegalStateException("BR-09"));
+        when(workouts.reassignFutureWorkoutsToGrooms(anyMap())).thenThrow(new IllegalStateException("workout sync failed"));
         status(HttpStatus.CONFLICT, () -> apply(groom(1, 1, 200L)));
     }
     @Test void missingBaselineIsRejected() {

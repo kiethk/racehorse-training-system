@@ -1,6 +1,5 @@
 import { apiGet, apiPost } from '@/services/api';
 import type {
-  CancelCareScheduleRequest,
   CareScheduleDetailResponse,
   CareScheduleResponse,
   CareScheduleStatus,
@@ -60,11 +59,6 @@ export const careService = {
 
   completeSchedule: async (id: number, data: CompleteCareScheduleRequest): Promise<CareScheduleResponse> => {
     const res = await apiPost<ApiResponse<CareScheduleResponse>>(`/api/care-schedules/${id}/complete`, data);
-    return res.data;
-  },
-
-  cancelSchedule: async (id: number, data: CancelCareScheduleRequest): Promise<CareScheduleResponse> => {
-    const res = await apiPost<ApiResponse<CareScheduleResponse>>(`/api/care-schedules/${id}/cancel`, data);
     return res.data;
   },
 

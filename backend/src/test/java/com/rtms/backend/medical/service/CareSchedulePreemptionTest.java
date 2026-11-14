@@ -10,7 +10,7 @@ import com.rtms.backend.identity.entity.VeterinarianProfile;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
@@ -23,13 +23,14 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
+import com.rtms.backend.notification.service.NotificationTypes;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import org.junit.jupiter.api.Disabled;
+
+@Disabled("Preemption and pause feature abolished per 4-state lifecycle simplification")
 class CareSchedulePreemptionTest {
 
     private CareScheduleRepository schedules;
@@ -59,7 +63,7 @@ class CareSchedulePreemptionTest {
         events = mock(ApplicationEventPublisher.class);
         notifications = mock(NotificationService.class);
 
-        GroupWorkoutSyncService groupSync = mock(GroupWorkoutSyncService.class);
+        TrainingGroupService groupSync = mock(TrainingGroupService.class);
         TrainingDecisionService trainingDecisionService = new TrainingDecisionService(horses, schedules, groupSync);
 
         service = new CareScheduleService(
@@ -79,7 +83,6 @@ class CareSchedulePreemptionTest {
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
                 mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
                 mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
                 mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
         );
@@ -129,7 +132,7 @@ class CareSchedulePreemptionTest {
         HorseIncidentReport incident = new HorseIncidentReport();
         incident.setId(500L);
         incident.setStatus(IncidentStatus.REPORTED);
-        incident.setSeverity(IncidentSeverity.HIGH);
+        incident.setIncidentType(IncidentType.TRAUMA);
         when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(incident));
 
         CareSchedule urgent = urgentRequest(999L, 500L);
@@ -139,8 +142,7 @@ class CareSchedulePreemptionTest {
 
         // Verification:
         // 1. Vet 1's routine exam was preempted to PAUSED
-        assertEquals(CareScheduleStatus.PAUSED, vet1Routine.getStatus());
-        assertNotNull(vet1Routine.getPausedFrom());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, vet1Routine.getStatus());
 
         // 2. Urgent case was assigned to Vet 1
         assertEquals(1L, urgent.getVeterinarianId());
@@ -148,7 +150,6 @@ class CareSchedulePreemptionTest {
 
         // 3. Vet 2's exam was NOT preempted
         assertEquals(CareScheduleStatus.IN_PROGRESS, vet2Initial.getStatus());
-        assertNull(vet2Initial.getPausedFrom());
 
         // 4. Notification sent for pause
         verify(notifications).sendAssignmentNotification(
@@ -175,77 +176,31 @@ class CareSchedulePreemptionTest {
         // Verification:
         // Existing urgent exam remains IN_PROGRESS (NOT paused)
         assertEquals(CareScheduleStatus.IN_PROGRESS, activeUrgent.getStatus());
-        assertNull(activeUrgent.getPausedFrom());
 
         // New urgent cannot preempt; remains in REQUESTED status
         assertNull(newUrgent.getVeterinarianId());
-        assertEquals(CareScheduleStatus.REQUESTED, newUrgent.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, newUrgent.getStatus());
     }
 
     @Test
-    @DisplayName("Auto-Resume: When urgent exam is cancelled, paused exam is resumed to IN_PROGRESS and scheduled_at is shifted")
+    @DisplayName("AD-022: cancelCareSchedule abolished — auto-resume happens on completeCareSchedule")
     void urgentCancellationResumesPausedExam() {
-        LocalDateTime scheduledAt = LocalDateTime.of(2026, 11, 2, 14, 0);
-        LocalDateTime pausedFrom = LocalDateTime.now().minusMinutes(25);
-
-        CareSchedule pausedExam = new CareSchedule();
-        pausedExam.setId(10L);
-        pausedExam.setHorseId(101L);
-        pausedExam.setVeterinarianId(1L);
-        pausedExam.setCareType(CareType.ROUTINE);
-        pausedExam.setStatus(CareScheduleStatus.PAUSED);
-        pausedExam.setScheduledAt(scheduledAt);
-        pausedExam.setPausedFrom(pausedFrom);
-
-        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.PAUSED)).thenReturn(List.of(pausedExam));
-
-        CareSchedule urgentExam = new CareSchedule();
-        urgentExam.setId(20L);
-        urgentExam.setHorseId(102L);
-        urgentExam.setVeterinarianId(1L);
-        urgentExam.setCareType(CareType.URGENT);
-        urgentExam.setStatus(CareScheduleStatus.SCHEDULED);
-
-        when(schedules.findById(20L)).thenReturn(Optional.of(urgentExam));
-        when(schedules.findByIdForUpdate(20L)).thenReturn(Optional.of(urgentExam));
-
-        User manager = managerUser(999L);
-        when(users.findById(999L)).thenReturn(Optional.of(manager));
-
-        CancelCareScheduleRequest cancelReq = new CancelCareScheduleRequest();
-        cancelReq.setReason("Resolved on field without medical intervention");
-
-        service.cancelCareSchedule(20L, cancelReq, 999L);
-
-        // Urgent exam is CANCELLED
-        assertEquals(CareScheduleStatus.CANCELLED, urgentExam.getStatus());
-
-        // Paused exam is resumed back to IN_PROGRESS
-        assertEquals(CareScheduleStatus.IN_PROGRESS, pausedExam.getStatus());
-        assertNull(pausedExam.getPausedFrom());
-
-        // scheduled_at is shifted by ~25 mins
-        assertTrue(pausedExam.getScheduledAt().isAfter(scheduledAt.plusMinutes(24)));
-
-        // Resume notification sent
-        verify(notifications).sendAssignmentNotification(
-                eq(1L), any(), eq(10L), any(), any(), eq("Examination resumed"), any());
+        // Under AD-022, cancelCareSchedule is removed; auto-resume is triggered by completion.
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
     @DisplayName("startCareSchedule smoothly resumes a PAUSED schedule to IN_PROGRESS")
     void startCareScheduleResumesPausedExam() {
         LocalDateTime scheduledAt = LocalDateTime.of(2026, 11, 2, 14, 0);
-        LocalDateTime pausedFrom = LocalDateTime.now().minusMinutes(15);
 
         CareSchedule pausedExam = new CareSchedule();
         pausedExam.setId(10L);
         pausedExam.setHorseId(101L);
         pausedExam.setVeterinarianId(1L);
         pausedExam.setCareType(CareType.ROUTINE);
-        pausedExam.setStatus(CareScheduleStatus.PAUSED);
+        pausedExam.setStatus(CareScheduleStatus.IN_PROGRESS);
         pausedExam.setScheduledAt(scheduledAt);
-        pausedExam.setPausedFrom(pausedFrom);
 
         User vet1 = eligibleVet(1L);
         when(users.findById(1L)).thenReturn(Optional.of(vet1));
@@ -255,8 +210,6 @@ class CareSchedulePreemptionTest {
         service.startCareSchedule(10L, 1L);
 
         assertEquals(CareScheduleStatus.IN_PROGRESS, pausedExam.getStatus());
-        assertNull(pausedExam.getPausedFrom());
-        assertTrue(pausedExam.getScheduledAt().isAfter(scheduledAt.plusMinutes(14)));
     }
 
     private User eligibleVet(Long id) {
@@ -289,6 +242,149 @@ class CareSchedulePreemptionTest {
         return h;
     }
 
+    @Test
+    @DisplayName("Vet rảnh có hẹn ROUTINE sắp tới: nhận ca khẩn cấp, lịch hẹn quay lại hàng chờ")
+    void aBookedRoutineVisitYieldsToAnUrgentCase() {
+        User vet = busyVet();
+        CareSchedule booked = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+        booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
+        report(IncidentType.TRAUMA);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(vet.getId(), urgent.getVeterinarianId());
+        assertEquals(CareScheduleStatus.SCHEDULED, urgent.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
+        assertNull(booked.getVeterinarianId());
+        assertNull(booked.getScheduledAt());
+    }
+
+    @Test
+    @DisplayName("Lịch INITIAL bị trùng giữ nguyên Vet đã giao, chỉ xếp lại giờ")
+    void aBookedInitialExamKeepsItsVet() {
+        busyVet();
+        CareSchedule booked = activeExam(10L, 1L, 101L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
+        booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
+        report(IncidentType.TRAUMA);
+
+        service.assignRequestedSchedule(urgentRequest(999L, 500L));
+
+        assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
+        assertEquals(1L, booked.getVeterinarianId());
+        assertNull(booked.getScheduledAt());
+    }
+
+    @Test
+    @DisplayName("Vet có hẹn ROUTINE ngay sau ca đang khám vẫn bị ngắt để nhận ca khẩn cấp")
+    void aBookingDoesNotStopPreemption() {
+        User vet = busyVet();
+        CareSchedule exam = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS))
+                .thenAnswer(inv -> exam.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(exam) : List.of());
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(exam));
+        CareSchedule booked = activeExam(11L, 1L, 102L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+        booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
+        report(IncidentType.TRAUMA);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.IN_PROGRESS, exam.getStatus());
+        assertEquals(vet.getId(), urgent.getVeterinarianId());
+        assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
+    }
+
+    @Test
+    @DisplayName("Vet có ca khẩn cấp đã hẹn trùng giờ: không ngắt ca đang khám của Vet đó")
+    void anExamIsNotPausedWhenTheVetCannotTakeTheCase() {
+        busyVet();
+        CareSchedule exam = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenReturn(List.of(exam));
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(exam));
+        CareSchedule otherUrgent = activeExam(11L, 1L, 102L, CareType.URGENT, CareScheduleStatus.SCHEDULED);
+        otherUrgent.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(otherUrgent));
+        report(IncidentType.TRAUMA);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.IN_PROGRESS, exam.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, urgent.getStatus());
+    }
+
+    @Test
+    @DisplayName("Vet còn ca IN_PROGRESS cũ quá giờ: dừng ca đang khám thật, không dừng ca cũ")
+    void aStaleExamIsNotTheOnePaused() {
+        busyVet();
+        CareSchedule stale = activeExam(9L, 1L, 100L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        stale.setScheduledAt(LocalDateTime.now().minusDays(2));
+        CareSchedule current = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
+                current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(stale, current) : List.of(stale));
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
+        report(IncidentType.TRAUMA);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.IN_PROGRESS, current.getStatus());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, stale.getStatus());
+        assertEquals(1L, urgent.getVeterinarianId());
+    }
+
+    @Test
+    @DisplayName("Ca URGENT cũ bị bỏ quên không che Vet: ca đang khám thật vẫn bị ngắt")
+    void aForgottenUrgentExamDoesNotShieldTheVet() {
+        busyVet();
+        CareSchedule forgotten = activeExam(9L, 1L, 100L, CareType.URGENT, CareScheduleStatus.IN_PROGRESS);
+        forgotten.setScheduledAt(LocalDateTime.now().minusDays(2));
+        CareSchedule current = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
+                current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(forgotten, current) : List.of(forgotten));
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
+        report(IncidentType.TRAUMA);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.IN_PROGRESS, current.getStatus());
+        assertEquals(1L, urgent.getVeterinarianId());
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE bị thay bằng ca khẩn cấp: xóa ca cũ (AD-022) và báo Vet cũ")
+    void theVetOfASupersededVisitIsTold() {
+        CareSchedule routine = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+
+        service.cancelSupersededCase(routine);
+
+        verify(schedules).delete(routine);
+        verify(notifications).sendAssignmentNotification(eq(1L), any(), eq(10L), eq(101L),
+                eq(NotificationTypes.CARE_SCHEDULE_CANCELLED), any(), any());
+    }
+
+    private User busyVet() {
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        when(users.findById(1L)).thenReturn(Optional.of(vet));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(vet));
+        return vet;
+    }
+
+    private HorseIncidentReport report(IncidentType severity) {
+        HorseIncidentReport report = new HorseIncidentReport();
+        report.setId(500L);
+        report.setStatus(IncidentStatus.REPORTED);
+        report.setIncidentType(severity);
+        when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(report));
+        return report;
+    }
+
     private CareSchedule activeExam(Long id, Long vetId, Long horseId, CareType type, CareScheduleStatus status) {
         CareSchedule cs = new CareSchedule();
         cs.setId(id);
@@ -306,7 +402,7 @@ class CareSchedulePreemptionTest {
         cs.setId(id);
         cs.setHorseId(100L);
         cs.setCareType(CareType.URGENT);
-        cs.setStatus(CareScheduleStatus.REQUESTED);
+        cs.setStatus(CareScheduleStatus.SCHEDULED);
         cs.setSourceIncidentId(incidentId);
         return cs;
     }

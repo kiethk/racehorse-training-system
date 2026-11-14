@@ -17,7 +17,7 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,7 +43,7 @@ class HorseStatusChangeTest {
     @Mock
     private StableStallRepository stableStallRepository;
     @Mock
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     @Mock
     private AreaRepository areaRepository;
     @Mock
@@ -104,8 +105,6 @@ class HorseStatusChangeTest {
 
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(stallId)).thenReturn(Optional.of(stall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(horseId), anyList()))
-                .thenReturn(List.of(care));
         when(groomDailyTaskRepository.findByHorseIdAndIsCompletedFalse(horseId))
                 .thenReturn(List.of(groomTask));
         when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -117,8 +116,8 @@ class HorseStatusChangeTest {
         assertEquals(HorseStatus.INACTIVE, updated.getCurrentStatus());
         assertEquals("Passed away from natural causes", updated.getStatusReason());
         assertNull(updated.getCurrentStallId());
-        assertEquals(TrainingDecision.BLOCKED, updated.getTrainingDecision());
-        assertEquals("Passed away from natural causes", updated.getTrainingDecisionReason());
+        // INACTIVE không đụng tới quyết định tập: chỉ Vet mới đổi được.
+        assertEquals(TrainingDecision.ALLOWED, updated.getTrainingDecision());
 
         // Assert Stall vacated
         assertEquals(StallStatus.AVAILABLE, stall.getStatus());
@@ -127,10 +126,10 @@ class HorseStatusChangeTest {
         // Assert the horse left its training group (its not-yet-started Workouts are cancelled there)
         verify(workoutService).exitAnyGroup(horseId);
 
-        // Assert Care cancelled
-        assertEquals(CareScheduleStatus.CANCELLED, care.getStatus());
-        assertTrue(care.getCancelReason().contains("Horse marked INACTIVE"));
-        verify(careScheduleRepository).saveAll(List.of(care));
+        // Assert Care schedules transitioned to CANCELLED
+        verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
+                eq(horseId), eq(List.of(CareScheduleStatus.SCHEDULED)), anyString(), any(LocalDateTime.class));
+        verify(careScheduleRepository, never()).saveAll(any());
 
         // Assert Groom tasks deleted
         verify(groomDailyTaskRepository).deleteAll(List.of(groomTask));
@@ -171,8 +170,7 @@ class HorseStatusChangeTest {
 
         assertEquals(HorseStatus.ELIGIBLE, updated.getCurrentStatus());
         assertEquals("Horse returned to training", updated.getStatusReason());
-        assertEquals(TrainingDecision.ALLOWED, updated.getTrainingDecision());
-        assertNull(updated.getTrainingDecisionReason());
+        assertEquals(TrainingDecision.BLOCKED, updated.getTrainingDecision());
         assertEquals(105L, updated.getCurrentStallId());
         assertEquals(StallStatus.OCCUPIED, stall.getStatus());
         verify(workoutService).reassignFutureWorkoutsToGroom(horseId, 10L);

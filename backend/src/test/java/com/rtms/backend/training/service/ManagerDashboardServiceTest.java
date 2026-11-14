@@ -11,7 +11,7 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.entity.Area;
@@ -21,8 +21,8 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.ManagerDashboardSummaryResponse;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.enums.CourseRunStatus;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class ManagerDashboardServiceTest {
     private HorseRepository horseRepository;
 
     @Mock
-    private GroupPlanRepository horseTrainingPlanRepository;
+    private CourseRunRepository horseTrainingPlanRepository;
 
     @Mock
     private AdmissionApplicationRepository admissionApplicationRepository;
@@ -126,15 +126,15 @@ class ManagerDashboardServiceTest {
         ));
 
         // 2. Fleet
-        when(horseRepository.count()).thenReturn(20L);
         when(horseRepository.countByCurrentStatus(HorseStatus.ELIGIBLE)).thenReturn(15L);
         when(horseTrainingPlanRepository.countHorsesInTraining()).thenReturn(12L);
-        when(horseRepository.countByTrainingDecision(TrainingDecision.BLOCKED)).thenReturn(2L);
+        when(horseRepository.countByCurrentStatusAndTrainingDecision(HorseStatus.ELIGIBLE, TrainingDecision.BLOCKED)).thenReturn(2L);
         when(horseRepository.countByCurrentStatus(HorseStatus.INACTIVE)).thenReturn(3L);
 
         // 3. Admission Pipeline
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.MANAGER_REVIEW)).thenReturn(1L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_ARRIVAL)).thenReturn(2L);
+        when(admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_STALL)).thenReturn(0L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.GROOM_REVIEW)).thenReturn(3L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.VET_REVIEW)).thenReturn(1L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.TRAINER_REVIEW)).thenReturn(1L);
@@ -164,7 +164,7 @@ class ManagerDashboardServiceTest {
 
         // 4. Urgent Incidents
         when(horseIncidentReportRepository.countByStatusIn(anyList())).thenReturn(4L);
-        when(horseIncidentReportRepository.countByStatusInAndSeverityIn(anyList(), anyList())).thenReturn(1L);
+        when(horseIncidentReportRepository.countByStatusInAndIncidentTypeIn(anyList(), anyList())).thenReturn(1L);
 
         HorseIncidentReport incident = new HorseIncidentReport();
         setField(incident, "id", 301L);
@@ -172,7 +172,7 @@ class ManagerDashboardServiceTest {
         incident.setReportedById(501L);
         incident.setTitle("Colic symptoms observed");
         incident.setDescription("Horse showing signs of abdominal discomfort");
-        incident.setSeverity(IncidentSeverity.HIGH);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now().minusHours(2));
 
@@ -207,7 +207,7 @@ class ManagerDashboardServiceTest {
         assertEquals("REGULAR", response.barnOccupancies().get(1).areaType());
 
         // Fleet Summary
-        assertEquals(20L, response.fleetSummary().totalHorses());
+        assertEquals(15L, response.fleetSummary().totalHorses());
         assertEquals(15L, response.fleetSummary().activeEligible());
         assertEquals(12L, response.fleetSummary().inTraining());
         assertEquals(2L, response.fleetSummary().medicalBlocked());
@@ -227,6 +227,6 @@ class ManagerDashboardServiceTest {
         assertEquals(1, response.urgentIncidents().size());
         assertEquals("Pegasus", response.urgentIncidents().get(0).horseName());
         assertEquals("Dr. Emily Vet", response.urgentIncidents().get(0).reporterName());
-        assertEquals("HIGH", response.urgentIncidents().get(0).severity());
+        assertEquals("TRAUMA", response.urgentIncidents().get(0).incidentType());
     }
 }

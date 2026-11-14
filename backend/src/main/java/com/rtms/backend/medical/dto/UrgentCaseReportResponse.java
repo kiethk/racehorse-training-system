@@ -1,6 +1,6 @@
 package com.rtms.backend.medical.dto;
 
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +11,7 @@ public record UrgentCaseReportResponse(
         String reportedByName,
         String reportedByRole,
         LocalDateTime reportedAt,
-        IncidentSeverity severity,
+        IncidentType incidentType,
         String title,
         String description,
         String imageUrl

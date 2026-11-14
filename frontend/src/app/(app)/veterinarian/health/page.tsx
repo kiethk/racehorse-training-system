@@ -8,7 +8,7 @@ import { Panel } from '@/components/ui/Panel';
 import { Button, LinkButton } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/StatusBadge';
 import { DataTable } from '@/components/ui/DataTable';
-import { FilterChips, SearchInput, MetricCard, Notice, PageHeader } from '@/components/ui';
+import { FilterChips, SearchInput, MetricCard, Notice, PageHeader, Tabs, type TabItem } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
@@ -27,6 +27,16 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import type { HorsePreventiveStatus } from '@/features/care/types/preventive';
 import type { TreatmentPlan } from '@/features/care/types';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 type StatusFilter = 'ALL' | 'ALLOWED' | 'BLOCKED';
 
@@ -70,6 +80,26 @@ function HealthRecordsContent() {
   const [expandedRecordPlans, setExpandedRecordPlans] = useState<Set<number>>(new Set());
   const [openFollowUp, setOpenFollowUp] = useState<{ id: number; scheduledAt: string | null } | null>(null);
   const [followUpLoading, setFollowUpLoading] = useState(false);
+
+  const paramTab = searchParams?.get('tab');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return paramTab && ['overview', 'vitals', 'records', 'injuries-preventive'].includes(paramTab)
+      ? paramTab
+      : 'overview';
+  });
+
+  useEffect(() => {
+    if (paramTab && ['overview', 'vitals', 'records', 'injuries-preventive'].includes(paramTab)) {
+      setActiveTab(paramTab);
+    }
+  }, [paramTab]);
+
+  const handleTabChange = useCallback((newTab: string) => {
+    setActiveTab(newTab);
+    const nextParams = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    nextParams.set('tab', newTab);
+    router.replace(`/veterinarian/health?${nextParams.toString()}`, { scroll: false });
+  }, [searchParams, router]);
 
   const refreshData = useCallback(() => {
     setSummaries({});
@@ -157,10 +187,11 @@ function HealthRecordsContent() {
     if (paramHorseId) {
       const id = Number(paramHorseId);
       if (!Number.isNaN(id) && id > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedHorseId(id);
         void loadHorseDetail(id);
       }
+    } else {
+      setSelectedHorseId(null);
     }
   }, [paramHorseId, loadHorseDetail]);
 
@@ -173,7 +204,8 @@ function HealthRecordsContent() {
     setPreventive(null);
     setPlansByRecordId({});
     setExpandedRecordPlans(new Set());
-    router.replace('/veterinarian/health');
+    setActiveTab('overview');
+    router.push('/veterinarian/health');
   }, [router]);
 
   const stallMap = useMemo(() => {
@@ -193,42 +225,9 @@ function HealthRecordsContent() {
     return map;
   }, [vetAdmissions]);
 
-  // Clicking a row does exactly what that row's Action button would do; rows whose case
-  // is held by someone else (or still in intake) answer with a warning toast instead.
+  // Clicking a row opens the comprehensive in-page health profile for that horse.
   const handleHorseRow = (row: HorseListItem) => {
-    const { pendingUrgentScheduleId, pendingUrgentVetId, pendingUrgentVetName, pendingAdmissionId } = row.summary ?? {};
-    if (pendingUrgentScheduleId) {
-      if (pendingUrgentVetId != null && pendingUrgentVetId === user?.userId) {
-        router.push(`/veterinarian/urgent/${pendingUrgentScheduleId}`);
-      } else if (pendingUrgentVetName) {
-        toast.warning('Urgent case held by another vet', `${pendingUrgentVetName} is examining ${row.horse.name}. No record opens until that case is closed.`);
-      } else {
-        toast.warning('Urgent case awaiting assignment', `${row.horse.name} has an open urgent case. It is assigned from the Admissions queue.`);
-      }
-      return;
-    }
-    if (pendingAdmissionId) {
-      const admission = admissionByHorse.get(row.horse.id);
-      if (admission?.admissionStatus === 'VET_REVIEW') {
-        router.push(`/veterinarian/admissions?id=${pendingAdmissionId}`);
-        return;
-      }
-      const stage =
-        admission?.admissionStatus === 'TRAINER_REVIEW' ? 'trainer review'
-        : admission?.admissionStatus === 'MANAGER_REVIEW' ? 'manager review'
-        : 'intake review';
-      toast.warning('No health record yet', `${row.horse.name} is still in admission intake (${stage}).`);
-      return;
-    }
-    // Dead-end guard: horses that have never been examined (in-progress intake exams
-    // create their record only on completion) must not land on an empty record page.
-    if (!row.summary?.lastExaminedAt) {
-      toast.warning('No health record yet', `${row.horse.name} has no examination on file. Complete the in-progress exam, or schedule a routine exam from Routine Checks.`);
-      return;
-    }
-    router.push(
-      `/veterinarian/records?horseId=${row.horse.id}${row.horse.name ? `&horseName=${encodeURIComponent(row.horse.name)}` : ''}`,
-    );
+    router.push(`/veterinarian/health?horseId=${row.horse.id}`);
   };
 
   // Rejected horses are out of the clinical roster: no training to clear, so keep them out of the list and metrics.
@@ -410,6 +409,69 @@ function HealthRecordsContent() {
       const tb = b.examinedAt ? new Date(b.examinedAt).getTime() : 0;
       return tb - ta;
     });
+    const chartMetrics = [...metrics]
+      .sort((a, b) => {
+        const ta = a.recordedAt ? new Date(a.recordedAt).getTime() : 0;
+        const tb = b.recordedAt ? new Date(b.recordedAt).getTime() : 0;
+        return ta - tb;
+      })
+      .map((m) => ({
+        ...m,
+        date: formatDate(m.recordedAt),
+      }));
+
+    const hrStats = (() => {
+      const vals = chartMetrics.map((m) => m.heartRate).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+      if (!vals.length) return null;
+      return {
+        latest: vals[vals.length - 1],
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+        avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+      };
+    })();
+
+    const tempStats = (() => {
+      const vals = chartMetrics.map((m) => m.temperature).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+      if (!vals.length) return null;
+      return {
+        latest: vals[vals.length - 1],
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+        avg: Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10,
+      };
+    })();
+
+    const respStats = (() => {
+      const vals = chartMetrics.map((m) => m.respiratoryRate).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+      if (!vals.length) return null;
+      return {
+        latest: vals[vals.length - 1],
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+        avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+      };
+    })();
+
+    const weightStats = (() => {
+      const vals = chartMetrics.map((m) => m.weight).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+      if (!vals.length) return null;
+      const first = vals[0];
+      const latest = vals[vals.length - 1];
+      return {
+        latest,
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+        change: Math.round((latest - first) * 10) / 10,
+      };
+    })();
+
+    const healthTabs: TabItem[] = [
+      { id: 'overview', label: 'Overview', icon: 'shield' },
+      { id: 'vitals', label: 'Vitals & Trends', icon: 'activity', count: chartMetrics.length },
+      { id: 'records', label: 'Medical Records', icon: 'clipboard', count: sortedRecords.length },
+      { id: 'injuries-preventive', label: 'Injuries & Care', icon: 'alert-triangle', count: injuries.length },
+    ];
 
     return (
       <RoleGuard allowedRoles={['VETERINARIAN']}>
@@ -468,154 +530,430 @@ function HealthRecordsContent() {
               </div>
             </div>
 
-            {/* Top Overview: Status & Clearance + Vitals */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <Panel padded className="space-y-3 lg:col-span-2 border border-[var(--color-border)]">
-                <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <Icon name="shield" size={16} className="text-[var(--color-primary)]" />
-                    <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
-                      Clinical Status & Training Clearance
-                    </h2>
-                  </div>
-                  <Pill tone={decision === 'ALLOWED' ? 'success' : 'danger'}>{decision}</Pill>
-                </div>
-                {reason && (
-                  <div className="rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)]/20 p-2.5 text-xs text-[var(--color-warning)]">
-                    <strong>Clearance Reason:</strong> {reason}
-                  </div>
-                )}
-                {decision === 'BLOCKED' && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)]/20 p-2.5 text-xs">
-                    <span className="text-[var(--color-danger)] font-medium">
-                      {followUpLoading
-                        ? 'Looking for an open follow-up examination…'
-                        : openFollowUp
-                          ? `Open follow-up #${openFollowUp.id}${
-                              openFollowUp.scheduledAt ? ` · ${formatDate(openFollowUp.scheduledAt)}` : ''
-                            } — complete it to reassess clearance.`
-                          : 'No open follow-up examination for this horse. Schedule one in Routine Care to reassess clearance.'}
-                    </span>
-                    {!followUpLoading &&
-                      (openFollowUp ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          icon="stethoscope"
-                          onClick={() => router.push(`/veterinarian/routine/${openFollowUp.id}`)}
-                          className="transition-all active:scale-[0.98]"
-                        >
-                          Reassess clearance
-                        </Button>
-                      ) : (
-                        <LinkButton
-                          href="/veterinarian/routine"
-                          size="sm"
-                          icon="calendar"
-                          className="transition-all active:scale-[0.98]"
-                        >
-                          Open Routine Care
-                        </LinkButton>
-                      ))}
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-                  <div>
-                    <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
-                      Last Examined
-                    </span>
-                    <span className="font-medium text-[var(--color-text-primary)]">
-                      {healthSummary?.lastExaminedAt
-                        ? formatDate(healthSummary.lastExaminedAt)
-                        : 'No examination on record'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
-                      Last Diagnosis
-                    </span>
-                    <span className="font-medium text-[var(--color-text-primary)]">
-                      {healthSummary?.lastDiagnosis || 'None reported'}
-                    </span>
-                  </div>
-                </div>
-              </Panel>
+            {/* Navigation Tabs */}
+            <Tabs
+              tabs={healthTabs}
+              active={activeTab}
+              onChange={handleTabChange}
+              size="md"
+            />
 
-              <Panel padded className="space-y-2 border border-[var(--color-border)]">
-                <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2.5">
-                  <Icon name="heart-pulse" size={16} className="text-[var(--color-medical)]" />
-                  <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
-                    Latest Vitals Telemetry
-                  </h2>
-                </div>
-                {latestMetric ? (
-                  <div className="grid grid-cols-2 gap-2.5 text-xs pt-1">
-                    {latestMetric.heartRate != null && (
-                      <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                        <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                          Heart Rate
-                        </span>
-                        <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                          {latestMetric.heartRate} bpm
-                        </span>
-                      </div>
-                    )}
-                    {latestMetric.temperature != null && (
-                      <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                        <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                          Temperature
-                        </span>
-                        <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                          {latestMetric.temperature} °C
-                        </span>
-                      </div>
-                    )}
-                    {latestMetric.respiratoryRate != null && (
-                      <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                        <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                          Respiration
-                        </span>
-                        <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                          {latestMetric.respiratoryRate} rpm
-                        </span>
-                      </div>
-                    )}
-                    {latestMetric.weight != null && (
-                      <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                        <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                          Weight
-                        </span>
-                        <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                          {latestMetric.weight} kg
-                        </span>
-                      </div>
-                    )}
-                    {latestMetric.hydrationStatus && (
-                      <div className="col-span-2 text-xs">
-                        <span className="text-[var(--color-text-muted)]">Hydration: </span>
-                        <span className="font-semibold">{latestMetric.hydrationStatus}</span>
-                      </div>
-                    )}
-                    {latestMetric.notes && (
-                      <div className="col-span-2 text-xs text-[var(--color-text-secondary)] italic">
-                        &quot;{latestMetric.notes}&quot;
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[var(--color-text-muted)] pt-3">No telemetry recorded yet.</p>
-                )}
-              </Panel>
-            </div>
-
-            {/* 2-Column Clinical Workspace: Medical Records History (Left 7/12) & Injuries/Preventive (Right 5/12) */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-              {/* Left: Health Records History */}
-              <div className="lg:col-span-7 space-y-4">
+            {/* Tab 1: Overview */}
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 items-start">
                 <Panel padded className="space-y-3 border border-[var(--color-border)]">
                   <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <Icon name="clipboard" size={16} className="text-[var(--color-primary)]" />
+                    <div>
+                      <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+                        Clinical Status & Training Clearance
+                      </h2>
+                    </div>
+                    <Pill tone={decision === 'ALLOWED' ? 'success' : 'danger'}>{decision}</Pill>
+                  </div>
+                  {reason && (
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)]/20 p-2.5 text-xs text-[var(--color-warning)]">
+                      <strong>Clearance Reason:</strong> {reason}
+                    </div>
+                  )}
+                  {decision === 'BLOCKED' && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)]/20 p-2.5 text-xs">
+                      <span className="text-[var(--color-danger)] font-medium">
+                        {healthSummary?.pendingAdmissionId
+                          ? 'This horse is currently undergoing admission intake review (Quarantine Stall).'
+                          : followUpLoading
+                          ? 'Looking for an open follow-up examination…'
+                          : openFollowUp
+                            ? `Open follow-up #${openFollowUp.id}${
+                                openFollowUp.scheduledAt ? ` · ${formatDate(openFollowUp.scheduledAt)}` : ''
+                              } — complete it to reassess clearance.`
+                            : 'No open follow-up examination for this horse. Schedule one in Routine Care to reassess clearance.'}
+                      </span>
+                      {healthSummary?.pendingAdmissionId ? (
+                        <LinkButton
+                          href={`/veterinarian/admissions?id=${healthSummary.pendingAdmissionId}`}
+                          size="sm"
+                          icon="clipboard"
+                          className="transition-all active:scale-[0.98]"
+                        >
+                          Review Admission
+                        </LinkButton>
+                      ) : !followUpLoading &&
+                        (openFollowUp ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon="stethoscope"
+                            onClick={() => router.push(`/veterinarian/routine/${openFollowUp.id}`)}
+                            className="transition-all active:scale-[0.98]"
+                          >
+                            Reassess clearance
+                          </Button>
+                        ) : (
+                          <LinkButton
+                            href="/veterinarian/routine"
+                            size="sm"
+                            icon="calendar"
+                            className="transition-all active:scale-[0.98]"
+                          >
+                            Open Routine Care
+                          </LinkButton>
+                        ))}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                    <div>
+                      <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
+                        Last Examined
+                      </span>
+                      <span className="font-medium text-[var(--color-text-primary)]">
+                        {healthSummary?.lastExaminedAt
+                          ? formatDate(healthSummary.lastExaminedAt)
+                          : 'No examination on record'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
+                        Last Diagnosis
+                      </span>
+                      <span className="font-medium text-[var(--color-text-primary)]">
+                        {healthSummary?.lastDiagnosis || 'None reported'}
+                      </span>
+                    </div>
+                  </div>
+                </Panel>
+
+                <Panel padded className="space-y-2 border border-[var(--color-border)]">
+                  <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                    <div>
+                      <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+                        Latest Vitals Telemetry
+                      </h2>
+                    </div>
+                    {latestMetric && (
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        icon="activity"
+                        onClick={() => handleTabChange('vitals')}
+                        className="text-[11px] text-[var(--color-primary)] p-0 h-auto"
+                      >
+                        View Trends →
+                      </Button>
+                    )}
+                  </div>
+                  {latestMetric ? (
+                    <div className="grid grid-cols-2 gap-2.5 text-xs pt-1">
+                      {latestMetric.heartRate != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Heart Rate
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.heartRate} bpm
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.temperature != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Temperature
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.temperature} °C
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.respiratoryRate != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Respiration
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.respiratoryRate} rpm
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.weight != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Weight
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.weight} kg
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.hydrationStatus && (
+                        <div className="col-span-2 text-xs">
+                          <span className="text-[var(--color-text-muted)]">Hydration: </span>
+                          <span className="font-semibold">{latestMetric.hydrationStatus}</span>
+                        </div>
+                      )}
+                      {latestMetric.notes && (
+                        <div className="col-span-2 text-xs text-[var(--color-text-secondary)] italic">
+                          &quot;{latestMetric.notes}&quot;
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--color-text-muted)] pt-3">No telemetry recorded yet.</p>
+                  )}
+                </Panel>
+              </div>
+            )}
+
+            {/* Tab 2: Vitals & Trends */}
+            {activeTab === 'vitals' && (
+              <div className="space-y-5">
+                {chartMetrics.length === 0 ? (
+                  <Panel padded>
+                    <EmptyState
+                      icon="activity"
+                      title="No vital measurements recorded"
+                      description="Vital telemetry recorded during routine and admission examinations will chart physiological trends here."
+                    />
+                  </Panel>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-[var(--color-text-primary)]">
+                          Physiological Telemetry Progression
+                        </span>
+                        <span className="text-[var(--color-text-muted)]">
+                          ({chartMetrics.length} recorded examination{chartMetrics.length === 1 ? '' : 's'})
+                        </span>
+                      </div>
+                      <div className="text-[var(--color-text-secondary)]">
+                        Range: <strong>{chartMetrics[0].date}</strong> → <strong>{chartMetrics[chartMetrics.length - 1].date}</strong>
+                      </div>
+                    </div>
+
+                    {/* 2x2 Grid of Individual Charts */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* 1. Heart Rate Chart */}
+                      <Panel padded className="space-y-3 border border-[var(--color-border)]">
+                        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                          <div>
+                            <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Heart Rate</h3>
+                          </div>
+                          {hrStats?.latest != null && (
+                            <Pill tone="danger" size="sm">
+                              Latest: {hrStats.latest} bpm
+                            </Pill>
+                          )}
+                        </div>
+                        {hrStats && (
+                          <div className="flex items-center justify-between text-[11px] text-[var(--color-text-muted)] px-1">
+                            <span>Min: <strong className="text-[var(--color-text-primary)]">{hrStats.min} bpm</strong></span>
+                            <span>Avg: <strong className="text-[var(--color-text-primary)]">{hrStats.avg} bpm</strong></span>
+                            <span>Max: <strong className="text-[var(--color-text-primary)]">{hrStats.max} bpm</strong></span>
+                          </div>
+                        )}
+                        <div className="h-48 w-full pt-1">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartMetrics}>
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+                              <YAxis
+                                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                                domain={['auto', 'auto']}
+                                unit=" bpm"
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'var(--color-surface)',
+                                  borderColor: 'var(--color-border)',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="heartRate"
+                                stroke="var(--color-danger, #c33c3c)"
+                                strokeWidth={2}
+                                name="Heart Rate"
+                                unit=" bpm"
+                                dot={{ r: 3, fill: '#c33c3c' }}
+                                activeDot={{ r: 5 }}
+                                connectNulls
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </Panel>
+
+                      {/* 2. Body Temperature Chart */}
+                      <Panel padded className="space-y-3 border border-[var(--color-border)]">
+                        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                          <div>
+                            <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Body Temperature</h3>
+                          </div>
+                          {tempStats?.latest != null && (
+                            <Pill tone="warning" size="sm">
+                              Latest: {tempStats.latest} °C
+                            </Pill>
+                          )}
+                        </div>
+                        {tempStats && (
+                          <div className="flex items-center justify-between text-[11px] text-[var(--color-text-muted)] px-1">
+                            <span>Min: <strong className="text-[var(--color-text-primary)]">{tempStats.min} °C</strong></span>
+                            <span>Avg: <strong className="text-[var(--color-text-primary)]">{tempStats.avg} °C</strong></span>
+                            <span>Max: <strong className="text-[var(--color-text-primary)]">{tempStats.max} °C</strong></span>
+                          </div>
+                        )}
+                        <div className="h-48 w-full pt-1">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartMetrics}>
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+                              <YAxis
+                                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                                domain={['auto', 'auto']}
+                                unit=" °C"
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'var(--color-surface)',
+                                  borderColor: 'var(--color-border)',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="temperature"
+                                stroke="var(--color-warning, #8a5b08)"
+                                strokeWidth={2}
+                                name="Temperature"
+                                unit=" °C"
+                                dot={{ r: 3, fill: '#8a5b08' }}
+                                activeDot={{ r: 5 }}
+                                connectNulls
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </Panel>
+
+                      {/* 3. Respiratory Rate Chart */}
+                      <Panel padded className="space-y-3 border border-[var(--color-border)]">
+                        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                          <div>
+                            <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Respiratory Rate</h3>
+                          </div>
+                          {respStats?.latest != null && (
+                            <Pill tone="neutral" size="sm">
+                              Latest: {respStats.latest} rpm
+                            </Pill>
+                          )}
+                        </div>
+                        {respStats && (
+                          <div className="flex items-center justify-between text-[11px] text-[var(--color-text-muted)] px-1">
+                            <span>Min: <strong className="text-[var(--color-text-primary)]">{respStats.min} rpm</strong></span>
+                            <span>Avg: <strong className="text-[var(--color-text-primary)]">{respStats.avg} rpm</strong></span>
+                            <span>Max: <strong className="text-[var(--color-text-primary)]">{respStats.max} rpm</strong></span>
+                          </div>
+                        )}
+                        <div className="h-48 w-full pt-1">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartMetrics}>
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+                              <YAxis
+                                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                                domain={['auto', 'auto']}
+                                unit=" rpm"
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'var(--color-surface)',
+                                  borderColor: 'var(--color-border)',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="respiratoryRate"
+                                stroke="var(--color-primary, #6657c7)"
+                                strokeWidth={2}
+                                name="Respiratory Rate"
+                                unit=" rpm"
+                                dot={{ r: 3, fill: '#6657c7' }}
+                                activeDot={{ r: 5 }}
+                                connectNulls
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </Panel>
+
+                      {/* 4. Body Weight Chart */}
+                      <Panel padded className="space-y-3 border border-[var(--color-border)]">
+                        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                          <div>
+                            <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Body Weight</h3>
+                          </div>
+                          {weightStats?.latest != null && (
+                            <Pill tone="info" size="sm">
+                              Latest: {weightStats.latest} kg
+                            </Pill>
+                          )}
+                        </div>
+                        {weightStats && (
+                          <div className="flex items-center justify-between text-[11px] text-[var(--color-text-muted)] px-1">
+                            <span>Min: <strong className="text-[var(--color-text-primary)]">{weightStats.min} kg</strong></span>
+                            <span>Change: <strong className="text-[var(--color-text-primary)]">{weightStats.change >= 0 ? `+${weightStats.change}` : weightStats.change} kg</strong></span>
+                            <span>Max: <strong className="text-[var(--color-text-primary)]">{weightStats.max} kg</strong></span>
+                          </div>
+                        )}
+                        <div className="h-48 w-full pt-1">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartMetrics}>
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+                              <YAxis
+                                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                                domain={['auto', 'auto']}
+                                unit=" kg"
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'var(--color-surface)',
+                                  borderColor: 'var(--color-border)',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="weight"
+                                stroke="var(--color-info, #315fa8)"
+                                strokeWidth={2}
+                                name="Weight"
+                                unit=" kg"
+                                dot={{ r: 3, fill: '#315fa8' }}
+                                activeDot={{ r: 5 }}
+                                connectNulls
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </Panel>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Medical Records History */}
+            {activeTab === 'records' && (
+              <div className="space-y-4">
+                <Panel padded className="space-y-3 border border-[var(--color-border)]">
+                  <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                    <div>
                       <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                         Clinical Examination History
                       </h2>
@@ -839,9 +1177,11 @@ function HealthRecordsContent() {
                   )}
                 </Panel>
               </div>
+            )}
 
-              {/* Right: Active Injuries & Preventive protocols */}
-              <div className="lg:col-span-5 space-y-4">
+            {/* Tab 4: Injuries & Preventive Care */}
+            {activeTab === 'injuries-preventive' && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
                 {/* Injuries Panel */}
                 <Panel padded className="space-y-3 border border-[var(--color-border)]">
                   <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
@@ -857,9 +1197,17 @@ function HealthRecordsContent() {
                   </div>
 
                   {injuries.length === 0 ? (
-                    <p className="text-xs text-[var(--color-text-muted)] py-3 text-center">
-                      No active injury records.
-                    </p>
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <div className="rounded-full bg-[var(--color-surface-subtle)] p-2 mb-1.5 text-[var(--color-text-muted)]">
+                        <Icon name="check" size={18} className="text-[var(--color-success)]" />
+                      </div>
+                      <p className="text-xs font-medium text-[var(--color-text-primary)]">
+                        No active injury records
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                        Equine musculoskeletal and physical condition clear.
+                      </p>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       {injuries.map((inj) => (
@@ -904,42 +1252,47 @@ function HealthRecordsContent() {
                         Preventive Immunization & Care
                       </h2>
                     </div>
+                    {preventive && (
+                      <span className="text-xs text-[var(--color-text-muted)]">
+                        {preventive.protocols.length} protocols
+                      </span>
+                    )}
                   </div>
 
                   {preventive && preventive.protocols.length > 0 ? (
                     <div className="space-y-2">
-                      {preventive.protocols.map((p) => (
-                        <div
-                          key={p.protocolId}
-                          className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5"
-                        >
-                          <div className="min-w-0 flex-1 pr-2">
-                            <div className="font-semibold text-xs text-[var(--color-text-primary)] truncate">
-                              {p.name}{' '}
-                              <span className="text-[var(--color-text-muted)] font-mono text-[10px]">
-                                ({p.code})
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
-                              Due: <strong>{p.nextDueOn ? formatDate(p.nextDueOn) : 'Immediate'}</strong>
-                            </div>
-                          </div>
-                          <Pill
-                            tone={
-                              p.status === 'OVERDUE'
-                                ? 'danger'
-                                : p.status === 'DUE_SOON'
-                                ? 'warning'
-                                : p.status === 'MISSING'
-                                ? 'danger'
-                                : 'success'
-                            }
-                            size="sm"
+                      {preventive.protocols.map((p) => {
+                        const tone =
+                          p.status === 'OVERDUE' || p.status === 'MISSING'
+                            ? 'danger'
+                            : p.status === 'DUE_SOON'
+                            ? 'warning'
+                            : p.status === 'NONE'
+                            ? 'neutral'
+                            : 'success';
+
+                        return (
+                          <div
+                            key={p.protocolId}
+                            className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5"
                           >
-                            {p.status}
-                          </Pill>
-                        </div>
-                      ))}
+                            <div className="min-w-0 flex-1 pr-2">
+                              <div className="font-semibold text-xs text-[var(--color-text-primary)] truncate">
+                                {p.name}{' '}
+                                <span className="text-[var(--color-text-muted)] font-mono text-[10px]">
+                                  ({p.code})
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
+                                Due: <strong>{p.nextDueOn ? formatDate(p.nextDueOn) : p.status === 'NONE' ? 'Optional' : 'Immediate'}</strong>
+                              </div>
+                            </div>
+                            <Pill tone={tone} size="sm">
+                              {p.status}
+                            </Pill>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-xs text-[var(--color-text-muted)] py-3 text-center">
@@ -948,7 +1301,7 @@ function HealthRecordsContent() {
                   )}
                 </Panel>
               </div>
-            </div>
+            )}
           </div>
         </PageContainer>
 
@@ -1085,23 +1438,21 @@ function HealthRecordsContent() {
                     render: (row: HorseListItem) => {
                       const d = row.summary?.trainingDecision ?? row.horse.trainingDecision ?? 'ALLOWED';
                       return (
-                        <Pill tone={d === 'ALLOWED' ? 'success' : 'danger'} size="sm">
-                          {d}
-                        </Pill>
-                      );
-                    },
-                  },
-                  {
-                    id: 'reporter',
-                    header: 'Report by',
-                    render: (row: HorseListItem) => {
-                      // Who stands behind the block: the incident reporter (urgent) or the
-                      // owner of the still-running admission (quarantine).
-                      const name = row.summary?.pendingUrgentReportedByName ?? row.summary?.pendingAdmissionOwnerName;
-                      return name ? (
-                        <span className="font-medium text-[var(--color-text-secondary)]">{name}</span>
-                      ) : (
-                        <span className="text-xs text-[var(--color-text-muted)]">—</span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Pill tone={d === 'ALLOWED' ? 'success' : 'danger'} size="sm">
+                            {d}
+                          </Pill>
+                          {row.summary?.hasPendingUrgent && (
+                            <Pill tone="warning" size="sm">
+                              Urgent
+                            </Pill>
+                          )}
+                          {Boolean(row.summary?.pendingAdmissionId) && (
+                            <Pill tone="info" size="sm">
+                              Intake
+                            </Pill>
+                          )}
+                        </div>
                       );
                     },
                   },
@@ -1123,80 +1474,20 @@ function HealthRecordsContent() {
                     id: 'action',
                     header: 'Action',
                     align: 'right',
-                    render: (row: HorseListItem) => {
-                      // Reported but not yet examined → the assigned vet examines; a vet
-                      // looking at someone else's case only sees who holds it. A block from
-                      // the admission intake → review it while it is the vet's turn, or just
-                      // show which intake stage holds it. Once nothing is open → View Record.
-                      const { pendingUrgentScheduleId, pendingUrgentVetId, pendingUrgentVetName, pendingAdmissionId } =
-                        row.summary ?? {};
-                      if (pendingUrgentScheduleId) {
-                        if (pendingUrgentVetId != null && pendingUrgentVetId === user?.userId) {
-                          return (
-                            <Button
-                              variant="warning"
-                              size="sm"
-                              icon="activity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleHorseRow(row);
-                              }}
-                              className="transition-all active:scale-[0.97]"
-                            >
-                              Examine
-                            </Button>
-                          );
-                        }
-                        return (
-                          <span className="text-xs text-[var(--color-text-muted)] italic">
-                            {pendingUrgentVetName ? `With ${pendingUrgentVetName}` : 'Awaiting assignment'}
-                          </span>
-                        );
-                      }
-                      if (pendingAdmissionId) {
-                        const admission = admissionByHorse.get(row.horse.id);
-                        if (admission && admission.admissionStatus === 'VET_REVIEW') {
-                          // Deep link supported by VetAdmissionQueue via ?id=
-                          return (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              icon="clipboard"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleHorseRow(row);
-                              }}
-                              className="transition-all active:scale-[0.97]"
-                            >
-                              Review admission
-                            </Button>
-                          );
-                        }
-                        const stageLabel =
-                          admission?.admissionStatus === 'TRAINER_REVIEW'
-                            ? 'In intake · trainer review'
-                            : admission?.admissionStatus === 'MANAGER_REVIEW'
-                              ? 'In intake · manager review'
-                              : 'In intake review';
-                        return (
-                          <span className="text-xs text-[var(--color-text-muted)] italic">{stageLabel}</span>
-                        );
-                      }
-                      return (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          icon="chevron-right"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleHorseRow(row);
-                          }}
-                          className="transition-all active:scale-[0.97]"
-                        >
-                          View record
-                        </Button>
-                      );
-                    },
+                    render: (row: HorseListItem) => (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon="clipboard"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleHorseRow(row);
+                        }}
+                        className="transition-all active:scale-[0.97]"
+                      >
+                        Health details
+                      </Button>
+                    ),
                   },
                 ]}
                 getRowKey={(row: HorseListItem) => row.horse.id}

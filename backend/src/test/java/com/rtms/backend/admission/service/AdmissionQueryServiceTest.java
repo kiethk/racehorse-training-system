@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -145,8 +147,7 @@ class AdmissionQueryServiceTest {
     void groomQueueTrimsNameUsesInclusiveDateRangeAndCapsPageSize() {
         var page = PageRequest.of(2, 10,
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        when(stalls.isQuarantineGroom(7L)).thenReturn(true);
-        when(admissions.findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
+        when(admissions.findGroomQueue(eq(7L), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), any(), eq(true), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), page, 0));
 
@@ -156,7 +157,7 @@ class AdmissionQueryServiceTest {
         assertEquals(10, response.size());
         assertEquals(2, response.page());
         var pageable = org.mockito.ArgumentCaptor.forClass(Pageable.class);
-        verify(admissions).findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
+        verify(admissions).findGroomQueue(eq(7L), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), eq(LocalDateTime.of(2026, 1, 2, 0, 0)),
                 eq(true), eq(LocalDateTime.of(2026, 1, 9, 0, 0)), pageable.capture());
         // BR-04: oldest admission first, id as a stable tie-breaker for paging.
@@ -305,5 +306,31 @@ class AdmissionQueryServiceTest {
 
         assertNotNull(response);
         assertNull(response.getInitialVetExam(), "initialVetExam should be null when no initial exam schedule exists");
+    }
+    @Test
+    void detailAndQueueExposeAssignmentWindowAndFullFlag() {
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(500L); app.setAssignedGroomId(7L); app.setStatus(AdmissionStatus.GROOM_REVIEW);
+        app.setGroomAssignedAt(LocalDateTime.of(2026, 11, 6, 8, 0));
+        app.setGroomReviewDueAt(app.getGroomAssignedAt().plusHours(72));
+        when(admissions.findById(500L)).thenReturn(Optional.of(app));
+        CandidateHorseProfile profile = new CandidateHorseProfile(); profile.setName("Mercury");
+        when(candidates.findByAdmissionId(500L)).thenReturn(Optional.of(profile));
+        User groom = new User(); groom.setFullName("Assigned Groom");
+        when(users.findById(7L)).thenReturn(Optional.of(groom));
+        AdmissionDetailResponse detail = service.getAdmissionDetail(500L);
+        assertEquals(7L, detail.getAssignedGroomId());
+        assertEquals("Assigned Groom", detail.getAssignedGroomName());
+        assertEquals(app.getGroomAssignedAt(), detail.getGroomAssignedAt());
+        assertEquals(app.getGroomReviewDueAt(), detail.getGroomReviewDueAt());
+        assertTrue(detail.isAssignedGroomFull());
+        when(admissions.findGroomQueue(eq(7L), anyBoolean(), any(), anyBoolean(), anyString(),
+                anyBoolean(), any(), anyBoolean(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(app)));
+        var queue = service.getGroomQueue(7L, null, null, null, null, 0, 10);
+        assertEquals(app.getGroomReviewDueAt(), queue.content().getFirst().getGroomReviewDueAt());
+        assertTrue(queue.content().getFirst().isAssignedGroomFull());
+        when(stalls.findGroomIdsWithFreeQuarantineStall(List.of(7L))).thenReturn(List.of(7L));
+        assertFalse(service.getAdmissionDetail(500L).isAssignedGroomFull());
     }
 }

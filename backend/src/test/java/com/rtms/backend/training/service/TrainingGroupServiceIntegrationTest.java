@@ -7,6 +7,7 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.security.Roles;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
@@ -16,12 +17,12 @@ import com.rtms.backend.training.dto.GroupCandidateResponse;
 import com.rtms.backend.training.dto.RenameTrainingGroupRequest;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.enums.TrainingDay;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import jakarta.persistence.EntityManager;
@@ -45,9 +46,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Quản lý Training Group qua service trên PostgreSQL thật: luật thành viên (BR-09, BR-10, khu của Trainer, được phép
+ * Quản lý Training Group qua service trên PostgreSQL thật: luật thành viên (BR-10, khu của Trainer, được phép
  * tập), đổi tên, chuyển ngựa và truy vấn ứng viên. Mọi dữ liệu nằm trong một transaction rồi rollback.
- * (Training Group management through the service on a real PostgreSQL: membership rules (BR-09, BR-10, the Trainer's
+ * (Training Group management through the service on a real PostgreSQL: membership rules (BR-10, the Trainer's
  * area, allowed to train), rename, move, candidate query (disband is in GroupDisbandIntegrationTest). All data lives in one transaction that rolls back.)
  */
 @SpringBootTest
@@ -61,7 +62,7 @@ class TrainingGroupServiceIntegrationTest {
     @Autowired private StableStallRepository stalls;
     @Autowired private HorseRepository horses;
     @Autowired private CourseRepository courses;
-    @Autowired private GroupPlanRepository plans;
+    @Autowired private CourseRunRepository courseRuns;
     @Autowired private TrainingGroupRepository groups;
     @Autowired private TrainingGroupMemberRepository members;
     @Autowired private JdbcTemplate jdbc;
@@ -74,8 +75,8 @@ class TrainingGroupServiceIntegrationTest {
 
     @BeforeEach
     void buildFixture() {
-        trainer = user("HEAD_TRAINER", "trainer");
-        trainerPrincipal = new AuthenticatedUser(trainer.getId(), trainer.getEmail(), "HEAD_TRAINER");
+        trainer = user(Roles.HEAD_TRAINER, "trainer");
+        trainerPrincipal = new AuthenticatedUser(trainer.getId(), trainer.getEmail(), Roles.HEAD_TRAINER);
         area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
         area.setTrainerId(trainer.getId());
         areas.saveAndFlush(area);
@@ -121,16 +122,16 @@ class TrainingGroupServiceIntegrationTest {
     }
 
     @Test
-    void twoHorsesOfTheSameGroomAreRefusedInOneGroup() {
+    void oneGroomMayLeadSeveralHorsesOfTheSameGroup() {
         User an = groom("An");
         Horse first = horse("Thunder", an);
         Horse second = horse("Echo", an);
         TrainingGroupResponse group = service.createGroup(
                 new CreateTrainingGroupRequest("Nhom 1", List.of(first.getId())), trainerPrincipal);
 
-        ApiException error = assertThrows(ApiException.class,
-                () -> service.addHorse(group.id(), second.getId(), trainerPrincipal));
-        assertEquals("GROOM_ALREADY_IN_GROUP", error.getErrorCode());
+        TrainingGroupResponse filled = service.addHorse(group.id(), second.getId(), trainerPrincipal);
+
+        assertEquals(List.of("An", "An"), filled.members().stream().map(m -> m.groomName()).toList());
     }
 
     @Test
@@ -159,7 +160,7 @@ class TrainingGroupServiceIntegrationTest {
 
     @Test
     void aHorseOutsideTheTrainersAreaIsRefused() {
-        User otherTrainer = user("HEAD_TRAINER", "other-trainer");
+        User otherTrainer = user(Roles.HEAD_TRAINER, "other-trainer");
         Area otherArea = areas.findAll().stream().filter(a -> !"A".equals(a.getCode())).findFirst().orElseThrow();
         otherArea.setTrainerId(otherTrainer.getId());
         areas.saveAndFlush(otherArea);
@@ -241,8 +242,8 @@ class TrainingGroupServiceIntegrationTest {
     @Test
     void anotherTrainerDoesNotSeeOrChangeTheGroup() {
         TrainingGroupResponse group = service.createGroup(new CreateTrainingGroupRequest("Nhom 1", List.of()), trainerPrincipal);
-        User other = user("HEAD_TRAINER", "other");
-        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), "HEAD_TRAINER");
+        User other = user(Roles.HEAD_TRAINER, "other");
+        AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), Roles.HEAD_TRAINER);
 
         assertTrue(service.getGroups(otherPrincipal).isEmpty());
         ApiException error = assertThrows(ApiException.class,
@@ -253,12 +254,12 @@ class TrainingGroupServiceIntegrationTest {
     @Test
     void theListShowsTheCurrentCourseOfAGroup() {
         TrainingGroupResponse group = service.createGroup(new CreateTrainingGroupRequest("Nhom 1", List.of()), trainerPrincipal);
-        plan(group.id(), TrainingPlanStatus.ACTIVE);
+        courseRun(group.id(), CourseRunStatus.ACTIVE);
 
         TrainingGroupResponse listed = service.getGroups(trainerPrincipal).stream()
                 .filter(g -> g.id().equals(group.id())).findFirst().orElseThrow();
 
-        assertEquals("ACTIVE", listed.currentPlanStatus());
+        assertEquals("ACTIVE", listed.currentCourseRunStatus());
         assertTrue(listed.currentCourseName().startsWith("Group Course"));
     }
 
@@ -268,7 +269,7 @@ class TrainingGroupServiceIntegrationTest {
     void candidatesExplainWhyAHorseCannotJoin() {
         User an = groom("An");
         Horse member = horse("Thunder", an);
-        Horse sameGroom = horse("Echo", an);
+        horse("Echo", an);
         Horse free = horse("Free", groom("Binh"));
         Horse inOther = horse("Taken", groom("Chi"));
         TrainingGroupResponse group = service.createGroup(
@@ -277,9 +278,7 @@ class TrainingGroupServiceIntegrationTest {
 
         List<GroupCandidateResponse> candidates = service.getCandidates(group.id(), trainerPrincipal);
 
-        GroupCandidateResponse echo = byName(candidates, "Echo");
-        assertFalse(echo.joinable());
-        assertTrue(echo.reason().contains("Thunder"));
+        assertTrue(byName(candidates, "Echo").joinable());
         assertTrue(byName(candidates, "Free").joinable());
         assertFalse(byName(candidates, "Taken").joinable());
         assertTrue(candidates.stream().noneMatch(c -> c.horseName().equals("Thunder")));
@@ -302,7 +301,7 @@ class TrainingGroupServiceIntegrationTest {
     }
 
     private User groom(String name) {
-        return user("GROOM", name);
+        return user(Roles.GROOM, name);
     }
 
     private Horse horse(String name, User groom) {
@@ -310,7 +309,7 @@ class TrainingGroupServiceIntegrationTest {
     }
 
     private Horse horseIn(Area targetArea, String name, User groom) {
-        User owner = user("HORSE_OWNER", "owner");
+        User owner = user(Roles.HORSE_OWNER, "owner");
         StableStall stall = new StableStall();
         stall.setAreaId(targetArea.getId());
         stall.setGroomId(groom == null ? null : groom.getId());
@@ -325,7 +324,7 @@ class TrainingGroupServiceIntegrationTest {
         return horses.saveAndFlush(horse);
     }
 
-    private GroupPlan plan(Long groupId, TrainingPlanStatus status) {
+    private CourseRun courseRun(Long groupId, CourseRunStatus status) {
         Course course = new Course();
         course.setName("Group Course " + System.nanoTime());
         course.setTotalSessions(4);
@@ -333,15 +332,15 @@ class TrainingGroupServiceIntegrationTest {
         course.setTrainerId(trainer.getId());
         course = courses.saveAndFlush(course);
 
-        GroupPlan plan = new GroupPlan();
-        plan.setGroupId(groupId);
-        plan.setCourseId(course.getId());
-        plan.setTrainerId(trainer.getId());
-        plan.setStartDate(LocalDate.now().plusDays(10));
-        plan.setEndDate(LocalDate.now().plusDays(20));
+        CourseRun courseRun = new CourseRun();
+        courseRun.setGroupId(groupId);
+        courseRun.setCourseId(course.getId());
+        courseRun.setTrainerId(trainer.getId());
+        courseRun.setStartDate(LocalDate.now().plusDays(10));
+        courseRun.setEndDate(LocalDate.now().plusDays(20));
         Set<TrainingDay> days = new LinkedHashSet<>(List.of(TrainingDay.MONDAY));
-        plan.setTrainingDays(days);
-        plan.setStatus(status);
-        return plans.saveAndFlush(plan);
+        courseRun.setTrainingDays(days);
+        courseRun.setStatus(status);
+        return courseRuns.saveAndFlush(courseRun);
     }
 }

@@ -155,57 +155,63 @@ UPDATE treatment_plans plan
    AND pg_temp.try_jsonb_array(plan.instructions) IS DISTINCT FROM rewritten_plans.items;
 
 -- Move supported catalog drugs to non-injection routes.
-UPDATE clinical_medications
-   SET default_route = 'ORAL',
-       default_dosage = '1.1 mg/kg oral paste',
-       updated_at = now()
- WHERE name = 'Flunixin Meglumine'
-   AND (default_route IS DISTINCT FROM 'ORAL'
-        OR default_dosage IS DISTINCT FROM '1.1 mg/kg oral paste');
+-- Guarded: V202611031200 drops clinical_medications earlier on a fresh database.
+DO $$
+BEGIN
+    IF to_regclass('public.clinical_medications') IS NOT NULL THEN
+        UPDATE clinical_medications
+           SET default_route = 'ORAL',
+               default_dosage = '1.1 mg/kg oral paste',
+               updated_at = now()
+         WHERE name = 'Flunixin Meglumine'
+           AND (default_route IS DISTINCT FROM 'ORAL'
+                OR default_dosage IS DISTINCT FROM '1.1 mg/kg oral paste');
 
-UPDATE clinical_medications
-   SET default_route = 'ORAL',
-       default_dosage = '1 mg/kg oral',
-       updated_at = now()
- WHERE name = 'Furosemide'
-   AND (default_route IS DISTINCT FROM 'ORAL'
-        OR default_dosage IS DISTINCT FROM '1 mg/kg oral');
+        UPDATE clinical_medications
+           SET default_route = 'ORAL',
+               default_dosage = '1 mg/kg oral',
+               updated_at = now()
+         WHERE name = 'Furosemide'
+           AND (default_route IS DISTINCT FROM 'ORAL'
+                OR default_dosage IS DISTINCT FROM '1 mg/kg oral');
 
-UPDATE clinical_medications
-   SET default_route = 'ORAL',
-       default_dosage = '0.05 mg/kg oral powder',
-       updated_at = now()
- WHERE name = 'Dexamethasone'
-   AND (default_route IS DISTINCT FROM 'ORAL'
-        OR default_dosage IS DISTINCT FROM '0.05 mg/kg oral powder');
+        UPDATE clinical_medications
+           SET default_route = 'ORAL',
+               default_dosage = '0.05 mg/kg oral powder',
+               updated_at = now()
+         WHERE name = 'Dexamethasone'
+           AND (default_route IS DISTINCT FROM 'ORAL'
+                OR default_dosage IS DISTINCT FROM '0.05 mg/kg oral powder');
 
-UPDATE clinical_medications
-   SET default_route = 'ORAL',
-       default_dosage = '0.05 mg/kg oral granules',
-       updated_at = now()
- WHERE name = 'Acepromazine'
-   AND (default_route IS DISTINCT FROM 'ORAL'
-        OR default_dosage IS DISTINCT FROM '0.05 mg/kg oral granules');
+        UPDATE clinical_medications
+           SET default_route = 'ORAL',
+               default_dosage = '0.05 mg/kg oral granules',
+               updated_at = now()
+         WHERE name = 'Acepromazine'
+           AND (default_route IS DISTINCT FROM 'ORAL'
+                OR default_dosage IS DISTINCT FROM '0.05 mg/kg oral granules');
 
-UPDATE clinical_medications
-   SET active = FALSE,
-       updated_at = now()
- WHERE pg_temp.is_injection_route(default_route)
-   AND active IS DISTINCT FROM FALSE;
+        UPDATE clinical_medications
+           SET active = FALSE,
+               updated_at = now()
+         WHERE pg_temp.is_injection_route(default_route)
+           AND active IS DISTINCT FROM FALSE;
 
-UPDATE clinical_medications
-   SET active = TRUE,
-       updated_at = now()
- WHERE name = 'Trimethoprim-Sulfa'
-   AND active IS DISTINCT FROM TRUE;
+        UPDATE clinical_medications
+           SET active = TRUE,
+               updated_at = now()
+         WHERE name = 'Trimethoprim-Sulfa'
+           AND active IS DISTINCT FROM TRUE;
 
-INSERT INTO clinical_medications
-    (name, therapeutic_class, default_route, standard_withdrawal_days,
-     default_dosage, default_frequency)
-VALUES
-    ('Vitamin B Complex', 'Supplement', 'FEED_ADDITIVE', 0,
-     '10 mL in feed', 'SID')
-ON CONFLICT (name) DO NOTHING;
+        INSERT INTO clinical_medications
+            (name, therapeutic_class, default_route, standard_withdrawal_days,
+             default_dosage, default_frequency)
+        VALUES
+            ('Vitamin B Complex', 'Supplement', 'FEED_ADDITIVE', 0,
+             '10 mL in feed', 'SID')
+        ON CONFLICT (name) DO NOTHING;
+    END IF;
+END $$;
 
 DROP FUNCTION pg_temp.try_jsonb_array(TEXT);
 DROP FUNCTION pg_temp.is_injection_route(TEXT);

@@ -73,7 +73,7 @@ export interface PreventiveMilestone {
   id: number;
   horseId: number;
   veterinarianId: number | null;
-  status: 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   scheduledAt: string | null;
   requestedAt: string | null;
   description: string | null;

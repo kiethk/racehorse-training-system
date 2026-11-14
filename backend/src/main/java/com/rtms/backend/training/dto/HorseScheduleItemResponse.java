@@ -11,5 +11,5 @@ import java.time.LocalTime;
  * (One Session of a horse in its schedule: which Session, when, and the status of the Session and of this horse's own Workout.)
  */
 public record HorseScheduleItemResponse(Long sessionId, LocalDate sessionDate, LocalTime startTime, LocalTime endTime,
-                                        String subjectName, SessionStatus sessionStatus, WorkoutStatus workoutStatus) {
+                                        String exerciseName, SessionStatus sessionStatus, WorkoutStatus workoutStatus) {
 }

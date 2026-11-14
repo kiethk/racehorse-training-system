@@ -11,7 +11,7 @@ import { FilterChips } from '@/components/ui/SegmentedControl';
 import { EmptyState } from '@/components/ui/states';
 import { incidentApi } from '../services/incidentService';
 import {
-  INCIDENT_SEVERITY_MAP,
+  INCIDENT_TYPE_MAP,
   INCIDENT_STATUS_MAP,
   formatIncidentReportedAt,
   incidentHorseName,
@@ -89,7 +89,7 @@ export function IncidentList() {
     {
       id: 'veterinarian',
       header: 'Veterinarian',
-      render: (report) => report.handlerName
+      render: (report) => report.handlerName && report.status !== 'DISMISSED'
         ? report.handlerName
         : (
           <span className="italic text-[var(--color-text-muted)]">
@@ -102,7 +102,7 @@ export function IncidentList() {
       id: 'severity',
       header: 'Severity',
       render: (report) => {
-        const cfg = INCIDENT_SEVERITY_MAP[report.severity] || { tone: 'neutral', label: report.severity };
+        const cfg = INCIDENT_TYPE_MAP[report.incidentType] || { tone: 'neutral', label: report.incidentType };
         return <Pill tone={cfg.tone} size="sm">{cfg.label}</Pill>;
       },
     },
@@ -157,7 +157,7 @@ export function IncidentList() {
           { value: 'REPORTED', label: 'Awaiting veterinary review' },
           { value: 'IN_REVIEW', label: 'Under review' },
           { value: 'RESOLVED', label: 'Resolved' },
-          { value: 'DISMISSED', label: 'No issue' },
+          { value: 'DISMISSED', label: 'Closed' },
         ]}
       />
 

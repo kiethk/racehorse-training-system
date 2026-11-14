@@ -61,6 +61,9 @@ export function mapAdmissionPipeline(detail: PipelineDetailInput): PipelineMappi
     } else if (detail.groomDecision === 'REJECTED') {
       rejectedStepIndex = 1; // Groom Review is index 1
       rejectionMessage = 'Application was rejected during Groom Review.';
+    } else if (detail.vetReviewedAt && !detail.managerReviewedAt && !detail.trainerReviewedAt) {
+      rejectedStepIndex = 3; // Vet Review is index 3
+      rejectionMessage = 'Application was rejected during Veterinary Review.';
     } else {
       rejectionMessage = 'This application has been rejected.';
     }
@@ -132,7 +135,9 @@ export function mapAdmissionPipeline(detail: PipelineDetailInput): PipelineMappi
   let step3State: StepState = 'pending';
   let step3Note: string | undefined;
 
-  if (rejectedStepIndex !== null && rejectedStepIndex <= 2) {
+  if (rejectedStepIndex === 3) {
+    step3State = 'rejected';
+  } else if (rejectedStepIndex !== null && rejectedStepIndex <= 2) {
     step3State = 'pending';
   } else if (detail.vetReviewedAt || statusProgress > 3) {
     step3State = 'completed';

@@ -16,6 +16,9 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.config.ClientTimeContext;
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
@@ -23,15 +26,14 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Legacy route adapter: all work is stored and scheduled through CareSchedule.
@@ -41,19 +43,20 @@ import java.util.Set;
 @Service
 public class PreventiveCareService {
     private static final Set<String> TYPES = Set.of("ROUTINE_EXAM", "VACCINATION", "DEWORMING");
-    private static final List<CareScheduleStatus> ACTIVE_PREVENTIVE_STATUSES = List.of(
-            CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+    private static final List<CareScheduleStatus> ACTIVE_PREVENTIVE_STATUSES = CareScheduleStatus.OPEN;
     private final CareScheduleRepository schedules;
     private final HorseRepository horses;
     private final CareScheduleService care;
     private final AdmissionApplicationRepository admissions;
+    private final UserRepository users;
 
     public PreventiveCareService(CareScheduleRepository schedules, HorseRepository horses,
-            CareScheduleService care, AdmissionApplicationRepository admissions) {
+            CareScheduleService care, AdmissionApplicationRepository admissions, UserRepository users) {
         this.schedules = schedules;
         this.horses = horses;
         this.care = care;
         this.admissions = admissions;
+        this.users = users;
     }
 
     @Transactional
@@ -124,7 +127,7 @@ public class PreventiveCareService {
         if (request.getScheduledDate() != null) {
             requestedAt = request.getScheduledDate().atTime(14, 0);
         }
-        if (requestedAt == null || !requestedAt.isAfter(LocalDateTime.now())) {
+        if (requestedAt == null || !requestedAt.isAfter(ClientTimeContext.now())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "Requested schedule time must be in the future");
         }
 
@@ -135,11 +138,12 @@ public class PreventiveCareService {
                 admissionId = null;
             }
         }
-        String fingerprint = fingerprint(request.getHorseId(), admissionId, requestedAt, description);
-
         Optional<CareSchedule> existing = schedules.findByRequestedByIdAndIdempotencyKey(user.getUserId(), idempotencyKey);
         if (existing.isPresent()) {
-            if (!Objects.equals(existing.get().getRequestFingerprint(), fingerprint)) {
+            boolean payloadMatches = Objects.equals(existing.get().getHorseId(), request.getHorseId())
+                    && Objects.equals(existing.get().getAdmissionId(), admissionId)
+                    && Objects.equals(existing.get().getDescription(), description);
+            if (!payloadMatches) {
                 throw new ApiException(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "Idempotency key was already used with a different payload");
             }
             return existing.get();
@@ -151,7 +155,7 @@ public class PreventiveCareService {
                     request.getHorseId(), CareSchedulePurpose.PREVENTIVE, ACTIVE_PREVENTIVE_STATUSES);
             if (milestone.isPresent()) {
                 CareSchedule active = milestone.get();
-                if (active.getStatus() != CareScheduleStatus.REQUESTED) {
+                if (active.getVeterinarianId() != null) {
                     throw new ApiException(HttpStatus.CONFLICT, "PREVENTIVE_ALREADY_SCHEDULED",
                             "This horse already has an active preventive care visit. Reschedule that visit instead");
                 }
@@ -170,10 +174,9 @@ public class PreventiveCareService {
         schedule.setSourceScheduleId(null);
         schedule.setRequestedById(user.getUserId());
         schedule.setIdempotencyKey(idempotencyKey);
-        schedule.setRequestFingerprint(fingerprint);
         schedule.setCareType(CareType.ROUTINE);
         schedule.setPurpose(purpose);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         schedule.setDescription(description);
         schedule.setRequestedAt(requestedAt);
@@ -183,17 +186,7 @@ public class PreventiveCareService {
         return saved;
     }
 
-    private static String fingerprint(Long horseId, Long admissionId, LocalDateTime requestedAt, String description) {
-        String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException(impossible);
-        }
-    }
-
-    public List<CareSchedule> getSchedulesByHorse(Long horseId, AuthenticatedUser user) {
+    public List<CareScheduleResponse> getSchedulesByHorse(Long horseId, AuthenticatedUser user) {
         if ("HORSE_OWNER".equals(user.getRole())) {
             Horse horse = horses.findById(horseId).orElseThrow(() ->
                     new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found"));
@@ -201,7 +194,21 @@ public class PreventiveCareService {
                 throw new AccessDeniedException("You can only view schedules for horses you own");
             }
         }
-        return schedules.findByHorseIdOrderByScheduledAtAsc(horseId);
+        care.assignRequestedSchedules();
+        List<CareSchedule> list = schedules.findByHorseIdOrderByScheduledAtAsc(horseId);
+        Set<Long> vetIds = list.stream()
+                .map(CareSchedule::getVeterinarianId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> vetNames = users != null && !vetIds.isEmpty()
+                ? users.findAllById(vetIds).stream()
+                        .filter(u -> u.getId() != null && u.getFullName() != null)
+                        .collect(Collectors.toMap(User::getId, User::getFullName))
+                : Map.of();
+
+        return list.stream()
+                .map(cs -> CareScheduleResponse.from(cs, cs.getVeterinarianId() != null ? vetNames.get(cs.getVeterinarianId()) : null))
+                .toList();
     }
 
     public HealthRecord recordCompletion(Long id, CompletePreventiveCareScheduleRequest request, AuthenticatedUser user) {

@@ -1,14 +1,12 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.GroomConflictRow;
-import com.rtms.backend.training.dto.GroomWorkoutRow;
+import com.rtms.backend.training.repository.projection.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
-import com.rtms.backend.training.dto.PastWorkoutRow;
-import com.rtms.backend.training.dto.PerformanceSessionRow;
-import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.dto.SessionCountRow;
-import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
+import com.rtms.backend.training.repository.projection.PastWorkoutRow;
+import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
+import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
+import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,8 +22,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Truy vấn buổi tập (workout) của mô hình nhóm: Workout thuộc một Session, Session thuộc một Group Plan.
- * (Workout queries of the group model: a Workout belongs to a Session, a Session belongs to a Group Plan.)
+ * Truy vấn buổi tập (workout) của mô hình nhóm: Workout thuộc một Session, Session thuộc một Course Run.
+ * (Workout queries of the group model: a Workout belongs to a Session, a Session belongs to a Course Run.)
  *
  * Các truy vấn đọc dùng JOIN + DTO projection để service không phải gọi DB nhiều lần và không phải ép kiểu Object[]. Dự án không
  * dùng quan hệ JPA, nên JOIN viết dạng "JOIN X ON ...".
@@ -66,13 +64,13 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * course is assigned, so the order follows the Session date, never the creation date.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.PastWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.PastWorkoutRow(
                       w, s.sessionDate, s.startTime, s.endTime, sub.name, g.name,
                       CASE WHEN g.disbandedAt IS NULL THEN false ELSE true END, s.status)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
-           JOIN GroupPlan p ON s.groupPlanId = p.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
+           JOIN CourseRun p ON s.courseRunId = p.id
            LEFT JOIN TrainingGroup g ON p.groupId = g.id
            WHERE w.horseId = :horseId
              AND s.status <> com.rtms.backend.training.enums.SessionStatus.SCHEDULED
@@ -85,28 +83,6 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     List<TrainingWorkout> findByHorseIdAndSessionIdIsNotNull(Long horseId);
 
     /**
-     * Các Session mà Groom mới sẽ bị trùng (BR-09) nếu nhận con ngựa này, kèm tên con ngựa đang vướng. Một câu JOIN.
-     * (Sessions where the new Groom would clash (BR-09) if given this horse, with the name of the clashing horse. One JOIN.)
-     */
-    @Query("""
-           SELECT new com.rtms.backend.training.dto.GroomConflictRow(s.id, s.sessionDate, s.startTime, h.name)
-           FROM TrainingWorkout mine
-           JOIN TrainingSession s ON mine.sessionId = s.id
-           JOIN TrainingWorkout other ON other.sessionId = s.id
-           JOIN Horse h ON other.horseId = h.id
-           WHERE mine.horseId = :horseId
-             AND mine.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED
-             AND s.sessionDate >= :fromDate
-             AND other.assignedToId = :groomId
-             AND other.horseId <> :horseId
-             AND other.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
-           ORDER BY s.sessionDate ASC, s.startTime ASC
-           """)
-    List<GroomConflictRow> findGroomConflicts(@Param("horseId") Long horseId,
-                                              @Param("groomId") Long groomId,
-                                              @Param("fromDate") LocalDate fromDate);
-
-    /**
      * Lịch tập của MỘT con ngựa trong khoảng ngày, kể cả buổi đã hủy, theo thứ tự ngày rồi giờ.
      * (One horse schedule over a date range, cancelled Sessions included, in date then time order.)
      */
@@ -115,7 +91,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                       s.id, s.sessionDate, s.startTime, s.endTime, sub.name, s.status, w.status)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId = :horseId
              AND s.sessionDate BETWEEN :fromDate AND :toDate
            ORDER BY s.sessionDate ASC, s.startTime ASC
@@ -126,15 +102,15 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
 
     /**
      * Nguồn 2 của màn hình Today Tasks (Groom): buổi tập trong ngày kèm giờ, tên ngựa, tên bài tập.
-     * (Source 2 of the groom Today Tasks screen: the day workouts with times, horse and subject names.)
+     * (Source 2 of the groom Today Tasks screen: the day workouts with times, horse and exercise names.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.GroomWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.GroomWorkoutRow(
                       w.id, w.horseId, h.name, w.status, s.startTime, s.endTime, sub.name)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN Horse h ON w.horseId = h.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.assignedToId = :groomId
              AND s.sessionDate = :date
              AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
@@ -156,7 +132,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                       w.recoveryHeartRate, w.performanceRating)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId = :horseId
              AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND s.sessionDate BETWEEN :fromDate AND :toDate
@@ -173,7 +149,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * done in PerformanceTrendCalculator.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.PerformanceSessionRow(
+           SELECT new com.rtms.backend.training.repository.projection.PerformanceSessionRow(
                       w.horseId, s.sessionDate, w.performanceRating, w.averageSpeedKmh, w.maxHeartRate)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
@@ -191,7 +167,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * (Workouts with results since a date for MANY horses, newest first: the source for the alert rules and the dashboard.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.RecentWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.RecentWorkoutRow(
                       w.horseId, s.sessionDate, s.endTime, w.maxHeartRate, w.averageHeartRate, w.recoveryHeartRate, w.performanceRating)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
@@ -207,19 +183,19 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * Các buổi tập dùng để suy ra sở trường của NHIỀU ngựa: đã có kết quả, có điểm phong độ, có cự ly (thực tế, hoặc cự ly mục tiêu
      * của bài tập), không thuộc nhóm hồi phục, từ một mốc ngày.
      * (The Workouts used to infer the specialty of MANY horses: with results, with a rating, with a distance (actual, or the
-     * Subject target distance), not in the recovery category, since a date.)
+     * Exercise target distance), not in the recovery category, since a date.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.SpecialtyWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow(
                       w.horseId, COALESCE(w.actualDistanceMeters, sub.targetDistanceMeters),
                       sub.surfaceType, w.performanceRating, w.topSpeedKmh)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
-           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId IN :horseIds
              AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND w.performanceRating IS NOT NULL
-             AND sub.category <> com.rtms.backend.training.enums.SubjectCategory.RECOVERY
+             AND sub.category <> com.rtms.backend.training.enums.ExerciseCategory.RECOVERY
              AND s.sessionDate >= :since
            """)
     List<SpecialtyWorkoutRow> findSpecialtyWorkouts(@Param("horseIds") Collection<Long> horseIds,
@@ -232,15 +208,6 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            WHERE w.id = :workoutId AND s.trainerId = :trainerId
            """)
     Optional<TrainingWorkout> findByIdAndTrainerId(@Param("workoutId") Long workoutId, @Param("trainerId") Long trainerId);
-
-    /** Số Workout còn hiệu lực của nhiều buổi bằng MỘT truy vấn. (Non-cancelled Workout counts of many Sessions in ONE query.) */
-    @Query("""
-           SELECT new com.rtms.backend.training.dto.SessionCountRow(w.sessionId, COUNT(w))
-           FROM TrainingWorkout w
-           WHERE w.sessionId IN :sessionIds AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
-           GROUP BY w.sessionId
-           """)
-    List<SessionCountRow> countActiveBySession(@Param("sessionIds") Collection<Long> sessionIds);
 
     /** Workout còn SCHEDULED của các buổi đã HELD thành HELD. (SCHEDULED Workouts of HELD Sessions become HELD.) */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -308,5 +275,22 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            """)
     List<com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow> findFleetWorkoutSummaries(
             @Param("horseIds") java.util.Collection<Long> horseIds,
+            @Param("since") java.time.LocalDate since);
+    @Query("""
+            SELECT new com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow(
+                s.trainerId,
+                w.status,
+                w.performanceRating,
+                w.averageSpeedKmh,
+                w.recoveryHeartRate,
+                s.sessionDate,
+                w.horseId
+            )
+            FROM TrainingWorkout w
+            JOIN TrainingSession s ON w.sessionId = s.id
+            WHERE s.sessionDate >= :since
+            ORDER BY s.sessionDate ASC
+            """)
+    List<com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow> findTrainerWorkoutsSince(
             @Param("since") java.time.LocalDate since);
 }

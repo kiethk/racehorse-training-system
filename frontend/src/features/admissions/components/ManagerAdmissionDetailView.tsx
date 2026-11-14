@@ -24,6 +24,8 @@ import { ArrivalPhotosBlock } from '../shared/components/ArrivalPhotosBlock';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { ManagerTrainerAssessmentTab } from '../shared/components/ManagerTrainerAssessmentTab';
 import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
+import { ManagerGroomReassignment } from './ManagerGroomReassignment';
+import { ReviewDue } from '../shared/components/ReviewDue';
 import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
 
 function datetime(value: string | null) {
@@ -83,15 +85,13 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     setReopening(true);
     setError(null);
     try {
-      const updated = await admissionsApi.reopenExpiredArrival(admissionId);
+      await admissionsApi.reopenExpiredArrival(admissionId);
       await load();
-      toast.success('Arrival window reopened', updated.status === 'WAITING_FOR_ARRIVAL'
-        ? `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved again.`
-        : 'The admission is queued and gets the next free quarantine stall automatically.');
+      toast.success('Admission reopened for Groom review');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Unable to reopen the arrival window.';
       setError(message);
-      toast.error('Arrival window not reopened', message);
+      toast.error(message);
     } finally {
       setReopening(false);
     }
@@ -365,8 +365,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
               {detail.quarantineStallCode && <InfoRow label="Quarantine stall" value={<EntityLink href={entityHref('stall', detail.quarantineStallCode, 'CLUB_MANAGER')}>{detail.quarantineStallCode}</EntityLink>} />}
               <InfoRow
                 label="Assigned Groom"
-                value={<EntityLink href={detail.groomId ? entityHref('user', detail.groomId, 'CLUB_MANAGER') : null}>{detail.groomName ?? (detail.groomId ? `#${detail.groomId}` : 'Unassigned')}</EntityLink>}
+                value={<EntityLink href={detail.assignedGroomId != null ? `/manager/accounts?userId=${detail.assignedGroomId}` : null}>{detail.assignedGroomName ?? (detail.assignedGroomId != null ? `#${detail.assignedGroomId}` : 'Unassigned')}</EntityLink>}
               />
+              <InfoRow label="Review due" value={<ReviewDue dueAt={detail.groomReviewDueAt} />} />
               <InfoRow
                 label="Examining Vet"
                 value={<EntityLink href={detail.veterinarianId ? entityHref('user', detail.veterinarianId, 'CLUB_MANAGER') : null}>
@@ -406,9 +407,10 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
               )}
             </AdmissionSideCard>
 
+            {detail.status === 'GROOM_REVIEW' && <ManagerGroomReassignment key={detail.groomAssignedAt} detail={detail} onSuccess={load} />}
+
             {detail.status === 'ARRIVAL_EXPIRED' && (
               <AdmissionSideCard title="Arrival window expired" tone="warning">
-                <p className="text-[var(--color-text-secondary)]">The quarantine reservation was released. Reopening attempts to reserve an available quarantine stall and starts a new 14-day window.</p>
                 <Button type="button" className="w-full" loading={reopening} onClick={() => void reopenExpiredArrival()}>Reopen arrival window</Button>
               </AdmissionSideCard>
             )}

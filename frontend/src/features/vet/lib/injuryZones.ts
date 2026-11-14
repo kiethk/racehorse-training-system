@@ -2,6 +2,11 @@
 // Coordinates are NORMALIZED to the model's bounding box (0..1 per axis),
 // which is more stable than raw world coords. Boundaries are calibrated
 // against the GLB bbox (min/max from the mesh POSITION accessor).
+// Region bands live in horseAnatomyBlueprint.ts (user-approved 2D blueprint).
+import {
+  HORSE_ANATOMY_BLUEPRINT,
+  zoneFromBlueprint,
+} from './horseAnatomyBlueprint.ts';
 export interface BodyZone {
   id: string;
   label: string;
@@ -276,6 +281,76 @@ export function resolveInjuryNormal(
 }
 
 /**
+ * Normalizes a scene-local point (glTF scene space, i.e. what the runtime
+ * transform of UrgentHorseInjuryViewer maps to) into [0..1] anatomical coords
+ * measured against the RUNTIME bounding box of the same transform.
+ * urgent-horse.glb applies scale 0.01 on its mesh nodes, so the mesh accessor
+ * bounds (MODEL_BOUNDS) are ~100x the scene-space extents and must NOT be used
+ * on click points — that mismatch classified nearly every hit as Hindleg.
+ * - x: 0 = Left side, 0.5 = Spine/Midline, 1 = Right side (+X is Left in GLB)
+ * - y: 0 = Ground/Hooves, 1 = Top of head/Ears (-Y is ground)
+ * - z: 0 = Nose/Head (Front), 1 = Tail (Rear) (+Z is Front)
+ */
+export function normalizeScenePoint(
+  p: { x: number; y: number; z: number },
+  bounds: {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  },
+): { x: number; y: number; z: number } {
+  const w = Math.max(bounds.max.x - bounds.min.x, 1e-6);
+  const h = Math.max(bounds.max.y - bounds.min.y, 1e-6);
+  const d = Math.max(bounds.max.z - bounds.min.z, 1e-6);
+  // +X is Left: leftmost (+maxX) maps to 0, rightmost (minX) maps to 1.
+  const nx = 1 - (p.x - bounds.min.x) / w;
+  const ny = (p.y - bounds.min.y) / h;
+  const nz = (bounds.max.z - p.z) / d;
+
+  return {
+    x: Math.min(1, Math.max(0, Number(nx.toFixed(4)))),
+    y: Math.min(1, Math.max(0, Number(ny.toFixed(4)))),
+    z: Math.min(1, Math.max(0, Number(nz.toFixed(4)))),
+  };
+}
+
+/**
+ * Classifies a normalized [0..1] anatomical point into the geometry zone.
+ * Bands come from the 2D anatomy blueprint (horseAnatomyBlueprint.ts) — the
+ * user-approved source of truth, anchored to live-measured clicks, not to
+ * ad-hoc thresholds.
+ */
+export function zoneForNormalized(
+  n: { x: number; y: number; z: number },
+  surfaceNormal?: { x: number; y: number; z: number } | null,
+): string {
+  return zoneFromBlueprint(n, surfaceNormal);
+}
+
+/**
+ * Classifies a normalized [0..1] anatomical point into the canonical
+ * 8-region key. Legs keep the left/right split on the anatomy frame
+ * (n.x <= 0.5 means Left); head/neck/back/abdomen are already region keys.
+ */
+export function regionKeyForNormalized(
+  n: { x: number; y: number; z: number },
+  surfaceNormal?: { x: number; y: number; z: number } | null,
+): string {
+  const zone = zoneFromBlueprint(n, surfaceNormal);
+  if (zone === 'foreleg' || zone === 'hindleg') {
+    return n.x <= 0.5 ? `${zone}_left` : `${zone}_right`;
+  }
+  if (zone === 'trunk') {
+    // Legacy trunk passthrough: split spine vs belly by the approved normal rule.
+    if (surfaceNormal) {
+      const len = Math.hypot(surfaceNormal.x, surfaceNormal.y, surfaceNormal.z) || 1;
+      return surfaceNormal.y / len > HORSE_ANATOMY_BLUEPRINT.spineNormalY ? 'back' : 'abdomen';
+    }
+    return n.y > HORSE_ANATOMY_BLUEPRINT.trunkYMin ? 'back' : 'abdomen';
+  }
+  return zone;
+}
+
+/**
  * Maps a local 3D point (or normalized point) to standard body zone:
  * - head: high y
  * - neck: upper-mid y, front z
@@ -285,13 +360,138 @@ export function resolveInjuryNormal(
  * - trunk: mid body
  */
 export function zoneForPoint(p: { x: number; y: number; z: number }): string {
-  const n = normalizePoint(p);
-  if (n.y > 0.8) return 'head';
-  if (n.y > 0.6) return 'neck';
-  if (n.y < 0.35) return n.z < 0.55 ? 'foreleg' : 'hindleg';
-  return n.z > 0.65 ? 'hindquarters' : 'trunk';
+  return zoneForNormalized(normalizePoint(p));
 }
 
 export function zoneById(id: string): BodyZone | undefined {
   return BODY_ZONES.find((z) => z.id === id);
+}
+
+// Canonical 8 body-region keys mirror the horse_body_regions catalog
+// (modelNodeKey values seeded in V16). Markers store one of these keys in their
+// zoneId; legacy records may still carry the 6-zone ids of BODY_ZONES above.
+export const BODY_REGION_KEYS = [
+  'head',
+  'neck',
+  'back',
+  'abdomen',
+  'foreleg_left',
+  'foreleg_right',
+  'hindleg_left',
+  'hindleg_right',
+] as const;
+
+export type BodyRegionKey = (typeof BODY_REGION_KEYS)[number];
+
+const REGION_LABELS: Record<BodyRegionKey, string> = {
+  head: 'Head',
+  neck: 'Neck',
+  back: 'Back',
+  abdomen: 'Abdomen',
+  foreleg_left: 'Foreleg (Left)',
+  foreleg_right: 'Foreleg (Right)',
+  hindleg_left: 'Hindleg (Left)',
+  hindleg_right: 'Hindleg (Right)',
+};
+
+export function isBodyRegionKey(value: string | null | undefined): value is BodyRegionKey {
+  return value != null && value in REGION_LABELS;
+}
+
+/**
+ * Display label for a canonical region key; falls back to the legacy
+ * 6-zone label so old DB records (trunk, hindquarters, foreleg, ...) still
+ * resolve instead of rendering as "Hindleg" guesses.
+ */
+export function regionKeyLabel(key: string | null | undefined): string | undefined {
+  if (!key) return undefined;
+  if (isBodyRegionKey(key)) return REGION_LABELS[key];
+  return zoneById(key)?.label;
+}
+
+/**
+ * Geometry zone (BODY_ZONES id) that approximates a region key — used only for
+ * 2D-fallback anchoring and other zone-shaped consumers, never for storage.
+ */
+export function zoneForRegionKey(key: string | null | undefined): string | undefined {
+  if (!key) return undefined;
+  if (isBodyRegionKey(key)) {
+    if (key.startsWith('foreleg')) return 'foreleg';
+    if (key.startsWith('hindleg')) return 'hindleg';
+    if (key === 'back' || key === 'abdomen') return 'trunk';
+    return key;
+  }
+  return zoneById(key)?.id;
+}
+
+/**
+ * Full click classification: geometry zone + local model point → canonical
+ * 8-region key (e.g. foreleg + x < 0 → 'foreleg_right').
+ */
+export function regionKeyForPoint(p: { x: number; y: number; z: number }): string {
+  return resolveBodyRegionKey(zoneForPoint(p), p);
+}
+
+export interface MarkerRegionRef {
+  bodyRegionId?: number | null;
+  zoneId?: string | null;
+}
+
+export interface RegionCatalogItem {
+  id: number;
+  displayName?: string | null;
+  modelNodeKey?: string | null;
+  code?: string | null;
+}
+
+/**
+ * Zone label of a marker, by agreed priority:
+ * bodyRegionId (catalog truth) → zoneId (canonical key, then legacy zone) →
+ * recomputed from nothing (caller may pass undefined and show a fallback).
+ * Invisible: this is display-only; storage keeps bodyRegionId + zoneId.
+ */
+export function markerZoneLabel(
+  bodyRegions: RegionCatalogItem[],
+  marker: MarkerRegionRef,
+): string | undefined {
+  const region = marker.bodyRegionId != null
+    ? bodyRegions.find((r) => r.id === marker.bodyRegionId)
+    : undefined;
+  return region?.displayName ?? regionKeyLabel(marker.zoneId ?? undefined);
+}
+
+
+/**
+ * Maps a 3D hit point and zone to the canonical model_node_key of horse_body_regions:
+ * - Differentiates left vs right forelegs and hindlegs (+X is left, -X is right)
+ * - Differentiates upper trunk (back) vs lower trunk (abdomen)
+ */
+export function resolveBodyRegionKey(zoneId: string, p: { x: number; y: number; z: number }): string {
+  const isLeft = p.x >= 0;
+  if (zoneId === 'foreleg') {
+    return isLeft ? 'foreleg_left' : 'foreleg_right';
+  }
+  if (zoneId === 'hindleg') {
+    return isLeft ? 'hindleg_left' : 'hindleg_right';
+  }
+  if (zoneId === 'trunk' || zoneId === 'hindquarters') {
+    const n = normalizePoint(p);
+    return n.y > HORSE_ANATOMY_BLUEPRINT.trunkYMin ? 'back' : 'abdomen';
+  }
+  return zoneId;
+}
+
+export function matchBodyRegion<T extends { id: number; code: string; modelNodeKey?: string | null; displayName?: string }>(
+  bodyRegions: T[],
+  zoneId: string,
+  p?: { x: number; y: number; z: number },
+): T | undefined {
+  if (!bodyRegions.length) return undefined;
+  const key = p ? resolveBodyRegionKey(zoneId, p) : zoneId;
+  return (
+    bodyRegions.find((r) => r.modelNodeKey === key) ||
+    bodyRegions.find((r) => r.code.toLowerCase() === key.toLowerCase()) ||
+    bodyRegions.find((r) => r.modelNodeKey === zoneId) ||
+    bodyRegions[0]
+  );
 }

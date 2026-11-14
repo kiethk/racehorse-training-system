@@ -73,7 +73,11 @@ $env:PGOPTIONS = $null
 if ($AsOf) {
     $AsOf = ([datetime]::Parse($AsOf)).ToString("yyyy-MM-ddTHH:mm")
     $env:PGOPTIONS = "-c rtms.seed_now=$AsOf"
-    Write-Host "Testing only: seeding as if it were $AsOf (club time)." -ForegroundColor Yellow
+    Write-Host "Seeding as of $AsOf (club time)." -ForegroundColor Yellow
+} else {
+    $nowStr = (Get-Date).ToString("yyyy-MM-ddTHH:mm")
+    $env:PGOPTIONS = "-c rtms.seed_now=$nowStr"
+    Write-Host "Seeding dynamically relative to current time: $nowStr" -ForegroundColor Cyan
 }
 $connection = @('-h', $DbHost, '-p', "$Port", '-U', $User, '-d', $Database, '-X', '-v', 'ON_ERROR_STOP=1')
 
@@ -142,12 +146,11 @@ UNION ALL SELECT 'Admission documents', count(*)::TEXT FROM admission_documents
 UNION ALL SELECT 'Care schedules', count(*)::TEXT FROM care_schedule
 UNION ALL SELECT 'Health records', count(*)::TEXT FROM health_records
 UNION ALL SELECT 'Training groups', count(*)::TEXT FROM training_groups
-UNION ALL SELECT 'Group plans', count(*)::TEXT FROM group_plans
+UNION ALL SELECT 'Course runs', count(*)::TEXT FROM course_runs
 UNION ALL SELECT 'Training sessions', count(*)::TEXT FROM training_sessions
 UNION ALL SELECT 'Training workouts', count(*)::TEXT FROM training_workouts
 UNION ALL SELECT 'Groom daily tasks', count(*)::TEXT FROM groom_daily_tasks
 UNION ALL SELECT 'Incident reports', count(*)::TEXT FROM horse_incident_reports
-UNION ALL SELECT 'Race nominations', count(*)::TEXT FROM race_registrations
 UNION ALL SELECT 'Notifications', count(*)::TEXT FROM notifications;
 "@
 Write-Host 'Main accounts (password admin123): admin@rtms.com, owner@rtms.com, trainer1@rtms.com, vet1@rtms.com, groom1@rtms.com' -ForegroundColor Green

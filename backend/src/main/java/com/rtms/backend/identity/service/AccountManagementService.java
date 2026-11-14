@@ -15,18 +15,21 @@ import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.admission.service.TrainerAssignmentService;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.identity.entity.GroomProfile;
+import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.notification.service.EmailService;
 import com.rtms.backend.notification.service.NotificationService;
 import jakarta.validation.Validator;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -56,6 +59,9 @@ public class AccountManagementService {
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final NotificationService notificationService;
     private final com.rtms.backend.notification.service.EmailService emailService;
+    private final TrainerAssignmentService trainerAssignmentService;
+    private final CareScheduleService careScheduleService;
+    private final TrainerHandoverService trainerHandoverService;
 
     public AccountManagementService(
             UserRepository userRepository,
@@ -107,6 +113,50 @@ public class AccountManagementService {
                 careScheduleRepository, admissionApplicationRepository, notificationService, null);
     }
 
+    public AccountManagementService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            HorseRepository horseRepository,
+            PasswordEncoder passwordEncoder,
+            StaffManagementService staffManagementService,
+            GroomProfileRepository groomProfileRepository,
+            VeterinarianProfileRepository vetProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            Validator validator,
+            AreaRepository areaRepository,
+            StableStallRepository stableStallRepository,
+            CareScheduleRepository careScheduleRepository,
+            AdmissionApplicationRepository admissionApplicationRepository,
+            NotificationService notificationService,
+            EmailService emailService) {
+        this(userRepository, roleRepository, horseRepository, passwordEncoder, staffManagementService,
+                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, areaRepository, stableStallRepository,
+                careScheduleRepository, admissionApplicationRepository, notificationService, emailService, null, null, null);
+    }
+
+    public AccountManagementService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            HorseRepository horseRepository,
+            PasswordEncoder passwordEncoder,
+            StaffManagementService staffManagementService,
+            GroomProfileRepository groomProfileRepository,
+            VeterinarianProfileRepository vetProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            Validator validator,
+            AreaRepository areaRepository,
+            StableStallRepository stableStallRepository,
+            CareScheduleRepository careScheduleRepository,
+            AdmissionApplicationRepository admissionApplicationRepository,
+            NotificationService notificationService,
+            EmailService emailService,
+            TrainerAssignmentService trainerAssignmentService,
+            CareScheduleService careScheduleService) {
+        this(userRepository, roleRepository, horseRepository, passwordEncoder, staffManagementService,
+                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, areaRepository, stableStallRepository,
+                careScheduleRepository, admissionApplicationRepository, notificationService, emailService, trainerAssignmentService, careScheduleService, null);
+    }
+
     @Autowired
     public AccountManagementService(
             UserRepository userRepository,
@@ -123,7 +173,10 @@ public class AccountManagementService {
             CareScheduleRepository careScheduleRepository,
             AdmissionApplicationRepository admissionApplicationRepository,
             NotificationService notificationService,
-            @Autowired(required = false) EmailService emailService) {
+            @Autowired(required = false) EmailService emailService,
+            @Autowired(required = false) TrainerAssignmentService trainerAssignmentService,
+            @Autowired(required = false) CareScheduleService careScheduleService,
+            @Autowired(required = false) TrainerHandoverService trainerHandoverService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.horseRepository = horseRepository;
@@ -139,6 +192,9 @@ public class AccountManagementService {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.notificationService = notificationService;
         this.emailService = emailService;
+        this.trainerAssignmentService = trainerAssignmentService;
+        this.careScheduleService = careScheduleService;
+        this.trainerHandoverService = trainerHandoverService;
     }
 
     // ── READ ALL ─────────────────────────────────────────────────────────────
@@ -166,8 +222,8 @@ public class AccountManagementService {
             List<Area> allAreas = areaRepository.findAll();
             for (Area area : allAreas) {
                 areaById.put(area.getId(), area);
-                if (area.getTrainerId() != null) {
-                    managedAreasByTrainer.computeIfAbsent(area.getTrainerId(), k -> new ArrayList<>()).add("Area " + area.getCode());
+                if (area.getTrainerId() != null && area.getType() == AreaType.REGULAR) {
+                    managedAreasByTrainer.computeIfAbsent(area.getTrainerId(), k -> new ArrayList<>()).add(area.getCode());
                 }
             }
         }
@@ -338,9 +394,6 @@ public class AccountManagementService {
         String roleName = request.getRole();
         if (STAFF_ROLES.contains(roleName)) {
             StaffCreationResponse staffResponse = staffManagementService.createStaff(request.toStaffCreationRequest());
-            if (emailService != null) {
-                emailService.sendStaffWelcomeEmail(staffResponse.getEmail(), staffResponse.getFullName(), staffResponse.getRole(), request.getPassword());
-            }
             return copyToAccountCreationResponse(staffResponse);
         }
 
@@ -411,8 +464,20 @@ public class AccountManagementService {
 
     // ── STATUS TOGGLE (WITH ROLE-SPECIFIC DEACTIVATION PRECHECKS) ─────────────
 
+    public List<EligibleReplacementTrainerResponse> getEligibleReplacementTrainers(Long trainerId) {
+        if (trainerHandoverService == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "Handover service is not configured.");
+        }
+        return trainerHandoverService.getEligibleReplacements(trainerId);
+    }
+
     @Transactional
     public AccountSummaryResponse updateAccountStatus(Long currentUserId, Long targetUserId, boolean active) {
+        return updateAccountStatus(currentUserId, targetUserId, active, null);
+    }
+
+    @Transactional
+    public AccountSummaryResponse updateAccountStatus(Long currentUserId, Long targetUserId, boolean active, Long replacementTrainerId) {
         // Enforce self-lockout protection: An administrator cannot deactivate their own account!
         if (currentUserId != null && currentUserId.equals(targetUserId) && !active) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot deactivate your own administrator account.");
@@ -422,7 +487,7 @@ public class AccountManagementService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         if (!active && user.isActive()) {
-            validateDeactivationPrerequisites(user, currentUserId);
+            validateDeactivationPrerequisites(user, currentUserId, replacementTrainerId);
         }
 
         user.setActive(active);
@@ -439,10 +504,18 @@ public class AccountManagementService {
             singleCountMap.put(user.getId(), count);
         }
 
-        return mapToAccountSummary(user, singleCountMap);
+        Map<Long, List<String>> managedAreasByTrainer = new HashMap<>();
+        if (user.getRole() != null && "HEAD_TRAINER".equals(user.getRole().getName()) && areaRepository != null) {
+            List<Area> regularAreas = areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, user.getId());
+            if (regularAreas != null && !regularAreas.isEmpty()) {
+                managedAreasByTrainer.put(user.getId(), regularAreas.stream().map(Area::getCode).sorted().toList());
+            }
+        }
+
+        return mapToAccountSummary(user, singleCountMap, Collections.emptyMap(), managedAreasByTrainer, Collections.emptyMap(), Collections.emptyMap());
     }
 
-    private void validateDeactivationPrerequisites(User user, Long currentUserId) {
+    private void validateDeactivationPrerequisites(User user, Long currentUserId, Long replacementTrainerId) {
         Long targetUserId = user.getId();
         String roleName = user.getRole() != null ? user.getRole().getName() : "";
 
@@ -475,23 +548,57 @@ public class AccountManagementService {
                 break;
             }
             case "HEAD_TRAINER": {
-                if (areaRepository != null) {
-                    List<Area> regularAreas = areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, targetUserId);
-                    if (!regularAreas.isEmpty()) {
+                List<Area> regularAreas = areaRepository != null
+                        ? areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, targetUserId)
+                        : Collections.emptyList();
+                if (!regularAreas.isEmpty()) {
+                    if (replacementTrainerId == null) {
                         String areaCodes = regularAreas.stream()
                                 .map(Area::getCode)
                                 .sorted()
                                 .collect(Collectors.joining(", "));
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                "Cannot deactivate Head Trainer while they are assigned to areas: [" + areaCodes + "]. Please reassign or unassign these areas first.");
+                                "Cannot deactivate Head Trainer while they are assigned to areas: [" + areaCodes + "]. Please select an eligible replacement Head Trainer to take over their responsibilities.");
                     }
-                }
-                // When trainer manages no regular areas, auto-unassign subordinate reporting grooms
-                if (groomProfileRepository != null) {
-                    List<GroomProfile> reportingGrooms = groomProfileRepository.findByTrainerId(targetUserId);
-                    for (GroomProfile groom : reportingGrooms) {
-                        groom.setTrainerId(null);
-                        groomProfileRepository.save(groom);
+                    if (trainerHandoverService != null) {
+                        trainerHandoverService.executeHandover(targetUserId, replacementTrainerId);
+                    }
+                } else {
+                    if (replacementTrainerId != null && trainerHandoverService != null) {
+                        trainerHandoverService.executeHandover(targetUserId, replacementTrainerId);
+                    } else {
+                        // When trainer manages no regular areas, auto-unassign subordinate reporting grooms
+                        if (groomProfileRepository != null) {
+                            List<GroomProfile> reportingGrooms = groomProfileRepository.findByTrainerId(targetUserId);
+                            for (GroomProfile groom : reportingGrooms) {
+                                groom.setTrainerId(null);
+                                groomProfileRepository.save(groom);
+                            }
+                        }
+                        // Auto-reassign pending admission applications in TRAINER_REVIEW
+                        if (admissionApplicationRepository != null && admissionApplicationRepository.existsByTrainerIdAndStatus(targetUserId, AdmissionStatus.TRAINER_REVIEW)) {
+                            List<User> activeTrainers = userRepository.findActiveHeadTrainers();
+                            long otherActiveTrainers = (activeTrainers != null ? activeTrainers : Collections.<User>emptyList()).stream()
+                                    .filter(t -> !t.getId().equals(targetUserId))
+                                    .count();
+                            if (otherActiveTrainers == 0) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "Cannot deactivate Head Trainer while they have pending admission applications awaiting their assessment. Please reassign or complete these reviews before deactivating.");
+                            }
+                            user.setActive(false);
+                            userRepository.saveAndFlush(user);
+                            List<AdmissionApplication> pendingAdmissions = admissionApplicationRepository
+                                    .findByTrainerIdAndStatusOrderBySubmittedAtAscIdAsc(targetUserId, AdmissionStatus.TRAINER_REVIEW);
+                            if (pendingAdmissions != null) {
+                                for (AdmissionApplication app : pendingAdmissions) {
+                                    app.setTrainerId(null);
+                                    admissionApplicationRepository.save(app);
+                                    if (trainerAssignmentService != null) {
+                                        trainerAssignmentService.assignIfNeeded(app.getId());
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 break;
@@ -526,14 +633,42 @@ public class AccountManagementService {
                 break;
             }
             case "VETERINARIAN": {
-                if (careScheduleRepository != null) {
-                    boolean hasPendingSchedules = careScheduleRepository.existsByVeterinarianIdAndStatusIn(
-                            targetUserId,
-                            List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
-                    );
-                    if (hasPendingSchedules) {
+                if (careScheduleRepository != null && careScheduleRepository.existsByVeterinarianIdAndStatusIn(targetUserId, CareScheduleStatus.OPEN)) {
+                    List<User> activeVets = userRepository.findActiveVeterinarians();
+                    long otherActiveVets = (activeVets != null ? activeVets : Collections.<User>emptyList()).stream()
+                            .filter(v -> !v.getId().equals(targetUserId))
+                            .count();
+                    if (otherActiveVets == 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                 "Cannot deactivate Veterinarian while they have pending or in-progress care schedules. Please reassign their schedules before deactivating.");
+                    }
+                    user.setActive(false);
+                    userRepository.saveAndFlush(user);
+                    List<CareSchedule> openSchedules = careScheduleRepository.findByVeterinarianIdAndStatusIn(
+                            targetUserId,
+                            CareScheduleStatus.OPEN
+                    );
+                    if (openSchedules != null) {
+                        for (CareSchedule schedule : openSchedules) {
+                            if (schedule.getStatus() == CareScheduleStatus.IN_PROGRESS) {
+                                schedule.setStatus(CareScheduleStatus.SCHEDULED);
+                            }
+                            schedule.setVeterinarianId(null);
+                            schedule.setScheduledAt(null);
+                            schedule.setScheduledDate(null);
+                            CareSchedule saved = careScheduleRepository.save(schedule);
+                            if (saved.getAdmissionId() != null && admissionApplicationRepository != null) {
+                                admissionApplicationRepository.findById(saved.getAdmissionId()).ifPresent(admission -> {
+                                    if (Objects.equals(admission.getVeterinarianId(), targetUserId)) {
+                                        admission.setVeterinarianId(null);
+                                        admissionApplicationRepository.save(admission);
+                                    }
+                                });
+                            }
+                            if (careScheduleService != null) {
+                                careScheduleService.assignRequestedSchedule(saved);
+                            }
+                        }
                     }
                 }
                 break;
@@ -630,9 +765,11 @@ public class AccountManagementService {
                 case "HEAD_TRAINER": {
                     List<String> areas = managedAreasByTrainer.getOrDefault(user.getId(), Collections.emptyList());
                     if (!areas.isEmpty()) {
-                        summary.setManagedAreaCodes(areas);
-                        summary.setProfileSummary("Managed: " + String.join(", ", areas));
+                        List<String> sortedAreas = areas.stream().sorted().toList();
+                        summary.setManagedAreaCodes(sortedAreas);
+                        summary.setProfileSummary("Managed: " + sortedAreas.stream().map(c -> "Area " + c).collect(Collectors.joining(", ")));
                     } else {
+                        summary.setManagedAreaCodes(Collections.emptyList());
                         summary.setProfileSummary("Unassigned (No Areas)");
                     }
                     break;

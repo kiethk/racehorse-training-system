@@ -52,6 +52,18 @@ public class CareRescheduleService {
     @Autowired
     public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
             AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus,
+            CareScheduleService careScheduleService, AuditLogService auditLogService, Clock clock) {
+        this.schedules = schedules;
+        this.users = users;
+        this.auditLogs = auditLogs;
+        this.preventiveStatus = preventiveStatus;
+        this.careScheduleService = careScheduleService;
+        this.auditLogService = auditLogService;
+        this.clock = clock;
+    }
+
+    public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
+            AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus,
             CareScheduleService careScheduleService, AuditLogService auditLogService) {
         this(schedules, users, auditLogs, preventiveStatus, careScheduleService, auditLogService, Clock.systemDefaultZone());
     }
@@ -70,18 +82,6 @@ public class CareRescheduleService {
     CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
             PreventiveStatusService preventiveStatus, Clock clock) {
         this(schedules, users, auditLogs, preventiveStatus, null, null, clock);
-    }
-
-    CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
-            PreventiveStatusService preventiveStatus, CareScheduleService careScheduleService,
-            AuditLogService auditLogService, Clock clock) {
-        this.schedules = schedules;
-        this.users = users;
-        this.auditLogs = auditLogs;
-        this.preventiveStatus = preventiveStatus;
-        this.careScheduleService = careScheduleService;
-        this.auditLogService = auditLogService;
-        this.clock = clock;
     }
 
     @Transactional
@@ -112,7 +112,7 @@ public class CareRescheduleService {
         if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
             schedule.setVeterinarianId(null);
             schedule.setScheduledAt(null);
-            schedule.setStatus(CareScheduleStatus.REQUESTED);
+            schedule.setStatus(CareScheduleStatus.SCHEDULED);
         }
         schedule.setRequestedAt(request.getNewDate().atTime(PreventiveStatusService.MILESTONE_TIME));
         schedule.setRescheduleReason(request.getReason());
@@ -157,14 +157,14 @@ public class CareRescheduleService {
     private static void authorize(CareSchedule schedule, AuthenticatedUser actor) {
         boolean manager = MANAGER.equals(actor.getRole());
         switch (schedule.getStatus()) {
-            case REQUESTED:
-                // Chưa có vet được giao: chỉ Manager điều phối.
-                if (!manager) {
-                    throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
-                            "Only club managers can reschedule an unassigned schedule");
-                }
-                return;
             case SCHEDULED:
+                if (schedule.getVeterinarianId() == null) {
+                    if (!manager) {
+                        throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                                "Only club managers can reschedule an unassigned schedule");
+                    }
+                    return;
+                }
                 boolean assignedVet = VET.equals(actor.getRole())
                         && Objects.equals(schedule.getVeterinarianId(), actor.getUserId());
                 if (!manager && !assignedVet) {
@@ -174,7 +174,7 @@ public class CareRescheduleService {
                 return;
             default:
                 throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS",
-                        "Only REQUESTED or SCHEDULED schedules can be rescheduled");
+                        "Only SCHEDULED schedules can be rescheduled");
         }
     }
 

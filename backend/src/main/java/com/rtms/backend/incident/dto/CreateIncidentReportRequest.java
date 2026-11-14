@@ -1,14 +1,23 @@
 package com.rtms.backend.incident.dto;
 
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class CreateIncidentReportRequest {
 
+    @NotNull(message = "Horse ID is required")
     private Long horseId;
+
+    @NotBlank(message = "Title is required")
+    @Size(max = 255, message = "Title must be at most 255 characters")
     private String title;
+
+    @NotBlank(message = "Description is required")
     private String description;
-    private String imageUrl;
-    private IncidentSeverity severity;
+
+    private IncidentType incidentType;
 
     public Long getHorseId() {
         return horseId;
@@ -34,19 +43,12 @@ public class CreateIncidentReportRequest {
         this.description = description;
     }
 
-    public String getImageUrl() {
-        return imageUrl;
+
+    public IncidentType getIncidentType() {
+        return incidentType;
     }
 
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
-
-    public IncidentSeverity getSeverity() {
-        return severity;
-    }
-
-    public void setSeverity(IncidentSeverity severity) {
-        this.severity = severity;
+    public void setIncidentType(IncidentType incidentType) {
+        this.incidentType = incidentType;
     }
 }

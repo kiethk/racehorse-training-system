@@ -71,7 +71,7 @@ public record ManagerDashboardSummaryResponse(
             String horseName,
             String title,
             String description,
-            String severity,
+            String incidentType,
             String status,
             LocalDateTime reportedAt,
             Long reportedById,

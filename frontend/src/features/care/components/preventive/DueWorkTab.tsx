@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
@@ -57,6 +58,8 @@ interface DueWorkTabProps {
 }
 
 export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
+  const searchParams = useSearchParams();
+  const targetHorseId = searchParams.get('horseId');
   const [rows, setRows] = useState<PreventiveDueHorse[]>([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<PreventiveDueSummary | null>(null);
@@ -103,6 +106,31 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     load();
   }, [load]);
 
+  // If navigated from Schedule/Agenda with a specific horseId, auto-open CompleteVaccinationModal
+  useEffect(() => {
+    if (!targetHorseId || protocols.length === 0) return;
+    const hId = Number(targetHorseId);
+    if (Number.isNaN(hId)) return;
+
+    // Check if horse is in already loaded rows
+    const match = rows.find((r) => r.horseId === hId);
+    if (match) {
+      setCompleting(match);
+      return;
+    }
+
+    // Otherwise, load due horse specifically
+    void preventiveCareService
+      .listDueHorses({ search: String(hId), page: 0, size: 10 })
+      .then((res) => {
+        const directMatch = res.content.find((r) => r.horseId === hId);
+        if (directMatch) {
+          setCompleting(directMatch);
+        }
+      })
+      .catch(() => {});
+  }, [targetHorseId, protocols, rows]);
+
   const changeFilter = (next: Filter) => {
     setFilter(next);
     setPage(0);
@@ -129,7 +157,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
       try {
         await preventiveCareService.recordForHorse(horse.horseId, {
           administeredOn: batchDate,
-          doses: horse.protocols.map((p) => ({ protocolId: p.protocolId, dosage: '' })),
+          doses: horse.protocols.map((p) => ({ protocolId: p.protocolId, dosage: 'Standard dose' })),
         });
       } catch (cause) {
         failed.push({ name: horse.horseName, message: displayError(cause, 'Could not record.') });

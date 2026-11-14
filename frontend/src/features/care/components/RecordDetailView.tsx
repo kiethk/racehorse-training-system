@@ -12,7 +12,13 @@ import { healthApi } from '@/features/health/services/healthApi';
 import type { HealthRecord } from '@/features/health/types';
 import type { InjuryRecord } from '@/features/health/types';
 import type { InjuryMarkerData } from '@/features/vet/components/UrgentHorseInjuryViewer';
-import { zoneById, resolveInjuryWorldPosition, resolveInjuryNormal, isNormalizedPoint } from '@/features/vet/lib/injuryZones';
+import {
+  markerZoneLabel,
+  resolveInjuryWorldPosition,
+  resolveInjuryNormal,
+  isNormalizedPoint,
+} from '@/features/vet/lib/injuryZones';
+import type { RegionCatalogItem } from '@/features/vet/lib/injuryZones';
 import { TreatmentPlanModal } from '../shared/components/TreatmentPlanModal';
 import { PrescriptionModal } from './PrescriptionModal';
 import type { CareScheduleDetailResponse, TreatmentPlan } from '../types';
@@ -21,6 +27,7 @@ import type { HorseHealthMetric } from '@/features/horses/types';
 import { displayError, formatDate, formatDateTime } from '@/lib/display';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { BioSpcControlChart } from '@/features/medical-analytics';
 
 // The 3D canvas (three.js + GLB) must stay out of the server bundle.
 const UrgentHorseInjuryViewer = dynamic(
@@ -89,6 +96,7 @@ export function RecordDetailView({
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [metrics, setMetrics] = useState<HorseHealthMetric[]>([]);
   const [injuries, setInjuries] = useState<InjuryRecord[]>([]);
+  const [bodyRegions, setBodyRegions] = useState<RegionCatalogItem[]>([]);
   const [preventive, setPreventive] = useState<HorsePreventiveStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -194,6 +202,22 @@ export function RecordDetailView({
     Promise.resolve().then(() => void load());
   }, [load]);
 
+  // Region catalog for deriving zone labels from bodyRegionId (display only).
+  useEffect(() => {
+    let active = true;
+    healthApi
+      .getHorseBodyRegions()
+      .then((regions) => {
+        if (active) setBodyRegions(regions);
+      })
+      .catch(() => {
+        // Without the catalog, labels still resolve from zoneId.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   /** Switch to another record of the same horse inside the shared layout. */
   const selectRecord = useCallback(
     async (id: number) => {
@@ -248,7 +272,7 @@ export function RecordDetailView({
     return <Notice tone="warning">No clinical record to display.</Notice>;
   }
 
-  const resolvedHorseId = detail?.schedule?.horseId ?? fullRecord?.horseId ?? null;
+  const resolvedHorseId = detail?.schedule?.horseId ?? fullRecord?.horseId ?? horseId ?? null;
   const resolvedHorseName = detail?.horse?.name || horseName || (resolvedHorseId != null ? `#${resolvedHorseId}` : '—');
   const recordIdShown = activeRecordId ?? detail?.healthRecord?.id ?? fullRecord?.id ?? null;
   const trainingDecision = detail?.healthRecord?.trainingDecision ?? fullRecord?.trainingDecision ?? null;
@@ -290,7 +314,8 @@ export function RecordDetailView({
         normal,
         needsSurfaceSnap,
         zoneId: i.zoneId ?? undefined,
-        label: (i.zoneId && zoneById(i.zoneId)?.label) || i.injuryType,
+        // Label priority: bodyRegionId (catalog) → zoneId (canonical/legacy) → injuryType.
+        label: markerZoneLabel(bodyRegions, { bodyRegionId: i.bodyRegionId, zoneId: i.zoneId }) || i.injuryType,
         severity: i.severity ?? undefined,
         status: i.status ?? undefined,
         diagnosedAt: i.diagnosedAt ?? undefined,
@@ -321,7 +346,12 @@ export function RecordDetailView({
           <Panel padded className="border-l-4 border-l-[var(--color-medical)]">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3.5">
-                <HorseAvatar name={resolvedHorseName} image={null} size={50} rounded="md" />
+                <HorseAvatar
+                  name={resolvedHorseName}
+                  image={resolvedHorseId ? `/api/horses/${resolvedHorseId}/photo` : null}
+                  size={50}
+                  rounded="md"
+                />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
@@ -393,8 +423,7 @@ export function RecordDetailView({
           {recordIdShown ? (
             <Panel padded className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
-                <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                  <Icon name="clipboard" size={16} className="text-[var(--color-primary)]" />
+                <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                   Clinical Record #{recordIdShown}
                 </h2>
               </div>
@@ -452,8 +481,7 @@ export function RecordDetailView({
 
           {/* 3. Vitals (latest telemetry) */}
           <Panel padded className="space-y-3">
-            <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-              <Icon name="heart-pulse" size={16} className="text-[var(--color-medical)]" />
+            <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
               Vitals
             </h2>
             {latestMetric ? (
@@ -510,11 +538,15 @@ export function RecordDetailView({
             )}
           </Panel>
 
+          {/* 3.1 Personalized Bio-Process Control (Bio-SPC) */}
+          {resolvedHorseId != null && (
+            <BioSpcControlChart horseId={resolvedHorseId} horseName={resolvedHorseName} />
+          )}
+
           {/* 4. Injury — list + button opening the 3D map modal */}
           <Panel padded className="space-y-3">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-              <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                <Icon name="alert-triangle" size={16} className="text-[var(--color-danger)]" />
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                 Injury
               </h2>
               {markerData.length > 0 && (
@@ -539,7 +571,9 @@ export function RecordDetailView({
                 {recordInjuries.map((inj) => {
                   const isOpen = expandedMarkerId === String(inj.id);
                   const hasMarker = inj.positionX != null;
-                  const zoneLabel = (inj.zoneId && zoneById(inj.zoneId)?.label) || 'Unmapped zone';
+                  // Label priority: bodyRegionId (catalog) → zoneId (canonical/legacy).
+                  const zoneLabel =
+                    markerZoneLabel(bodyRegions, { bodyRegionId: inj.bodyRegionId, zoneId: inj.zoneId }) ?? 'Unmapped zone';
                   return (
                     <div
                       key={inj.id}
@@ -611,8 +645,7 @@ export function RecordDetailView({
 
           {/* 5. Preventive care (backend protocol statuses) */}
           <Panel padded className="space-y-3">
-            <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-              <Icon name="shield" size={16} className="text-[var(--color-medical)]" />
+            <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
               Preventive Care
             </h2>
             {preventive && preventive.protocols.length > 0 ? (
@@ -650,8 +683,7 @@ export function RecordDetailView({
           {recordIdShown != null && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                  <Icon name="pill" size={16} className="text-[var(--color-primary)]" />
+                <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                   Treatment Plans &amp; Prescriptions ({plans.length})
                 </h2>
                 <Button
@@ -739,21 +771,53 @@ export function RecordDetailView({
           {/* 7. Health metrics trend chart */}
           {metrics.length > 0 && (
             <Panel padded className="space-y-3">
-              <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                <Icon name="activity" size={16} className="text-[var(--color-primary)]" />
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                 Health Metrics Trend
               </h2>
-              <div className="h-48">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={metrics.map((m) => ({ ...m, date: formatDate(m.recordedAt) }))}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
+                    <YAxis
+                      yAxisId="left"
+                      tick={{ fontSize: 10 }}
+                      domain={['auto', 'auto']}
+                      label={{ value: 'Vitals (bpm / °C)', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--color-text-muted)' } }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 10 }}
+                      domain={['auto', 'auto']}
+                      label={{ value: 'Weight (kg)', angle: 90, position: 'insideRight', style: { fontSize: 10, fill: 'var(--color-text-muted)' } }}
+                    />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="heartRate" stroke="var(--color-danger)" name="Heart rate" dot={false} />
-                    <Line type="monotone" dataKey="temperature" stroke="var(--color-warning)" name="Temp °C" dot={false} />
-                    <Line type="monotone" dataKey="weight" stroke="var(--color-info)" name="Weight kg" dot={false} />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="heartRate"
+                      stroke="var(--color-danger)"
+                      name="Heart rate (bpm)"
+                      dot={{ r: 2 }}
+                    />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="temperature"
+                      stroke="var(--color-warning)"
+                      name="Temp (°C)"
+                      dot={{ r: 2 }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="weight"
+                      stroke="var(--color-info)"
+                      name="Weight (kg)"
+                      dot={{ r: 2 }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

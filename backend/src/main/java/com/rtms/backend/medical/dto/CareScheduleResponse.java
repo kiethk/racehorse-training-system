@@ -6,16 +6,19 @@ import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record CareScheduleResponse(
         Long id,
         Long horseId,
         Long veterinarianId,
+        String veterinarianName,
         Long admissionId,
         Long sourceIncidentId,
         CareType careType,
         CareScheduleStatus status,
+        LocalDate scheduledDate,
         LocalDateTime scheduledAt,
         int durationMinutes,
         String description,
@@ -27,24 +30,30 @@ public record CareScheduleResponse(
         LocalDateTime requestedAt,
         RescheduleReason rescheduleReason,
         String rescheduleNote,
-        /** D1 cờ dẫn xuất: IN_PROGRESS quá 30 phút so với scheduled_at (không phải trạng thái DB). */
-        boolean overdue,
-        /** D2 thời điểm ca khám bị tạm dừng do ưu tiên ca cấp cứu khác. */
-        LocalDateTime pausedFrom
+        int rolloverCount
 ) {
     public static CareScheduleResponse from(CareSchedule cs) {
+        return from(cs, null);
+    }
+
+    public static CareScheduleResponse from(CareSchedule cs, String vetName) {
         if (cs == null) return null;
-        boolean overdue = cs.getStatus() == CareScheduleStatus.IN_PROGRESS
-                && cs.getScheduledAt() != null
-                && java.time.LocalDateTime.now().isAfter(cs.getScheduledAt().plusMinutes(30));
+        LocalDate date = cs.getScheduledDate();
+        if (date == null && cs.getScheduledAt() != null) {
+            date = cs.getScheduledAt().toLocalDate();
+        } else if (date == null && cs.getRequestedAt() != null) {
+            date = cs.getRequestedAt().toLocalDate();
+        }
         return new CareScheduleResponse(
                 cs.getId(),
                 cs.getHorseId(),
                 cs.getVeterinarianId(),
+                vetName,
                 cs.getAdmissionId(),
                 cs.getSourceIncidentId(),
                 cs.getCareType(),
                 cs.getStatus(),
+                date,
                 cs.getScheduledAt(),
                 cs.getDurationMinutes(),
                 cs.getDescription(),
@@ -56,8 +65,7 @@ public record CareScheduleResponse(
                 cs.getRequestedAt(),
                 cs.getRescheduleReason(),
                 cs.getRescheduleNote(),
-                overdue,
-                cs.getPausedFrom()
+                cs.getRolloverCount()
         );
     }
 }

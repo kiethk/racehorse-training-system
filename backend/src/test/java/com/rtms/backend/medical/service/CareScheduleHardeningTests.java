@@ -17,6 +17,9 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.entity.Notification;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
@@ -25,7 +28,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -55,7 +58,7 @@ class CareScheduleHardeningTests {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     private NotificationService notificationService;
     private AdmissionApplicationRepository admissionRepository;
     private CareScheduleService service;
@@ -68,7 +71,7 @@ class CareScheduleHardeningTests {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(GroupWorkoutSyncService.class);
+        workoutService = mock(TrainingGroupService.class);
         notificationService = mock(NotificationService.class);
         admissionRepository = mock(AdmissionApplicationRepository.class);
 
@@ -87,11 +90,10 @@ class CareScheduleHardeningTests {
                 mock(EntityManager.class),
                 notificationService,
                 new TrainingDecisionService(horses, schedules, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                mock(PreventiveVaccinationService.class),
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
 
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -141,7 +143,7 @@ class CareScheduleHardeningTests {
         routine.setId(101L);
         routine.setHorseId(10L);
         routine.setCareType(CareType.ROUTINE);
-        routine.setStatus(CareScheduleStatus.REQUESTED);
+        routine.setStatus(CareScheduleStatus.SCHEDULED);
         routine.setAdmissionId(null);
         routine.setDurationMinutes(30);
 
@@ -179,7 +181,7 @@ class CareScheduleHardeningTests {
         urgent.setId(102L);
         urgent.setHorseId(10L);
         urgent.setCareType(CareType.URGENT);
-        urgent.setStatus(CareScheduleStatus.REQUESTED);
+        urgent.setStatus(CareScheduleStatus.SCHEDULED);
         urgent.setSourceIncidentId(50L);
         urgent.setAdmissionId(null);
         urgent.setDurationMinutes(30);
@@ -198,7 +200,7 @@ class CareScheduleHardeningTests {
                 anyString(),
                 anyString()
         );
-        verify(events).publishEvent(any(com.rtms.backend.event.UrgentAssignmentCommittedEvent.class));
+        verify(events).publishEvent(any(UrgentAssignmentCommittedEvent.class));
     }
 
     @Test

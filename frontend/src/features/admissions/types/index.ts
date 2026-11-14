@@ -96,6 +96,11 @@ export interface AdmissionDetailResponse {
 
   groomId: number | null;
   groomName?: string | null;
+  assignedGroomId: number | null;
+  assignedGroomName: string | null;
+  groomAssignedAt: string | null;
+  groomReviewDueAt: string | null;
+  assignedGroomFull: boolean;
   groomDecision: string | null;
   groomFeedback: string | null;
   groomReviewedAt: string | null;
@@ -182,10 +187,8 @@ export interface InitialVetExamResponse {
 
 // Care Schedule Types
 export type CareScheduleStatus =
-  | 'REQUESTED'
   | 'SCHEDULED'
   | 'IN_PROGRESS'
-  | 'PAUSED'
   | 'COMPLETED'
   | 'CANCELLED';
 
@@ -212,7 +215,7 @@ export interface UrgentAssignmentAlert {
   reportedByName: string | null;
   reportedByRole?: string | null;
   reportedAt: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  incidentType: 'PROBLEM' | 'TRAUMA';
   title: string;
   description: string;
   imageUrl: string | null;
@@ -230,13 +233,15 @@ export interface UrgentCaseReport {
   reportedByName: string | null;
   reportedByRole: string | null;
   reportedAt: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  incidentType: 'PROBLEM' | 'TRAUMA';
   title: string;
   description: string;
   imageUrl: string | null;
 }
 
 export interface CareSchedule {
+  sourceIncidentId?: number | null;
+  cancelReason?: string | null;
   id: number;
   horseId: number;
   veterinarianId?: number | null;
@@ -247,6 +252,7 @@ export interface CareSchedule {
   assignedVetId?: number | null;
   scheduledDate?: string | null;
   scheduledAt?: string | null;
+  rolloverCount?: number;
   completedAt?: string | null;
   durationMinutes?: number | null;
   notes?: string | null;
@@ -254,9 +260,8 @@ export interface CareSchedule {
   createdAt?: string;
   purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   requestedAt?: string | null;
-  /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
-  overdue?: boolean;
-  pausedFrom?: string | null;
+  rescheduleReason?: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'URGENT_PREEMPTION' | 'TIME_EXCEEDED' | 'PEER_OFFLOAD' | 'OTHER' | null;
+  rescheduleNote?: string | null;
 }
 
 export type CareScheduleResponse = CareSchedule;
@@ -265,6 +270,10 @@ export interface CareScheduleDetail {
   schedule: CareSchedule;
   horse: HorseSummary | null;
   veterinarian: { id: number; fullName: string; email: string } | null;
+  /** The exam that decides the block when this incident visit cannot lift it. */
+  blockHeldUntil?: string | null;
+  /** The horse's waiting Follow-up: a new date merges into it. */
+  waitingFollowUp?: { at: string; veterinarianName: string | null } | null;
   healthRecord: {
     id: number;
     findings: string;
@@ -309,7 +318,6 @@ export interface CompleteCareScheduleRequest {
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
   /** Multiple follow-up rechecks (rotating vets on consecutive days). */
-  nextSchedules?: CreateNextScheduleRequest[];
   vaccinations?: VaccinationRequest[];
   /** 7–10 days; only on a preventive visit without vaccinations. */
   deferVaccinationDays?: number;
@@ -324,10 +332,10 @@ export interface CompleteCareScheduleRequest {
 }
 
 export interface CreateInjuryMarkerRequest {
-  injuryType: string;
+  injuryType?: string;
   bodyRegionId: number;
-  severity: string;
-  description?: string;
+  severity?: string;
+  description: string;
   diagnosedAt: string;
   positionX?: number | null;
   positionY?: number | null;
@@ -339,7 +347,6 @@ export interface CreateInjuryMarkerRequest {
   normalX?: number | null;
   normalY?: number | null;
   normalZ?: number | null;
-  meshName?: string | null;
 }
 
 export interface VetAdmissionQueueItem {
@@ -466,8 +473,30 @@ export interface GroomQueueFilters {
   page: number;
 }
 
+export interface GroomQueueItem extends AdmissionSummaryResponse {
+  groomReviewDueAt: string | null;
+  assignedGroomFull: boolean;
+}
+
+export interface GroomAssignmentHistoryItem {
+  id: number;
+  groomId: number;
+  groomName: string;
+  assignedAt: string;
+  endedAt: string | null;
+  endReason: 'DECIDED' | 'OVERDUE' | 'FULL' | 'LOST_QUARANTINE' | 'MANUAL' | 'REOPENED' | null;
+  assignedByName: string | null;
+}
+
+export interface QuarantineGroomOption {
+  groomId: number;
+  name: string;
+  workload: number;
+  full: boolean;
+}
+
 export interface GroomQueueResponse {
-  content: AdmissionSummaryResponse[];
+  content: GroomQueueItem[];
   page: number;
   size: number;
   totalElements: number;

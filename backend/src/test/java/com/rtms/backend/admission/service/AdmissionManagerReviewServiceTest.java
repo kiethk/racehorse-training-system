@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,7 +60,7 @@ class AdmissionManagerReviewServiceTest {
 
     private AdmissionManagerReviewService service;
 
-    // ─── Shared helpers ───────────────────────────────────────────────────────
+    // â”€â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private AdmissionApplication buildAdmission(AdmissionStatus status) {
         AdmissionApplication a = new AdmissionApplication();
@@ -112,12 +113,12 @@ class AdmissionManagerReviewServiceTest {
                 admissionNotificationService);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // APPROVE — manual stall selection
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // APPROVE â€” manual stall selection
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("APPROVE thủ công: Admission=APPROVED, Horse=ELIGIBLE, chuồng thường=OCCUPIED, chuồng Q=AVAILABLE")
+    @DisplayName("APPROVE thá»§ cÃ´ng: Admission=APPROVED, Horse=ELIGIBLE, chuá»“ng thÆ°á»ng=OCCUPIED, chuá»“ng Q=AVAILABLE")
     void approve_withSelectedStall_success() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -139,7 +140,7 @@ class AdmissionManagerReviewServiceTest {
 
         assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());
         assertEquals(20L, horse.getCurrentStallId());
-        // Duyệt xong: ELIGIBLE + ALLOWED -> Trainer lập kế hoạch được ngay.
+        // Duyá»‡t xong: ELIGIBLE + ALLOWED -> Trainer láº­p káº¿ hoáº¡ch Ä‘Æ°á»£c ngay.
         assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
         assertTrue(horse.canTrain());
         verify(horseRepository).save(horse);
@@ -150,17 +151,17 @@ class AdmissionManagerReviewServiceTest {
         assertEquals(StallStatus.AVAILABLE, qStall.getStatus());
         verify(stableStallRepository).save(qStall);
 
-        // Phác đồ bắt buộc còn MISSING sau khám nhập trại được hẹn tiêm ngày hôm sau.
+        // PhÃ¡c Ä‘á»“ báº¯t buá»™c cÃ²n MISSING sau khÃ¡m nháº­p tráº¡i Ä‘Æ°á»£c háº¹n tiÃªm ngÃ y hÃ´m sau.
         verify(preventiveStatusService).upsertMilestone(10L, "preventive:approval:1", 5L,
                 java.time.LocalDate.now().plusDays(1));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // APPROVE — automatic stall selection (no stallId in request)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // APPROVE â€” automatic stall selection (no stallId in request)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("APPROVE tự động: không truyền stallId, hệ thống tự chọn chuồng REGULAR đầu tiên")
+    @DisplayName("APPROVE tá»± Ä‘á»™ng: khÃ´ng truyá»n stallId, há»‡ thá»‘ng tá»± chá»n chuá»“ng REGULAR Ä‘áº§u tiÃªn")
     void approve_withAutoStall_success() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -182,12 +183,12 @@ class AdmissionManagerReviewServiceTest {
         assertEquals(StallStatus.AVAILABLE, qStall.getStatus());
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // REJECT — full state verification
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // REJECT â€” full state verification
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("REJECT: Admission=REJECTED, Horse=REJECTED, currentStallId=null, chuồng Q=AVAILABLE")
+    @DisplayName("REJECT: Admission=REJECTED, Horse=REJECTED, currentStallId=null, chuá»“ng Q=AVAILABLE")
     void reject_success_admissionAndHorseRejected() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -196,9 +197,7 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
-                .thenReturn(List.of());
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(10L), any()))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -219,7 +218,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT: chỉ lịch SCHEDULED bị CANCELLED")
+    @DisplayName("REJECT: chá»‰ lá»‹ch SCHEDULED bá»‹ CANCELLED")
     void reject_cancelsActiveSchedules_notCompleted() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -228,7 +227,7 @@ class AdmissionManagerReviewServiceTest {
         CareSchedule pending = new CareSchedule();
         pending.setId(1L);
         pending.setHorseId(10L);
-        pending.setStatus(CareScheduleStatus.REQUESTED);
+        pending.setStatus(CareScheduleStatus.SCHEDULED);
 
         CareSchedule overdue = new CareSchedule();
         overdue.setId(2L);
@@ -238,30 +237,23 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(10L), any()))
                 .thenReturn(List.of());
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
-                .thenReturn(List.of(overdue));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        assertEquals(CareScheduleStatus.REQUESTED, pending.getStatus());
-        assertEquals(CareScheduleStatus.CANCELLED, overdue.getStatus());
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<CareSchedule>> captor = ArgumentCaptor.forClass(List.class);
-        verify(careScheduleRepository).saveAll(captor.capture());
-        List<CareSchedule> saved = captor.getValue();
-        assertEquals(1, saved.size());
-        assertTrue(saved.stream().allMatch(s -> s.getStatus() == CareScheduleStatus.CANCELLED));
+        // Lịch chưa diễn ra (SCHEDULED) của ngựa rớt tuyển được chuyển sang CANCELLED.
+        verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
+                eq(10L), eq(List.of(CareScheduleStatus.SCHEDULED)), anyString(), any(LocalDateTime.class));
+        verify(careScheduleRepository, never()).saveAll(any());
 
         // COMPLETED schedules are never queried in this call — no interference
         verify(careScheduleRepository, never()).findByHorseIdOrderByScheduledAtAsc(any());
     }
 
     @Test
-    @DisplayName("REJECT: không có lịch nào cần huỷ — saveAll vẫn được gọi với danh sách rỗng")
+    @DisplayName("REJECT: khong co lich can xoa — cancelOpenSchedulesIfUnreferenced van duoc goi")
     void reject_noSchedulesToCancel_saveAllCalledWithEmptyList() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -270,19 +262,18 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
-                .thenReturn(List.of());
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(10L), any()))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        verify(careScheduleRepository).saveAll(List.of());
+        verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
+                eq(10L), eq(List.of(CareScheduleStatus.SCHEDULED)), anyString(), any(LocalDateTime.class));
     }
 
     @Test
-    @DisplayName("REJECT: không chuyển REQUESTED hoặc IN_PROGRESS sang CANCELLED")
+    @DisplayName("REJECT: chan tu choi khi ca kham dang REQUESTED, IN_PROGRESS, OVERDUE hoac PAUSED")
     void reject_doesNotCancelInvalidTransitions() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -291,7 +282,7 @@ class AdmissionManagerReviewServiceTest {
         CareSchedule requested = new CareSchedule();
         requested.setId(100L);
         requested.setHorseId(10L);
-        requested.setStatus(CareScheduleStatus.REQUESTED);
+        requested.setStatus(CareScheduleStatus.SCHEDULED);
 
         CareSchedule inProgress = new CareSchedule();
         inProgress.setId(101L);
@@ -301,26 +292,19 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(10L), any()))
                 .thenReturn(List.of(requested, inProgress));
 
         assertThrows(IllegalStateException.class,
                 () -> service.review(1L, 5L, rejectRequest("Rejected")));
 
-        assertEquals(CareScheduleStatus.REQUESTED, requested.getStatus());
-        assertNull(requested.getCancelReason());
-        assertEquals(CareScheduleStatus.IN_PROGRESS, inProgress.getStatus());
-        assertNull(inProgress.getCancelReason());
-
-        verify(careScheduleRepository, never()).saveAll(any());
+        verify(careScheduleRepository, never()).cancelOpenSchedulesIfUnreferenced(any(), any(), any(), any());
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // REJECT — validation failures
-    // ═══════════════════════════════════════════════════════════════════════════
+    // REJECT â€” validation failures
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("REJECT thiếu feedback: ném IllegalArgumentException, không lưu gì")
+    @DisplayName("REJECT thiáº¿u feedback: nÃ©m IllegalArgumentException, khÃ´ng lÆ°u gÃ¬")
     void reject_missingFeedback_throwsAndNoSave() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -339,7 +323,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT feedback rỗng (blank): ném IllegalArgumentException")
+    @DisplayName("REJECT feedback rá»—ng (blank): nÃ©m IllegalArgumentException")
     void reject_blankFeedback_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -351,12 +335,12 @@ class AdmissionManagerReviewServiceTest {
                 () -> service.review(1L, 5L, rejectRequest("   ")));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // Admission state validation
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("Admission không ở trạng thái MANAGER_REVIEW: ném IllegalStateException")
+    @DisplayName("Admission khÃ´ng á»Ÿ tráº¡ng thÃ¡i MANAGER_REVIEW: nÃ©m IllegalStateException")
     void review_admissionNotManagerReview_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.VET_REVIEW);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
@@ -369,7 +353,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("APPROVE sau khi Admission đã APPROVED: ném IllegalStateException (không cho review lần 2)")
+    @DisplayName("APPROVE sau khi Admission Ä‘Ã£ APPROVED: nÃ©m IllegalStateException (khÃ´ng cho review láº§n 2)")
     void review_alreadyApproved_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.APPROVED);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
@@ -379,7 +363,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT sau khi Admission đã REJECTED: ném IllegalStateException (không cho review lần 2)")
+    @DisplayName("REJECT sau khi Admission Ä‘Ã£ REJECTED: nÃ©m IllegalStateException (khÃ´ng cho review láº§n 2)")
     void review_alreadyRejected_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.REJECTED);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
@@ -388,12 +372,12 @@ class AdmissionManagerReviewServiceTest {
                 () -> service.review(1L, 5L, rejectRequest("Again")));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // Horse validation
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("horseId là null trong Admission: ném IllegalStateException")
+    @DisplayName("horseId lÃ  null trong Admission: nÃ©m IllegalStateException")
     void review_horseIdNull_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         admission.setHorseId(null);
@@ -407,7 +391,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("Horse không tồn tại: ném IllegalStateException")
+    @DisplayName("Horse khÃ´ng tá»“n táº¡i: nÃ©m IllegalStateException")
     void review_horseNotFound_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
@@ -420,7 +404,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("Horse không ở trạng thái CANDIDATE: ném IllegalStateException")
+    @DisplayName("Horse khÃ´ng á»Ÿ tráº¡ng thÃ¡i CANDIDATE: nÃ©m IllegalStateException")
     void review_horseNotCandidate_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.ELIGIBLE); // Already past CANDIDATE
@@ -434,12 +418,12 @@ class AdmissionManagerReviewServiceTest {
         verify(admissionApplicationRepository, never()).save(any());
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // Stall validation
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("Chuồng REGULAR được chọn thủ công không còn AVAILABLE hoặc chưa có Groom: 409, không lưu gì")
+    @DisplayName("Chuá»“ng REGULAR Ä‘Æ°á»£c chá»n thá»§ cÃ´ng khÃ´ng cÃ²n AVAILABLE hoáº·c chÆ°a cÃ³ Groom: 409, khÃ´ng lÆ°u gÃ¬")
     void approve_selectedStallUnavailable_throwsAndNoSave() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -457,7 +441,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("Không có chuồng REGULAR có Groom nào AVAILABLE cho tự động chọn: 409")
+    @DisplayName("KhÃ´ng cÃ³ chuá»“ng REGULAR cÃ³ Groom nÃ o AVAILABLE cho tá»± Ä‘á»™ng chá»n: 409")
     void approve_noAvailableRegularStall_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -474,12 +458,12 @@ class AdmissionManagerReviewServiceTest {
         verify(horseRepository, never()).save(any());
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // Decision validation
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("decision là null: ném IllegalArgumentException trước khi chạm tới chuồng")
+    @DisplayName("decision lÃ  null: nÃ©m IllegalArgumentException trÆ°á»›c khi cháº¡m tá»›i chuá»“ng")
     void review_nullDecision_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -496,12 +480,12 @@ class AdmissionManagerReviewServiceTest {
         verify(admissionApplicationRepository, never()).save(any());
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // Q stall absent (null quarantineStallId)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
-    @DisplayName("APPROVE khi Admission không có Q stall: không cố gắng giải phóng Q stall")
+    @DisplayName("APPROVE khi Admission khÃ´ng cÃ³ Q stall: khÃ´ng cá»‘ gáº¯ng giáº£i phÃ³ng Q stall")
     void approve_noQuarantineStall_skipsQStallRelease() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         admission.setQuarantineStallId(null); // No Q stall assigned
@@ -522,7 +506,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("APPROVE giữ nguyên quyết định chặn tập (BLOCKED) của Thú y")
+    @DisplayName("APPROVE giá»¯ nguyÃªn quyáº¿t Ä‘á»‹nh cháº·n táº­p (BLOCKED) cá»§a ThÃº y")
     void approve_withVetBlockedDecision_preservesBlock() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -544,16 +528,16 @@ class AdmissionManagerReviewServiceTest {
         assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());
         assertEquals(20L, horse.getCurrentStallId());
 
-        // Quyết định chặn tập của Thú y phải giữ nguyên sau khi duyệt.
+        // Quyáº¿t Ä‘á»‹nh cháº·n táº­p cá»§a ThÃº y pháº£i giá»¯ nguyÃªn sau khi duyá»‡t.
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Left forelimb tendon strain - rest prescribed by vet", horse.getTrainingDecisionReason());
         assertFalse(horse.canTrain());
         verify(horseRepository).save(horse);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // WAITING_FOR_STALL processing
-    // ═══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @DisplayName("Approve: releases Q stall, stamps the regular groom, notifies them and lets the stall queue move")
@@ -579,7 +563,6 @@ class AdmissionManagerReviewServiceTest {
         verify(groomProfileRepository).touchLastHorseAssignedAt(org.mockito.ArgumentMatchers.eq(33L), any());
         verify(admissionGroomReviewService).notifyGroomAssigned(org.mockito.ArgumentMatchers.same(admission),
                 org.mockito.ArgumentMatchers.same(regularStall), org.mockito.ArgumentMatchers.anyString());
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
     }
 
     @Test
@@ -598,6 +581,5 @@ class AdmissionManagerReviewServiceTest {
 
         assertEquals(StallStatus.AVAILABLE, quarantineStall.getStatus());
         assertEquals("Not a good fit", admission.getManagerFeedback());
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
     }
 }

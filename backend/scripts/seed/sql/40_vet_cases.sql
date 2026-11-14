@@ -99,22 +99,33 @@ BEGIN
     --    (Lame after this morning's gallop; vet1 is examining now. A second report joins the same urgent case.)
     s := pg_temp.urgent_case('H002', 'GR01', pg_temp.clock() - INTERVAL '95 minutes', 'Lame on the right fore after gallop',
                              'Short and uneven on the right fore when walked back from the track, warm over the fetlock.',
-                             'HIGH', 'VT01', 'IN_PROGRESS', p_image => 'admission-packs/h002-eagle-atena/horse-photo.jpg');
+                             'TRAUMA', 'VT01', 'IN_PROGRESS', p_image => 'admission-packs/h002-eagle-atena/horse-photo.jpg');
     PERFORM pg_temp.report_incident(pg_temp.hid('H002'), pg_temp.uid('GR01'), pg_temp.clock() - INTERVAL '60 minutes',
                                     'Swelling over the right fore fetlock',
-                                    'The swelling is larger now and she is reluctant to put full weight on the leg.', 'HIGH', NULL,
+                                    'The swelling is larger now and she is reluctant to put full weight on the leg.', 'TRAUMA', NULL,
                                     'admission-packs/h002-eagle-atena/horse-photo.jpg');
+
+    -- 1b. WILD IVANA (A08, groom4): đau bụng (colic) cấp, vừa báo cáo 25 phút trước, đã gán VT01 (SCHEDULED - Pending Intake).
+    --     (Acute colic symptoms reported 25 minutes ago, assigned to VT01 waiting for vet intake.)
+    s := pg_temp.report_incident(pg_temp.hid('H008'), pg_temp.uid('GR04'), pg_temp.clock() - INTERVAL '25 minutes',
+                                 'Acute colic signs - sweating and rolling',
+                                 'Sweating profusely, pawing ground and attempting to roll in the stall. Urgent veterinary exam requested.',
+                                 'TRAUMA', NULL, 'admission-packs/h008-wild-ivana/horse-photo.jpg', p_auto_assign => FALSE);
+    UPDATE care_schedule SET status = 'SCHEDULED', veterinarian_id = pg_temp.uid('VT01'), scheduled_at = pg_temp.clock() - INTERVAL '25 minutes', updated_at = pg_temp.clock() - INTERVAL '25 minutes'
+     WHERE id = (SELECT care_schedule_id FROM horse_incident_reports WHERE id = s);
+    UPDATE horse_incident_reports SET status = 'IN_REVIEW', handled_by_id = pg_temp.uid('VT01'), handled_at = pg_temp.clock() - INTERVAL '25 minutes'
+     WHERE id = s;
 
     -- 2. DOUGLAS (A05, groom2): sưng ống chân sau phải, vừa báo, đã giao Thú y (SCHEDULED, chưa bắt đầu khám).
     --    (Swollen right hind cannon, just reported and assigned, not started yet.)
     s := pg_temp.urgent_case('H005', 'GR02', pg_temp.clock() - INTERVAL '25 minutes', 'Swollen right hind cannon',
                              'Firm swelling on the inside of the right hind cannon noticed during grooming, no lameness at walk.',
-                             'MEDIUM', 'VT02', 'SCHEDULED', p_image => 'admission-packs/h005-douglas/horse-photo.jpg');
+                             'TRAUMA', 'VT02', 'SCHEDULED', p_image => 'admission-packs/h005-douglas/horse-photo.jpg');
 
     -- 3. FC NAJAA (B01): vết rách nông chân trước trái, khám xong cho tập ngay (ALLOWED); chấn thương đã lành.
     --    (Superficial cut on the left fore, cleared to train at once; the injury has healed.)
     s := pg_temp.urgent_case('H010', 'GR05', pg_temp.at(-20, TIME '08:20'), 'Cut on the left fore',
-                             'Kicked the stall door, 4 cm cut above the left fore coronet, bleeding stopped.', 'LOW', 'VT01',
+                             'Kicked the stall door, 4 cm cut above the left fore coronet, bleeding stopped.', 'TRAUMA', 'VT01',
                              'COMPLETED', 40, 'ALLOWED', 'Small bleeding cut, sound at walk and trot',
                              'Superficial 4 cm laceration above the coronet band, no joint or tendon involvement.',
                              'Superficial laceration, left fore', 'Wound cleaned and dressed, topical antiseptic for 5 days.',
@@ -137,7 +148,7 @@ BEGIN
     --    (Tendon strain: rest, still resting at the first recheck, cleared at the second. The injury was corrected
     --    by the vet (old row SUPERSEDED, with an audit row). An automatic recheck is still upcoming.)
     s := pg_temp.urgent_case('H014', 'GR06', pg_temp.at(-35, TIME '07:50'), 'Heat in the right fore tendon',
-                             'Heat and a soft swelling along the back of the right fore cannon after the canter.', 'HIGH',
+                             'Heat and a soft swelling along the back of the right fore cannon after the canter.', 'TRAUMA',
                              'VT02', 'COMPLETED', 45, 'BLOCKED', 'Heat and swelling along the flexor tendon, lame at trot',
                              'Ultrasound: mild core lesion in the superficial digital flexor tendon, right fore.',
                              'Superficial digital flexor tendon strain, right fore', 'Cold hosing twice daily, support bandage, box rest.',
@@ -176,7 +187,7 @@ BEGIN
     -- 5. GOLD (C02, Trainer trainer2): đau bụng (colic) nhẹ -> nghỉ 1 tuần -> cho tập lại; lịch tái khám tự động sắp tới.
     --    (Mild colic: one week of rest, then cleared; the automatic recheck is upcoming.)
     s := pg_temp.urgent_case('H020', 'GR09', pg_temp.at(-12, TIME '16:40'), 'Rolling and pawing in the stall',
-                             'Pawing, looking at her flank and trying to roll after the evening feed.', 'CRITICAL', 'VT02',
+                             'Pawing, looking at her flank and trying to roll after the evening feed.', 'TRAUMA', 'VT02',
                              'COMPLETED', 50, 'BLOCKED', 'Pawing, flank watching, reduced gut sounds',
                              'Heart rate 52 bpm, reduced gut sounds on the right, no reflux, rectal exam normal.',
                              'Mild spasmodic colic', 'Butylscopolamine IV and flunixin, feed withheld 12 hours.',
@@ -194,7 +205,7 @@ BEGIN
     -- 6. BV KAROL (D04): ho, chảy mũi -> đang nghỉ, tái khám trong vài ngày tới, phác đồ kháng sinh đang dùng.
     --    (Cough and nasal discharge: resting now, recheck in a few days, antibiotics running.)
     s := pg_temp.urgent_case('H031', 'GR14', pg_temp.at(-3, TIME '08:10'), 'Coughing and nasal discharge',
-                             'Coughing during the warm-up and thick nasal discharge from both nostrils.', 'MEDIUM', 'VT03',
+                             'Coughing during the warm-up and thick nasal discharge from both nostrils.', 'TRAUMA', 'VT03',
                              'COMPLETED', 40, 'BLOCKED', 'Cough, bilateral mucopurulent nasal discharge, temperature 38.9 °C',
                              'Enlarged submandibular lymph nodes, harsh lung sounds cranially.',
                              'Upper respiratory tract infection', 'Antibiotics for 7 days, stable in a well-ventilated box.',
@@ -203,7 +214,7 @@ BEGIN
                              p_note => 'She is bright and eating well, an early antibiotic response is expected. Recheck before returning to work.',
                              p_image => 'admission-packs/h031-bv-karol/horse-photo.jpg');
     r := pg_temp.record_of(s);
-    PERFORM pg_temp.treatment(r, 'Respiratory infection treatment', '[{"medication_name":"Doxycycline","dosage":"10 mg/kg","frequency":"Twice daily","route":"ORAL","duration":7,"notes":"Give with morning and evening feed. Ensure full feed consumption."},{"medication_name":"Vitamin B Complex","dosage":"10 mL","frequency":"Once daily","route":"FEED_ADDITIVE","duration":5,"notes":"Mix into the morning feed."}]',
+    PERFORM pg_temp.treatment(r, 'Respiratory infection treatment', 'Antibiotic course with feed supplement. Follow the dosage and notes for each medication.',
                               pg_temp.today() - 3, pg_temp.today() + 4, 'ACTIVE',
                               ARRAY[['Doxycycline', '10 mg/kg', 'Twice daily', 'Oral', 'After feed.'],
                                     ['Vitamin B Complex', '10 mL', 'Once daily', 'FEED_ADDITIVE', 'Mix into the morning feed.']]);
@@ -212,7 +223,7 @@ BEGIN
     -- 7. SANTIAGO EGA (E02, Trainer trainer3): áp xe móng -> nghỉ; lịch tái khám đã quá giờ mà chưa khám (quá hạn).
     --    (Hoof abscess: resting; the recheck time has passed without the visit, so it shows as overdue.)
     s := pg_temp.urgent_case('H038', 'GR17', pg_temp.at(-10, TIME '07:30'), 'Sudden lameness, right fore',
-                             'Will not put weight on the right fore this morning, foot is warm.', 'HIGH', 'VT03',
+                             'Will not put weight on the right fore this morning, foot is warm.', 'TRAUMA', 'VT03',
                              'COMPLETED', 45, 'BLOCKED', 'Severe lameness, strong digital pulse',
                              'Hoof testers positive at the toe, abscess opened and drained.', 'Subsolar hoof abscess, right fore',
                              'Poultice and hoof boot, tetanus status checked.', 'Hoof abscess: box rest, daily poultice.',
@@ -233,10 +244,10 @@ BEGIN
     -- 8. AG NOBEL EMIR (A07): xây xát nhẹ, Groom báo trùng hai lần; Manager bác báo cáo trùng (DISMISSED), ca khẩn cấp
     --    khám xong đóng báo cáo còn lại. (A scrape reported twice; the manager dismisses the duplicate.)
     s := pg_temp.urgent_case('H007', 'GR03', pg_temp.at(-15, TIME '10:20'), 'Scrape on the left hip',
-                             'Hair rubbed off and a small scrape on the left hip, probably from the stall wall.', 'LOW', 'VT01',
+                             'Hair rubbed off and a small scrape on the left hip, probably from the stall wall.', 'TRAUMA', 'VT01',
                              'SCHEDULED', p_image => 'admission-packs/h007-ag-nobel-emir/horse-photo.jpg');
     v_dup := pg_temp.report_incident(pg_temp.hid('H007'), pg_temp.uid('GR03'), pg_temp.at(-15, TIME '10:35'),
-                                     'Scrape on the left hip', 'Same scrape on the left hip, reporting again.', 'LOW', NULL);
+                                     'Scrape on the left hip', 'Same scrape on the left hip, reporting again.', 'TRAUMA', NULL);
     UPDATE horse_incident_reports SET status = 'DISMISSED', handled_by_id = pg_temp.uid('ADMIN'),
                                       handled_at = pg_temp.at(-15, TIME '10:50'),
                                       handler_note = 'Duplicate of the report sent at 10:20, the vet is already on this case.'
@@ -251,7 +262,7 @@ BEGIN
 
     -- 9. D ADOOB (C08): sự cố cũ hai tháng trước, mắt chảy nước, khám xong cho tập. (Two-month-old case: watery eye.)
     s := pg_temp.urgent_case('H026', 'GR11', pg_temp.at(-60, TIME '09:10'), 'Watery left eye',
-                             'Left eye half closed and watering after turnout.', 'MEDIUM', 'VT02', 'COMPLETED', 35, 'ALLOWED',
+                             'Left eye half closed and watering after turnout.', 'TRAUMA', 'VT02', 'COMPLETED', 35, 'ALLOWED',
                              'Squinting, tear staining', 'Fluorescein stain negative, mild conjunctivitis.', 'Conjunctivitis, left eye',
                              'Eye ointment for 5 days, fly mask at turnout.',
                              p_note => 'No corneal involvement, expect full recovery on the ointment.',
@@ -277,15 +288,13 @@ BEGIN
                               pg_temp.today() - 6, pg_temp.today() - 5, 'CANCELLED',
                               ARRAY[['Miconazole 2% cream', 'Thin layer', 'Twice daily', 'Topical', 'Stopped after one day.']]);
 
-    -- 11. NAUSICAA BY NIKA (A01, groom1): Thú y vet1 tự hẹn kiểm tra độ chắc chân trước mùa giải (lịch đứng riêng).
-    --     (vet1 books a pre-season soundness check on her own, a standalone follow-up.)
+    -- 11. NAUSICAA BY NIKA (A01, groom1): Thú y vet1 hẹn kiểm tra độ chắc chân trước mùa giải (lịch thường hôm nay).
+    --     (vet1 routine pre-season soundness check scheduled for today at 13:30.)
     SELECT id INTO c FROM care_schedule WHERE horse_id = pg_temp.hid('H001') AND status = 'COMPLETED'
      ORDER BY completed_at DESC LIMIT 1;
     s := pg_temp.new_schedule(pg_temp.hid('H001'), 'ROUTINE', 'FOLLOW_UP', 'Pre-season soundness and flexion check',
-                              pg_temp.at(3, TIME '14:00'), pg_temp.at(-1, TIME '16:00'), NULL, NULL, NULL, pg_temp.uid('VT01'),
-                              'soundness-check-' || pg_temp.hid('H001'),
-                              pg_temp.fingerprint(pg_temp.hid('H001'), NULL, pg_temp.at(3, TIME '14:00'),
-                                                  'Pre-season soundness and flexion check'));
-    PERFORM pg_temp.book(s, pg_temp.uid('VT01'));
+                              pg_temp.at(0, TIME '13:30'), pg_temp.at(-1, TIME '16:00'), NULL, NULL, NULL, pg_temp.uid('VT01'),
+                              'soundness-check-' || pg_temp.hid('H001'), NULL);
+    PERFORM pg_temp.assign(s, pg_temp.uid('VT01'), pg_temp.at(0, TIME '13:30'), pg_temp.at(-1, TIME '16:00'));
 
 END $$;

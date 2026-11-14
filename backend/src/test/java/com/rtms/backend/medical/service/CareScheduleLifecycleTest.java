@@ -7,7 +7,9 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import java.time.LocalDate;
 
 
 import com.rtms.backend.config.ApiException;
@@ -90,31 +92,26 @@ class CareScheduleLifecycleTest {
     }
 
     @Test
-    @DisplayName("cancelCareSchedule permits CLUB_MANAGER and rejects VETERINARIAN")
-    void testCancelCareSchedule_authorization() {
+    @DisplayName("startCareSchedule rejects future ROUTINE schedule with 400 ROUTINE_EXAM_TOO_EARLY")
+    void testStart_futureRoutineSchedule_throwsBadRequest() {
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setScheduledDate(LocalDate.now().plusDays(2));
+        when(userRepository.findById(assignedVet.getId())).thenReturn(Optional.of(assignedVet));
+        when(careScheduleRepository.findById(schedule.getId())).thenReturn(Optional.of(schedule));
+        when(horseRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(new Horse()));
         when(careScheduleRepository.findByIdForUpdate(schedule.getId())).thenReturn(Optional.of(schedule));
 
-        Role vetRole = new Role();
-        vetRole.setName("VETERINARIAN");
-        assignedVet.setRole(vetRole);
-        when(userRepository.findById(assignedVet.getId())).thenReturn(Optional.of(assignedVet));
-
-        CancelCareScheduleRequest cancelReq = new CancelCareScheduleRequest();
-        cancelReq.setReason("Cancel request");
-
         ApiException ex = assertThrows(ApiException.class, () ->
-                careScheduleService.cancelCareSchedule(schedule.getId(), cancelReq, assignedVet.getId()));
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+                careScheduleService.startCareSchedule(schedule.getId(), assignedVet.getId()));
 
-        User manager = new User();
-        manager.setId(3L);
-        Role mgrRole = new Role();
-        mgrRole.setName("CLUB_MANAGER");
-        manager.setRole(mgrRole);
-        when(userRepository.findById(manager.getId())).thenReturn(Optional.of(manager));
-        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("ROUTINE_EXAM_TOO_EARLY", ex.getErrorCode());
+    }
 
-        var response = careScheduleService.cancelCareSchedule(schedule.getId(), cancelReq, manager.getId());
-        assertEquals(CareScheduleStatus.CANCELLED, response.status());
+    @Test
+    @DisplayName("AD-022: cancelCareSchedule abolished — lifecycle uses reschedule and OVERDUE instead")
+    void testCancelCareSchedule_abolished() {
+        // Under AD-022, cancelCareSchedule is removed; stuck exams are moved via reschedule().
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 }

@@ -2,7 +2,7 @@ package com.rtms.backend.notification.service;
 
 import com.rtms.backend.notification.dto.UrgentAssignmentAlert;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class UrgentAlertStreamServiceTest {
         LocalDateTime now = LocalDateTime.now();
         UrgentAssignmentAlert alert = new UrgentAssignmentAlert(
                 500L, 500L, 700L, 2L, 99L, "Rocket", "North barn", "A-01",
-                8L, "Groom A", now, IncidentSeverity.CRITICAL, "Acute lameness",
+                8L, "Groom A", now, IncidentType.TRAUMA, "Acute lameness",
                 "Cannot bear weight", null, TrainingDecision.BLOCKED,
                 CareScheduleStatus.SCHEDULED, now, now);
 

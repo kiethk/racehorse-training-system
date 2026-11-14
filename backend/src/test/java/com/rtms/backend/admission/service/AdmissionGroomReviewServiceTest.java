@@ -1,5 +1,8 @@
 package com.rtms.backend.admission.service;
 import com.rtms.backend.medical.service.CareScheduleService;
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.event.AdmissionEnteredGroomReviewEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 
@@ -88,6 +91,10 @@ class AdmissionGroomReviewServiceTest {
     @Mock
     private AdmissionDocumentRepository admissionDocumentRepository;
 
+    @Mock private GroomAssignmentService assignments;
+    @Mock private GroomWorkloadService workload;
+    @Mock private GroomAssignmentTriggers triggers;
+    @Mock private ApplicationEventPublisher events;
     private AdmissionGroomReviewService service;
 
     @BeforeEach
@@ -105,17 +112,16 @@ class AdmissionGroomReviewServiceTest {
                 groomProfileRepository,
                 admissionNotificationService,
                 fileStorageService,
-                admissionDocumentRepository);
+                admissionDocumentRepository, assignments, workload, triggers, events);
         lenient().when(fileStorageService.store(any(), anyString())).thenReturn("local:arrival.png");
         lenient().when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
     }
 
     @Test
     @DisplayName("Groom reject: Admission REJECTED và không tạo Horse")
-    void review_reject_success() {
+    void fullGroomCanRejectWithoutLookingForStall() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.REJECTED, "Missing documents"));
@@ -124,6 +130,9 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(7L, result.getGroomId());
         assertEquals(ReviewDecision.REJECTED, result.getGroomDecision());
         assertEquals("Missing documents", result.getGroomFeedback());
+        verify(assignments).closeAsDecided(1L);
+        verifyNoInteractions(workload);
+        verify(stableStallRepository, never()).findAvailableQuarantineStallOfGroomForUpdate(anyLong());
         assertNotNull(result.getGroomReviewedAt());
         assertNull(result.getHorseId());
         verify(stableStallRepository, never()).lockAdmissionCapacityStallsForUpdate();
@@ -132,60 +141,35 @@ class AdmissionGroomReviewServiceTest {
     }
 
     @Test
-    @DisplayName("Groom approve thiếu capacity: Admission WAITING_FOR_STALL và chưa tạo Horse")
-    void review_approveWithoutCapacity_waitingForStall() {
+    void fullGroomCannotApproveAndDecisionRemainsPending() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(0L);
-        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(10L);
-        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "OK"));
-
-        assertEquals(AdmissionStatus.WAITING_FOR_STALL, result.getStatus());
-        assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
-        assertNull(result.getHorseId());
-        verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
-        verify(admissionApplicationRepository, never()).findNextWaitingForStallForUpdate();
-        verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                careScheduleRepository, notificationService);
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.review(1L, 7L, request(ReviewDecision.APPROVED, null)));
+        assertEquals(409, error.getStatus().value());
+        assertEquals("GROOM_FULL", error.getErrorCode());
+        assertEquals(AdmissionStatus.GROOM_REVIEW, admission.getStatus());
+        assertNull(admission.getGroomDecision());
+        verifyNoInteractions(assignments, triggers, notificationService);
     }
 
     @Test
-    @DisplayName("Groom approve thiếu regular reserve vẫn duyệt nhưng chờ stall")
-    void review_approveWithoutRegularReserve_waitingForStall() {
+    void approvalWithoutFeedbackReservesOwnStallAndClosesAssignment() {
         AdmissionApplication admission = admission();
+        StableStall own = stall(99L);
+        own.setGroomId(7L);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(2L);
-        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(1L);
-        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        AdmissionApplication result = service.review(1L, 7L,
-                request(ReviewDecision.APPROVED, "Documents verified"));
-
-        assertEquals(AdmissionStatus.WAITING_FOR_STALL, result.getStatus());
+        when(stableStallRepository.findAvailableQuarantineStallOfGroomForUpdate(7L)).thenReturn(Optional.of(own));
+        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "  "));
+        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, result.getStatus());
+        assertEquals(99L, result.getQuarantineStallId());
+        assertEquals(StallStatus.RESERVED, own.getStatus());
         assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
-        verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                careScheduleRepository, notificationService);
-    }
-
-    @Test
-    @DisplayName("BR-02: approve without feedback is allowed and stores no feedback")
-    void review_approveWithoutFeedback_isAllowed() {
-        AdmissionApplication admission = admission();
-        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(0L);
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "  \t "));
-
-        assertEquals(AdmissionStatus.WAITING_FOR_STALL, result.getStatus());
         assertNull(result.getGroomFeedback());
+        assertNull(result.getHorseId());
+        assertNotNull(result.getArrivalDeadlineAt());
+        verify(assignments).closeAsDecided(1L);
+        verifyNoInteractions(triggers);
     }
 
     @Test
@@ -193,7 +177,6 @@ class AdmissionGroomReviewServiceTest {
     void review_rejectWithBlankFeedback_isRejected() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
                 () -> service.review(1L, 7L, request(ReviewDecision.REJECTED, "  \t ")));
@@ -208,7 +191,6 @@ class AdmissionGroomReviewServiceTest {
     void review_tooLongFeedback_isRejected() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
                 () -> service.review(1L, 7L, request(ReviewDecision.REJECTED, "x".repeat(2001))));
@@ -222,12 +204,12 @@ class AdmissionGroomReviewServiceTest {
     void review_byNonQuarantineGroom_isForbidden() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(8L)).thenReturn(false);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
                 () -> service.review(1L, 8L, request(ReviewDecision.APPROVED, null)));
 
         assertEquals(403, exception.getStatusCode().value());
+        assertEquals("This admission is assigned to another groom", exception.getReason());
         verify(admissionApplicationRepository, never()).save(any());
     }
 
@@ -236,7 +218,6 @@ class AdmissionGroomReviewServiceTest {
     void review_trimsFeedback() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L,
@@ -246,104 +227,51 @@ class AdmissionGroomReviewServiceTest {
     }
 
     @Test
-    void reviewApprovalJoinsQueueAndReservesFairStallWithoutCreatingHorse() {
+    void approvalMakingGroomFullSchedulesReassignmentAfterCommit() {
         AdmissionApplication admission = admission();
-        StableStall qStall = stall(99L);
-        qStall.setGroomId(12L);
+        StableStall own = stall(99L); own.setGroomId(7L);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(1L, 0L);
-        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(2L);
-        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
-        when(admissionApplicationRepository.findNextWaitingForStallForUpdate()).thenReturn(Optional.of(admission));
-        when(stableStallRepository.findFairAvailableStallForUpdate("QUARANTINE")).thenReturn(Optional.of(qStall));
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Ready"));
-
-        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, result.getStatus());
-        assertEquals(StallStatus.RESERVED, qStall.getStatus());
-        assertEquals(99L, result.getQuarantineStallId());
-        assertNotNull(result.getArrivalDeadlineAt());
-        assertNull(result.getHorseId());
-        verify(groomProfileRepository).touchLastHorseAssignedAt(eq(12L), any());
-        verify(notificationService).createNotification(eq(12L), anyString(), anyString(),
-                eq(NotificationTypes.ADMISSION_GROOM_ASSIGNED), eq(NotificationTypes.REFERENCE_ADMISSION), eq(1L),
-                eq("12:ADMISSION_1:ADMISSION_GROOM_ASSIGNED:stall:99"));
-        verify(admissionNotificationService).notifyOwnerWaitingForArrival(eq(admission), anyString(), eq(qStall));
-        verifyNoInteractions(horseRepository, horsePedigreeRepository, careScheduleRepository);
+        when(stableStallRepository.findAvailableQuarantineStallOfGroomForUpdate(7L)).thenReturn(Optional.of(own));
+        when(workload.isFull(7L)).thenReturn(true);
+        service.review(1L, 7L, request(ReviewDecision.APPROVED, "Ready"));
+        verify(triggers).reassignFullAfterCommit(7L);
+        verify(stableStallRepository, never()).findFairAvailableStallForUpdate(anyString());
     }
 
     @Test
-    @DisplayName("BR-01: allocation serves the queue oldest first and stops without error when capacity runs out")
-    void allocateWaitingAdmissionsServesQueueUntilCapacityRunsOut() {
-        AdmissionApplication oldest = admission();
-        oldest.setStatus(AdmissionStatus.WAITING_FOR_STALL);
-        AdmissionApplication next = admission();
-        next.setId(2L);
-        next.setStatus(AdmissionStatus.WAITING_FOR_STALL);
-        StableStall first = stall(98L);
-        first.setGroomId(12L);
-        StableStall second = stall(99L);
-        second.setGroomId(13L);
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(2L, 1L, 0L);
-        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(10L);
-        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L, 1L);
-        when(admissionApplicationRepository.findNextWaitingForStallForUpdate())
-                .thenReturn(Optional.of(oldest), Optional.of(next));
-        when(stableStallRepository.findFairAvailableStallForUpdate("QUARANTINE"))
-                .thenReturn(Optional.of(first), Optional.of(second));
-
-        int allocated = service.allocateWaitingAdmissions();
-
-        assertEquals(2, allocated);
-        assertEquals(98L, oldest.getQuarantineStallId());
-        assertEquals(99L, next.getQuarantineStallId());
-        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, oldest.getStatus());
-        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, next.getStatus());
-        var order = inOrder(admissionApplicationRepository, stableStallRepository);
-        order.verify(admissionApplicationRepository).flush();
-        order.verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
-    }
-
-    @Test
-    @DisplayName("BR-01: an empty queue or a missing groom stall ends allocation quietly")
-    void allocateWaitingAdmissionsWithoutWorkReturnsZero() {
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(3L);
-        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(10L);
-        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L);
-        when(admissionApplicationRepository.findNextWaitingForStallForUpdate()).thenReturn(Optional.empty());
-
-        assertEquals(0, service.allocateWaitingAdmissions());
-
-        AdmissionApplication waiting = admission();
-        waiting.setStatus(AdmissionStatus.WAITING_FOR_STALL);
-        when(admissionApplicationRepository.findNextWaitingForStallForUpdate()).thenReturn(Optional.of(waiting));
-        when(stableStallRepository.findFairAvailableStallForUpdate("QUARANTINE")).thenReturn(Optional.empty());
-
-        assertEquals(0, service.allocateWaitingAdmissions());
-        assertEquals(AdmissionStatus.WAITING_FOR_STALL, waiting.getStatus());
-        verifyNoInteractions(notificationService, groomProfileRepository);
-    }
-
-    @Test
-    @DisplayName("BR-01: expiring a reservation hands the freed stall to the queue")
-    void expiringReservationTriggersAllocation() {
+    void expiringReservationReleasesStallWithoutAllocatingAnotherAdmission() {
         AdmissionApplication overdue = awaitingArrival();
         overdue.setArrivalDeadlineAt(LocalDateTime.now().minusMinutes(1));
         when(admissionApplicationRepository.findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
                 eq(AdmissionStatus.WAITING_FOR_ARRIVAL), any())).thenReturn(List.of(overdue));
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(overdue));
-        StableStall reserved = stall(99L);
-        reserved.setStatus(StallStatus.RESERVED);
+        StableStall reserved = stall(99L); reserved.setStatus(StallStatus.RESERVED);
         when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(0L);
-
         service.expireOverdueArrivalReservations();
-
         assertEquals(AdmissionStatus.ARRIVAL_EXPIRED, overdue.getStatus());
         assertEquals(StallStatus.AVAILABLE, reserved.getStatus());
-        verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
+        verify(stableStallRepository, never()).findAvailableQuarantineStallOfGroomForUpdate(anyLong());
+    }
+
+    @Test
+    void reopenClearsDecisionAndPublishesFreshAssignment() {
+        AdmissionApplication admission = awaitingArrival();
+        admission.setStatus(AdmissionStatus.ARRIVAL_EXPIRED);
+        admission.setQuarantineStallId(null);
+        admission.setGroomDecision(ReviewDecision.APPROVED);
+        admission.setGroomFeedback("Old feedback");
+        admission.setGroomReviewedAt(LocalDateTime.now());
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        service.reopenExpiredArrival(1L);
+        assertEquals(AdmissionStatus.GROOM_REVIEW, admission.getStatus());
+        assertNull(admission.getGroomId());
+        assertNull(admission.getGroomDecision());
+        assertNull(admission.getGroomFeedback());
+        assertNull(admission.getGroomReviewedAt());
+        assertNull(admission.getQuarantineStallId());
+        assertNull(admission.getArrivalDeadlineAt());
+        verify(assignments).closeAsReopened(1L);
+        verify(events).publishEvent(new AdmissionEnteredGroomReviewEvent(1L));
     }
 
     @Test
@@ -405,6 +333,7 @@ class AdmissionGroomReviewServiceTest {
         verify(careScheduleService, never()).assignRequestedSchedules();
         verify(notificationService).sendAssignmentNotification(eq(15L), eq(1L), eq(20L),
                 eq(NotificationTypes.ADMISSION_VET_ASSIGNED), anyString(), anyString());
+        verify(groomProfileRepository).touchLastArrivalConfirmedAt(eq(7L), any());
     }
 
     @Test
@@ -667,6 +596,7 @@ class AdmissionGroomReviewServiceTest {
         admission.setId(1L);
         admission.setOwnerId(5L);
         admission.setStatus(AdmissionStatus.GROOM_REVIEW);
+        admission.setAssignedGroomId(7L);
         return admission;
     }
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, FormField, Input, Modal, Notice, Select } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { displayError } from '@/lib/display';
+import { generateSecurePassword } from '@/features/staff/lib/creation';
 import type { AccountCreationRequest, AccountCreationResponse } from '../types';
 import { AccountCreationResult } from './AccountCreationResult';
 
@@ -59,7 +60,14 @@ function AccountCreationSession({ onClose, onSubmit, loading, defaultRole }: Pro
       errs.email = 'Please enter a valid email address.';
     }
     if (!req.password) errs.password = 'Password is required.';
-    else if (req.password.length < 6) errs.password = 'Password must be at least 6 characters.';
+    else if (req.password.length < 8) errs.password = 'Password must be between 8 and 72 characters.';
+
+    if (req.phone?.trim()) {
+      const trimmed = req.phone.trim();
+      if (trimmed.length > 20 || !/^((0|\+84)[3|5|7|8|9][0-9]{8}|[+]?[0-9]{10,15})$/.test(trimmed)) {
+        errs.phone = 'Enter a valid phone number (10-15 digits).';
+      }
+    }
 
     if (isVet && (!req.licenseNumber || !req.licenseNumber.trim())) {
       errs.licenseNumber = 'License number is required for Veterinarians.';
@@ -135,6 +143,12 @@ function AccountCreationSession({ onClose, onSubmit, loading, defaultRole }: Pro
       if (message.toLowerCase().includes('email already')) {
         pendingFocus.current = 'account-email';
         setErrors({ email: message });
+      } else if (message.toLowerCase().includes('certification number')) {
+        pendingFocus.current = 'account-certificationNumber';
+        setErrors({ certificationNumber: message });
+      } else if (message.toLowerCase().includes('license number')) {
+        pendingFocus.current = 'account-licenseNumber';
+        setErrors({ licenseNumber: message });
       } else {
         setError(message);
       }
@@ -214,12 +228,36 @@ function AccountCreationSession({ onClose, onSubmit, loading, defaultRole }: Pro
             {input('fullName', 'Full Name', { required: true, max: 255, autoComplete: 'name' })}
             {input('email', 'Email Address', { type: 'email', required: true, max: 255, autoComplete: 'off' })}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {input('password', 'Initial Password', {
-                type: 'password',
-                required: true,
-                max: 72,
-                autoComplete: 'new-password',
-              })}
+              <FormField label="Initial Password" htmlFor="acc-password" required error={errors.password}>
+                <div className="flex gap-2">
+                  <Input
+                    id="acc-password"
+                    type="text"
+                    value={draft.password}
+                    disabled={loading}
+                    maxLength={72}
+                    autoComplete="new-password"
+                    placeholder="Min 8 characters"
+                    onChange={e => {
+                      setDraft(p => ({ ...p, password: e.target.value }));
+                      if (errors.password) setErrors(p => ({ ...p, password: '' }));
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const rand = generateSecurePassword();
+                      setDraft(p => ({ ...p, password: rand }));
+                      if (errors.password) setErrors(p => ({ ...p, password: '' }));
+                    }}
+                    title="Generate a random secure password"
+                  >
+                    Random
+                  </Button>
+                </div>
+              </FormField>
               {input('phone', 'Phone Number', { type: 'tel', max: 20, autoComplete: 'tel' })}
             </div>
             {input('address', 'Mailing Address', { max: 255, autoComplete: 'street-address' })}

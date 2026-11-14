@@ -16,6 +16,8 @@ export interface DistanceStat {
 export interface HorseSpecialty {
   /** Rated workouts a group needs before it can be judged (from the backend, never hard-coded in the UI). */
   minWorkoutsPerGroup: number;
+  /** Average rating (out of 10) a group needs for a badge, from the backend. */
+  minAverageRating: number;
   /** Bands the horse does well in. Empty when none qualifies; may hold several. */
   strongDistances: DistanceBand[];
   /** Null when no surface clearly stands out. */

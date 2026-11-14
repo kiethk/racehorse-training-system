@@ -138,7 +138,7 @@ public class InjuryRecordService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found with id: " + horseId));
 
         boolean hasUrgent = careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                horseId, CareType.URGENT, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                horseId, CareType.URGENT, CareScheduleStatus.OPEN);
 
         List<InjuryRecord> injuries = injuryRecordRepository.findByHorseIdOrderByDiagnosedAtDesc(horseId);
         int activeInjuries = (int) injuries.stream().filter(i -> "ACTIVE".equalsIgnoreCase(i.getStatus())).count();
@@ -150,7 +150,7 @@ public class InjuryRecordService {
         // The pending urgent case of this horse (if any): its schedule id and who
         // reported the incident behind it — this is what the Health list shows.
         CareSchedule pendingUrgent = careScheduleRepository
-                .findByHorseIdAndStatusIn(horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS))
+                .findByHorseIdAndStatusIn(horseId, CareScheduleStatus.OPEN)
                 .stream()
                 .filter(s -> s.getCareType() == CareType.URGENT)
                 .min(java.util.Comparator.comparing(CareSchedule::getId))

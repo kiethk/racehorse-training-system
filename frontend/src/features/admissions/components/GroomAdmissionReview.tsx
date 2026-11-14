@@ -11,6 +11,10 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '../services/api';
 import { formatDate, formatDateTime } from '@/lib/display';
+import { ApiError } from '@/services/api';
+import { Pill } from '@/components/ui/StatusBadge';
+import { ReviewDue } from '../shared/components/ReviewDue';
+import { GROOM_FULL_MESSAGE } from '../shared/lib/reviewDue';
 import { toast } from '@/lib/toast';
 import { ReviewDecisionDialog } from '../shared/components/ReviewDecisionDialog';
 import type { ReviewDecisionValue } from '../shared/lib/reviewDecision';
@@ -110,19 +114,16 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       setDetail(updated);
       setDecision(null);
       onUpdated?.();
-      if (choice === 'REJECTED') {
-        toast.success('Admission rejected', 'The owner can see your reason on the application.');
-      } else if (updated.status === 'WAITING_FOR_STALL') {
-        toast.info('Admission approved and queued',
-          'No quarantine stall is free yet. A stall is assigned automatically in submission order.');
-      } else {
-        toast.success('Admission approved',
-          `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved until ${updated.arrivalDeadlineAt ? formatDateTime(updated.arrivalDeadlineAt) : 'the arrival deadline'}.`);
-      }
+      toast.success(choice === 'REJECTED' ? 'Admission rejected' : 'Admission approved');
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'Unable to submit the Groom decision.';
+      const full = cause instanceof ApiError && cause.status === 409 && cause.errorCode === 'GROOM_FULL';
+      const message = full ? GROOM_FULL_MESSAGE : cause instanceof Error ? cause.message : 'Unable to submit the Groom decision.';
+      if (full) {
+        setDetail(current => current ? { ...current, assignedGroomFull: true } : current);
+        setDecision(null);
+      }
       setDecisionError(message);
-      toast.error('Decision not saved', message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -140,7 +141,8 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       setArrivalPhotos([]);
       onUpdated?.();
       if (updated.status === 'ARRIVAL_EXPIRED') {
-        toast.warning('Arrival window expired');
+        toast.warning('Arrival window expired',
+          'The reservation was released. Ask an authorized manager to reopen the admission.');
       } else {
         toast.success('Arrival confirmed');
       }
@@ -239,12 +241,11 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
 
             {canReview && (
               <AdmissionSideCard title="Groom decision" tone="primary" className="space-y-3">
-                <p className="text-[var(--color-text-secondary)]">
-                  Approving places the admission in the stall queue. A quarantine stall is assigned automatically,
-                  oldest application first, as soon as capacity allows.
-                </p>
+                <InfoRow label="Review due" value={<ReviewDue dueAt={detail.groomReviewDueAt} />} />
+                {detail.assignedGroomFull && <Pill tone="warning" size="sm">Full</Pill>}
+                {detail.assignedGroomFull && <Notice tone="warning">{GROOM_FULL_MESSAGE}</Notice>}
                 <div className="space-y-2">
-                  <Button type="button" variant="primary" className="w-full" disabled={submitting} onClick={() => setDecision('APPROVED')}>Approve</Button>
+                  <Button type="button" variant="primary" className="w-full" disabled={submitting || detail.assignedGroomFull} onClick={() => setDecision('APPROVED')}>Approve</Button>
                   <Button type="button" variant="destructive" className="w-full" disabled={submitting} onClick={() => setDecision('REJECTED')}>Reject</Button>
                 </div>
               </AdmissionSideCard>
@@ -305,9 +306,6 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       <ReviewDecisionDialog
         decision={decision}
         title={decision === 'REJECTED' ? 'Reject admission?' : 'Approve admission?'}
-        description={decision === 'REJECTED'
-          ? 'The application closes and the owner sees your reason.'
-          : 'A quarantine stall is assigned automatically. If none is free, the admission joins the stall queue in submission order.'}
         loading={submitting}
         error={decisionError}
         onConfirm={(choice, feedback) => void review(choice, feedback)}

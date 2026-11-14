@@ -50,8 +50,7 @@ public class AuditLogService {
             "STABLE", List.of("StableStall", "Area", "GroomDailyTask", "Stable"),
             "HORSES", List.of("Horse", "Horses"),
             "STAFF", List.of("User", "Staff", "Account"),
-            "TRAINING", List.of("Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule", "Training"),
-            "RACING", List.of("RaceRegistration", "Racing")
+            "TRAINING", List.of("Course", "CourseRun", "Exercise", "GroupPlan", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule", "Training")
     );
 
     private final AuditLogRepository auditLogRepository;
@@ -128,6 +127,11 @@ public class AuditLogService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordHttpRequest(Long userId, String httpMethod, String requestPath, int statusCode) {
+        recordHttpRequest(userId, httpMethod, requestPath, statusCode, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordHttpRequest(Long userId, String httpMethod, String requestPath, int statusCode, String failureReason) {
         try {
             AuditLog log = new AuditLog();
 
@@ -142,10 +146,37 @@ public class AuditLogService {
 
             // Resolve business activity details
             var activity = activityResolver.resolve(httpMethod, requestPath, statusCode);
+            Long entityId = activity.entityId();
+            String entityName = activity.entityName();
+
+            try {
+                var attributes = RequestContextHolder.getRequestAttributes();
+                if (attributes instanceof ServletRequestAttributes servletAttrs) {
+                    HttpServletRequest req = servletAttrs.getRequest();
+                    if (entityId == null) {
+                        Object attrId = req.getAttribute("AUDIT_ENTITY_ID");
+                        if (attrId instanceof Long lid) entityId = lid;
+                        else if (attrId instanceof Number nid) entityId = nid.longValue();
+                    }
+                    if (req.getAttribute("AUDIT_ENTITY_NAME") instanceof String ename && !ename.isBlank()) {
+                        entityName = ename;
+                    }
+                }
+            } catch (Exception ignored) {}
+
             log.setAction(activity.action());
-            log.setEntityName(activity.entityName());
-            log.setEntityId(activity.entityId());
-            log.setDetails(activity.details());
+            log.setEntityName(entityName);
+            log.setEntityId(entityId);
+
+            if (statusCode >= 400 && failureReason != null && !failureReason.isBlank()) {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("summary", activity.details());
+                payload.put("reason", failureReason);
+                payload.put("module", AuditLogResponse.resolveModule(activity.entityName(), activity.details(), requestPath, activity.action()));
+                log.setDetails(objectMapper.writeValueAsString(payload));
+            } else {
+                log.setDetails(activity.details());
+            }
 
             auditLogRepository.save(log);
         } catch (Exception e) {
@@ -251,6 +282,9 @@ public class AuditLogService {
                             cb.like(cb.lower(root.get("requestPath")), "%/training%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/courses%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/subjects%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/exercises%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/course-runs%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/group-plans%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/lots%"),
                             cb.like(cb.lower(root.get("requestPath")), "%/workouts%")
                     );
@@ -394,18 +428,31 @@ public class AuditLogService {
 
     @Transactional
     public AuditPurgeResponse purgeAuditLogs(Long actorUserId, AuditPurgeRequest request) {
-        int purgedCount;
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         LocalDateTime beforeDate = request != null ? request.beforeDate() : null;
         LocalDateTime fromDate = request != null ? request.fromDate() : null;
 
+        if (beforeDate != null && beforeDate.isAfter(thirtyDaysAgo)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PURGE_RETENTION_VIOLATION",
+                    "Cannot purge audit logs within the last 30 days. Logs must be retained for at least 30 days.");
+        }
+        if (fromDate != null && fromDate.isAfter(thirtyDaysAgo)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PURGE_RETENTION_VIOLATION",
+                    "Cannot purge audit logs within the last 30 days. Logs must be retained for at least 30 days.");
+        }
+        if (fromDate != null && beforeDate != null && fromDate.isAfter(beforeDate)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
+                    "fromDate cannot be after beforeDate.");
+        }
+
+        int purgedCount;
         if (fromDate != null && beforeDate != null) {
             purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, beforeDate);
         } else if (fromDate != null) {
-            purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, LocalDateTime.now());
+            purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, thirtyDaysAgo);
         } else if (beforeDate != null) {
             purgedCount = auditLogRepository.deleteByCreatedAtBefore(beforeDate);
         } else {
-            LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
             purgedCount = auditLogRepository.deleteByCreatedAtBefore(thirtyDaysAgo);
         }
 

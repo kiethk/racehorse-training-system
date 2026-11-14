@@ -7,13 +7,13 @@ import {
 } from '../lib/dashboardUtils.ts';
 import type { CareScheduleResponse } from '../types.ts';
 
-test('filterActiveEmergencies includes only pending/in-progress URGENT schedules', () => {
+test('filterActiveEmergencies includes scheduled and in-progress URGENT schedules', () => {
   const mockSchedules = [
-    { id: 1, careType: 'URGENT', status: 'REQUESTED' },
+    { id: 1, careType: 'URGENT', status: 'SCHEDULED' },
     { id: 2, careType: 'URGENT', status: 'IN_PROGRESS' },
     { id: 3, careType: 'URGENT', status: 'COMPLETED' },
     { id: 4, careType: 'URGENT', status: 'CANCELLED' },
-    { id: 5, careType: 'ROUTINE', status: 'REQUESTED' },
+    { id: 5, careType: 'ROUTINE', status: 'SCHEDULED' },
   ] as CareScheduleResponse[];
 
   const active = filterActiveEmergencies(mockSchedules);

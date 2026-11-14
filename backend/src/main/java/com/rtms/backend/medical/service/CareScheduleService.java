@@ -1,4 +1,5 @@
 package com.rtms.backend.medical.service;
+import com.rtms.backend.config.ClientTimeContext;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
@@ -23,9 +24,9 @@ import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
 import com.rtms.backend.medical.dto.PrescriptionItemRequest;
 import com.rtms.backend.medical.dto.UrgentCaseReportResponse;
 import com.rtms.backend.medical.entity.CareSchedule;
-import com.rtms.backend.medical.entity.ClinicalMedication;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
+import com.rtms.backend.medical.entity.HorseBodyRegion;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
 import com.rtms.backend.medical.entity.Prescription;
 import com.rtms.backend.medical.entity.TreatmentPlan;
@@ -35,7 +36,6 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
 import com.rtms.backend.medical.event.PrescriptionCreatedEvent;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
@@ -63,11 +63,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import com.rtms.backend.event.ClinicalRecordCreatedEvent;
 import com.rtms.backend.event.InitialExamCompletedEvent;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
@@ -75,7 +74,13 @@ import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 @Service
 public class CareScheduleService {
 
+    public static final int ROUTINE_DAILY_QUOTA = 3;
+    public static final int PREVENTIVE_DAILY_QUOTA = 3;
+    public static final int ADMISSION_DAILY_QUOTA = 2;
+
     private static final int DEFAULT_DURATION_MINUTES = 30;
+    /** PAUSED vẫn là ca đang khám dở: Vet quay lại sau ca khẩn cấp. */
+    private static final List<CareScheduleStatus> OPEN_CASE_STATUSES = CareScheduleStatus.OPEN;
     private static final int ASSIGNMENT_BATCH_SIZE = 25;
     /**
      * Lịch thường chỉ được xếp vet khi còn trong cửa sổ này. Mốc ở xa (tiêm phòng +180 ngày)
@@ -89,7 +94,8 @@ public class CareScheduleService {
      * so a re-submit keeps the same fingerprint and resolves to the same row instead of an idempotency conflict.
      */
     static final int ROUTINE_CADENCE_DAYS = 14;
-    static final String ROUTINE_CADENCE_DESCRIPTION = "Routine follow-up recheck examination";
+    static final String ROUTINE_CADENCE_DESCRIPTION = "Routine follow-up examination";
+    static final String RETURN_FOLLOW_UP_DESCRIPTION = "Follow-up after the horse returned to the club";
 
     private final CareScheduleRepository careScheduleRepository;
     private final HorseRepository horseRepository;
@@ -107,7 +113,6 @@ public class CareScheduleService {
     private final TrainingDecisionService trainingDecisionService;
     private final PreventiveVaccinationService preventiveVaccinationService;
     private final InjuryRecordRepository injuryRecordRepository;
-    private final ClinicalMedicationRepository clinicalMedicationRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
 
@@ -128,7 +133,6 @@ public class CareScheduleService {
             TrainingDecisionService trainingDecisionService,
             PreventiveVaccinationService preventiveVaccinationService,
             InjuryRecordRepository injuryRecordRepository,
-            ClinicalMedicationRepository clinicalMedicationRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository) {
         this.careScheduleRepository = careScheduleRepository;
@@ -147,7 +151,6 @@ public class CareScheduleService {
         this.trainingDecisionService = trainingDecisionService;
         this.preventiveVaccinationService = preventiveVaccinationService;
         this.injuryRecordRepository = injuryRecordRepository;
-        this.clinicalMedicationRepository = clinicalMedicationRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.prescriptionRepository = prescriptionRepository;
     }
@@ -175,7 +178,7 @@ public class CareScheduleService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found"));
         boolean activeExists = careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
                 horseId, CareType.INITIAL,
-                List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                CareScheduleStatus.OPEN);
         if (activeExists) {
             CareSchedule existing = careScheduleRepository
                     .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)
@@ -187,7 +190,7 @@ public class CareScheduleService {
         schedule.setHorseId(horseId);
         schedule.setAdmissionId(admissionId);
         schedule.setCareType(CareType.INITIAL);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(DEFAULT_DURATION_MINUTES);
         schedule.setDescription("Initial admission physical examination in quarantine area");
         // Không khóa ngựa ở đây: ngựa CANDIDATE vốn không tập được (Horse.canTrain()),
@@ -205,24 +208,108 @@ public class CareScheduleService {
         CareSchedule schedule = new CareSchedule();
         schedule.setHorseId(horseId);
         schedule.setCareType(careType);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setRequestedAt(requestedAt);
         schedule.setDurationMinutes(DEFAULT_DURATION_MINUTES);
         schedule.setDescription(description != null ? description.trim() : null);
         schedule.setSourceIncidentId(sourceIncidentId);
 
-        if (careType == CareType.URGENT) {
-            // Chặn phòng ngừa ngay khi có ca khẩn cấp, kéo theo hủy buổi tập
-            // tương lai: không để ngựa đang có vấn đề vẫn được dắt ra sân sáng mai.
-            String reason = (description != null && !description.isBlank())
-                    ? "Urgent veterinary care pending: " + description.trim()
-                    : "Urgent veterinary care pending";
-            trainingDecisionService.block(horse, reason);
-        }
-
         CareSchedule saved = careScheduleRepository.save(schedule);
         assignRequestedSchedule(saved);
         return CareScheduleResponse.from(saved);
+    }
+
+    /**
+     * Ca sự cố đang mở của ngựa: ca URGENT, hoặc ca ROUTINE do báo cáo tạo ra. Mỗi ngựa chỉ có một ca như vậy.
+     * Lịch ROUTINE thường như tiêm chủng không tính.
+     */
+    @Transactional(readOnly = true)
+    public Optional<CareSchedule> findOpenIncidentCase(Long horseId) {
+        return careScheduleRepository.findByHorseIdAndStatusIn(horseId, OPEN_CASE_STATUSES).stream()
+                .filter(CareScheduleService::isIncidentCase)
+                .min(Comparator.comparing((CareSchedule cs) -> cs.getCareType() != CareType.URGENT));
+    }
+
+    /** Ca ROUTINE chưa khám nhường chỗ cho ca URGENT. Báo cáo của nó được chuyển sang ca mới, lịch cũ xóa cứng theo AD-022/AD-025. */
+    @Transactional
+    public void cancelSupersededCase(CareSchedule routineCase) {
+        Long caseId = routineCase.getId();
+        Long horseId = routineCase.getHorseId();
+        Long vetId = routineCase.getVeterinarianId();
+        String horseName = horseNameOf(routineCase);
+        careScheduleRepository.delete(routineCase);
+        notificationService.sendAssignmentNotification(
+                vetId,
+                NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                caseId,
+                horseId,
+                NotificationTypes.CARE_SCHEDULE_CANCELLED,
+                "Visit replaced by an urgent case",
+                "The visit for " + horseName + " (schedule #" + caseId
+                        + ") was cancelled because a later incident report made it urgent.");
+    }
+
+    /**
+     * AD-022 / Mục 8 & 9: Khi ngựa chuyển INACTIVE, đóng các báo cáo sự cố còn mở của các ca chưa khám
+     * sang DISMISSED kèm lý do, thông báo cho người gửi, và gỡ liên kết để ca chưa khám được xóa cứng.
+     */
+    @Transactional
+    public void closeOpenIncidentCasesForHorse(Long horseId, String reason) {
+        List<HorseIncidentReport> openReports = incidentReportRepository.findByHorseIdAndStatusIn(
+                horseId, List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW));
+        if (openReports.isEmpty()) return;
+
+        Set<Long> unexaminedCaseIds = careScheduleRepository.findByHorseIdAndStatusIn(
+                        horseId, List.of(CareScheduleStatus.SCHEDULED))
+                .stream()
+                .map(CareSchedule::getId)
+                .collect(Collectors.toSet());
+
+        LocalDateTime now = ClientTimeContext.now();
+        String effectiveReason = (reason != null && !reason.isBlank()) ? reason : "Horse left the club";
+        List<HorseIncidentReport> closed = new ArrayList<>();
+        for (HorseIncidentReport report : openReports) {
+            Long caseId = report.getCareScheduleId();
+            if (caseId != null && !unexaminedCaseIds.contains(caseId)) continue;
+            report.setStatus(IncidentStatus.DISMISSED);
+            report.setHandledAt(now);
+            report.setHandlerNote("Closed without an examination: " + effectiveReason);
+            report.setCareScheduleId(null);
+            closed.add(report);
+            notificationService.sendAssignmentNotification(
+                    report.getReportedById(),
+                    NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                    caseId,
+                    horseId,
+                    NotificationTypes.URGENT_CASE_CLOSED,
+                    "Incident report closed",
+                    "Your incident report \"" + report.getTitle() + "\" was closed without an examination. Reason: " + effectiveReason);
+        }
+        if (!closed.isEmpty()) {
+            incidentReportRepository.saveAll(closed);
+        }
+    }
+
+    private static boolean isIncidentCase(CareSchedule schedule) {
+        return schedule.getCareType() == CareType.URGENT || schedule.getSourceIncidentId() != null;
+    }
+
+    /** Vet đã nhận ca: mọi báo cáo của ca chuyển IN_REVIEW, kể cả báo cáo gắn vào trước khi có Vet. */
+    private HorseIncidentReport markCaseReportsInReview(CareSchedule schedule, Long vetId, LocalDateTime assignedAt) {
+        HorseIncidentReport source = incidentReportRepository.findByIdForUpdate(schedule.getSourceIncidentId())
+                .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "INCIDENT_NOT_FOUND", "Urgent incident not found"));
+        List<HorseIncidentReport> reports = new ArrayList<>(
+                incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(schedule.getId()));
+        if (reports.stream().noneMatch(report -> Objects.equals(report.getId(), source.getId()))) {
+            reports.add(source);
+        }
+        for (HorseIncidentReport report : reports) {
+            report.setStatus(IncidentStatus.IN_REVIEW);
+            report.setHandledById(vetId);
+            report.setHandledAt(assignedAt);
+        }
+        incidentReportRepository.saveAll(reports);
+        return source;
     }
 
     private CareSchedule lockClinicalSchedule(Long scheduleId) {
@@ -246,27 +333,93 @@ public class CareScheduleService {
     }
 
     private void ensureAvailable(CareSchedule schedule, Long vetId, LocalDateTime start) {
-        boolean vetHasConflict = careScheduleRepository.findByVeterinarianIdAndStatus(
-                        vetId, CareScheduleStatus.IN_PROGRESS).stream()
+        List<CareSchedule> activeExams = new ArrayList<>(
+                careScheduleRepository.findByVeterinarianIdAndStatus(vetId, CareScheduleStatus.IN_PROGRESS));
+        boolean vetHasConflict = activeExams.stream()
                 .anyMatch(other -> inProgressConflictsWithSlot(schedule, start, other));
         boolean horseBusy = careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS);
         if (horseBusy && schedule.getCareType() == CareType.URGENT) {
             // An emergency must reach a horse whose in-progress visit is stale (past
             // its booked duration); only a genuinely current examination blocks it.
-            horseBusy = careScheduleRepository
-                    .findByHorseIdAndStatusIn(schedule.getHorseId(), List.of(CareScheduleStatus.IN_PROGRESS)).stream()
+            horseBusy = activeExams.stream()
+                    .filter(cs -> Objects.equals(cs.getHorseId(), schedule.getHorseId()))
                     .anyMatch(other -> inProgressConflictsWithSlot(schedule, start, other));
         }
         if (vetHasConflict || horseBusy) {
             throw new ApiException(HttpStatus.CONFLICT, "SLOT_UNAVAILABLE", "Veterinarian or horse has an examination in progress");
         }
-        List<CareSchedule> booked = new ArrayList<>(careScheduleRepository.findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED));
+        // AD-022: an OVERDUE exam still holds its slot, so it counts as booked for conflicts.
+        List<CareSchedule> booked = new ArrayList<>(
+                careScheduleRepository.findByVeterinarianIdAndStatusIn(vetId, CareScheduleStatus.BOOKED_OR_ACTIVE));
         if (schedule.getCareType() != CareType.URGENT) {
-            booked.addAll(careScheduleRepository.findScheduledForHorse(schedule.getHorseId(), CareScheduleStatus.SCHEDULED));
+            booked.addAll(careScheduleRepository.findByHorseIdAndStatusIn(
+                    schedule.getHorseId(), CareScheduleStatus.BOOKED_OR_ACTIVE));
         }
         for (CareSchedule other : booked) {
-            if (Objects.equals(other.getId(), schedule.getId()) || !overlaps(schedule, start, other)) continue;
+            if (Objects.equals(other.getId(), schedule.getId()) || !blocksSlot(schedule, start, other)) continue;
             throw new ApiException(HttpStatus.CONFLICT, "SLOT_UNAVAILABLE", "Veterinarian or horse is already scheduled in this slot");
+        }
+    }
+
+    /** Ca khẩn cấp được ưu tiên hơn lịch hẹn thường: chỉ một ca khẩn cấp khác mới cản được nó. */
+    private boolean blocksSlot(CareSchedule schedule, LocalDateTime start, CareSchedule other) {
+        boolean outranked = schedule.getCareType() == CareType.URGENT && other.getCareType() != CareType.URGENT;
+        return !outranked && overlaps(schedule, start, other);
+    }
+
+    /** V2: San sẻ ca Routine trong ngày cho Vet đồng nghiệp nếu Vet chính bận ca cấp cứu. */
+    private void offloadRoutineForUrgent(Long vetId, LocalDate date, boolean wasBusy) {
+        if (vetId == null) return;
+        // Chỉ offload khi vet đang bận (preemption được dùng) — tránh offload không cần thiết khi vet rảnh.
+        if (!wasBusy) return;
+        List<CareSchedule> uncompletedRoutines = careScheduleRepository
+                .findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                        vetId, date, CareType.ROUTINE, CareScheduleStatus.BOOKED_OR_ACTIVE);
+        if (uncompletedRoutines.isEmpty()) return;
+
+        List<User> activeVets = userRepository.findActiveVeterinarians();
+        for (CareSchedule routine : uncompletedRoutines) {
+            boolean isPreventive = routine.getPurpose() == CareSchedulePurpose.PREVENTIVE;
+            int quota = isPreventive ? PREVENTIVE_DAILY_QUOTA : ROUTINE_DAILY_QUOTA;
+            User peer = activeVets.stream()
+                    .filter(v -> !Objects.equals(v.getId(), vetId))
+                    .filter(v -> {
+                        List<CareSchedule> peerRoutines = careScheduleRepository
+                                .findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                                        v.getId(), date, CareType.ROUTINE, CareScheduleStatus.BOOKED_OR_ACTIVE);
+                        long count = peerRoutines.stream()
+                                .filter(cs -> isPreventive
+                                        ? cs.getPurpose() == CareSchedulePurpose.PREVENTIVE
+                                        : cs.getPurpose() != CareSchedulePurpose.PREVENTIVE)
+                                .count();
+                        if (count >= quota) return false;
+                        return peerRoutines.stream()
+                                .noneMatch(cs -> Objects.equals(cs.getHorseId(), routine.getHorseId()));
+                    })
+                    .min(Comparator.comparingLong(v -> careScheduleRepository
+                            .findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                                    v.getId(), date, CareType.ROUTINE, CareScheduleStatus.BOOKED_OR_ACTIVE).size()))
+                    .orElse(null);
+
+            if (peer != null) {
+                routine.setVeterinarianId(peer.getId());
+                routine.setRescheduleReason(RescheduleReason.PEER_OFFLOAD);
+                routine.setRescheduleNote("Offloaded to Dr. " + peer.getFullName() + " due to emergency case handling");
+                careScheduleRepository.save(routine);
+
+                notificationService.sendAssignmentNotification(
+                        peer.getId(),
+                        NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                        routine.getId(),
+                        routine.getHorseId(),
+                        NotificationTypes.ROUTINE_ASSIGNED,
+                        "Routine visit offloaded to you",
+                        "Routine visit for horse #" + routine.getHorseId() + " was transferred to you to support urgent care.");
+            } else {
+                routine.setRescheduleReason(RescheduleReason.URGENT_PREEMPTION);
+                routine.setRescheduleNote("Priority shifted due to urgent case handling");
+                careScheduleRepository.save(routine);
+            }
         }
     }
 
@@ -283,24 +436,16 @@ public class CareScheduleService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "VET_NOT_FOUND", "Veterinarian not found"));
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
 
-        if (schedule.getStatus() != CareScheduleStatus.SCHEDULED && schedule.getStatus() != CareScheduleStatus.PAUSED) {
-            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Only SCHEDULED or PAUSED care schedules can be started");
+        if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS",
+                    "Only SCHEDULED care schedules can be started");
         }
 
         if (!Objects.equals(schedule.getVeterinarianId(), vetId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can start this schedule");
         }
-
-        if (schedule.getStatus() == CareScheduleStatus.PAUSED) {
-            LocalDateTime now = LocalDateTime.now();
-            if (schedule.getPausedFrom() != null && schedule.getScheduledAt() != null) {
-                java.time.Duration pausedDuration = java.time.Duration.between(schedule.getPausedFrom(), now);
-                if (!pausedDuration.isNegative()) {
-                    schedule.setScheduledAt(schedule.getScheduledAt().plus(pausedDuration));
-                }
-            }
-            schedule.setPausedFrom(null);
-        }
+        validateRoutineScheduleDate(schedule);
+        validateRoutineExamWindowForStart(schedule);
 
         schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         return CareScheduleResponse.from(careScheduleRepository.save(schedule));
@@ -323,15 +468,7 @@ public class CareScheduleService {
                         "Restriction details are required when training is BLOCKED");
             }
         }
-        if (request.getInjuryMarkers() != null) {
-            for (InjuryMarkerRequest m : request.getInjuryMarkers()) {
-                if (!InjuryRecord.isValidSeverity(m.getSeverity())) {
-                    throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
-                            "Injury severity must be one of " + InjuryRecord.SEVERITY_VALUES);
-                }
-            }
-        }
-        validatePrescriptionCatalog(request.getPrescriptions());
+        validatePrescriptions(request.getPrescriptions());
 
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
 
@@ -343,11 +480,22 @@ public class CareScheduleService {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can access this completed schedule");
         }
 
-        if (schedule.getStatus() != CareScheduleStatus.IN_PROGRESS) {
-            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Care schedule must be IN_PROGRESS to complete");
+        // AD-022/BRD: a late exam is completed from OVERDUE too — the vet never has to
+        // reopen it. ACTIVE_EXAM = {IN_PROGRESS, OVERDUE}. SCHEDULED is also accepted directly
+        // for routine and admission visits (no start-exam step needed).
+        if (!CareScheduleStatus.ACTIVE_EXAM.contains(schedule.getStatus())
+                && schedule.getStatus() != CareScheduleStatus.SCHEDULED) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS",
+                    "Care schedule must be SCHEDULED, IN_PROGRESS or OVERDUE to complete");
         }
         if (!Objects.equals(schedule.getVeterinarianId(), vetId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can complete this schedule");
+        }
+        validateRoutineScheduleDate(schedule);
+        // Window only applies when the exam hasn't been started yet (SCHEDULED).
+        // Once IN_PROGRESS or OVERDUE the vet may finish past 15:30.
+        if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
+            validateRoutineExamWindowForStart(schedule);
         }
 
         validateMandatoryVitalsAndMarkers(request, schedule);
@@ -355,9 +503,7 @@ public class CareScheduleService {
         boolean requiresFollowUp = schedule.getCareType() == CareType.URGENT
                 || request.getTrainingDecision() == TrainingDecision.BLOCKED;
         if (requiresFollowUp) {
-            boolean hasFollowUp = request.getNextSchedule() != null
-                    || (request.getNextSchedules() != null && !request.getNextSchedules().isEmpty());
-            if (!hasFollowUp) {
+            if (request.getNextSchedule() == null) {
                 String message = schedule.getCareType() == CareType.URGENT
                         ? "A follow-up examination (nextSchedule) is required for all urgent cases"
                         : "A follow-up examination (nextSchedule) is required when training is BLOCKED";
@@ -397,8 +543,7 @@ public class CareScheduleService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found"));
 
         TrainingDecision decision = request.getTrainingDecision();
-        List<CareScheduleStatus> activeStatuses = List.of(
-                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+        List<CareScheduleStatus> activeStatuses = CareScheduleStatus.OPEN;
         boolean anotherActiveUrgent = schedule.getCareType() == CareType.URGENT
                 ? careScheduleRepository.existsByHorseIdAndCareTypeAndStatusInAndIdNot(
                         horse.getId(), CareType.URGENT, activeStatuses, schedule.getId())
@@ -410,17 +555,49 @@ public class CareScheduleService {
         boolean preservedUrgentLock = anotherActiveUrgent
                 && horse.getTrainingDecision() == TrainingDecision.BLOCKED
                 && decision == TrainingDecision.ALLOWED;
-        if (!preservedUrgentLock) {
+        // Ca nhẹ từ báo cáo không mở được lệnh chặn có sẵn: lần khám đang chờ mới quyết định.
+        // Không còn lịch nào khác thì Vet vẫn mở được, để ngựa không bị khóa vĩnh viễn.
+        boolean preservedForOtherExam = schedule.getCareType() == CareType.ROUTINE
+                && schedule.getSourceIncidentId() != null
+                && horse.getTrainingDecision() == TrainingDecision.BLOCKED
+                && decision == TrainingDecision.ALLOWED
+                && careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(
+                        horse.getId(), CareSchedulePurpose.FOLLOW_UP, activeStatuses, schedule.getId());
+        TrainingDecision previousDecision = horse.getTrainingDecision();
+        if (!preservedUrgentLock && !preservedForOtherExam) {
             if (schedule.getCareType() == CareType.URGENT && decision == TrainingDecision.ALLOWED) {
                 // WF-02 (Q11): URGENT never releases the training block.
                 // Ngựa giữ nguyên BLOCKED từ lúc report incident tới khi ca tái khám (ROUTINE) quyết định.
                 if (request.getRestrictionDetails() != null && !request.getRestrictionDetails().isBlank()) {
                     trainingDecisionService.block(horse, request.getRestrictionDetails().trim());
                 } else if (horse.getTrainingDecision() != TrainingDecision.BLOCKED) {
-                    trainingDecisionService.block(horse, "Post-urgent monitoring: awaiting routine follow-up recheck");
+                    trainingDecisionService.block(horse, "Post-urgent monitoring: awaiting a follow-up examination");
                 }
             } else if (decision == TrainingDecision.ALLOWED) {
                 trainingDecisionService.allow(horse);
+                // Chỉ thông báo cho Trainer khi ngựa chuyển thật từ BLOCKED sang ALLOWED
+                // (tránh làm phiền khi khám định kỳ ALLOWED -> ALLOWED).
+                if (previousDecision == TrainingDecision.BLOCKED) {
+                    horseRepository.findTrainerIdByHorseId(horse.getId()).ifPresent(trainerId -> {
+                        String horseName = horse.getName() != null ? horse.getName() : ("#" + horse.getId());
+                        String title = "Training resumed: " + horseName;
+                        String message = "Horse " + horseName
+                                + " has been cleared by the veterinarian and is now allowed to train.";
+                        try {
+                            notificationService.sendAssignmentNotification(
+                                    trainerId,
+                                    NotificationTypes.REFERENCE_HORSE,
+                                    horse.getId(),
+                                    horse.getId(),
+                                    NotificationTypes.HORSE_TRAINING_ALLOWED,
+                                    title,
+                                    message
+                            );
+                        } catch (Exception ex) {
+                            // Bỏ qua lỗi gửi notification để bảo toàn giao dịch khám bệnh
+                        }
+                    });
+                }
             } else {
                 trainingDecisionService.block(horse, request.getRestrictionDetails().trim());
             }
@@ -430,7 +607,7 @@ public class CareScheduleService {
         TrainingDecision effectiveDecision = horse.getTrainingDecision();
         String effectiveReason = horse.getTrainingDecisionReason();
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = ClientTimeContext.now().minusNanos(1_000_000);
         HealthRecord record = new HealthRecord();
         record.setHorseId(horse.getId());
         record.setVeterinarianId(vetId);
@@ -438,10 +615,13 @@ public class CareScheduleService {
         record.setRecordType(schedule.getCareType().name());
         record.setExaminedAt(now);
         record.setFindings(request.getFindings().trim());
-        record.setDiagnosis(request.getDiagnosis().trim());
+        com.rtms.backend.medical.enums.ClinicalDiagnosis cd = com.rtms.backend.medical.enums.ClinicalDiagnosis.fromString(request.getDiagnosis());
+        record.setDiagnosis(cd != null ? cd.getDisplayName() : request.getDiagnosis().trim());
         record.setTreatment(request.getTreatment() != null ? request.getTreatment().trim() : null);
-        record.setTrainingDecision(request.getTrainingDecision());
-        record.setRestrictionDetails(request.getRestrictionDetails() != null ? request.getRestrictionDetails().trim() : null);
+        // Bệnh án ghi kết quả thực tế: ca bị giữ chặn thì ngựa vẫn BLOCKED dù Vet chọn ALLOWED.
+        record.setTrainingDecision(preservedForOtherExam ? TrainingDecision.BLOCKED : request.getTrainingDecision());
+        record.setRestrictionDetails(preservedForOtherExam ? horse.getTrainingDecisionReason()
+                : request.getRestrictionDetails() != null ? request.getRestrictionDetails().trim() : null);
 
         record.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
         HealthRecord savedRecord = healthRecordRepository.save(record);
@@ -459,15 +639,25 @@ public class CareScheduleService {
         persistPrescriptions(request.getPrescriptions(), horse, savedRecord, request);
 
         // Persist injury markers captured on the 3D model (T4).
+        // FE không gửi injuryType/severity: loại chấn thương lấy từ displayName của bodyRegion
+        // (Q5-1, duyệt 2026-11-12), severity mặc định MODERATE — Vet sửa sau qua injury correction.
         if (request.getInjuryMarkers() != null) {
             for (InjuryMarkerRequest m : request.getInjuryMarkers()) {
                 InjuryRecord ir = new InjuryRecord();
                 ir.setHorseId(horse.getId());
                 ir.setHealthRecordId(savedRecord.getId());
-                ir.setInjuryType(m.getInjuryType());
+                HorseBodyRegion region = m.getBodyRegionId() != null
+                        ? entityManager.find(HorseBodyRegion.class, m.getBodyRegionId())
+                        : null;
+                String resolvedType = (region != null && region.getDisplayName() != null
+                        && !region.getDisplayName().isBlank())
+                        ? region.getDisplayName().trim()
+                        : (m.getZoneId() != null && !m.getZoneId().isBlank() ? m.getZoneId() : "INJURY");
+                String note = m.getDescription() != null ? m.getDescription().trim() : "";
+                ir.setInjuryType(resolvedType);
                 ir.setBodyRegionId(m.getBodyRegionId());
-                ir.setSeverity(m.getSeverity());
-                ir.setDescription(m.getDescription());
+                ir.setSeverity("MODERATE");
+                ir.setDescription(note.isEmpty() ? null : note);
                 ir.setDiagnosedAt(m.getDiagnosedAt() != null ? m.getDiagnosedAt() : now);
                 ir.setStatus("ACTIVE");
                 ir.setPositionX(m.getPositionX());
@@ -480,7 +670,6 @@ public class CareScheduleService {
                 ir.setNormalX(m.getNormalX());
                 ir.setNormalY(m.getNormalY());
                 ir.setNormalZ(m.getNormalZ());
-                ir.setMeshName(m.getMeshName());
                 injuryRecordRepository.save(ir);
             }
         }
@@ -553,25 +742,22 @@ public class CareScheduleService {
         schedule.setCompletedAt(now);
         CareSchedule completedSchedule = careScheduleRepository.save(schedule);
 
-        if (schedule.getCareType() == CareType.URGENT) {
-            resumePausedExamIfAny(schedule.getVeterinarianId());
-        }
-
         // Sau khi ca này COMPLETED (không còn là mốc active) mới đặt mốc tiêm kế tiếp.
         // Ca tiêm phòng mà vet hoãn tiêm vẫn phải để lại một mốc mới cho ngựa.
         if (deferDays != null) {
             careScheduleRepository.flush();
-            preventiveVaccinationService.deferMilestone(horse.getId(), savedRecord.getId(), vetId, deferDays);
+            preventiveVaccinationService.deferMilestone(horse.getId(), savedRecord.getId(), vetId, deferDays)
+                    .ifPresent(this::assignRequestedSchedule);
         } else if (!vaccinations.isEmpty()) {
             careScheduleRepository.flush();
             preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
-                    schedule.getCareType());
+                    schedule.getCareType()).ifPresent(this::assignRequestedSchedule);
         } else if (schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE) {
             // Auto-create a preventive (vaccination) milestone after an ALLOWED exam even when
             // no vaccine was administered, so the next vaccination checkpoint is booked.
             careScheduleRepository.flush();
             preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
-                    schedule.getCareType());
+                    schedule.getCareType()).ifPresent(this::assignRequestedSchedule);
         }
 
         // Gán Trainer chạy SAU khi transaction này commit (TrainerAssignmentTriggers):
@@ -580,8 +766,8 @@ public class CareScheduleService {
             eventPublisher.publishEvent(new InitialExamCompletedEvent(schedule.getAdmissionId()));
         }
 
-        if (schedule.getCareType() == CareType.URGENT) {
-            List<HorseIncidentReport> openIncidents = new java.util.ArrayList<>(
+        if (isIncidentCase(schedule)) {
+            List<HorseIncidentReport> openIncidents = new ArrayList<>(
                     incidentReportRepository.findByHorseIdAndStatusIn(
                             horse.getId(),
                             List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW)
@@ -596,7 +782,7 @@ public class CareScheduleService {
                 });
             }
 
-            java.util.Set<Long> recipients = new java.util.HashSet<>();
+            Set<Long> recipients = new HashSet<>();
             for (HorseIncidentReport inc : openIncidents) {
                 inc.setStatus(IncidentStatus.RESOLVED);
                 inc.setHandledById(vetId);
@@ -610,14 +796,18 @@ public class CareScheduleService {
                 incidentReportRepository.saveAll(openIncidents);
             }
 
-            // Gửi thông báo cho Trainer phụ trách khu chuồng của ngựa
-            horseRepository.findTrainerIdByHorseId(horse.getId()).ifPresent(recipients::add);
+            // Gửi thông báo cho Trainer phụ trách khu chuồng của ngựa.
+            // Ca ROUTINE đã có thông báo riêng cho Trainer ở khối bên dưới.
+            if (schedule.getCareType() == CareType.URGENT) {
+                horseRepository.findTrainerIdByHorseId(horse.getId()).ifPresent(recipients::add);
+            }
 
             // Bắn thông báo URGENT_CASE_CLOSED về cho cả Groom và Trainer liên quan
             String horseName = horse.getName() != null ? horse.getName() : ("#" + horse.getId());
-            String title = "Ca khám khẩn cấp hoàn tất: " + horseName;
-            String message = "Bác sĩ Thú y đã hoàn tất ca khám khẩn cấp cho ngựa " + horseName
-                    + ". Quyết định tập luyện: " + effectiveDecision
+            String caseLabel = schedule.getCareType() == CareType.URGENT ? "Urgent case" : "Incident case";
+            String title = caseLabel + " closed: " + horseName;
+            String message = caseLabel + " closed for " + horseName
+                    + ". Training decision: " + effectiveDecision
                     + (effectiveDecision == TrainingDecision.BLOCKED
                             && effectiveReason != null && !effectiveReason.isBlank()
                             ? " (" + effectiveReason + ")" : "");
@@ -670,17 +860,6 @@ public class CareScheduleService {
         // rotate rechecks on consecutive days; each entry gets its own idempotency
         // key (source_schedule_id is one-to-one and cannot anchor them all).
         boolean createdFollowUp = false;
-        if (request.getNextSchedules() != null) {
-            int index = 0;
-            for (CreateNextScheduleRequest next : request.getNextSchedules()) {
-                String entryKey = next.getIdempotencyKey() != null && !next.getIdempotencyKey().isBlank()
-                        ? next.getIdempotencyKey().trim() : "entry-" + index;
-                createNextSchedule(next, vetId, completedSchedule,
-                        "completion:" + completedSchedule.getId() + ":" + entryKey, false);
-                index++;
-                createdFollowUp = true;
-            }
-        }
         if (request.getNextSchedule() != null) {
             createNextSchedule(request.getNextSchedule(), vetId, completedSchedule);
             createdFollowUp = true;
@@ -693,13 +872,50 @@ public class CareScheduleService {
     }
 
     /**
+     * Ca khám định kỳ (ROUTINE) chỉ được phép bắt đầu hoặc hoàn thành vào đúng ngày hẹn hoặc sau đó.
+     * Chặn các ca khám có ngày hẹn ở tương lai.
+     */
+    private void validateRoutineScheduleDate(CareSchedule schedule) {
+        if (schedule.getCareType() == CareType.ROUTINE) {
+            LocalDate today = ClientTimeContext.today();
+            LocalDate scheduledDate = schedule.getScheduledDate();
+            if (scheduledDate == null && schedule.getScheduledAt() != null) {
+                scheduledDate = schedule.getScheduledAt().toLocalDate();
+            }
+            if (scheduledDate == null && schedule.getRequestedAt() != null) {
+                scheduledDate = schedule.getRequestedAt().toLocalDate();
+            }
+            if (scheduledDate != null && scheduledDate.isAfter(today)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTINE_EXAM_TOO_EARLY",
+                        "Routine examination can only be conducted on or after the scheduled date (" + scheduledDate + ")");
+            }
+        }
+    }
+
+    /**
+     * Ca khám định kỳ (ROUTINE) chỉ được phép bấm bắt đầu (Examine) trong khung giờ 13:30 - 15:30.
+     * Sau 15:30, ca nào đã kịp IN_PROGRESS vẫn được phép hoàn tất (completeCareSchedule).
+     */
+    private void validateRoutineExamWindowForStart(CareSchedule schedule) {
+        if (schedule.getCareType() == CareType.ROUTINE && schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE) {
+            LocalTime now = ClientTimeContext.time();
+            if (now.isBefore(FarmSchedulePolicy.VET_WINDOW_START) || now.isAfter(FarmSchedulePolicy.VET_WINDOW_END)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTINE_EXAM_OUTSIDE_WINDOW",
+                        "Routine examinations can only be started between " + FarmSchedulePolicy.VET_WINDOW_START
+                                + " and " + FarmSchedulePolicy.VET_WINDOW_END);
+            }
+        }
+    }
+
+    /**
      * D3: khám nhập trại (INITIAL) và tái khám định kỳ (ROUTINE+FOLLOW_UP) bắt buộc ghi đủ
      * 6 chỉ số sinh hiệu trong phạm vi cho phép. D4: INITIAL kết luận BLOCKED phải có ít nhất
      * một marker chấn thương/bệnh lý. Không cho phép thay đổi trạng thái nếu thiếu.
      */
     private void validateMandatoryVitalsAndMarkers(CompleteCareScheduleRequest request, CareSchedule schedule) {
         boolean requiresFullVitals = schedule.getCareType() == CareType.INITIAL
-                || (schedule.getCareType() == CareType.ROUTINE && schedule.getPurpose() == CareSchedulePurpose.FOLLOW_UP);
+                || (schedule.getCareType() == CareType.ROUTINE && schedule.getPurpose() == CareSchedulePurpose.FOLLOW_UP
+                        && schedule.getSourceIncidentId() == null);
         if (requiresFullVitals) {
             if (request.getMetrics() == null || request.getMetrics().isEmpty()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
@@ -716,18 +932,19 @@ public class CareScheduleService {
                 if (m.getHydrationStatus() == null) missing.add("hydration status");
                 if (m.getBodyConditionScore() == null) missing.add("body condition score");
 
+                // Giới hạn đo được, không phải khoảng bình thường: ngựa đang bệnh vẫn phải ghi nhận được.
                 List<String> outOfRange = new ArrayList<>();
                 if (m.getHeartRate() != null) {
                     double hr = m.getHeartRate().doubleValue();
-                    if (hr < 28 || hr > 44) outOfRange.add("heart rate " + hr + " (28-44)");
+                    if (hr < 20 || hr > 240) outOfRange.add("heart rate " + hr + " (20-240)");
                 }
                 if (m.getTemperature() != null) {
                     double t = m.getTemperature().doubleValue();
-                    if (t < 37.0 || t > 38.5) outOfRange.add("temperature " + t + " (37.0-38.5)");
+                    if (t < 30 || t > 45) outOfRange.add("temperature " + t + " (30-45)");
                 }
                 if (m.getRespiratoryRate() != null) {
                     double rr = m.getRespiratoryRate().doubleValue();
-                    if (rr < 8 || rr > 16) outOfRange.add("respiratory rate " + rr + " (8-16)");
+                    if (rr < 4 || rr > 100) outOfRange.add("respiratory rate " + rr + " (4-100)");
                 }
                 if (m.getWeight() != null) {
                     double w = m.getWeight().doubleValue();
@@ -758,32 +975,30 @@ public class CareScheduleService {
                         "An injury or condition record is required when blocking a newly admitted horse.");
             }
         }
+
+        // Coupling marker => BLOCKED (duyệt 2026-11-12, mirror FE lock): ca INITIAL/ROUTINE
+        // có marker cắm trong phiên khám thì không được phép ALLOWED. URGENT giữ rule riêng.
+        boolean hasInjuryMarkers = request.getInjuryMarkers() != null && !request.getInjuryMarkers().isEmpty();
+        if (hasInjuryMarkers && request.getTrainingDecision() == TrainingDecision.ALLOWED
+                && (schedule.getCareType() == CareType.INITIAL
+                        || schedule.getCareType() == CareType.ROUTINE)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "MARKERS_BLOCK_TRAINING",
+                    "Injury markers require training to stay BLOCKED. Remove the markers or keep the horse blocked.");
+        }
     }
 
-    /**
-     * A3: mọi đơn phải khớp danh mục chuẩn — thuốc tồn tại & đang hoạt động,
-     * không trùng trong cùng lần nộp, withdrawal không dưới mốc FEI.
-     */
-    private void validatePrescriptionCatalog(List<PrescriptionItemRequest> prescriptions) {
+    private void validatePrescriptions(List<PrescriptionItemRequest> prescriptions) {
         if (prescriptions == null || prescriptions.isEmpty()) return;
-        Set<Long> seen = new HashSet<>();
+        Set<String> seen = new HashSet<>();
         for (PrescriptionItemRequest item : prescriptions) {
-            if (!seen.add(item.getMedicationId())) {
+            String medicationName = item.getMedicationName().trim();
+            if (!seen.add(medicationName.toLowerCase(Locale.ROOT))) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "DUPLICATE_MEDICATION",
-                        "Medication " + item.getMedicationId() + " is already prescribed in this examination");
+                        "Medication " + medicationName + " is already prescribed in this examination");
             }
-            ClinicalMedication med = clinicalMedicationRepository.findById(item.getMedicationId())
-                    .filter(ClinicalMedication::getActive)
-                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "MEDICATION_NOT_FOUND",
-                            "Medication " + item.getMedicationId() + " is not in the active catalog"));
             if (item.getRoute() != null && item.getRoute().isInjection()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INJECTION_NOT_ALLOWED",
                         "Treatment plans cannot contain injections");
-            }
-            if (item.getWithdrawalDays() < med.getStandardWithdrawalDays()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_WITHDRAWAL_DAYS",
-                        "Withdrawal days cannot be lower than regulatory standard: "
-                                + med.getStandardWithdrawalDays());
             }
         }
     }
@@ -802,7 +1017,7 @@ public class CareScheduleService {
                         : "Follow dosage and instructions on each prescription.");
         plan.setInstructions(instructions);
         plan.setStartDate(prescriptions.stream().map(PrescriptionItemRequest::getStartDate)
-                .min(LocalDate::compareTo).orElse(LocalDate.now()));
+                .min(LocalDate::compareTo).orElse(ClientTimeContext.today()));
         plan.setEndDate(prescriptions.stream().map(PrescriptionItemRequest::getEndDate)
                 .max(LocalDate::compareTo).orElse(null));
         plan.setStatus("ACTIVE");
@@ -810,19 +1025,15 @@ public class CareScheduleService {
 
         List<Long> rxIds = new ArrayList<>();
         for (PrescriptionItemRequest item : prescriptions) {
-            ClinicalMedication med = clinicalMedicationRepository.findById(item.getMedicationId())
-                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "MEDICATION_NOT_FOUND",
-                            "Medication " + item.getMedicationId() + " disappeared from the catalog"));
             Prescription rx = new Prescription();
             rx.setTreatmentPlanId(savedPlan.getId());
-            rx.setMedicationName(med.getName());
+            rx.setMedicationName(item.getMedicationName().trim());
             rx.setDosage(item.getDosage());
             rx.setFrequency(item.getFrequency());
             rx.setRoute(item.getRoute().name());
             rx.setStartDate(item.getStartDate());
             rx.setEndDate(item.getEndDate());
             rx.setInstructions(item.getInstructions());
-            rx.setWithdrawalDays(item.getWithdrawalDays());
             rx.setStatus("ACTIVE");
             rx.setAdministeredByRole(item.getRoute().requiresVeterinarian() ? "VETERINARIAN" : "GROOM");
             rxIds.add(prescriptionRepository.save(rx).getId());
@@ -831,52 +1042,9 @@ public class CareScheduleService {
                 record.getCareScheduleId(), record.getId(), horse.getId(), rxIds));
     }
 
-    @Transactional
-    public CareScheduleResponse cancelCareSchedule(Long scheduleId, CancelCareScheduleRequest request, Long userId) {
-        if (request.getReason() == null || request.getReason().isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Cancel reason is required");
-        }
-
-        CareSchedule schedule = careScheduleRepository.findByIdForUpdate(scheduleId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SCHEDULE_NOT_FOUND", "Care schedule not found"));
-
-        if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) {
-            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Only SCHEDULED care schedules can be cancelled");
-        }
-
-        User actor = userRepository.findById(userId).orElse(null);
-        boolean isManager = actor != null && actor.getRole() != null && "CLUB_MANAGER".equals(actor.getRole().getName());
-
-        if (!isManager) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only club managers can cancel care schedules. Veterinarians cannot decline assignments");
-        }
-
-        // Ngựa đang tạm nghỉ chỉ được mở khóa bởi một lần khám. Hủy nốt lần khám
-        // cuối cùng thì ngựa bị khóa vô thời hạn mà không còn ai để mở.
-        // Mốc tiêm phòng (có thể ở +180 ngày) không thay được lần tái khám đó.
-        Horse horse = horseRepository.findById(schedule.getHorseId()).orElse(null);
-        if (horse != null && horse.getTrainingDecision() == TrainingDecision.BLOCKED
-                && schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE
-                && !careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(horse.getId(),
-                        CareSchedulePurpose.FOLLOW_UP,
-                        List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS),
-                        schedule.getId())) {
-            throw new ApiException(HttpStatus.CONFLICT, "LAST_FOLLOW_UP",
-                    "This horse is blocked from training and this is its last pending examination. "
-                            + "Schedule a replacement examination before cancelling this one.");
-        }
-
-        schedule.setStatus(CareScheduleStatus.CANCELLED);
-        schedule.setCancelReason(request.getReason().trim());
-        careScheduleRepository.save(schedule);
-
-        if (schedule.getCareType() == CareType.URGENT) {
-            resumePausedExamIfAny(schedule.getVeterinarianId());
-        }
-
-        return CareScheduleResponse.from(schedule);
-    }
-
+    /**
+     * Lấy chi tiết ca khám (bao gồm horse, vet, health record liên quan).
+     */
     @Transactional(readOnly = true)
     public CareScheduleDetailResponse getScheduleDetail(Long scheduleId) {
         CareSchedule schedule = careScheduleRepository.findById(scheduleId)
@@ -885,7 +1053,18 @@ public class CareScheduleService {
         User vet = schedule.getVeterinarianId() != null ? userRepository.findById(schedule.getVeterinarianId()).orElse(null) : null;
         HealthRecord hr = healthRecordRepository.findByCareScheduleId(scheduleId).orElse(null);
 
-        return CareScheduleDetailResponse.of(schedule, horse, vet, hr);
+        LocalDateTime blockHeldUntil = schedule.getCareType() == CareType.ROUTINE && schedule.getSourceIncidentId() != null
+                && schedule.getStatus() != CareScheduleStatus.COMPLETED
+                && horse != null && horse.getTrainingDecision() == TrainingDecision.BLOCKED
+                ? careScheduleRepository.findNextExamTime(horse.getId(), CareScheduleStatus.OPEN)
+                : null;
+        CareScheduleDetailResponse.WaitingFollowUp waitingFollowUp = findWaitingFollowUp(schedule.getHorseId())
+                .filter(waiting -> !Objects.equals(waiting.getId(), scheduleId))
+                .map(waiting -> new CareScheduleDetailResponse.WaitingFollowUp(plannedAt(waiting),
+                        waiting.getVeterinarianId() == null ? null : userRepository.findById(waiting.getVeterinarianId())
+                                .map(User::getFullName).orElse(null)))
+                .orElse(null);
+        return CareScheduleDetailResponse.of(schedule, horse, vet, hr, blockHeldUntil, waitingFollowUp);
     }
 
     @Transactional(readOnly = true)
@@ -896,6 +1075,46 @@ public class CareScheduleService {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can view this schedule");
         }
         return getScheduleDetail(scheduleId);
+    }
+
+    @Transactional
+    public CareScheduleResponse cancelCareSchedule(Long scheduleId, CancelCareScheduleRequest request, Long managerId) {
+        CareSchedule schedule = lockClinicalSchedule(scheduleId);
+        if (schedule.getStatus() == CareScheduleStatus.COMPLETED) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Completed care schedules cannot be cancelled");
+        }
+        if (schedule.getStatus() == CareScheduleStatus.CANCELLED) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Care schedule is already cancelled");
+        }
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+
+        schedule.setStatus(CareScheduleStatus.CANCELLED);
+        schedule.setCancelReason(request.getReason());
+        CareSchedule saved = careScheduleRepository.save(schedule);
+
+        AuditLog audit = new AuditLog();
+        audit.setAction("Care Schedule Cancelled");
+        audit.setEntityName("CareSchedule");
+        audit.setEntityId(saved.getId());
+        audit.setUser(manager);
+        audit.setDetails("Care schedule #" + saved.getId() + " was cancelled by Club Manager. Reason: " + request.getReason());
+        auditLogRepository.save(audit);
+
+        if (saved.getVeterinarianId() != null) {
+            String horseName = horseNameOf(saved);
+            notificationService.sendAssignmentNotification(
+                    saved.getVeterinarianId(),
+                    NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                    saved.getId(),
+                    saved.getHorseId(),
+                    NotificationTypes.CARE_SCHEDULE_CANCELLED,
+                    "Care schedule cancelled",
+                    "Care schedule #" + saved.getId() + " for " + horseName + " was cancelled by manager. Reason: " + request.getReason()
+            );
+        }
+
+        return CareScheduleResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -1003,7 +1222,9 @@ public class CareScheduleService {
             if (request.getHorseId() != null && !Objects.equals(request.getHorseId(), horseId)) {
                 throw new ApiException(HttpStatus.CONFLICT, "HORSE_MISMATCH", "nextSchedule horseId must match the completed examination");
             }
-            if (request.getAdmissionId() != null && !Objects.equals(request.getAdmissionId(), admissionId)) {
+            if (request.getAdmissionId() != null
+                    && !Objects.equals(request.getAdmissionId(), source.getAdmissionId())
+                    && !Objects.equals(request.getAdmissionId(), admissionId)) {
                 throw new ApiException(HttpStatus.CONFLICT, "ADMISSION_MISMATCH", "nextSchedule admissionId must match the completed examination");
             }
         }
@@ -1021,11 +1242,11 @@ public class CareScheduleService {
         if (requestedAt == null && request.getScheduledDate() != null && !request.getScheduledDate().isBlank()) {
             try {
                 requestedAt = LocalDate.parse(request.getScheduledDate()).atTime(14, 0);
-            } catch (java.time.format.DateTimeParseException ex) {
+            } catch (DateTimeParseException ex) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "scheduledDate must use ISO format yyyy-MM-dd");
             }
         }
-        if (requestedAt == null || !requestedAt.isAfter(LocalDateTime.now())) {
+        if (requestedAt == null || !requestedAt.isAfter(ClientTimeContext.now())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "Requested schedule time must be in the future");
         }
         String operationKey = operationKeyOverride != null
@@ -1045,15 +1266,22 @@ public class CareScheduleService {
                 throw new ApiException(HttpStatus.CONFLICT, "ADMISSION_MISMATCH", "Admission does not belong to the scheduled horse");
             }
         }
-        String fingerprint = fingerprint(horseId, admissionId, requestedAt, description);
         Optional<CareSchedule> existing = linkedToSourceSchedule
                 ? careScheduleRepository.findBySourceScheduleId(source.getId())
                 : careScheduleRepository.findByRequestedByIdAndIdempotencyKey(userId, operationKey);
         if (existing.isPresent()) {
-            if (!Objects.equals(existing.get().getRequestFingerprint(), fingerprint)) {
+            boolean payloadMatches = Objects.equals(existing.get().getHorseId(), horseId)
+                    && Objects.equals(existing.get().getAdmissionId(), admissionId)
+                    && Objects.equals(existing.get().getDescription(), description);
+            if (!payloadMatches) {
                 throw new ApiException(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "Idempotency key was already used with a different payload");
             }
             return CareScheduleResponse.from(existing.get());
+        }
+
+        Optional<CareSchedule> waiting = findWaitingFollowUp(horseId);
+        if (waiting.isPresent()) {
+            return CareScheduleResponse.from(mergeIntoWaitingFollowUp(waiting.get(), requestedAt, description, userId));
         }
 
         CareSchedule schedule = new CareSchedule();
@@ -1065,9 +1293,8 @@ public class CareScheduleService {
         schedule.setSourceScheduleId(linkedToSourceSchedule ? source.getId() : null);
         schedule.setRequestedById(userId);
         schedule.setIdempotencyKey(operationKey);
-        schedule.setRequestFingerprint(fingerprint);
         schedule.setCareType(CareType.ROUTINE);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(DEFAULT_DURATION_MINUTES);
         schedule.setDescription(description);
         schedule.setRequestedAt(requestedAt);
@@ -1086,6 +1313,9 @@ public class CareScheduleService {
         if (completed.getCareType() != CareType.ROUTINE) return;
         // A preventive milestone already books its own next visit (refreshMilestone/deferMilestone).
         if (completed.getPurpose() != CareSchedulePurpose.FOLLOW_UP) return;
+        // A visit opened by an incident report ends with its exam; it is not a Follow-up series.
+        if (completed.getSourceIncidentId() != null) return;
+        if (findWaitingFollowUp(completed.getHorseId()).isPresent()) return;
         LocalDateTime completedAt = completed.getCompletedAt();
         if (completedAt == null) return;
 
@@ -1096,47 +1326,87 @@ public class CareScheduleService {
         createNextSchedule(next, vetId, completed);
     }
 
-    private static String fingerprint(Long horseId, Long admissionId, LocalDateTime requestedAt, String description) {
-        String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException(impossible);
+    /** Lịch Follow-up đang chờ của ngựa. Ca từ báo cáo sự cố và mốc tiêm phòng không phải Follow-up. */
+    private Optional<CareSchedule> findWaitingFollowUp(Long horseId) {
+        return careScheduleRepository
+                .findByHorseIdAndStatusIn(horseId, List.of(CareScheduleStatus.SCHEDULED)).stream()
+                .filter(cs -> cs.getCareType() == CareType.ROUTINE && cs.getPurpose() == CareSchedulePurpose.FOLLOW_UP
+                        && cs.getSourceIncidentId() == null)
+                .min(Comparator.comparing(CareScheduleService::plannedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+    }
+
+    private static LocalDateTime plannedAt(CareSchedule schedule) {
+        return schedule.getScheduledAt() != null ? schedule.getScheduledAt() : schedule.getRequestedAt();
+    }
+
+    /** Mỗi ngựa chỉ có một Follow-up đang chờ: yêu cầu mới ghép vào lịch đó, giữ ngày sớm hơn. */
+    private CareSchedule mergeIntoWaitingFollowUp(CareSchedule waiting, LocalDateTime requestedAt, String description, Long userId) {
+        String current = waiting.getDescription();
+        if (description != null && !description.isBlank() && (current == null || !current.contains(description))) {
+            waiting.setDescription(current == null || current.isBlank() ? description : current + ". " + description);
         }
+        LocalDateTime planned = plannedAt(waiting);
+        if (planned != null && !requestedAt.isBefore(planned)) {
+            return careScheduleRepository.save(waiting);
+        }
+        waiting.setRequestedAt(requestedAt);
+        waiting.setVeterinarianId(null);
+        waiting.setScheduledAt(null);
+        waiting.setStatus(CareScheduleStatus.SCHEDULED);
+        CareSchedule saved = careScheduleRepository.save(waiting);
+        assignRequestedSchedule(saved, userId);
+        return saved;
+    }
+
+    /**
+     * Ngựa quay lại từ INACTIVE vẫn giữ quyết định tập cũ. Mọi lịch khám đã bị hủy lúc rời trại, nên ngựa
+     * đang bị chặn cần một Follow-up mới, nếu không sẽ không còn ai mở được lệnh chặn.
+     */
+    @Transactional
+    public void scheduleFollowUpIfBlocked(Horse horse, Long actorId) {
+        if (horse.getTrainingDecision() != TrainingDecision.BLOCKED) return;
+        if (findOpenIncidentCase(horse.getId()).isPresent() || findWaitingFollowUp(horse.getId()).isPresent()) return;
+
+        LocalDateTime now = ClientTimeContext.now();
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setHorseId(horse.getId());
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledAt(now.toLocalDate().plusDays(1).atTime(FarmSchedulePolicy.VET_WINDOW_START));
+        next.setDescription(RETURN_FOLLOW_UP_DESCRIPTION);
+        createNextSchedule(next, actorId, null, "return:" + horse.getId() + ":" + now.toLocalDate(), false);
     }
 
     // ------------------------------------------------------------------
     // D1 — careScheduleLifecycleSweep (ROADMAP v2.2 §4.5; WF-01 §3.1.3-5, WF-03 §3.2)
     // ------------------------------------------------------------------
 
-    private static final LocalTime WORKDAY_START = LocalTime.of(8, 0);
+    private static final LocalTime WORKDAY_START = LocalTime.of(7, 0);
     private static final LocalTime WORKDAY_END = LocalTime.of(17, 0);
-    private static final java.time.format.DateTimeFormatter SWEEP_TIME_FMT =
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    /** AD-022: an exam still open 30 minutes past its appointment time becomes OVERDUE. */
+    static final int OVERDUE_GRACE_MINUTES = 30;
+    private static final DateTimeFormatter SWEEP_TIME_FMT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     /**
-     * Job 60s: (1) auto-activate ca SCHEDULED đã đến giờ trong 08:00–17:00 — semantics
-     * giống POST /start, không tạo HealthRecord giả; (2) 17:00 EOD rollover INITIAL/ROUTINE
-     * chưa xong sang ngày làm việc kế; (3) URGENT quá hạn — escalate notification, không dời.
+     * Job 60s:
+     * - Midnight EOD rollover (00:00 - 05:00): dời tất cả các ca INITIAL/ROUTINE chưa xong của ngày hôm trước.
+     *   Nếu bác sĩ có xử lý URGENT trong ngày -> URGENT_PREEMPTION, bỏ gán để sáng hôm sau gán đều lại.
+     *   Nếu không có URGENT mà trễ -> TIME_EXCEEDED, giữ nguyên bác sĩ làm tiếp.
+     * - URGENT quá hạn: escalate notification, không bao giờ dời lịch.
      */
     @Transactional
     public void careScheduleLifecycleSweep() {
-        runLifecycleSweep(LocalDateTime.now());
+        runLifecycleSweep(ClientTimeContext.now());
     }
 
     /** Tách `now` thành tham số để test dùng clock cố định. */
     void runLifecycleSweep(LocalDateTime now) {
         LocalTime tod = now.toLocalTime();
         if (!tod.isBefore(WORKDAY_START) && tod.isBefore(WORKDAY_END)) {
-            careScheduleRepository.autoActivateDueSchedules(now);
             return;
         }
-        if (tod.isBefore(WORKDAY_END)) {
-            return; // trước 17:00: không rollover/escalate
-        }
-        List<CareScheduleStatus> openStatuses =
-                List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.PAUSED);
+
+        List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
         for (CareSchedule cs : careScheduleRepository.findRollableEodCandidates(openStatuses, now)) {
             rollOverEod(cs, now);
         }
@@ -1145,27 +1415,99 @@ public class CareScheduleService {
         }
     }
 
+    private boolean vetHandledUrgentToday(Long vetId, LocalDate date) {
+        if (vetId == null) return false;
+        return careScheduleRepository.existsByVeterinarianIdAndCareTypeAndStatusInAndScheduledDate(
+                vetId, CareType.URGENT,
+                List.of(CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.COMPLETED, CareScheduleStatus.SCHEDULED),
+                date);
+    }
+
+    private void cascadeIfTomorrowFull(CareSchedule cs, LocalDate targetDate) {
+        if (cs.getVeterinarianId() == null) return;
+        boolean isPreventive = cs.getCareType() == CareType.ROUTINE && cs.getPurpose() == CareSchedulePurpose.PREVENTIVE;
+        int maxQuota = cs.getCareType() == CareType.INITIAL
+                ? ADMISSION_DAILY_QUOTA
+                : (isPreventive ? PREVENTIVE_DAILY_QUOTA : ROUTINE_DAILY_QUOTA);
+        List<CareSchedule> allVisits = careScheduleRepository
+                .findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                        cs.getVeterinarianId(), targetDate, cs.getCareType(), List.of(CareScheduleStatus.SCHEDULED));
+        List<CareSchedule> targetVisits = allVisits.stream()
+                .filter(visit -> cs.getCareType() != CareType.ROUTINE || (isPreventive
+                        ? visit.getPurpose() == CareSchedulePurpose.PREVENTIVE
+                        : visit.getPurpose() != CareSchedulePurpose.PREVENTIVE))
+                .collect(Collectors.toList());
+        if (targetVisits.size() >= maxQuota) {
+            CareSchedule toCascade = targetVisits.stream()
+                    .min(Comparator.comparingInt(CareSchedule::getRolloverCount)
+                            .thenComparing(Comparator.comparing(CareSchedule::getCreatedAt).reversed()))
+                    .orElse(targetVisits.get(targetVisits.size() - 1));
+
+            if (!Objects.equals(toCascade.getId(), cs.getId())) {
+                LocalDate nextDate = targetDate.plusDays(1);
+                toCascade.setScheduledDate(nextDate);
+                if (toCascade.getScheduledAt() != null) {
+                    toCascade.setScheduledAt(nextDate.atTime(toCascade.getScheduledAt().toLocalTime()));
+                }
+                toCascade.setRescheduleReason(RescheduleReason.TIME_EXCEEDED);
+                toCascade.setRescheduleNote("Cascaded to " + nextDate + " to prioritize rolled-over queue (FIFO)");
+                careScheduleRepository.save(toCascade);
+                if (toCascade.getVeterinarianId() != null) {
+                    notificationService.sendAssignmentNotification(
+                            toCascade.getVeterinarianId(),
+                            NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                            toCascade.getId(),
+                            toCascade.getHorseId(),
+                            NotificationTypes.CARE_SCHEDULE_EOD_ROLLED,
+                            "Examination rescheduled",
+                            "Examination #" + toCascade.getId() + " was moved to " + nextDate + " to make room for a rolled-over visit.");
+                }
+                cascadeIfTomorrowFull(toCascade, nextDate);
+            }
+        }
+    }
+
     private void rollOverEod(CareSchedule cs, LocalDateTime now) {
         LocalDateTime slot = nextEodSlot(cs, now);
         if (slot == null) return; // shortcut: 7 ngày kề đều kín — thử lại ở tick job sau
         CareScheduleStatus previous = cs.getStatus();
         cs.setStatus(CareScheduleStatus.SCHEDULED);
-        cs.setPausedFrom(null);
-        cs.setScheduledAt(slot);
-        cs.setRescheduleReason(RescheduleReason.EOD_ROLLOVER);
-        cs.setRescheduleNote("Unfinished at the 17:00 close — auto-moved to " + slot.format(SWEEP_TIME_FMT)
-                + (previous == CareScheduleStatus.IN_PROGRESS ? " (was in progress)" : ""));
+        cs.setScheduledDate(slot.toLocalDate());
+        cs.setScheduledAt(null);
+        cs.setRolloverCount(cs.getRolloverCount() + 1);
+
+        LocalDate examOriginalDate = cs.getScheduledDate() != null ? cs.getScheduledDate()
+                : (cs.getScheduledAt() != null ? cs.getScheduledAt().toLocalDate() : now.toLocalDate());
+        boolean handledUrgent = vetHandledUrgentToday(cs.getVeterinarianId(), examOriginalDate);
+        RescheduleReason reason = handledUrgent
+                ? RescheduleReason.URGENT_PREEMPTION
+                : RescheduleReason.TIME_EXCEEDED;
+        cs.setRescheduleReason(reason);
+        cs.setRescheduleNote("Unfinished by end of day — auto-moved to " + slot.format(SWEEP_TIME_FMT)
+                + (CareScheduleStatus.ACTIVE_EXAM.contains(previous) ? " (was in progress)" : "")
+                + " (reason: " + reason + ")");
+
+        Long previousVetId = cs.getVeterinarianId();
+        // Nếu bị URGENT ngắt trong ngày -> gỡ gán để ngày hôm sau hệ thống tự động gán đều lại cho bác sĩ khác
+        if (handledUrgent) {
+            cs.setVeterinarianId(null);
+            cs.setStatus(CareScheduleStatus.SCHEDULED);
+        } else {
+            cascadeIfTomorrowFull(cs, slot.toLocalDate());
+        }
+
         careScheduleRepository.save(cs);
-        if (cs.getVeterinarianId() == null) return;
+        if (previousVetId == null) return;
         notificationService.sendAssignmentNotification(
-                cs.getVeterinarianId(),
+                previousVetId,
                 NotificationTypes.REFERENCE_CARE_SCHEDULE,
                 cs.getId(),
                 cs.getHorseId(),
                 NotificationTypes.CARE_SCHEDULE_EOD_ROLLED,
                 "Examination rolled over to the next working day",
                 "The " + cs.getCareType() + " examination for " + horseNameOf(cs) + " (schedule #" + cs.getId()
-                        + ") did not finish by the 17:00 close and was moved to " + slot.format(SWEEP_TIME_FMT) + ".");
+                        + ") did not finish by end of day and was moved to " + slot.format(SWEEP_TIME_FMT)
+                        + (handledUrgent ? " (unassigned due to urgent case preemption)." : "."));
     }
 
     /** URGENT quá hạn: ngựa đang BLOCKED — chỉ escalate, không bao giờ dời lịch im lặng. */
@@ -1189,18 +1531,45 @@ public class CareScheduleService {
                 ? List.of(FarmSchedulePolicy.VET_WINDOW_START, LocalTime.of(14, 0),
                         LocalTime.of(14, 30), LocalTime.of(15, 0))
                 : eodInitialGrid();
-        List<CareSchedule> horseScheduled =
-                careScheduleRepository.findScheduledForHorse(cs.getHorseId(), CareScheduleStatus.SCHEDULED);
-        LocalDate day = now.toLocalDate().plusDays(1);
+        // AD-022: an OVERDUE exam still occupies the horse's calendar, so rollover must dodge it.
+        List<CareSchedule> horseScheduled = careScheduleRepository.findByHorseIdAndStatusIn(
+                cs.getHorseId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
+        LocalDate startDay = cs.getScheduledDate() != null ? cs.getScheduledDate().plusDays(1) : now.toLocalDate();
+        if (startDay.isBefore(now.toLocalDate())) {
+            startDay = now.toLocalDate();
+        }
+        LocalDate day = startDay;
         for (int d = 0; d < 7; d++, day = day.plusDays(1)) {
             LocalDate currentDay = day;
             List<CareSchedule> assignedInDay = careScheduleRepository.findAssignedInDay(
                     currentDay.atStartOfDay(), currentDay.atStartOfDay().plusDays(1),
-                    List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                    CareScheduleStatus.BOOKED_OR_ACTIVE);
+            // Quota check: vet đã đầy quota cho careType/purpose này trong ngày → skip ngày.
+            if (cs.getVeterinarianId() != null) {
+                boolean isPreventive = cs.getCareType() == CareType.ROUTINE && cs.getPurpose() == CareSchedulePurpose.PREVENTIVE;
+                int maxQuota = cs.getCareType() == CareType.INITIAL
+                        ? ADMISSION_DAILY_QUOTA
+                        : (isPreventive ? PREVENTIVE_DAILY_QUOTA : ROUTINE_DAILY_QUOTA);
+                long vetDayCount = assignedInDay.stream()
+                        .filter(o -> Objects.equals(o.getVeterinarianId(), cs.getVeterinarianId())
+                                && o.getCareType() == cs.getCareType()
+                                && (cs.getCareType() != CareType.ROUTINE
+                                        || (isPreventive ? o.getPurpose() == CareSchedulePurpose.PREVENTIVE
+                                                         : o.getPurpose() != CareSchedulePurpose.PREVENTIVE)))
+                        .count();
+                if (vetDayCount >= maxQuota) continue;
+            }
             for (LocalTime time : times) {
                 LocalDateTime slot = currentDay.atTime(time);
-                boolean horseBusy = horseScheduled.stream()
-                        .anyMatch(o -> !Objects.equals(o.getId(), cs.getId()) && overlaps(cs, slot, o));
+                boolean horseBusy = horseScheduled.stream().anyMatch(o -> {
+    if (Objects.equals(o.getId(), cs.getId())) return false;
+    if (cs.getCareType() != CareType.URGENT && o.getCareType() != CareType.URGENT) {
+        LocalDate otherDate = o.getScheduledDate() != null ? o.getScheduledDate()
+                : (o.getScheduledAt() != null ? o.getScheduledAt().toLocalDate() : null);
+        if (otherDate != null && otherDate.equals(currentDay)) return true;
+    }
+    return overlaps(cs, slot, o);
+});
                 if (horseBusy) continue;
                 if (cs.getVeterinarianId() == null) return slot;
                 boolean vetBusy = assignedInDay.stream()
@@ -1216,7 +1585,7 @@ public class CareScheduleService {
     /** Lưới 08:00–17:00 ngoài khung routine trước, khe trong khung làm fallback — gương findAssignmentSlot. */
     private static List<LocalTime> eodInitialGrid() {
         List<LocalTime> times = new ArrayList<>();
-        for (int hour = 8; hour <= 17; hour++) {
+        for (int hour = 8; hour < 17; hour++) {
             for (int minute : List.of(0, 30)) {
                 LocalTime time = LocalTime.of(hour, minute);
                 if (!time.isBefore(FarmSchedulePolicy.VET_WINDOW_START)
@@ -1240,26 +1609,43 @@ public class CareScheduleService {
 
     @Transactional
     public void assignRequestedSchedules() {
-        LocalDateTime horizon = LocalDateTime.now().plusDays(ASSIGNMENT_HORIZON_DAYS);
+        LocalDateTime horizon = ClientTimeContext.now().plusDays(ASSIGNMENT_HORIZON_DAYS);
         for (CareSchedule schedule : careScheduleRepository.lockNextRequestedBatch(ASSIGNMENT_BATCH_SIZE, horizon)) {
             assignRequestedSchedule(schedule);
         }
     }
 
     public void assignRequestedSchedule(CareSchedule schedule) {
-        assignRequestedSchedule(schedule, null);
+        assignRequestedSchedule(schedule, schedule.getRequestedById(), false);
+    }
+
+    @Transactional
+    public void assignPendingSchedulesForHorse(Long horseId) {
+        if (horseId == null) return;
+        List<CareSchedule> pending = careScheduleRepository.findByHorseIdAndStatusIn(
+                horseId, List.of(CareScheduleStatus.SCHEDULED));
+        for (CareSchedule schedule : pending) {
+            if (schedule.getVeterinarianId() == null) {
+                assignRequestedSchedule(schedule, schedule.getRequestedById(), true);
+            }
+        }
     }
 
     /**
-     * @param preferredVetId Vet who created this schedule. Ranked ahead of the load-balanced vets
-     *                       while they still have a free slot, so a Vet keeps the visit they just
-     *                       created; otherwise the normal assignment flow decides.
+     * @param creatorVetId Vet who requested/created this schedule. Deprioritized so the visit
+     *                     is balanced across other active vets; only assigned to the creator
+     *                     if other vets are unavailable or at daily quota.
      */
-    void assignRequestedSchedule(CareSchedule schedule, Long preferredVetId) {
-        if (schedule.getStatus() != CareScheduleStatus.REQUESTED) return;
-        LocalDateTime now = LocalDateTime.now();
+    void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId) {
+        assignRequestedSchedule(schedule, creatorVetId, false);
+    }
+
+    void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId, boolean ignoreHorizon) {
+        if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) return;
+        if (schedule.getVeterinarianId() != null && (schedule.getScheduledDate() != null || schedule.getScheduledAt() != null)) return;
+        LocalDateTime now = ClientTimeContext.now();
         LocalDateTime horizon = now.plusDays(ASSIGNMENT_HORIZON_DAYS);
-        if (isBeyondAssignmentHorizon(schedule, horizon)) return;
+        if (!ignoreHorizon && isBeyondAssignmentHorizon(schedule, horizon)) return;
 
         // Keep the global lock order admission -> horse -> schedule (same as lockClinicalSchedule)
         // so concurrent Vet actions and auto-assignment cannot deadlock.
@@ -1277,18 +1663,15 @@ public class CareScheduleService {
         Map<Long, Integer> overdueAppointmentsByVet = new HashMap<>();
         Map<Long, Integer> scheduledMinutesByVet = new HashMap<>();
         for (CareSchedule assigned : careScheduleRepository
-                .findByStatusInAndVeterinarianIdIsNotNull(List.of(
-                        CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS))) {
+                .findByStatusInAndVeterinarianIdIsNotNull(CareScheduleStatus.OPEN)) {
             if (assigned.getVeterinarianId() == null) continue;
             LocalDateTime when = assigned.getScheduledAt() != null ? assigned.getScheduledAt() : assigned.getRequestedAt();
             if (when != null && !when.isBefore(horizon)) continue;
             scheduledMinutesByVet.merge(assigned.getVeterinarianId(),
                     assigned.getDurationMinutes() > 0 ? assigned.getDurationMinutes() : DEFAULT_DURATION_MINUTES,
                     Integer::sum);
-            if (assigned.getScheduledAt() != null && assigned.getScheduledAt().isBefore(now)
-                    && (assigned.getStatus() == CareScheduleStatus.SCHEDULED
-                            || assigned.getStatus() == CareScheduleStatus.IN_PROGRESS)) {
-                overdueAppointmentsByVet.merge(assigned.getVeterinarianId(), 1, Integer::sum);
+            if (assigned.getRolloverCount() > 0) {
+                overdueAppointmentsByVet.merge(assigned.getVeterinarianId(), assigned.getRolloverCount(), Integer::sum);
             }
         }
 
@@ -1310,9 +1693,11 @@ public class CareScheduleService {
                 : activeVets;
         if (candidateVets.isEmpty()) return;
 
-        VetScheduleCache vetCache = new VetScheduleCache(candidateVets, preferredVetId);
+        Long effectiveCreatorId = creatorVetId != null ? creatorVetId : schedule.getRequestedById();
+        VetScheduleCache vetCache = new VetScheduleCache(candidateVets, effectiveCreatorId);
         SlotAssignment assignment = findAssignmentSlot(schedule, vetCache, overdueAppointmentsByVet, scheduledMinutesByVet);
-        if ((assignment == null || assignment.rankedVets().isEmpty()) && schedule.getCareType() == CareType.URGENT) {
+        boolean usedPreemption = (assignment == null || assignment.rankedVets().isEmpty()) && schedule.getCareType() == CareType.URGENT;
+        if (usedPreemption) {
             assignment = attemptPreemptionForUrgent(schedule, candidateVets, overdueAppointmentsByVet, scheduledMinutesByVet);
         }
         if (assignment == null || assignment.rankedVets().isEmpty()) return;
@@ -1329,13 +1714,17 @@ public class CareScheduleService {
             }
 
             schedule.setVeterinarianId(lockedVet.getId());
-            schedule.setScheduledAt(slot);
+            schedule.setScheduledDate(slot.toLocalDate());
+            schedule.setScheduledAt(schedule.getCareType() == CareType.URGENT ? slot : null);
             schedule.setStatus(CareScheduleStatus.SCHEDULED);
 
             careScheduleRepository.save(schedule);
             assignInitialAdmissionVet(schedule, lockedVet.getId());
 
             boolean urgent = schedule.getCareType() == CareType.URGENT;
+            if (urgent) {
+                offloadRoutineForUrgent(lockedVet.getId(), slot.toLocalDate(), usedPreemption);
+            }
             String notificationType;
             String notificationTitle;
             String notificationMessage;
@@ -1343,7 +1732,7 @@ public class CareScheduleService {
                 notificationType = NotificationTypes.CARE_SCHEDULE_URGENT_ASSIGNED;
                 notificationTitle = "Urgent case assigned";
                 notificationMessage = "You have been assigned to an urgent care case for horse " + horse.getName()
-                        + ". Training is blocked until the examination is complete.";
+                        + " on care schedule #" + schedule.getId() + ".";
             } else if (schedule.getCareType() == CareType.ROUTINE) {
                 notificationType = NotificationTypes.ROUTINE_ASSIGNED;
                 notificationTitle = "Care schedule assigned";
@@ -1365,16 +1754,13 @@ public class CareScheduleService {
                     notificationMessage
             );
 
-            if (urgent) {
-                HorseIncidentReport incident = incidentReportRepository.findByIdForUpdate(schedule.getSourceIncidentId())
-                        .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "INCIDENT_NOT_FOUND", "Urgent incident not found"));
-                LocalDateTime assignedAt = LocalDateTime.now();
-                incident.setStatus(IncidentStatus.IN_REVIEW);
-                incident.setHandledById(lockedVet.getId());
-                incident.setHandledAt(assignedAt);
-                incidentReportRepository.save(incident);
-                eventPublisher.publishEvent(new UrgentAssignmentCommittedEvent(
-                        buildUrgentAlert(schedule, incident, horse, lockedVet.getId(), assignedAt)));
+            if (urgent || schedule.getSourceIncidentId() != null) {
+                LocalDateTime assignedAt = ClientTimeContext.now();
+                HorseIncidentReport incident = markCaseReportsInReview(schedule, lockedVet.getId(), assignedAt);
+                if (urgent) {
+                    eventPublisher.publishEvent(new UrgentAssignmentCommittedEvent(
+                            buildUrgentAlert(schedule, incident, horse, lockedVet.getId(), assignedAt)));
+                }
             }
 
             recordAssignmentAudit(schedule, lockedVet);
@@ -1386,110 +1772,59 @@ public class CareScheduleService {
             List<User> candidateVets,
             Map<Long, Integer> overdueAppointmentsByVet,
             Map<Long, Integer> scheduledMinutesByVet) {
+        LocalDate today = ClientTimeContext.today();
 
-        List<User> preemptibleVets = new ArrayList<>();
-        Map<Long, CareSchedule> inProgressExamByVet = new HashMap<>();
-
-        for (User vet : candidateVets) {
-            List<CareSchedule> inProgress = careScheduleRepository.findByVeterinarianIdAndStatus(
-                    vet.getId(), CareScheduleStatus.IN_PROGRESS);
-            if (inProgress.isEmpty()) continue;
-
-            // Inviolable rule: NEVER preempt if vet is already handling an URGENT emergency
-            boolean hasUrgent = inProgress.stream().anyMatch(cs -> cs.getCareType() == CareType.URGENT);
-            if (hasUrgent) continue;
-
-            CareSchedule pausable = inProgress.stream()
-                    .filter(cs -> cs.getCareType() == CareType.ROUTINE || cs.getCareType() == CareType.INITIAL)
-                    .findFirst()
-                    .orElse(null);
-            if (pausable != null) {
-                preemptibleVets.add(vet);
-                inProgressExamByVet.put(vet.getId(), pausable);
-            }
-        }
-
-        if (preemptibleVets.isEmpty()) {
-            return null;
-        }
-
-        // Rank by lowest load
-        List<User> ranked = preemptibleVets.stream()
-                .sorted(Comparator
-                        .comparingInt((User v) -> overdueAppointmentsByVet.getOrDefault(v.getId(), 0))
-                        .thenComparingInt(v -> scheduledMinutesByVet.getOrDefault(v.getId(), 0))
-                        .thenComparing(User::getId))
+        // Tầng 2: Nếu không ai rảnh, tìm các bác sĩ đang có ca khám dở (IN_PROGRESS)
+        // Chỉ chọn bác sĩ đang làm Routine (để đẩy Routine về SCHEDULED)
+        // Tuyệt đối không chọn bác sĩ đang làm ca URGENT khác
+        List<User> preemptible = candidateVets.stream()
+                .filter(v -> {
+                    List<CareSchedule> inProgress = careScheduleRepository.findByVeterinarianIdAndStatus(v.getId(), CareScheduleStatus.IN_PROGRESS);
+                    boolean hasUrgentInProgress = inProgress.stream().anyMatch(cs -> cs.getCareType() == CareType.URGENT);
+                    boolean hasRoutineInProgress = inProgress.stream().anyMatch(cs -> cs.getCareType() != CareType.URGENT);
+                    return !hasUrgentInProgress && hasRoutineInProgress;
+                })
                 .toList();
+        if (preemptible.isEmpty()) return null;
 
-        for (User candidate : ranked) {
-            User lockedVet = userRepository.findByIdForUpdate(candidate.getId()).orElse(null);
-            if (!isStillEligible(lockedVet)) continue;
+        // Xếp hạng: ưu tiên bác sĩ có ít ca hơn trong ngày hôm nay, sau đó theo ID
+        User chosen = preemptible.stream()
+                .min(Comparator
+                        .comparingInt((User v) -> countAssignedSchedulesToday(v.getId(), today))
+                        .thenComparing(User::getId))
+                .orElse(null);
+        if (chosen == null) return null;
 
-            CareSchedule examToPause = careScheduleRepository.findByIdForUpdate(
-                    inProgressExamByVet.get(lockedVet.getId()).getId()).orElse(null);
-            if (examToPause == null || examToPause.getStatus() != CareScheduleStatus.IN_PROGRESS
-                    || examToPause.getCareType() == CareType.URGENT) {
-                continue;
-            }
-
-            LocalDateTime now = LocalDateTime.now();
-            examToPause.setStatus(CareScheduleStatus.PAUSED);
-            examToPause.setPausedFrom(now);
-            careScheduleRepository.save(examToPause);
-
-            Horse pausedHorse = horseRepository.findById(examToPause.getHorseId()).orElse(null);
-            String horseName = pausedHorse != null ? pausedHorse.getName() : "the horse";
-            notificationService.sendAssignmentNotification(
-                    lockedVet.getId(),
-                    NotificationTypes.REFERENCE_CARE_SCHEDULE,
-                    examToPause.getId(),
-                    examToPause.getHorseId(),
-                    NotificationTypes.ROUTINE_ASSIGNED,
-                    "Examination paused for emergency",
-                    "Your examination for horse " + horseName + " (schedule #" + examToPause.getId()
-                            + ") was paused to prioritize an emergency case."
-            );
-
-            return new SlotAssignment(now, List.of(lockedVet));
+        List<CareSchedule> inProgress = careScheduleRepository.findByVeterinarianIdAndStatus(chosen.getId(), CareScheduleStatus.IN_PROGRESS);
+        for (CareSchedule exam : inProgress) {
+            if (exam.getCareType() == CareType.URGENT) continue;
+            exam.setStatus(CareScheduleStatus.SCHEDULED);
+            exam.setVeterinarianId(null);
+            exam.setScheduledAt(null);
+            exam.setScheduledDate(null);
+            exam.setRescheduleReason(RescheduleReason.URGENT_PREEMPTION);
+            exam.setRescheduleNote("Deferred to make room for urgent case #" + urgentSchedule.getId());
+            careScheduleRepository.save(exam);
+            break;
         }
 
-        return null;
+        notificationService.sendAssignmentNotification(
+                chosen.getId(),
+                NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                urgentSchedule.getId(),
+                urgentSchedule.getHorseId(),
+                NotificationTypes.CARE_SCHEDULE_PAUSED,
+                "Examination deferred for urgent case",
+                "An in-progress examination was deferred to handle urgent case #" + urgentSchedule.getId() + ".");
+
+        return new SlotAssignment(ClientTimeContext.now(), List.of(chosen));
     }
 
-    private void resumePausedExamIfAny(Long veterinarianId) {
-        if (veterinarianId == null) return;
-        List<CareSchedule> pausedList = careScheduleRepository.findByVeterinarianIdAndStatus(
-                veterinarianId, CareScheduleStatus.PAUSED);
-        if (pausedList.isEmpty()) return;
-
-        // Resume the most recently paused exam
-        CareSchedule paused = pausedList.stream()
-                .max(Comparator.comparing(cs -> cs.getPausedFrom() != null ? cs.getPausedFrom() : cs.getUpdatedAt()))
-                .orElse(pausedList.get(0));
-
-        LocalDateTime now = LocalDateTime.now();
-        if (paused.getPausedFrom() != null && paused.getScheduledAt() != null) {
-            java.time.Duration pausedDuration = java.time.Duration.between(paused.getPausedFrom(), now);
-            if (!pausedDuration.isNegative()) {
-                paused.setScheduledAt(paused.getScheduledAt().plus(pausedDuration));
-            }
-        }
-        paused.setStatus(CareScheduleStatus.IN_PROGRESS);
-        paused.setPausedFrom(null);
-        careScheduleRepository.save(paused);
-
-        Horse horse = horseRepository.findById(paused.getHorseId()).orElse(null);
-        String horseName = horse != null ? horse.getName() : "the horse";
-        notificationService.sendAssignmentNotification(
-                veterinarianId,
-                NotificationTypes.REFERENCE_CARE_SCHEDULE,
-                paused.getId(),
-                paused.getHorseId(),
-                NotificationTypes.ROUTINE_ASSIGNED,
-                "Examination resumed",
-                "Emergency care concluded. Your examination for horse " + horseName
-                        + " (schedule #" + paused.getId() + ") has been resumed to In Progress."
-        );
+    private int countAssignedSchedulesToday(Long vetId, LocalDate date) {
+        if (vetId == null) return 0;
+        return careScheduleRepository.findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                vetId, date, CareType.ROUTINE, CareScheduleStatus.BOOKED_OR_ACTIVE).size()
+                + careScheduleRepository.findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED).size();
     }
 
     static boolean isBeyondAssignmentHorizon(CareSchedule schedule, LocalDateTime horizon) {
@@ -1511,7 +1846,11 @@ public class CareScheduleService {
     private User assignInitialExamToLeastLoadedVet(List<User> activeVets,
             Map<Long, Integer> overdueAppointmentsByVet,
             Map<Long, Integer> scheduledMinutesByVet) {
+        // Lọc vet đã đạt quota INITIAL (2/ngày) trước khi xếp hạng.
         List<User> ranked = activeVets.stream()
+                .filter(v -> careScheduleRepository
+                        .findByVeterinarianIdAndCareTypeAndStatusIn(v.getId(), CareType.INITIAL, CareScheduleStatus.BOOKED_OR_ACTIVE).size()
+                        < ADMISSION_DAILY_QUOTA)
                 .sorted(Comparator
                         .comparingInt((User vet) -> overdueAppointmentsByVet.getOrDefault(vet.getId(), 0))
                         .thenComparingInt(vet -> scheduledMinutesByVet.getOrDefault(vet.getId(), 0))
@@ -1529,15 +1868,15 @@ public class CareScheduleService {
 
     private static final class VetScheduleCache {
         final List<User> candidateVets;
-        final Long preferredVetId;
+        final Long creatorVetId;
         final Map<Long, Boolean> hasInProgressByVet = new HashMap<>();
         final Map<Long, List<CareSchedule>> inProgressByVet = new HashMap<>();
         final Map<Long, List<CareSchedule>> scheduledByVet = new HashMap<>();
         final Map<Long, Boolean> historyByVet = new HashMap<>();
 
-        VetScheduleCache(List<User> candidateVets, Long preferredVetId) {
+        VetScheduleCache(List<User> candidateVets, Long creatorVetId) {
             this.candidateVets = candidateVets;
-            this.preferredVetId = preferredVetId;
+            this.creatorVetId = creatorVetId;
         }
     }
 
@@ -1545,23 +1884,25 @@ public class CareScheduleService {
             VetScheduleCache vetCache,
             Map<Long, Integer> overdueAppointmentsByVet, Map<Long, Integer> scheduledMinutesByVet) {
         if (schedule.getCareType() == CareType.URGENT) {
-            LocalDateTime urgentSlot = LocalDateTime.now();
+            LocalDateTime urgentSlot = ClientTimeContext.now();
             List<User> ranked = rankVeterinarians(schedule, urgentSlot, vetCache, overdueAppointmentsByVet, scheduledMinutesByVet, null);
             return ranked.isEmpty() ? null : new SlotAssignment(urgentSlot, ranked);
         }
 
         // 1. Nếu ngựa đang có ca khám dở dang, không thể xếp thêm lịch mới
-        if (careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS)) {
+        //    (AD-022: ca dở dang có thể là IN_PROGRESS hoặc OVERDUE)
+        if (careScheduleRepository.existsByHorseIdAndStatusIn(
+                schedule.getHorseId(), CareScheduleStatus.ACTIVE_EXAM)) {
             return null;
         }
 
         // 2. Tải trước danh sách ca khám đã lên lịch của ngựa 1 lần duy nhất cho toàn bộ 14 ngày
-        List<CareSchedule> scheduledForHorse = careScheduleRepository.findScheduledForHorse(
-                schedule.getHorseId(), CareScheduleStatus.SCHEDULED);
+        List<CareSchedule> scheduledForHorse = careScheduleRepository.findByHorseIdAndStatusIn(
+                schedule.getHorseId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
 
         LocalDateTime requested = schedule.getRequestedAt();
-        LocalDate startDate = (requested != null && requested.isAfter(LocalDateTime.now())
-                ? requested : LocalDateTime.now()).toLocalDate();
+        LocalDate startDate = (requested != null && requested.isAfter(ClientTimeContext.now())
+                ? requested : ClientTimeContext.now()).toLocalDate();
         for (int dayOffset = 0; dayOffset < 14; dayOffset++) {
             LocalDate day = startDate.plusDays(dayOffset);
             List<CareSchedule> assignedInDay = null;
@@ -1580,7 +1921,7 @@ public class CareScheduleService {
                 // day is taken can one fall back into the window's free slots (it is a routine
                 // preference, not an exclusive lock; urgent cases may also land inside it).
                 times = new ArrayList<>();
-                for (int hour = 8; hour <= 17; hour++) {
+                for (int hour = 8; hour < 17; hour++) {
                     for (int minute : List.of(0, 30)) {
                         LocalTime time = LocalTime.of(hour, minute);
                         if (!time.isBefore(FarmSchedulePolicy.VET_WINDOW_START)
@@ -1598,14 +1939,14 @@ public class CareScheduleService {
             for (LocalTime time : times) {
                 LocalDateTime slot = day.atTime(time);
                 if (requested != null && slot.isBefore(requested)) continue;
-                if (slot.isBefore(LocalDateTime.now())) continue;
-                if (horseHasConflict(schedule, slot, scheduledForHorse)) continue;
+                if (slot.isBefore(ClientTimeContext.now())) continue;
+                if (horseHasConflict(schedule, day, slot, scheduledForHorse)) continue;
 
                 if (assignedInDay == null) {
                     LocalDateTime dayStart = day.atStartOfDay();
                     LocalDateTime dayEnd = dayStart.plusDays(1);
                     assignedInDay = careScheduleRepository.findAssignedInDay(dayStart, dayEnd,
-                            List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                            CareScheduleStatus.BOOKED_OR_ACTIVE);
                 }
                 List<User> ranked = rankVeterinarians(schedule, slot, vetCache, overdueAppointmentsByVet, scheduledMinutesByVet, assignedInDay);
                 if (!ranked.isEmpty()) {
@@ -1616,8 +1957,16 @@ public class CareScheduleService {
         return null;
     }
 
-    private boolean horseHasConflict(CareSchedule schedule, LocalDateTime slot, List<CareSchedule> scheduledForHorse) {
-        return scheduledForHorse.stream().anyMatch(other -> !Objects.equals(other.getId(), schedule.getId()) && overlaps(schedule, slot, other));
+    private boolean horseHasConflict(CareSchedule schedule, LocalDate day, LocalDateTime slot, List<CareSchedule> scheduledForHorse) {
+        return scheduledForHorse.stream().anyMatch(other -> {
+            if (Objects.equals(other.getId(), schedule.getId())) return false;
+            if (schedule.getCareType() != CareType.URGENT && other.getCareType() != CareType.URGENT) {
+                LocalDate otherDate = other.getScheduledDate() != null ? other.getScheduledDate()
+                        : (other.getScheduledAt() != null ? other.getScheduledAt().toLocalDate() : null);
+                if (day.equals(otherDate)) return true;
+            }
+            return overlaps(schedule, slot, other);
+        });
     }
 
     private List<User> rankVeterinarians(CareSchedule schedule, LocalDateTime slot,
@@ -1631,7 +1980,7 @@ public class CareScheduleService {
 
         List<CareSchedule> assigned = assignedInDay != null ? assignedInDay : careScheduleRepository.findAssignedInDay(
                 slot.toLocalDate().atStartOfDay(), slot.toLocalDate().atStartOfDay().plusDays(1),
-                List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                CareScheduleStatus.BOOKED_OR_ACTIVE);
 
         Map<Long, Set<Long>> horsesByVet = new HashMap<>();
         Map<Long, Integer> minutesByVet = new HashMap<>();
@@ -1645,12 +1994,31 @@ public class CareScheduleService {
         List<User> eligibleVets = vets.stream()
                 .filter(v -> {
                     if (schedule.getCareType() == CareType.INITIAL && schedule.getVeterinarianId() != null) {
-                        return Objects.equals(v.getId(), schedule.getVeterinarianId());
+                        if (!Objects.equals(v.getId(), schedule.getVeterinarianId())) return false;
                     }
-                    // For URGENT the in-progress conflict check below decides, so a
-                    // stale overdue exam never disqualifies the vet from an emergency.
+                    // V2 Daily bucket quota: Routine max 3/vet/day, Preventive max 3/vet/day, Initial/Admission max 2/vet/day
+                    if (schedule.getCareType() == CareType.ROUTINE) {
+                        boolean isPreventive = schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE;
+                        long count = assigned.stream()
+                                .filter(cs -> Objects.equals(cs.getVeterinarianId(), v.getId())
+                                        && cs.getCareType() == CareType.ROUTINE
+                                        && (isPreventive
+                                                ? cs.getPurpose() == CareSchedulePurpose.PREVENTIVE
+                                                : cs.getPurpose() != CareSchedulePurpose.PREVENTIVE)
+                                        && !Objects.equals(cs.getId(), schedule.getId()))
+                                .count();
+                        int quota = isPreventive ? PREVENTIVE_DAILY_QUOTA : ROUTINE_DAILY_QUOTA;
+                        if (count >= quota) return false;
+                    } else if (schedule.getCareType() == CareType.INITIAL) {
+                        long count = assigned.stream()
+                                .filter(cs -> Objects.equals(cs.getVeterinarianId(), v.getId())
+                                        && cs.getCareType() == CareType.INITIAL
+                                        && !Objects.equals(cs.getId(), schedule.getId()))
+                                .count();
+                        if (count >= ADMISSION_DAILY_QUOTA) return false;
+                    }
                     boolean activeExamBlocks = schedule.getCareType() != CareType.URGENT
-                            && slot.toLocalDate().isEqual(LocalDate.now())
+                            && slot.toLocalDate().isEqual(ClientTimeContext.today())
                             && vetCache.hasInProgressByVet.computeIfAbsent(v.getId(),
                                     id -> careScheduleRepository.existsByVeterinarianIdAndStatus(id, CareScheduleStatus.IN_PROGRESS));
                     return !activeExamBlocks;
@@ -1662,7 +2030,7 @@ public class CareScheduleService {
                 .filter(v -> vetCache.scheduledByVet.computeIfAbsent(v.getId(),
                                 id -> careScheduleRepository.findScheduledForVet(id, CareScheduleStatus.SCHEDULED))
                         .stream()
-                        .noneMatch(other -> overlaps(schedule, slot, other)))
+                        .noneMatch(other -> blocksSlot(schedule, slot, other)))
                 .toList();
 
         if (eligibleVets.size() <= 1) {
@@ -1678,15 +2046,22 @@ public class CareScheduleService {
             }
         }
 
+        Map<Long, Integer> dailyCountByVet = new HashMap<>();
+        for (User v : eligibleVets) {
+            dailyCountByVet.put(v.getId(), countAssignedSchedulesToday(v.getId(), slot.toLocalDate()));
+        }
+
         return eligibleVets.stream()
                 .sorted(Comparator
-                        .comparing((User v) -> !Objects.equals(v.getId(), vetCache.preferredVetId))
-                        .thenComparingInt((User v) -> overdueAppointmentsByVet.getOrDefault(v.getId(), 0))
-                        .thenComparingInt(v -> scheduledMinutesByVet.getOrDefault(v.getId(), 0))
+                        // 1. Deprioritize creator vet so other active vets take the visit
+                        .comparing((User v) -> vetCache.creatorVetId != null && Objects.equals(v.getId(), vetCache.creatorVetId))
+                        // 2. Lowest number of horses assigned on the slot's day
                         .thenComparingInt(v -> horsesByVet.getOrDefault(v.getId(), Set.of()).size())
+                        // 3. Lowest minutes booked on the slot's day
                         .thenComparingInt(v -> minutesByVet.getOrDefault(v.getId(), 0))
-                        .thenComparing((User v) -> schedule.getCareType() == CareType.URGENT ? false
-                                : !Boolean.TRUE.equals(vetCache.historyByVet.get(v.getId())))
+                        // 4. Cân bằng tải: Ưu tiên bác sĩ có ít ca hơn trong ngày hôm nay
+                        .thenComparingInt((User v) -> dailyCountByVet.getOrDefault(v.getId(), 0))
+                        // 5. Deterministic tie-breaker
                         .thenComparing(User::getId))
                 .toList();
     }
@@ -1701,16 +2076,16 @@ public class CareScheduleService {
             if (startedAt == null) return true;
             int duration = inProgress.getDurationMinutes() > 0
                     ? inProgress.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
-            return startedAt.plusMinutes(duration).isAfter(LocalDateTime.now());
+            return startedAt.plusMinutes(duration).isAfter(ClientTimeContext.now());
         }
         LocalDateTime scheduledAt = inProgress.getScheduledAt();
-        if (scheduledAt == null) return slot.toLocalDate().isEqual(LocalDate.now());
+        if (scheduledAt == null) return slot.toLocalDate().isEqual(ClientTimeContext.today());
         int duration = inProgress.getDurationMinutes() > 0
                 ? inProgress.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
         // An overdue in-progress visit remains active; retain the Vet assignment but
         // do not book a conflicting appointment until that visit is completed.
-        if (!scheduledAt.plusMinutes(duration).isAfter(LocalDateTime.now())) {
-            return slot.toLocalDate().isEqual(LocalDate.now());
+        if (!scheduledAt.plusMinutes(duration).isAfter(ClientTimeContext.now())) {
+            return slot.toLocalDate().isEqual(ClientTimeContext.today());
         }
         return overlaps(schedule, slot, inProgress);
     }
@@ -1735,9 +2110,18 @@ public class CareScheduleService {
 
     @Transactional(readOnly = true)
     public List<UrgentAssignmentAlert> getPendingUrgentAlerts(Long veterinarianId) {
+        return getPendingUrgentAlerts(veterinarianId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UrgentAssignmentAlert> getPendingUrgentAlerts(Long veterinarianId, boolean includeCompleted) {
+        List<CareScheduleStatus> statuses = includeCompleted
+                ? List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.COMPLETED)
+                : CareScheduleStatus.BOOKED_OR_ACTIVE;
+
         return careScheduleRepository.findByVeterinarianIdAndCareTypeAndStatusIn(
                         veterinarianId, CareType.URGENT,
-                        List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)).stream()
+                        statuses).stream()
                 .map(schedule -> {
                     HorseIncidentReport incident = schedule.getSourceIncidentId() != null
                             ? incidentReportRepository.findById(schedule.getSourceIncidentId()).orElse(null)
@@ -1747,6 +2131,9 @@ public class CareScheduleService {
                             : buildUrgentAlert(schedule, incident, horse, veterinarianId, schedule.getUpdatedAt());
                 })
                 .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(
+                        (UrgentAssignmentAlert a) -> a.reportedAt() != null ? a.reportedAt() : (a.scheduledAt() != null ? a.scheduledAt() : LocalDateTime.MIN)
+                ).reversed().thenComparing(Comparator.comparing(UrgentAssignmentAlert::scheduleId).reversed()))
                 .toList();
     }
 
@@ -1762,12 +2149,12 @@ public class CareScheduleService {
     }
 
     /**
-     * Mọi báo cáo sự cố đã gộp vào ca khẩn cấp, kể cả báo cáo nguồn.
+     * Mọi báo cáo sự cố đã gộp vào ca sự cố, kể cả báo cáo nguồn.
      * Báo cáo gộp trước đây không hiển thị ở đâu nên Thú y chỉ thấy báo cáo đầu tiên.
      */
     @Transactional(readOnly = true)
-    public List<UrgentCaseReportResponse> getUrgentCaseReports(Long scheduleId, Long veterinarianId) {
-        CareSchedule schedule = requireAssignedUrgentCase(scheduleId, veterinarianId);
+    public List<UrgentCaseReportResponse> getIncidentCaseReports(Long scheduleId, Long veterinarianId) {
+        CareSchedule schedule = requireAssignedIncidentCase(scheduleId, veterinarianId);
         List<HorseIncidentReport> reports = new ArrayList<>(
                 incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(scheduleId));
         // Báo cáo cũ có thể chưa có care_schedule_id; ca luôn lưu báo cáo nguồn.
@@ -1781,13 +2168,21 @@ public class CareScheduleService {
     }
 
     private CareSchedule requireAssignedUrgentCase(Long scheduleId, Long veterinarianId) {
-        CareSchedule schedule = careScheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SCHEDULE_NOT_FOUND", "Care schedule not found"));
+        CareSchedule schedule = requireAssignedIncidentCase(scheduleId, veterinarianId);
         if (schedule.getCareType() != CareType.URGENT) {
             throw new ApiException(HttpStatus.NOT_FOUND, "URGENT_CASE_NOT_FOUND", "Urgent case not found");
         }
+        return schedule;
+    }
+
+    private CareSchedule requireAssignedIncidentCase(Long scheduleId, Long veterinarianId) {
+        CareSchedule schedule = careScheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SCHEDULE_NOT_FOUND", "Care schedule not found"));
+        if (!isIncidentCase(schedule)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "URGENT_CASE_NOT_FOUND", "Incident case not found");
+        }
         if (!Objects.equals(schedule.getVeterinarianId(), veterinarianId)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can view this urgent case");
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can view this case");
         }
         return schedule;
     }
@@ -1802,7 +2197,7 @@ public class CareScheduleService {
                 reporter != null ? reporter.getFullName() : null,
                 label.isEmpty() ? null : label,
                 report.getReportedAt(),
-                report.getSeverity(),
+                report.getIncidentType(),
                 report.getTitle(),
                 report.getDescription(),
                 report.getImageUrl() != null
@@ -1839,20 +2234,6 @@ public class CareScheduleService {
         return note.length() > 2000 ? note.substring(0, 2000) : note.toString();
     }
 
-    /**
-     * Đóng ca khẩn cấp cuối cùng: trả lại kết luận của lần khám gần nhất không phải ca khẩn cấp thay vì luôn mở khóa.
-     * Bệnh án của ca khẩn cấp đang đóng chưa được lưu ở bước này nên không lẫn vào kết quả.
-     */
-    private void restoreTrainingDecisionBeforeUrgent(Horse horse, CareSchedule schedule) {
-        LocalDateTime cutoff = schedule.getCreatedAt() != null ? schedule.getCreatedAt() : LocalDateTime.now();
-        HealthRecord previous = previousTrainingRecord(horse.getId(), cutoff).orElse(null);
-        if (previous != null && previous.getTrainingDecision() == TrainingDecision.BLOCKED) {
-            trainingDecisionService.block(horse, previous.getRestrictionDetails());
-        } else {
-            trainingDecisionService.allow(horse);
-        }
-    }
-
     /** Kết luận của lần khám lâm sàng gần nhất trước sự cố này — trạng thái trước khi ngựa bị chặn khẩn cấp. */
     private Optional<HealthRecord> previousTrainingRecord(Long horseId, LocalDateTime cutoff) {
         if (cutoff != null) {
@@ -1877,7 +2258,7 @@ public class CareScheduleService {
         StableStall stall = horse.getCurrentStallId() == null ? null
                 : stallRepository.findById(horse.getCurrentStallId()).orElse(null);
         long eventId = schedule.getId();
-        LocalDateTime cutoff = schedule.getCreatedAt() != null ? schedule.getCreatedAt() : LocalDateTime.now();
+        LocalDateTime cutoff = schedule.getCreatedAt() != null ? schedule.getCreatedAt() : ClientTimeContext.now();
         HealthRecord previousTraining = previousTrainingRecord(horse.getId(), cutoff).orElse(null);
         return new UrgentAssignmentAlert(
                 eventId,
@@ -1892,7 +2273,7 @@ public class CareScheduleService {
                 formattedName,
                 label.isEmpty() ? null : label,
                 incident != null ? incident.getReportedAt() : schedule.getCreatedAt(),
-                incident != null ? incident.getSeverity() : null,
+                incident != null ? incident.getIncidentType() : null,
                 incident != null ? incident.getTitle() : "Urgent Care",
                 incident != null ? incident.getDescription() : schedule.getDescription(),
                 // The image endpoint, never the storage key: the client loads it with its access token.

@@ -14,7 +14,6 @@ import {AdmissionFilterBar, FilterDateRange, FilterSelect} from '../shared/compo
 const VALID_STATUSES: ReadonlyArray<AdmissionStatus | 'ALL'> = [
   'ALL',
   'GROOM_REVIEW',
-  'WAITING_FOR_STALL',
   'WAITING_FOR_ARRIVAL',
   'ARRIVAL_EXPIRED',
   'VET_REVIEW',
@@ -147,7 +146,6 @@ export function ManagerAdmissionsListView() {
   const statuses: { value: AdmissionStatus | 'ALL'; label: string }[] = [
     { value: 'ALL', label: 'All statuses' },
     { value: 'GROOM_REVIEW', label: 'Groom Review' },
-    { value: 'WAITING_FOR_STALL', label: 'Waiting for Stall' },
     { value: 'WAITING_FOR_ARRIVAL', label: 'Waiting for Arrival' },
     { value: 'ARRIVAL_EXPIRED', label: 'Arrival Expired' },
     { value: 'VET_REVIEW', label: 'Vet Review' },

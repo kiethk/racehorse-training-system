@@ -44,8 +44,11 @@ export async function deleteConversation(conversationId: number): Promise<void> 
 /**
  * Gửi tin nhắn đồng bộ đến AI Agent Orchestrator.
  */
-export async function sendChatMessage(request: AiChatRequestDto): Promise<AiChatResponseDto> {
-  return apiPost<AiChatResponseDto>('/api/v1/ai/chat', request);
+export async function sendChatMessage(
+  request: AiChatRequestDto,
+  signal?: AbortSignal
+): Promise<AiChatResponseDto> {
+  return apiPost<AiChatResponseDto>('/api/v1/ai/chat', request, signal);
 }
 
 /**

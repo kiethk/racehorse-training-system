@@ -18,8 +18,12 @@ export interface VetReviewFormProps {
   careScheduleId?: number | null;
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
+  scheduledDate?: string | null;
   /** PREVENTIVE: the system-booked vaccination visit; it can defer vaccination instead of giving it. */
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
+  fromIncident?: boolean;
+  blockHeldUntil?: string | null;
+  waitingFollowUpAt?: string | null;
   onStartExam?: () => Promise<void>;
   /** Rendered above the decision panel in the side column (e.g. the examination details card). */
   asideTop?: ReactNode;
@@ -37,7 +41,11 @@ export function VetReviewForm({
   careScheduleId,
   careType = 'INITIAL',
   scheduleStatus,
+  scheduledDate,
   schedulePurpose,
+  fromIncident,
+  blockHeldUntil,
+  waitingFollowUpAt,
   onStartExam,
   asideTop,
   onSuccess,
@@ -55,7 +63,11 @@ export function VetReviewForm({
       careScheduleId={careScheduleId}
       careType={careType}
       scheduleStatus={scheduleStatus}
+      scheduledDate={scheduledDate}
       schedulePurpose={schedulePurpose}
+      fromIncident={fromIncident}
+      blockHeldUntil={blockHeldUntil}
+      waitingFollowUpAt={waitingFollowUpAt}
       onStartExam={onStartExam}
       asideTop={asideTop}
       onSuccess={(result, kind) => onSuccess(result, kind)}

@@ -10,6 +10,7 @@ import {
   ZAxis,
   Tooltip,
   Cell,
+  CartesianGrid,
 } from 'recharts';
 import { calculateTrendLinePoints } from '../lib/edaTransform';
 
@@ -54,12 +55,18 @@ export function EdaScatterChart({
     const xVals = points.map((p) => p.x);
     const yVals = points.map((p) => p.y);
 
-    const minXVal = Math.floor(Math.min(...xVals) * 0.95);
-    const maxXVal = Math.ceil(Math.max(...xVals) * 1.05);
-    const minYVal = Math.floor(Math.min(...yVals) * 0.90);
-    const maxYVal = Math.ceil(Math.max(...yVals) * 1.10);
+    const minXVal = Math.floor((Math.min(...xVals) * 0.95) / 5) * 5;
+    const maxXVal = Math.ceil((Math.max(...xVals) * 1.05) / 5) * 5;
 
     const trend = calculateTrendLinePoints(minXVal, maxXVal, slope, intercept);
+
+    const allYVals = [...yVals];
+    if (trend.length > 0) {
+      allYVals.push(...trend.map((t) => t.y));
+    }
+
+    const minYVal = Math.max(0, Math.floor((Math.min(...allYVals) * 0.95) / 10) * 10);
+    const maxYVal = Math.ceil((Math.max(...allYVals) * 1.05) / 10) * 10;
 
     return {
       minX: minXVal,
@@ -129,14 +136,14 @@ export function EdaScatterChart({
           {data.isOutlier && (
             <div className="mt-1.5 pt-1.5 border-t border-[var(--color-danger)]/30 text-[11px] text-[var(--color-danger)] space-y-0.5">
               <div className="flex justify-between items-center gap-2 font-medium">
-                <span>⚠️ Outlier:</span>
+                <span>Outlier:</span>
                 <span className="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-[var(--color-danger-subtle)] text-[var(--color-danger)]">
                   Anomaly
                 </span>
               </div>
               <div className="font-normal text-[10px] text-[var(--color-text-primary)] mt-0.5">
                 <span className="text-[var(--color-text-secondary)]">Reason: </span>
-                {data.outlierReason || 'Outlier deviation > 1.5 IQR'}
+                {data.outlierReason || 'Unusual workout reading'}
               </div>
             </div>
           )}
@@ -168,26 +175,34 @@ export function EdaScatterChart({
         </div>
       </div>
 
-      <div className="w-full h-[300px]">
+      <div className="w-full h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 10, right: 20, bottom: 25, left: 10 }}>
+          <ScatterChart margin={{ top: 15, right: 25, bottom: 40, left: 50 }}>
+            <CartesianGrid vertical={false} stroke="var(--color-border)" strokeDasharray="3 3" opacity={0.5} />
             <XAxis
               type="number"
               dataKey="x"
               name="Speed"
-              unit=" km/h"
               domain={[minX, maxX]}
-              label={{ value: xAxisLabel, position: 'bottom', offset: 10, fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              label={{ value: xAxisLabel, position: 'bottom', offset: 14, fontSize: 11, fill: 'var(--color-text-secondary)' }}
               tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              tickMargin={8}
             />
             <YAxis
               type="number"
               dataKey="y"
               name="Recovery HR"
-              unit=" bpm"
               domain={[minY, maxY]}
-              label={{ value: yAxisLabel, angle: -90, position: 'left', offset: 0, fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              label={{
+                value: yAxisLabel,
+                angle: -90,
+                position: 'insideLeft',
+                textAnchor: 'middle',
+                style: { textAnchor: 'middle', fill: 'var(--color-text-secondary)', fontSize: 11 },
+                offset: -35,
+              }}
               tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              tickMargin={8}
             />
             <ZAxis range={[50, 90]} />
             <Tooltip content={<CustomTooltip />} />

@@ -21,7 +21,7 @@ CREATE FUNCTION pg_temp.ref_day() RETURNS DATE AS $$ SELECT DATE '2026-10-25' $$
 -- set rtms.seed_now, e.g. seed-database.ps1 -AsOf '2026-11-02 08:00'.)
 CREATE FUNCTION pg_temp.clock() RETURNS TIMESTAMP AS $$
     SELECT date_trunc('minute', COALESCE(NULLIF(current_setting('rtms.seed_now', TRUE), '')::TIMESTAMP,
-                                         now() AT TIME ZONE 'Asia/Ho_Chi_Minh'))::TIMESTAMP
+                                         TIMESTAMP '2026-11-06 14:00:00'))::TIMESTAMP
 $$ LANGUAGE sql STABLE;
 
 CREATE FUNCTION pg_temp.today() RETURNS DATE AS $$ SELECT pg_temp.clock()::DATE $$ LANGUAGE sql STABLE;
@@ -100,10 +100,6 @@ END $$ LANGUAGE plpgsql STABLE;
 -- Khóa file của một ảnh seed dựng sẵn trong backend\uploads: "local:<uuid>.<đuôi>", uuid = md5 của đường dẫn
 -- trong bộ hồ sơ. report_incident dùng để ảnh sự cố render từ đĩa local (hướng 3.3 local-only, không qua
 -- Cloudinary như admission_documents của develop). (Storage key of a locally seeded picture.)
-CREATE FUNCTION pg_temp.file_key(p_path TEXT) RETURNS TEXT AS $$
-    SELECT 'local:' || md5('rtms-seed/' || p_path)::UUID::TEXT || lower(substring(p_path FROM '\.[A-Za-z0-9]+$'))
-$$ LANGUAGE sql IMMUTABLE;
-
 -- Ngày giờ theo kiểu LocalDateTime.toString() của Java (bỏ giây khi bằng 0), dùng cho request_fingerprint.
 -- (Date-time as Java LocalDateTime.toString(), used by request_fingerprint.)
 CREATE FUNCTION pg_temp.java_ts(p TIMESTAMP) RETURNS TEXT AS $$
@@ -238,10 +234,10 @@ CREATE FUNCTION pg_temp.new_schedule(p_horse BIGINT, p_care_type TEXT, p_purpose
                                      p_source BIGINT DEFAULT NULL, p_requested_by BIGINT DEFAULT NULL,
                                      p_key TEXT DEFAULT NULL, p_fingerprint TEXT DEFAULT NULL) RETURNS BIGINT AS $$
     INSERT INTO care_schedule (horse_id, admission_id, source_incident_id, care_type, status, duration_minutes, description,
-                               created_at, updated_at, requested_at, source_schedule_id, requested_by_id, idempotency_key,
-                               request_fingerprint, purpose)
-    VALUES (p_horse, p_admission, p_incident, p_care_type, 'REQUESTED', 30, p_desc, p_created_at, p_created_at,
-            p_requested_at, p_source, p_requested_by, p_key, p_fingerprint, p_purpose)
+                               created_at, updated_at, requested_at, scheduled_date, source_schedule_id, requested_by_id, idempotency_key,
+                               purpose)
+    VALUES (p_horse, p_admission, p_incident, p_care_type, 'SCHEDULED', 30, p_desc, p_created_at, p_created_at,
+            p_requested_at, CAST(p_requested_at AS DATE), p_source, p_requested_by, p_key, p_purpose)
     RETURNING id
 $$ LANGUAGE sql;
 
@@ -253,7 +249,11 @@ DECLARE
     v_horse TEXT;
     v_type TEXT; v_title TEXT; v_message TEXT;
 BEGIN
-    UPDATE care_schedule SET veterinarian_id = p_vet, scheduled_at = p_slot, status = 'SCHEDULED', updated_at = p_at
+    UPDATE care_schedule SET veterinarian_id = p_vet,
+                             scheduled_at = CASE WHEN care_type = 'URGENT' THEN p_slot ELSE NULL END,
+                             scheduled_date = CAST(p_slot AS DATE),
+                             status = 'SCHEDULED',
+                             updated_at = p_at
      WHERE id = p_schedule RETURNING * INTO c;
     SELECT name INTO v_horse FROM horses WHERE id = c.horse_id;
     IF c.care_type = 'INITIAL' AND c.admission_id IS NOT NULL THEN
@@ -296,16 +296,13 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION pg_temp.start_care(p_schedule BIGINT) RETURNS VOID AS $$
-    UPDATE care_schedule SET status = 'IN_PROGRESS', updated_at = scheduled_at WHERE id = p_schedule
+    UPDATE care_schedule SET status = 'IN_PROGRESS', updated_at = COALESCE(scheduled_at, created_at, pg_temp.clock()) WHERE id = p_schedule
 $$ LANGUAGE sql;
 
--- Quản lý hủy một lịch đã xếp (chỉ SCHEDULED, kèm lý do). (The manager cancels a booked schedule, with a reason.)
+-- AD-022 / AD-025: Xóa một lịch đã xếp chưa diễn ra (thay thế cho việc hủy ca).
 CREATE FUNCTION pg_temp.cancel_care(p_schedule BIGINT, p_reason TEXT, p_at TIMESTAMP) RETURNS VOID AS $$
 BEGIN
-    IF (SELECT status FROM care_schedule WHERE id = p_schedule) <> 'SCHEDULED' THEN
-        RAISE EXCEPTION 'Only SCHEDULED care schedules can be cancelled (schedule %)', p_schedule;
-    END IF;
-    UPDATE care_schedule SET status = 'CANCELLED', cancel_reason = p_reason, updated_at = p_at WHERE id = p_schedule;
+    DELETE FROM care_schedule WHERE id = p_schedule;
 END $$ LANGUAGE plpgsql;
 
 -- Lịch tái khám sinh ra khi hoàn tất một ca (createNextSchedule): ROUTINE, một-một với ca nguồn qua source_schedule_id.
@@ -371,13 +368,13 @@ DECLARE
 BEGIN
     IF (SELECT current_status FROM horses WHERE id = p_horse) = 'REJECTED' THEN RETURN NULL; END IF;
     SELECT * INTO m FROM care_schedule
-     WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS');
+     WHERE horse_id = p_horse AND purpose = 'PREVENTIVE' AND status IN ('SCHEDULED', 'IN_PROGRESS');
     SELECT min(due) INTO v_target FROM pg_temp.due_list(p_horse, p_missing_due, v_on);
     IF v_target IS NULL THEN RETURN m.id; END IF;
     v_req := (CASE WHEN v_target > v_on THEN v_target ELSE v_on + 1 END) + TIME '14:00';
     IF m.id IS NOT NULL THEN
         IF m.status = 'IN_PROGRESS' THEN RETURN m.id; END IF;
-        IF m.status = 'REQUESTED' THEN
+        IF m.veterinarian_id IS NULL THEN
             UPDATE care_schedule SET requested_at = v_req, description = pg_temp.describe_due(p_horse, p_missing_due, v_on, v_req::DATE),
                                      updated_at = p_at
              WHERE id = m.id;
@@ -389,9 +386,7 @@ BEGIN
              WHERE id = m.id;
             RETURN m.id;
         END IF;
-        UPDATE care_schedule SET status = 'CANCELLED', updated_at = p_at,
-                                 cancel_reason = 'Vaccinated early in a combined visit on ' || to_char(v_on, 'DD/MM')
-         WHERE id = m.id;
+        DELETE FROM care_schedule WHERE id = m.id;
     END IF;
     SELECT a.id INTO v_admission FROM admission_applications a
      WHERE a.horse_id = p_horse AND a.status NOT IN ('APPROVED', 'REJECTED') ORDER BY a.submitted_at DESC LIMIT 1;
@@ -511,7 +506,7 @@ BEGIN
     IF p_defer_days IS NOT NULL THEN
         PERFORM pg_temp.upsert_milestone(h.id, 'preventive:' || v_hr, c.veterinarian_id, p_at::DATE, p_at);
         UPDATE care_schedule SET requested_at = (p_at::DATE + p_defer_days) + TIME '14:00', reschedule_reason = 'UNDER_TREATMENT'
-         WHERE horse_id = h.id AND purpose = 'PREVENTIVE' AND status = 'REQUESTED';
+         WHERE horse_id = h.id AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED';
     ELSIF v_has_vaccines THEN
         PERFORM pg_temp.upsert_milestone(h.id, 'preventive:' || v_hr, c.veterinarian_id,
                                          CASE WHEN c.care_type = 'INITIAL' THEN NULL ELSE p_at::DATE END, p_at);
@@ -557,10 +552,11 @@ CREATE FUNCTION pg_temp.child_of(p_source BIGINT) RETURNS BIGINT AS $$
     SELECT id FROM care_schedule WHERE source_schedule_id = p_source
 $$ LANGUAGE sql STABLE;
 
--- Sự cố do Groom báo (createReport): mở ca khẩn cấp nếu ngựa chưa có, chặn tập, giao Thú y ngay.
--- (An incident reported by a groom: opens an urgent case if none is open, blocks training, assigns a vet at once.)
+-- Sự cố do Groom báo (createReport): mở ca khẩn cấp nếu ngựa chưa có, giao Thú y nếu p_auto_assign=TRUE.
+-- (An incident reported by a groom: opens an urgent case if none is open, assigns a vet if p_auto_assign=TRUE.)
 CREATE FUNCTION pg_temp.report_incident(p_horse BIGINT, p_reporter BIGINT, p_at TIMESTAMP, p_title TEXT, p_desc TEXT,
-                                        p_severity TEXT, p_vet BIGINT, p_image TEXT DEFAULT NULL) RETURNS BIGINT AS $$
+                                        p_severity TEXT, p_vet BIGINT, p_image TEXT DEFAULT NULL,
+                                        p_auto_assign BOOLEAN DEFAULT TRUE) RETURNS BIGINT AS $$
 DECLARE
     v_incident BIGINT;
     v_schedule BIGINT;
@@ -568,20 +564,29 @@ DECLARE
 BEGIN
     INSERT INTO horse_incident_reports (reported_by_id, horse_id, title, description, severity, reported_at, status,
                                         image_url)
-    VALUES (p_reporter, p_horse, p_title, p_desc, p_severity, p_at, 'REPORTED', pg_temp.file_key(p_image)) RETURNING id INTO v_incident;
+    VALUES (p_reporter, p_horse, p_title, p_desc, p_severity, p_at, 'REPORTED',
+            (SELECT doc.file_url FROM seed_doc doc WHERE doc.doc_type = 'HORSE_PHOTO'
+              AND lower(doc.horse_k) = substring(p_image FROM '/(h[0-9]+)-')))
+    RETURNING id INTO v_incident;
     SELECT id INTO v_schedule FROM care_schedule
-     WHERE horse_id = p_horse AND care_type = 'URGENT' AND status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS');
+     WHERE horse_id = p_horse AND care_type = 'URGENT' AND status IN ('SCHEDULED', 'IN_PROGRESS');
     IF v_schedule IS NULL THEN
         v_schedule := pg_temp.new_schedule(p_horse, 'URGENT', 'FOLLOW_UP', p_desc, NULL, p_at, NULL, v_incident);
-        PERFORM pg_temp.block(p_horse, 'Urgent veterinary care pending: ' || p_desc, p_at);
-        -- Thú y rảnh lúc này, ưu tiên p_vet. (A vet free right now, preferring p_vet.)
-        SELECT u.id INTO v_vet FROM users u JOIN roles r ON r.id = u.role_id
-         WHERE r.name = 'VETERINARIAN' AND u.is_active AND NOT pg_temp.vet_busy(u.id, p_at, 30, NULL)
-         ORDER BY (u.id = p_vet) DESC, u.id LIMIT 1;
-        PERFORM pg_temp.assign(v_schedule, v_vet, p_at, p_at);
-        UPDATE horse_incident_reports SET status = 'IN_REVIEW', handled_by_id = v_vet, handled_at = p_at WHERE id = v_incident;
+        IF p_auto_assign THEN
+            -- Thú y rảnh lúc này, ưu tiên p_vet. (A vet free right now, preferring p_vet.)
+            SELECT u.id INTO v_vet FROM users u JOIN roles r ON r.id = u.role_id
+             WHERE r.name = 'VETERINARIAN' AND u.is_active AND NOT pg_temp.vet_busy(u.id, p_at, 30, NULL)
+             ORDER BY (u.id = p_vet) DESC, u.id LIMIT 1;
+            IF v_vet IS NOT NULL THEN
+                PERFORM pg_temp.assign(v_schedule, v_vet, p_at, p_at);
+                UPDATE horse_incident_reports SET status = 'IN_REVIEW', handled_by_id = v_vet, handled_at = p_at WHERE id = v_incident;
+            END IF;
+        END IF;
     ELSE
-        PERFORM pg_temp.block(p_horse, 'Urgent veterinary care pending', p_at);
+        IF p_auto_assign THEN
+            UPDATE horse_incident_reports r SET status = 'IN_REVIEW', handled_by_id = c.veterinarian_id, handled_at = p_at
+              FROM care_schedule c WHERE r.id = v_incident AND c.id = v_schedule AND c.veterinarian_id IS NOT NULL;
+        END IF;
     END IF;
     UPDATE horse_incident_reports SET care_schedule_id = v_schedule WHERE id = v_incident;
     RETURN v_incident;

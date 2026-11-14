@@ -19,8 +19,10 @@ export default function ScheduleDetailPage() {
   const searchParams = useSearchParams();
   const scheduleId = Number(params?.scheduleId);
   // Opened from the admission queue? Return there instead of the timeline.
-  const backHref = searchParams.get('back') === 'admissions' ? '/veterinarian/admissions' : '/veterinarian/schedule';
-  const backLabel = searchParams.get('back') === 'admissions' ? 'Back to Admissions' : 'Back to Schedule';
+  const fromAdmissions = searchParams.get('back') === 'admissions';
+  const backHref = fromAdmissions ? '/veterinarian/admissions' : '/veterinarian/schedule';
+  const successHref = fromAdmissions ? '/veterinarian/admissions?tab=APPROVED' : '/veterinarian/schedule';
+  const backLabel = fromAdmissions ? 'Back to Admissions' : 'Back to Schedule';
   const [detail, setDetail] = useState<CareScheduleDetail | null>(null);
   const [documents, setDocuments] = useState<AdmissionDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,20 +74,9 @@ export default function ScheduleDetailPage() {
   // Completed schedules share the unified View Record screen (Routine/Health/Schedule).
   useEffect(() => {
     if (isCompleted && !Number.isNaN(scheduleId)) {
-      router.replace(`/veterinarian/records?scheduleId=${scheduleId}&back=schedule`);
+      router.replace(`/veterinarian/records?scheduleId=${scheduleId}&back=${fromAdmissions ? 'admissions' : 'schedule'}`);
     }
-  }, [isCompleted, scheduleId, router]);
-
-  // The timeline card already asked to start the exam; entering this page auto-starts it once.
-  const autoStartRef = useRef(false);
-  useEffect(() => {
-    if (detail?.schedule?.status === 'SCHEDULED' && !autoStartRef.current) {
-      autoStartRef.current = true;
-      handleStartExam().catch(() => {
-        // The form stays gated; the vet can still use the manual Start Examination button.
-      });
-    }
-  }, [detail, handleStartExam]);
+  }, [isCompleted, scheduleId, router, fromAdmissions]);
 
   return (
     <RoleGuard allowedRoles={['VETERINARIAN']}>
@@ -120,6 +111,7 @@ export default function ScheduleDetailPage() {
                 scheduledAt={detail.schedule.scheduledAt ?? detail.schedule.scheduledDate}
                 horseName={detail.horse?.name}
                 horseBreed={detail.horse?.breed}
+                horseId={detail.horse?.id}
                 veterinarianName={detail.veterinarian?.fullName}
               />
               {error && (
@@ -130,12 +122,13 @@ export default function ScheduleDetailPage() {
                 careScheduleId={detail.schedule.id}
                 careType={detail.schedule.careType}
                 scheduleStatus={detail.schedule.status}
+                scheduledDate={detail.schedule.scheduledDate ?? detail.schedule.scheduledAt}
                 schedulePurpose={detail.schedule.purpose}
                 candidateName={detail.horse?.name}
                 horseId={detail.schedule.horseId ?? undefined}
                 documents={documents}
                 onStartExam={handleStartExam}
-                onSuccess={() => router.push(backHref)}
+                onSuccess={() => router.push(successHref)}
               />
             </div>
           )

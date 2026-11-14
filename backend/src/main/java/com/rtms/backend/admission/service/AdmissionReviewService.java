@@ -119,32 +119,23 @@ public class AdmissionReviewService {
                 || (before.getStatus() == AdmissionStatus.VET_REVIEW && schedule.getCareType() != CareType.INITIAL)) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "Examination does not belong to this admission review");
         }
-        if (schedule.getStatus() == CareScheduleStatus.REQUESTED) {
+        if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
             Long assignedVetId = schedule.getVeterinarianId() != null
                     ? schedule.getVeterinarianId()
                     : before.getVeterinarianId();
 
-            if (assignedVetId == null) {
-                schedule.setVeterinarianId(actorId);
-                schedule.setScheduledAt(java.time.LocalDateTime.now());
-                schedule.setStatus(CareScheduleStatus.SCHEDULED);
-                careSchedules.save(schedule);
-                careScheduleService.startCareSchedule(schedule.getId(), actorId);
-            } else if (java.util.Objects.equals(assignedVetId, actorId)) {
+            if (assignedVetId == null || java.util.Objects.equals(assignedVetId, actorId)) {
                 schedule.setVeterinarianId(actorId);
                 if (schedule.getScheduledAt() == null) {
                     schedule.setScheduledAt(java.time.LocalDateTime.now());
                 }
-                schedule.setStatus(CareScheduleStatus.SCHEDULED);
                 careSchedules.save(schedule);
                 careScheduleService.startCareSchedule(schedule.getId(), actorId);
             } else {
                 throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
                         "Only the assigned veterinarian can review this examination");
             }
-        } else if (schedule.getStatus() == CareScheduleStatus.SCHEDULED || schedule.getStatus() == CareScheduleStatus.PAUSED) {
-            careScheduleService.startCareSchedule(schedule.getId(), actorId);
-        } else if (schedule.getStatus() != CareScheduleStatus.IN_PROGRESS) {
+        } else if (!CareScheduleStatus.ACTIVE_EXAM.contains(schedule.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
                     "Start the examination before submitting a review");
         }
@@ -259,15 +250,10 @@ public class AdmissionReviewService {
         Horse horse = horseId != null ? horses.findById(horseId).orElse(null) : null;
         LocalDateTime now = LocalDateTime.now();
 
-        // Cancel every open schedule for this horse; keep completed history untouched.
+        // Tự động chuyển CANCELLED các lịch chưa diễn ra của ngựa khi vet từ chối nhập viện.
         if (horseId != null) {
-            List<CareSchedule> openSchedules = careSchedules.findByHorseIdAndStatusIn(horseId,
-                    List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
-            for (CareSchedule cs : openSchedules) {
-                cs.setStatus(CareScheduleStatus.CANCELLED);
-                cs.setCancelReason("Admission rejected by veterinarian");
-            }
-            careSchedules.saveAll(openSchedules);
+            careSchedules.cancelOpenSchedulesIfUnreferenced(horseId, CareScheduleStatus.OPEN,
+                    "Admission application rejected during veterinary review: " + reason, now);
         }
 
         // Release the quarantine stall if one is recorded for this admission.
@@ -299,7 +285,6 @@ public class AdmissionReviewService {
         admissionNotificationService.notifyManagersOfAdmissionRejection(admission, horseName,
                 "Veterinary Clinical Review", reason);
 
-        admissionGroomReviewService.allocateWaitingAdmissions();
 
         if (auditLogService != null) {
             auditLogService.recordDomainEvent(DomainAuditEvent.builder()

@@ -1,11 +1,12 @@
 package com.rtms.backend.stable.service;
 
+import com.rtms.backend.admission.service.GroomAssignmentTriggers;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.repository.*;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -47,8 +48,8 @@ class StableAssignmentPostgresTest {
     @Autowired UserRepository users;
     @Autowired GroomProfileRepository profiles;
     @Autowired HorseRepository horses;
-    @Autowired GroupWorkoutSyncService workouts;
-    @Autowired com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
+    @Autowired TrainingGroupService workouts;
+    @Autowired GroomAssignmentTriggers groomAssignmentTriggers;
     @Autowired EntityManager em;
     @Autowired AreaTrainerAssignmentPolicy trainerPolicy;
     @Autowired com.rtms.backend.identity.service.StaffManagementService staffManagement;
@@ -114,8 +115,8 @@ class StableAssignmentPostgresTest {
     }
     long session() {
         return jdbc.queryForObject("""
-            INSERT INTO training_lots(trainer_id,subject_id,lot_date,start_time,end_time)
-            SELECT ?,id,CURRENT_DATE+1,'08:00','09:00' FROM subjects ORDER BY id LIMIT 1 RETURNING id
+            INSERT INTO training_lots(trainer_id,exercise_id,lot_date,start_time,end_time)
+            SELECT ?,id,CURRENT_DATE+1,'08:00','09:00' FROM exercises ORDER BY id LIMIT 1 RETURNING id
             """, Long.class, trainer1);
     }
     void workout(long horse, long session, long groom, String status) {
@@ -127,7 +128,7 @@ class StableAssignmentPostgresTest {
     }
     StableAssignmentService independentService(GroomProfileRepository profileRepository) {
         return new StableAssignmentService(areas, stalls, users, profileRepository, horses, workouts, em, trainerPolicy,
-                admissionAllocation);
+                groomAssignmentTriggers);
     }
     String emptyAssignmentJson(long target, long groom) {
         return "{\"groomAssignments\":[{\"areaId\":" + target + ",\"blockNumber\":1,\"groomId\":" + groom

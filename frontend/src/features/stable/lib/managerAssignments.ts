@@ -121,7 +121,9 @@ export function planAssignment(data: StableSnapshot, current: AssignmentDraft, t
     if (t.kind !== 'groom') return;
     const rows = blockStalls(data, t.areaId, t.blockNumber);
     if (rows.length !== 3) throw new Error('This block does not contain three stalls. Refresh the board.');
-    if (id == null && rows.some(s => horses.has(s.id))) throw new Error('This block has horses. Swap Groom instead of removing.');
+    if (id == null && rows.some(s => horses.has(s.id) || s.status === 'OCCUPIED' || s.status === 'RESERVED')) {
+      throw new Error('This block has active horses or reserved stalls. Swap Groom instead of removing.');
+    }
     rows.forEach(s => { next.grooms[s.id] = id; }); touch(t);
   };
   if (personId != null && !(target.kind === 'trainer' ? data.trainers : data.grooms).some(u => u.id === personId)) {
@@ -147,6 +149,12 @@ export function planAssignment(data: StableSnapshot, current: AssignmentDraft, t
         const sourceIds = blockStalls(data, source.areaId, source.blockNumber).map(s => current.grooms[s.id]);
         if (oldIds.length > 1 || sourceIds.length !== 3 || sourceIds.some(id => id !== personId)) {
           throw new Error('Resolve the mixed block before swapping this Groom.');
+        }
+        if (oldIds[0] == null) {
+          const sourceRows = blockStalls(data, source.areaId, source.blockNumber);
+          if (sourceRows.some(s => horses.has(s.id) || s.status === 'OCCUPIED' || s.status === 'RESERVED')) {
+            throw new Error('This Groom is already assigned to another block. Swap Groom instead of moving.');
+          }
         }
         setBlock(source, oldIds[0] ?? null);
       }

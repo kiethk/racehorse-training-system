@@ -4,11 +4,15 @@ import dynamic from 'next/dynamic';
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { Input, Select } from '@/components/ui/Input';
-import { zoneById, worldToNormalized } from '@/features/vet/lib/injuryZones';
+import { Input } from '@/components/ui/Input';
+import {
+  markerZoneLabel,
+  matchBodyRegion,
+  regionKeyLabel,
+  worldToNormalized,
+} from '@/features/vet/lib/injuryZones';
 import type { HorseBodyRegion } from '@/features/health/types';
 import type { CreateInjuryMarkerRequest } from '../../types';
-import { INJURY_SEVERITY_OPTIONS } from './constants';
 
 const UrgentHorseInjuryViewer = dynamic(
   () => import('@/features/vet/components/UrgentHorseInjuryViewer'),
@@ -20,20 +24,15 @@ export interface InjuryMarker {
   position: [number, number, number];
   normal: [number, number, number];
   zoneId?: string;
-  /** Free-text injury type required by the backend. */
-  injuryType: string;
-  /** Maps to a real horse body region from the catalog. */
+  /** Maps to a real horse body region from the catalog (resolved from 3D hit). */
   bodyRegionId?: number | null;
   description?: string;
-  severity: string;
 }
 
 export function buildInjuryMarkerRequests(markers: InjuryMarker[]): CreateInjuryMarkerRequest[] {
   return markers.map((m) => ({
-    injuryType: m.injuryType.trim() || 'UNSPECIFIED',
     bodyRegionId: m.bodyRegionId ?? 1,
-    severity: m.severity || 'MODERATE',
-    description: m.description?.trim() || undefined,
+    description: m.description?.trim() || '',
     diagnosedAt: new Date().toISOString(),
     positionX: m.position[0],
     positionY: m.position[1],
@@ -45,7 +44,6 @@ export function buildInjuryMarkerRequests(markers: InjuryMarker[]): CreateInjury
     normalX: m.normal[0],
     normalY: m.normal[1],
     normalZ: m.normal[2],
-    meshName: 'Horse.001_M_Body_0',
   }));
 }
 
@@ -63,6 +61,12 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
   const { markers, setMarkers, bodyRegions, readOnly, onAppendToFindings, fieldErrors, setFieldErrors } = props;
   const [isAddMode, setIsAddMode] = useState(false);
 
+  const clearMarkerErrors = () => {
+    if (setFieldErrors && fieldErrors?.injuryMarkers) {
+      setFieldErrors((prev) => ({ ...prev, injuryMarkers: '' }));
+    }
+  };
+
   const handleInjuryHit = (hit: {
     position: [number, number, number];
     normal: [number, number, number];
@@ -72,26 +76,22 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `marker-${Date.now()}`;
-    const zone = hit.zoneId ? zoneById(hit.zoneId) : undefined;
-    const zoneName = zone?.label ?? 'Unspecified';
+    const region = matchBodyRegion(bodyRegions, hit.zoneId);
+    const zoneName = region?.displayName ?? regionKeyLabel(hit.zoneId) ?? 'Unspecified';
     const newMarker: InjuryMarker = {
       id,
       position: hit.position,
       normal: hit.normal,
       zoneId: hit.zoneId,
-      injuryType: '',
-      bodyRegionId: bodyRegions.length ? bodyRegions[0].id : null,
+      bodyRegionId: region?.id ?? (bodyRegions.length ? bodyRegions[0].id : null),
       description: '',
-      severity: 'MODERATE',
     };
     setMarkers((prev) => [...prev, newMarker]);
     if (onAppendToFindings) {
       const line = `- 3D injury marker [${zoneName}] at [${hit.position.map((n) => n.toFixed(2)).join(', ')}]`;
       onAppendToFindings(line);
     }
-    if (setFieldErrors && fieldErrors?.injuryMarkers) {
-      setFieldErrors((prev) => ({ ...prev, injuryMarkers: '' }));
-    }
+    clearMarkerErrors();
   };
 
   const handleDeleteMarker = (id: string) => {
@@ -103,18 +103,16 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
       prev.map((m) => {
         if (m.id !== id) return m;
         const next = { ...m, ...updates };
-        if ('injuryType' in updates && setFieldErrors && fieldErrors?.[`injuryType:${id}`]) {
-          setFieldErrors((errs) => ({ ...errs, [`injuryType:${id}`]: '' }));
-        }
-        if ('bodyRegionId' in updates && setFieldErrors && fieldErrors?.[`bodyRegionId:${id}`]) {
-          setFieldErrors((errs) => ({ ...errs, [`bodyRegionId:${id}`]: '' }));
+        if ('description' in updates && setFieldErrors && fieldErrors?.[`description:${id}`]) {
+          setFieldErrors((errs) => ({ ...errs, [`description:${id}`]: '' }));
         }
         return next;
       }),
     );
   };
 
-  const regionOptions = bodyRegions.length ? bodyRegions : [];
+  /** Zone label per agreed priority: bodyRegionId → zoneId (canonical, then legacy). */
+  const zoneLabelOf = (marker: InjuryMarker) => markerZoneLabel(bodyRegions, marker);
 
   return (
     <div className="space-y-4">
@@ -135,7 +133,7 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
       </div>
 
       <UrgentHorseInjuryViewer
-        injuries={markers}
+        injuries={markers.map((m) => ({ ...m, label: zoneLabelOf(m) }))}
         isAddMode={isAddMode}
         readOnly={readOnly}
         onPointerHit={handleInjuryHit}
@@ -170,7 +168,7 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
         ) : (
           <div className="space-y-3">
             {markers.map((marker, index) => {
-              const zoneName = (marker.zoneId && zoneById(marker.zoneId)?.label) || 'Unspecified';
+              const zoneName = zoneLabelOf(marker) ?? 'Unspecified';
               return (
                 <div
                   key={marker.id}
@@ -180,9 +178,6 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
                     <div className="flex items-center gap-2">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-danger)] text-[10px] font-bold text-[var(--color-text-inverse)]">
                         {index + 1}
-                      </span>
-                      <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                        {marker.injuryType || `Marker ${index + 1}`}
                       </span>
                       <span className="rounded bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-secondary)]">
                         Zone: {zoneName}
@@ -203,101 +198,27 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
                     )}
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label
-                        htmlFor={`marker-type-${marker.id}`}
-                        className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
-                      >
-                        Injury type <span className="text-[var(--color-danger)]">*</span>
-                      </label>
-                      <Input
-                        id={`marker-type-${marker.id}`}
-                        type="text"
-                        placeholder="e.g. SDFT strain, laceration, cellulitis"
-                        value={marker.injuryType}
-                        disabled={readOnly}
-                        onChange={(e) => handleUpdateMarker(marker.id, { injuryType: e.target.value })}
-                        className="text-xs"
-                      />
-                      {fieldErrors?.[`injuryType:${marker.id}`] && (
-                        <p className="mt-1 text-xs text-[var(--color-danger)]">
-                          {fieldErrors[`injuryType:${marker.id}`]}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor={`marker-region-${marker.id}`}
-                        className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
-                      >
-                        Body region <span className="text-[var(--color-danger)]">*</span>
-                      </label>
-                      <Select
-                        id={`marker-region-${marker.id}`}
-                        value={marker.bodyRegionId ?? ''}
-                        disabled={readOnly || regionOptions.length === 0}
-                        onChange={(e) =>
-                          handleUpdateMarker(marker.id, { bodyRegionId: Number(e.target.value) })
-                        }
-                        className="text-xs"
-                      >
-                        {regionOptions.length === 0 && (
-                          <option value="">Loading regions…</option>
-                        )}
-                        {regionOptions.map((region) => (
-                          <option key={region.id} value={region.id}>
-                            {region.displayName}
-                          </option>
-                        ))}
-                      </Select>
-                      {fieldErrors?.[`bodyRegionId:${marker.id}`] && (
-                        <p className="mt-1 text-xs text-[var(--color-danger)]">
-                          {fieldErrors[`bodyRegionId:${marker.id}`]}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor={`marker-severity-${marker.id}`}
-                        className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
-                      >
-                        Severity
-                      </label>
-                      <Select
-                        id={`marker-severity-${marker.id}`}
-                        value={marker.severity}
-                        disabled={readOnly}
-                        onChange={(e) => handleUpdateMarker(marker.id, { severity: e.target.value })}
-                        className="text-xs"
-                      >
-                        {INJURY_SEVERITY_OPTIONS.map((severity) => (
-                          <option key={severity} value={severity}>
-                            {severity}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor={`marker-note-${marker.id}`}
-                        className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
-                      >
-                        Clinical note
-                      </label>
-                      <Input
-                        id={`marker-note-${marker.id}`}
-                        type="text"
-                        placeholder="Enter clinical observation, swelling, pain response, wound details…"
-                        value={marker.description || ''}
-                        disabled={readOnly}
-                        onChange={(e) => handleUpdateMarker(marker.id, { description: e.target.value })}
-                        className="text-xs"
-                      />
-                    </div>
+                  <div>
+                    <label
+                      htmlFor={`marker-note-${marker.id}`}
+                      className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
+                    >
+                      Clinical note (Optional)
+                    </label>
+                    <Input
+                      id={`marker-note-${marker.id}`}
+                      type="text"
+                      placeholder="Optional: enter specific details or leave blank to use region name"
+                      value={marker.description || ''}
+                      disabled={readOnly}
+                      onChange={(e) => handleUpdateMarker(marker.id, { description: e.target.value })}
+                      className="text-xs"
+                    />
+                    {fieldErrors?.[`description:${marker.id}`] && (
+                      <p className="mt-1 text-xs text-[var(--color-danger)]">
+                        {fieldErrors[`description:${marker.id}`]}
+                      </p>
+                    )}
                   </div>
                 </div>
               );

@@ -30,10 +30,149 @@ BEGIN
 
     -- Lịch đang chờ đã vào cửa sổ 14 ngày thì đã được xếp giờ. (Pending schedules inside the 14-day horizon are booked.)
     FOR c IN SELECT cs.id, cs.horse_id FROM care_schedule cs
-              WHERE cs.status = 'REQUESTED' AND cs.care_type = 'ROUTINE'
+              WHERE cs.status = 'SCHEDULED' AND cs.veterinarian_id IS NULL AND cs.care_type = 'ROUTINE'
                 AND GREATEST(cs.created_at, cs.requested_at - INTERVAL '14 days') <= pg_temp.clock()
               ORDER BY cs.requested_at
     LOOP
         PERFORM pg_temp.book(c.id, NULL, pg_temp.clock());
     END LOOP;
+
+    -- ---------------------------------------------------------------------
+    -- Showcase Care Scheduling V2: Dữ liệu mẫu Routine & Preventive hôm nay cho Dr. James Carter (VT01)
+    -- Routine max 3 ca/ngày, Preventive max 3 ca/ngày, Admission max 2 ca/ngày
+    -- ---------------------------------------------------------------------
+    DECLARE
+        v_routine_ids BIGINT[];
+        v_prev_ids BIGINT[];
+        v_cs RECORD;
+    BEGIN
+        -- Đảm bảo tất cả ca Routine, Preventive và Initial đều lên lịch theo ngày (scheduled_at = NULL)
+        -- và luôn ở trạng thái SCHEDULED (không có IN_PROGRESS)
+        UPDATE care_schedule
+           SET scheduled_at = NULL,
+               status = 'SCHEDULED'
+         WHERE (care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE')
+           AND status = 'IN_PROGRESS';
+
+        UPDATE care_schedule SET scheduled_at = NULL WHERE care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE';
+
+        -- Dời các ca Preventive đã hoàn tất hôm nay về hôm qua để hôm nay không bị tràn quota (> 3)
+        UPDATE care_schedule
+           SET scheduled_date = pg_temp.today() - 1,
+               completed_at = (pg_temp.today() - 1) + TIME '14:20'
+         WHERE veterinarian_id = pg_temp.uid('VT01')
+           AND purpose = 'PREVENTIVE'
+           AND status = 'COMPLETED'
+           AND scheduled_date = pg_temp.today();
+
+        -- Lấy các ca Routine lâm sàng (purpose != 'PREVENTIVE') hôm nay của VT01 đang SCHEDULED
+        SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_routine_ids
+          FROM (SELECT id FROM care_schedule
+                 WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                   AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
+                   AND scheduled_date = pg_temp.today()
+                 LIMIT 3) s;
+
+        -- Nếu chưa đủ 2 ca Routine lâm sàng, kéo từ tương lai về hôm nay
+        IF COALESCE(array_length(v_routine_ids, 1), 0) < 2 THEN
+            FOR v_cs IN SELECT id FROM care_schedule
+                         WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                           AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
+                           AND scheduled_date > pg_temp.today()
+                         ORDER BY scheduled_date ASC, id ASC LIMIT (2 - COALESCE(array_length(v_routine_ids, 1), 0)) LOOP
+                UPDATE care_schedule SET scheduled_date = pg_temp.today(), scheduled_at = NULL WHERE id = v_cs.id;
+            END LOOP;
+            SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_routine_ids
+              FROM (SELECT id FROM care_schedule
+                     WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                       AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
+                       AND scheduled_date = pg_temp.today()
+                     LIMIT 3) s;
+        END IF;
+
+        -- Routine Slot 1: Ca bình thường chờ khám
+        IF v_routine_ids[1] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET status = 'SCHEDULED', rollover_count = 0, reschedule_reason = NULL, reschedule_note = NULL
+             WHERE id = v_routine_ids[1];
+        END IF;
+
+        -- Routine Slot 2: Ca dời lịch từ hôm qua do hết giờ (Rolled 1x)
+        IF v_routine_ids[2] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET status = 'SCHEDULED', rollover_count = 1,
+                    reschedule_reason = 'TIME_EXCEEDED',
+                    reschedule_note = 'Routine examination window closed at 15:30, rescheduled to next day'
+             WHERE id = v_routine_ids[2];
+        END IF;
+
+        -- Lấy các ca Preventive tiêm phòng (purpose = 'PREVENTIVE') hôm nay của VT01 đang SCHEDULED
+        SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_prev_ids
+          FROM (SELECT id FROM care_schedule
+                 WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                   AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
+                   AND scheduled_date = pg_temp.today()
+                 LIMIT 3) s;
+
+        -- Nếu chưa đủ 2 ca Preventive, kéo từ tương lai về hôm nay
+        IF COALESCE(array_length(v_prev_ids, 1), 0) < 2 THEN
+            FOR v_cs IN SELECT id FROM care_schedule
+                         WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                           AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
+                           AND scheduled_date > pg_temp.today()
+                         ORDER BY scheduled_date ASC, id ASC LIMIT (2 - COALESCE(array_length(v_prev_ids, 1), 0)) LOOP
+                UPDATE care_schedule SET scheduled_date = pg_temp.today(), scheduled_at = NULL WHERE id = v_cs.id;
+            END LOOP;
+            SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_prev_ids
+              FROM (SELECT id FROM care_schedule
+                     WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                       AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
+                       AND scheduled_date = pg_temp.today()
+                     LIMIT 3) s;
+        END IF;
+
+        -- Preventive Slot 1: Chờ tiêm bình thường
+        IF v_prev_ids[1] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET status = 'SCHEDULED', rollover_count = 0, reschedule_reason = NULL, reschedule_note = NULL
+             WHERE id = v_prev_ids[1];
+        END IF;
+
+        -- Preventive Slot 2: San sẻ từ bác sĩ khác (Transferred)
+        IF v_prev_ids[2] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET status = 'SCHEDULED', rollover_count = 0,
+                    reschedule_reason = 'PEER_OFFLOAD',
+                    reschedule_note = 'Transferred from Dr. Emily Wilson (VT02) due to emergency case workload'
+             WHERE id = v_prev_ids[2];
+        END IF;
+
+        -- Preventive Slot 3: Dời lịch từ hôm qua (Rolled 1x) nếu có
+        IF v_prev_ids[3] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET status = 'SCHEDULED', rollover_count = 1,
+                    reschedule_reason = 'TIME_EXCEEDED',
+                    reschedule_note = 'Preventive vaccination window closed at 15:30, rescheduled to next day'
+             WHERE id = v_prev_ids[3];
+        END IF;
+
+        -- Làm đẹp thêm cho ngày mai: xếp 1 ca Routine và 1 ca Preventive nếu có ca tương lai
+        UPDATE care_schedule
+           SET scheduled_at = NULL,
+               scheduled_date = pg_temp.today() + 1
+         WHERE id = (SELECT id FROM care_schedule
+                      WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                        AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
+                        AND scheduled_date > pg_temp.today() + 1
+                      ORDER BY scheduled_date ASC, id ASC LIMIT 1);
+
+        UPDATE care_schedule
+           SET scheduled_at = NULL,
+               scheduled_date = pg_temp.today() + 1
+         WHERE id = (SELECT id FROM care_schedule
+                      WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                        AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
+                        AND scheduled_date > pg_temp.today() + 1
+                      ORDER BY scheduled_date ASC, id ASC LIMIT 1);
+    END;
 END $$;

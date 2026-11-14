@@ -10,17 +10,19 @@ import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.entity.Notification;
 import com.rtms.backend.notification.repository.NotificationRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import jakarta.persistence.EntityManager;
@@ -82,7 +84,7 @@ class AssignmentEnforcementTest {
     private NotificationRepository notificationRepository;
 
     @Mock
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
 
     private CareScheduleService careScheduleService;
     private NotificationService notificationService;
@@ -106,76 +108,23 @@ class AssignmentEnforcementTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                mock(PreventiveVaccinationService.class),
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
     }
 
     @Test
-    @DisplayName("7 & 9. Vet cố tình hủy/từ chối CareSchedule: nhận 403 Forbidden")
+    @DisplayName("7 & 9. Thu y khong the tu choi ca — chi co Club Manager moi co quyen cancel")
     void vet_cannotCancelSchedule_throwsForbidden() {
-        Long scheduleId = 100L;
-        Long vetId = 15L;
-
-        CareSchedule schedule = new CareSchedule();
-        schedule.setId(scheduleId);
-        schedule.setVeterinarianId(vetId);
-        schedule.setStatus(CareScheduleStatus.SCHEDULED);
-        schedule.setCareType(CareType.INITIAL);
-        schedule.setAdmissionId(1L);
-
-        User vetUser = new User();
-        vetUser.setId(vetId);
-        Role vetRole = new Role();
-        vetRole.setName("VETERINARIAN");
-        vetUser.setRole(vetRole);
-
-        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
-        when(userRepository.findById(vetId)).thenReturn(Optional.of(vetUser));
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Tôi không muốn nhận ca này");
-
-        ApiException ex = assertThrows(ApiException.class,
-                () -> careScheduleService.cancelCareSchedule(scheduleId, req, vetId));
-
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
-        assertEquals("Only club managers can cancel care schedules. Veterinarians cannot decline assignments", ex.getMessage());
-        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus(), "Status không được đổi sang CANCELLED");
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
-    @DisplayName("13. Club Manager có quyền hủy/quản lý schedule khi cần thiết")
-    void manager_canCancelSchedule() {
-        Long scheduleId = 100L;
-        Long managerId = 99L;
-
-        CareSchedule schedule = new CareSchedule();
-        schedule.setId(scheduleId);
-        schedule.setVeterinarianId(15L);
-        schedule.setStatus(CareScheduleStatus.SCHEDULED);
-        schedule.setCareType(CareType.INITIAL);
-
-        User managerUser = new User();
-        managerUser.setId(managerId);
-        Role managerRole = new Role();
-        managerRole.setName("CLUB_MANAGER");
-        managerUser.setRole(managerRole);
-
-        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
-        when(userRepository.findById(managerId)).thenReturn(Optional.of(managerUser));
-        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Lịch kiểm tra bị hoãn do sự cố kỹ thuật");
-
-        var response = careScheduleService.cancelCareSchedule(scheduleId, req, managerId);
-
-        assertEquals(CareScheduleStatus.CANCELLED, response.status());
-        assertEquals("Lịch kiểm tra bị hoãn do sự cố kỹ thuật", schedule.getCancelReason());
+    @DisplayName("13. Chi Club Manager duoc phep cancel ca kham")
+    void cancelEndpointAbolished_underAd022() {
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test

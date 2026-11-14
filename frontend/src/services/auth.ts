@@ -32,3 +32,21 @@ export async function registerOwner(
 ): Promise<ApiResponse<OwnerRegistrationResponse>> {
   return apiPost<ApiResponse<OwnerRegistrationResponse>>('/api/auth/register', request);
 }
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  accessToken: string;
+  message: string;
+}
+
+export async function changePassword(request: ChangePasswordRequest): Promise<ApiResponse<ChangePasswordResponse>> {
+  const res = await apiPost<ApiResponse<ChangePasswordResponse>>('/api/auth/change-password', request);
+  if (res?.data?.accessToken) {
+    setAccessToken(res.data.accessToken);
+  }
+  return res;
+}

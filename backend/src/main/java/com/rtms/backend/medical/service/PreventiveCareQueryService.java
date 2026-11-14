@@ -45,8 +45,7 @@ public class PreventiveCareQueryService {
     static final Set<HorseStatus> HORSES_IN_SCOPE = EnumSet.of(HorseStatus.CANDIDATE, HorseStatus.ELIGIBLE);
     static final Set<PreventiveDueStatus> DEFAULT_DUE_STATUSES = EnumSet.of(
             PreventiveDueStatus.OVERDUE, PreventiveDueStatus.MISSING, PreventiveDueStatus.DUE_SOON);
-    private static final List<CareScheduleStatus> ACTIVE = List.of(
-            CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+    private static final List<CareScheduleStatus> ACTIVE = CareScheduleStatus.OPEN;
 
     private final PreventiveProtocolRepository protocols;
     private final HorseRepository horses;
@@ -56,17 +55,17 @@ public class PreventiveCareQueryService {
 
     @Autowired
     public PreventiveCareQueryService(PreventiveProtocolRepository protocols, HorseRepository horses,
-            CareScheduleRepository schedules, PreventiveStatusService preventiveStatus) {
-        this(protocols, horses, schedules, preventiveStatus, Clock.systemDefaultZone());
-    }
-
-    PreventiveCareQueryService(PreventiveProtocolRepository protocols, HorseRepository horses,
             CareScheduleRepository schedules, PreventiveStatusService preventiveStatus, Clock clock) {
         this.protocols = protocols;
         this.horses = horses;
         this.schedules = schedules;
         this.preventiveStatus = preventiveStatus;
         this.clock = clock;
+    }
+
+    public PreventiveCareQueryService(PreventiveProtocolRepository protocols, HorseRepository horses,
+            CareScheduleRepository schedules, PreventiveStatusService preventiveStatus) {
+        this(protocols, horses, schedules, preventiveStatus, Clock.systemDefaultZone());
     }
 
     @Transactional(readOnly = true)

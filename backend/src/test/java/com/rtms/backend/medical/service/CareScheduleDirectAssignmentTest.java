@@ -16,14 +16,17 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -51,7 +54,7 @@ class CareScheduleDirectAssignmentTest {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     private CareScheduleService service;
 
     @BeforeEach
@@ -62,7 +65,7 @@ class CareScheduleDirectAssignmentTest {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(GroupWorkoutSyncService.class);
+        workoutService = mock(TrainingGroupService.class);
         service = new CareScheduleService(
                 schedules,
                 horses,
@@ -78,11 +81,10 @@ class CareScheduleDirectAssignmentTest {
                 mock(EntityManager.class),
                 mock(NotificationService.class),
                 new TrainingDecisionService(horses, schedules, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
+                mock(PreventiveVaccinationService.class),
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class));
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
@@ -147,7 +149,7 @@ class CareScheduleDirectAssignmentTest {
 
         service.assignRequestedSchedule(requested);
 
-        assertEquals(CareScheduleStatus.REQUESTED, requested.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
         assertNull(requested.getVeterinarianId());
         assertNull(requested.getScheduledAt());
     }
@@ -200,8 +202,8 @@ class CareScheduleDirectAssignmentTest {
         service.assignRequestedSchedule(requested);
 
         assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
-        assertEquals(day.atTime(8, 0), requested.getScheduledAt(),
-                "Admission exams must fill the working day outside 13:30-15:30 before touching the routine window");
+        assertEquals(day, requested.getScheduledDate());
+        assertNull(requested.getScheduledAt(), "Admission exams are date-based and do not store a minute slot");
     }
 
     @Test
@@ -236,8 +238,8 @@ class CareScheduleDirectAssignmentTest {
         service.assignRequestedSchedule(requested);
 
         assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
-        assertEquals(day.atTime(13, 30), requested.getScheduledAt(),
-                "When the hours outside the window are full, the exam takes a free slot inside it");
+        assertEquals(day, requested.getScheduledDate());
+        assertNull(requested.getScheduledAt(), "When scheduled, admission exams remain date-based with null scheduledAt");
     }
 
     private CareSchedule initialRequest(Long horseId, LocalDateTime requestedAt) {
@@ -249,7 +251,7 @@ class CareScheduleDirectAssignmentTest {
         schedule.setId(600L);
         schedule.setHorseId(horseId);
         schedule.setCareType(CareType.INITIAL);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         schedule.setRequestedAt(requestedAt);
         return schedule;
@@ -265,7 +267,7 @@ class CareScheduleDirectAssignmentTest {
         schedule.setId(500L);
         schedule.setHorseId(horseId);
         schedule.setCareType(CareType.URGENT);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         schedule.setSourceIncidentId(incidentId);
         return schedule;
@@ -277,7 +279,7 @@ class CareScheduleDirectAssignmentTest {
         incident.setGroomId(8L);
         incident.setHorseId(99L);
         incident.setTitle("Acute lameness");
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now());
         when(incidents.findByIdForUpdate(incidentId)).thenReturn(Optional.of(incident));
@@ -308,7 +310,7 @@ class CareScheduleDirectAssignmentTest {
         requested.setId(500L);
         requested.setHorseId(99L);
         requested.setCareType(CareType.URGENT);
-        requested.setStatus(CareScheduleStatus.REQUESTED);
+        requested.setStatus(CareScheduleStatus.SCHEDULED);
         requested.setDurationMinutes(30);
         requested.setSourceIncidentId(700L);
 
@@ -318,7 +320,7 @@ class CareScheduleDirectAssignmentTest {
         incident.setHorseId(99L);
         incident.setTitle("Acute lameness");
         incident.setDescription("Horse cannot bear weight on the left foreleg.");
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now());
         when(incidents.findByIdForUpdate(700L)).thenReturn(Optional.of(incident));
@@ -334,12 +336,12 @@ class CareScheduleDirectAssignmentTest {
         assertEquals(IncidentStatus.IN_REVIEW, incident.getStatus());
         assertEquals(2L, incident.getHandledById());
         assertNotNull(incident.getHandledAt());
-        verify(incidents).save(incident);
-        verify(events).publishEvent(any(com.rtms.backend.event.UrgentAssignmentCommittedEvent.class));
+        verify(incidents).saveAll(List.of(incident));
+        verify(events).publishEvent(any(UrgentAssignmentCommittedEvent.class));
     }
 
     @Test
-    void creatingUrgentScheduleBlocksHorseAndKeepsItRequestedWithoutVet() {
+    void creatingUrgentScheduleKeepsItRequestedWithoutVetAndLeavesTrainingAlone() {
         Horse horse = new Horse();
         horse.setId(99L);
         horse.setName("Rocket");
@@ -354,13 +356,12 @@ class CareScheduleDirectAssignmentTest {
 
         service.createSchedule(99L, CareType.URGENT, "Acute lameness", null, 700L);
 
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        // Chặn tập luôn kéo theo hủy buổi tập tương lai.
-        verify(workoutService).exitAnyGroup(99L);
-        verify(horses).save(horse);
+        // Báo cáo sự cố quyết định việc chặn tập, không phải lịch khám.
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+        verify(workoutService, never()).exitAnyGroup(99L);
         verify(schedules, atLeastOnce()).save(argThat(schedule ->
                 schedule.getCareType() == CareType.URGENT
-                        && schedule.getStatus() == CareScheduleStatus.REQUESTED
+                        && schedule.getStatus() == CareScheduleStatus.SCHEDULED
                         && schedule.getVeterinarianId() == null
                         && schedule.getScheduledAt() == null
                         && Long.valueOf(700L).equals(schedule.getSourceIncidentId())));
@@ -396,7 +397,7 @@ class CareScheduleDirectAssignmentTest {
         schedule.setId(500L);
         schedule.setHorseId(horseId);
         schedule.setCareType(CareType.URGENT);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(30);
         // No source incident here: ranking tests stop before incident handling by using ROUTINE behavior below.
         schedule.setCareType(CareType.ROUTINE);

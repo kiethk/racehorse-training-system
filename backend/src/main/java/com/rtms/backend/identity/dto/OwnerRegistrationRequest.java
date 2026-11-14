@@ -21,11 +21,13 @@ public class OwnerRegistrationRequest {
     private String password;
 
     @Size(max = 20, message = "Phone number must be at most 20 characters")
-    @Pattern(regexp = "^$|^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{9,15}$", message = "Invalid phone number format")
+    @Pattern(regexp = "^$|^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{10,15}$", message = "Invalid phone number format")
     private String phone;
 
     @Size(max = 255, message = "Address must be at most 255 characters")
     private String address;
+
+    private String captchaToken;
 
     // Getters and Setters
 
@@ -67,5 +69,13 @@ public class OwnerRegistrationRequest {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getCaptchaToken() {
+        return captchaToken;
+    }
+
+    public void setCaptchaToken(String captchaToken) {
+        this.captchaToken = captchaToken;
     }
 }

@@ -14,6 +14,7 @@ import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
@@ -41,6 +42,7 @@ public class AdmissionManagerReviewService {
     private final GroomProfileRepository groomProfileRepository;
     private final AdmissionNotificationService admissionNotificationService;
     private final AuditLogService auditLogService;
+    private final CareScheduleService careScheduleService;
 
     @Autowired
     public AdmissionManagerReviewService(
@@ -52,7 +54,8 @@ public class AdmissionManagerReviewService {
             PreventiveStatusService preventiveStatusService,
             GroomProfileRepository groomProfileRepository,
             AdmissionNotificationService admissionNotificationService,
-            AuditLogService auditLogService) {
+            AuditLogService auditLogService,
+            CareScheduleService careScheduleService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.stableStallRepository = stableStallRepository;
         this.horseRepository = horseRepository;
@@ -62,6 +65,7 @@ public class AdmissionManagerReviewService {
         this.groomProfileRepository = groomProfileRepository;
         this.admissionNotificationService = admissionNotificationService;
         this.auditLogService = auditLogService;
+        this.careScheduleService = careScheduleService;
     }
 
     public AdmissionManagerReviewService(
@@ -75,7 +79,7 @@ public class AdmissionManagerReviewService {
             AdmissionNotificationService admissionNotificationService) {
         this(admissionApplicationRepository, stableStallRepository, horseRepository,
              careScheduleRepository, admissionGroomReviewService, preventiveStatusService,
-             groomProfileRepository, admissionNotificationService, null);
+             groomProfileRepository, admissionNotificationService, null, null);
     }
 
     @Transactional
@@ -180,10 +184,13 @@ public class AdmissionManagerReviewService {
         preventiveStatusService.upsertMilestone(horse.getId(), "preventive:approval:" + admission.getId(),
                 managerId, LocalDate.now().plusDays(1));
 
+        if (careScheduleService != null) {
+            careScheduleService.assignPendingSchedulesForHorse(horse.getId());
+        }
+
         admissionGroomReviewService.notifyGroomAssigned(admission, regularStall,
                 horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");
         admissionNotificationService.notifyOwnerApproved(admission, horse, regularStall);
-        admissionGroomReviewService.allocateWaitingAdmissions();
 
         if (auditLogService != null) {
             auditLogService.recordDomainEvent(DomainAuditEvent.builder()
@@ -240,23 +247,19 @@ public class AdmissionManagerReviewService {
         horse.setCurrentStallId(null);
         horseRepository.save(horse);
 
-        // Cancel active CareSchedule records for this horse
+        // Tự động chuyển CANCELLED các lịch chưa diễn ra của ngựa khi manager từ chối nhập viện.
         if (careScheduleRepository != null) {
             List<CareSchedule> nonCancellableSchedules =
-                    careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(), List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS));
+                    careScheduleRepository.findByHorseIdAndStatusIn(horse.getId(),
+                            CareScheduleStatus.ACTIVE_EXAM);
             if (!nonCancellableSchedules.isEmpty()) {
                 throw new IllegalStateException(
-                        "Admission cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS");
+                        "Admission cannot be rejected while veterinary care is IN_PROGRESS");
             }
-            List<CareSchedule> careSchedulesToCancel =
-                    careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
-            for (CareSchedule cs : careSchedulesToCancel) {
-                cs.setStatus(CareScheduleStatus.CANCELLED);
-                cs.setCancelReason("Admission rejected by manager");
-            }
-            careScheduleRepository.saveAll(careSchedulesToCancel);
+            careScheduleRepository.cancelOpenSchedulesIfUnreferenced(
+                    horse.getId(), List.of(CareScheduleStatus.SCHEDULED),
+                    "Admission application rejected by Club Manager: " + feedback,
+                    LocalDateTime.now());
         }
 
         admission.setManagerId(managerId);
@@ -268,7 +271,6 @@ public class AdmissionManagerReviewService {
         admission = admissionApplicationRepository.save(admission);
         admissionNotificationService.notifyOwnerRejected(
                 admission, horse.getName(), "Club Manager Final Review", feedback);
-        admissionGroomReviewService.allocateWaitingAdmissions();
 
         if (auditLogService != null) {
             auditLogService.recordDomainEvent(DomainAuditEvent.builder()

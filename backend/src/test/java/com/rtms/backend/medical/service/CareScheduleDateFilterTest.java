@@ -13,7 +13,6 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
@@ -67,7 +66,7 @@ class CareScheduleDateFilterTest {
                 mock(HorseIncidentReportRepository.class), mock(VeterinarianProfileRepository.class), mock(AuditLogRepository.class),
                 mock(ApplicationEventPublisher.class), mock(EntityManager.class), mock(NotificationService.class),
                 mock(TrainingDecisionService.class), mock(PreventiveVaccinationService.class), mock(InjuryRecordRepository.class),
-                mock(ClinicalMedicationRepository.class), mock(TreatmentPlanRepository.class), mock(PrescriptionRepository.class)
+                mock(TreatmentPlanRepository.class), mock(PrescriptionRepository.class)
         );
     }
 

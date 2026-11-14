@@ -2,11 +2,18 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 describe('Vet Admission Approved State Invariants', () => {
-  it('1. APPROVED admission row displays "View Record" action instead of "Examine"', () => {
-    // Action resolution function mirroring VetAdmissionQueue queueColumns render logic
+  it('1. APPROVED admission or COMPLETED exam row displays "View Record" action instead of "Examine"', () => {
+    function isVetStageCompleted(status: string) {
+      return status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW' || status === 'APPROVED';
+    }
+
+    // Action resolution function mirroring VetAdmissionQueue render logic
     function resolveAction(row: { admissionStatus: string; careSchedule?: { status: string } | null }, queuePillFilter: string) {
-      const isApproved = row.admissionStatus === 'APPROVED' || queuePillFilter === 'APPROVED';
-      if (isApproved) {
+      const isVetApproved =
+        isVetStageCompleted(row.admissionStatus) ||
+        row.careSchedule?.status === 'COMPLETED' ||
+        queuePillFilter === 'APPROVED';
+      if (isVetApproved) {
         return { label: 'View Record', icon: 'clipboard', primary: false };
       }
       const status = row.careSchedule?.status;
@@ -14,9 +21,7 @@ describe('Vet Admission Approved State Invariants', () => {
         ? { label: 'Continue', icon: 'activity', primary: true }
         : status === 'SCHEDULED'
           ? { label: 'Examine', icon: 'stethoscope', primary: true }
-          : status === 'COMPLETED'
-            ? { label: 'View results', icon: 'check', primary: false }
-            : { label: 'Details', icon: 'chevron-right', primary: false };
+          : { label: 'Details', icon: 'chevron-right', primary: false };
     }
 
     // Row that has a scheduled schedule but is already APPROVED
@@ -34,6 +39,20 @@ describe('Vet Admission Approved State Invariants', () => {
     assert.equal(actionInAll.label, 'View Record');
     assert.equal(actionInAll.primary, false);
 
+    // Row where Vet finished the exam and admission is in TRAINER_REVIEW or MANAGER_REVIEW,
+    // even if a follow-up ROUTINE schedule is IN_PROGRESS or SCHEDULED
+    const trainerReviewFollowUpRow = {
+      admissionStatus: 'TRAINER_REVIEW',
+      careSchedule: { status: 'IN_PROGRESS' },
+    };
+    assert.equal(resolveAction(trainerReviewFollowUpRow, 'ACTIVE').label, 'View Record');
+
+    const managerReviewFollowUpRow = {
+      admissionStatus: 'MANAGER_REVIEW',
+      careSchedule: { status: 'IN_PROGRESS' },
+    };
+    assert.equal(resolveAction(managerReviewFollowUpRow, 'ACTIVE').label, 'View Record');
+
     // Conversely, non-approved SCHEDULED row displays 'Examine'
     const pendingRow = {
       admissionStatus: 'VET_REVIEW',
@@ -44,7 +63,7 @@ describe('Vet Admission Approved State Invariants', () => {
     assert.equal(actionPending.primary, true);
   });
 
-  it('2. Opening an APPROVED admission opens the "history" (Medical Records) tab and blocks exam editing', () => {
+  it('2. Opening an APPROVED or COMPLETED admission opens the "exam" tab in read-only record view and blocks exam editing', () => {
     function computeExamState({
       admissionStatus,
       scheduleStatus,
@@ -56,23 +75,27 @@ describe('Vet Admission Approved State Invariants', () => {
       assignedVetId: number;
       userId: number;
     }) {
-      const isApprovedAdmission = admissionStatus === 'APPROVED';
+      const isVetStageDone =
+        admissionStatus === 'TRAINER_REVIEW' ||
+        admissionStatus === 'MANAGER_REVIEW' ||
+        admissionStatus === 'APPROVED';
+      const isCompletedExam = isVetStageDone || scheduleStatus === 'COMPLETED';
 
       const canStartExam = Boolean(
-        !isApprovedAdmission &&
+        !isVetStageDone &&
         scheduleStatus === 'SCHEDULED' &&
         assignedVetId === userId,
       );
 
       const canCompleteExam = Boolean(
-        !isApprovedAdmission &&
+        !isVetStageDone &&
         ['SCHEDULED', 'IN_PROGRESS'].includes(scheduleStatus) &&
         assignedVetId === userId,
       );
 
-      const defaultTab = isApprovedAdmission || scheduleStatus === 'COMPLETED' ? 'history' : 'exam';
+      const defaultTab = 'exam';
 
-      return { canStartExam, canCompleteExam, defaultTab };
+      return { canStartExam, canCompleteExam, isCompletedExam, defaultTab };
     }
 
     // Approved admission with a lingering SCHEDULED schedule
@@ -85,7 +108,21 @@ describe('Vet Admission Approved State Invariants', () => {
 
     assert.equal(approvedState.canStartExam, false, 'Start examination must be disabled when approved');
     assert.equal(approvedState.canCompleteExam, false, 'Vet review form must not be active when approved');
-    assert.equal(approvedState.defaultTab, 'history', 'Default tab must be history (Medical Records)');
+    assert.equal(approvedState.isCompletedExam, true, 'Must render read-only record view when approved');
+    assert.equal(approvedState.defaultTab, 'exam', 'Default tab must be exam (Clinical Examination record view)');
+
+    // Completed vet exam awaiting Trainer/Manager review
+    const completedState = computeExamState({
+      admissionStatus: 'TRAINER_REVIEW',
+      scheduleStatus: 'COMPLETED',
+      assignedVetId: 10,
+      userId: 10,
+    });
+
+    assert.equal(completedState.canStartExam, false);
+    assert.equal(completedState.canCompleteExam, false);
+    assert.equal(completedState.isCompletedExam, true);
+    assert.equal(completedState.defaultTab, 'exam');
 
     // Active review admission awaiting vet exam
     const activeState = computeExamState({
@@ -97,6 +134,7 @@ describe('Vet Admission Approved State Invariants', () => {
 
     assert.equal(activeState.canStartExam, true);
     assert.equal(activeState.canCompleteExam, true);
+    assert.equal(activeState.isCompletedExam, false);
     assert.equal(activeState.defaultTab, 'exam');
   });
 

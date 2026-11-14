@@ -5,20 +5,20 @@ How a Trainer organises racehorses into fixed groups and runs them through cours
 ## Language
 
 **Training Group**:
-A named, lasting set of horses (at most 6) owned by one Trainer, going out on the track together on training days. A horse belongs to at most one Training Group at a time, and no two horses of the same Groom share one.
+A named, lasting set of horses (at most 6) owned by one Trainer, going out on the track together on training days. A horse belongs to at most one Training Group at a time; one Groom may lead several horses of the same group.
 _Avoid_: Lot, cohort, batch
 
 **Disbanded**:
-The state of a Training Group its Trainer has closed for good: it keeps its name and its past Group Plans, but has no horses, takes no new horses and gets no new Group Plan. Disbanding is always the Trainer's own act, never a result of the group running empty. Disbanding a group that still has unfinished Group Plans cancels them in the same act. A group that never had a Group Plan is simply removed, leaving no trace.
+The state of a Training Group its Trainer has closed for good: it keeps its name and its past Course Runs, but has no horses, takes no new horses and gets no new Course Run. Disbanding is always the Trainer's own act, never a result of the group running empty. Disbanding a group that still has unfinished Course Runs cancels them in the same act. A group that never had a Course Run is simply removed, leaving no trace.
 _Avoid_: Deleted, cancelled, archived
 
-**Group Plan**:
+**Course Run**:
 A Training Group running one Course from a start date on chosen weekdays; it ends together for the whole group when its last Session finishes. Horses may join or leave while it runs.
-_Avoid_: Horse plan, enrollment
+_Avoid_: Group Plan, Class, Plan (kept for a possible long-term layer), Horse plan, enrollment
 
 **Session**:
-One outing of a Training Group on one day, running one Subject, with a start time found for that day.
-_Avoid_: Lot, class
+One outing of a Training Group on one day, running one Exercise, with a start time found for that day.
+_Avoid_: Lot, Class
 
 **Workout**:
 One horse's result within a Session.
@@ -33,7 +33,7 @@ The state of a Held Workout once its results are recorded; the recorded results 
 _Avoid_: Attended, present, completed
 
 **Cancel**:
-Withdrawing a Session, one horse's Workout, or a whole Group Plan before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone.
+Withdrawing a Session, one horse's Workout, or a whole Course Run before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone.
 _Avoid_: Skip, postpone
 
 **Did not run**:
@@ -44,11 +44,63 @@ _Avoid_: No-show, absent
 The morning hours, 06:00 to 10:00, in which every Session must start and end; Session start times fall on 15-minute steps.
 _Avoid_: Training hours, time slot
 
+**Course Run progress**:
+How many of a Course Run's Sessions have been Held, shown against all the Sessions the Course Run was created with (for example 5 of 10). Cancelled Sessions stay in the total and are never made up, so a Course Run that closed with cancellations never shows full (for example 8 of 10 with 2 cancelled).
+_Avoid_: Completion rate
+
 **Attendance**:
-How many of a Course's Sessions a horse took part in (its Workouts that Ran), shown against the Course total (for example 7 of 20). A missed Session is never made up: the horse simply goes on with its group.
+How many of a Course Run's Sessions a horse took part in (its Workouts that Ran), shown against the same total as the Course Run progress (for example 4 of 10). Sessions from before the horse joined, and Sessions or Workouts that were cancelled, stay in the total: the horse simply goes on with its group.
+_Avoid_: Presence
 
 **Course**:
-An ordered list of Subjects that a Training Group works through over a number of Sessions.
+An ordered list of Exercises that a Training Group works through over a number of Sessions.
 
-**Subject**:
+**Exercise**:
 A single exercise (distance, surface, intensity, duration) run in a Session.
+_Avoid_: Subject
+
+### Incidents
+
+**Incident Report**:
+A notice from a horse's Groom or Trainer that a horse in a stall has a health problem, rated with a Severity.
+_Avoid_: Ticket, complaint
+
+**Severity**:
+How serious the reporter judges an Incident Report to be. Low and Medium wait for the next routine vet slot and the horse keeps training; High and Critical stop training and call a vet at once, even from another examination.
+_Avoid_: Priority
+
+**Incident Case**:
+The one open examination that handles every Incident Report of a horse. A horse has at most one, and a High or Critical report replaces a routine Incident Case that has not started.
+_Avoid_: Urgent case (only a High or Critical one is urgent)
+
+**Follow-up**:
+An examination booked to see how a horse is progressing and decide whether it may train. A horse has at most one waiting; a visit opened by an Incident Report is not a Follow-up.
+_Avoid_: Recheck, Re-examination
+
+**Closed**:
+The end of an Incident Report whose Incident Case was cancelled, so no vet examined it; the reason stays on the report.
+_Avoid_: Dismissed, No issue
+
+### Admissions
+
+**Quarantine Groom**:
+A Groom who looks after at least one stall in a quarantine area. Only Quarantine Grooms can be given an Admission to review.
+
+**Assigned Groom**:
+The one Quarantine Groom an Admission in Groom review is given to. Only the Assigned Groom sees and decides it, and the same Groom keeps the horse in one of their own quarantine stalls when it arrives. An Admission is assigned even when every quarantine stall is taken, but it can only be approved once the Assigned Groom has a free quarantine stall.
+_Avoid_: Reviewer pool, any quarantine groom
+
+**Full**:
+A Quarantine Groom with no free quarantine stall left. A Full Groom can still reject an Admission but cannot approve one. When an approval makes a Groom Full, their Admissions still waiting for a decision are reassigned to the Quarantine Groom with a free stall and the lowest Groom Workload; if every Groom is Full they stay where they are.
+
+**Groom Workload**:
+The number of horses in a Groom's stalls plus the Admissions assigned to that Groom that are still waiting for the Groom's decision. The lower it is, the sooner the Groom gets the next Admission. On a tie, the Groom who last confirmed a horse's arrival longest ago (or never) goes first.
+_Avoid_: Load, capacity
+
+**Reassignment**:
+Handing an Admission in Groom review from its Assigned Groom to the Quarantine Groom with the next lowest Groom Workload who has not had it yet, because the Assigned Groom did not decide within 72 hours of being assigned, became Full, was deactivated or no longer looks after a quarantine stall. The 72 hours are counted around the clock and restart with every Reassignment. Once every Quarantine Groom has had it, the rotation starts again from the lowest Groom Workload. The Manager can also reassign an Admission by hand to any Quarantine Groom. The new Assigned Groom, the previous one and the Manager are told every time.
+_Avoid_: Escalation, transfer
+
+**Review Due**:
+The moment, 72 hours after the latest assignment, when an Admission still waiting for its Assigned Groom's decision is reassigned. Shown to the Groom and the Manager.
+_Avoid_: Deadline, SLA

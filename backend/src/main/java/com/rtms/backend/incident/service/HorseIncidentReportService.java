@@ -1,14 +1,16 @@
 package com.rtms.backend.incident.service;
 
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.incident.dto.CreateIncidentReportRequest;
 import com.rtms.backend.incident.dto.HandleIncidentRequest;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
@@ -17,8 +19,10 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -30,10 +34,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class HorseIncidentReportService {
+
+    /** Ca chưa khám. */
+    private static final Set<CareScheduleStatus> NOT_EXAMINED =
+            Set.of(CareScheduleStatus.SCHEDULED);
 
     private final HorseIncidentReportRepository incidentReportRepository;
     private final HorseRepository horseRepository;
@@ -42,6 +51,7 @@ public class HorseIncidentReportService {
     private final CareScheduleService careScheduleService;
     private final TrainingDecisionService trainingDecisionService;
     private final UserRepository userRepository;
+    private final StableStallRepository stableStallRepository;
 
     public HorseIncidentReportService(HorseIncidentReportRepository incidentReportRepository,
                                       HorseRepository horseRepository,
@@ -49,7 +59,8 @@ public class HorseIncidentReportService {
                                       CareScheduleRepository careScheduleRepository,
                                       CareScheduleService careScheduleService,
                                       TrainingDecisionService trainingDecisionService,
-                                      UserRepository userRepository) {
+                                      UserRepository userRepository,
+                                      StableStallRepository stableStallRepository) {
         this.incidentReportRepository = incidentReportRepository;
         this.horseRepository = horseRepository;
         this.fileStorage = fileStorage;
@@ -57,61 +68,94 @@ public class HorseIncidentReportService {
         this.careScheduleService = careScheduleService;
         this.trainingDecisionService = trainingDecisionService;
         this.userRepository = userRepository;
+        this.stableStallRepository = stableStallRepository;
     }
 
+    /**
+     * Mức độ quyết định ca khám: LOW, MEDIUM thành ca ROUTINE, ngựa vẫn tập. HIGH, CRITICAL thành ca URGENT và chặn tập.
+     * Mỗi ngựa chỉ có một ca sự cố đang mở: báo cáo mới gắn vào ca đó, ca ROUTINE chưa khám thì nhường chỗ cho ca URGENT.
+     */
     @Transactional
     public HorseIncidentReport createReport(CreateIncidentReportRequest request, AuthenticatedUser currentUser) {
-        if (request.getHorseId() == null) {
-            throw new RuntimeException("Horse ID is required");
-        }
         Horse horse = horseRepository.findByIdForUpdate(request.getHorseId())
-                .orElseThrow(() -> new RuntimeException("Horse not found with id: " + request.getHorseId()));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found"));
+        assertCanReport(horse, currentUser);
 
-        if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
-            throw new RuntimeException("Title is required");
-        }
-
-        if (request.getDescription() == null || request.getDescription().trim().isEmpty()) {
-            throw new RuntimeException("Description is required");
-        }
-
-        IncidentSeverity severity = request.getSeverity() != null ? request.getSeverity() : IncidentSeverity.MEDIUM;
-
-        HorseIncidentReport report = new HorseIncidentReport(
+        HorseIncidentReport saved = incidentReportRepository.save(new HorseIncidentReport(
                 currentUser.getUserId(),
                 request.getHorseId(),
                 request.getTitle().trim(),
                 request.getDescription().trim(),
-                request.getImageUrl(),
-                severity
-        );
+                request.getIncidentType()));
 
-        HorseIncidentReport saved = incidentReportRepository.save(report);
+        boolean serious = saved.getIncidentType() == IncidentType.TRAUMA;
 
-        List<CareScheduleStatus> activeStatuses = List.of(
-                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
-        CareSchedule active = careScheduleRepository
-                .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(
-                        horse.getId(), CareType.URGENT, activeStatuses)
-                .orElse(null);
-        if (active == null) {
-            String scheduleDescription = (report.getDescription() != null && !report.getDescription().trim().isEmpty())
-                    ? report.getDescription().trim()
-                    : "Incident reported";
-            careScheduleService.createSchedule(horse.getId(), CareType.URGENT, scheduleDescription, null, saved.getId());
-            active = careScheduleRepository
-                    .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(
-                            horse.getId(), CareType.URGENT, activeStatuses)
-                    .orElseThrow(() -> new IllegalStateException("Urgent schedule was not created"));
-            // A reported incident suspends training from the moment it is reported — same as
-            // a report landing on an already-open case. The completing exam lifts the block.
-            trainingDecisionService.block(horse, "Urgent veterinary care pending");
-        } else {
-            // Đã có ca khẩn cấp đang mở: báo cáo mới chỉ gắn vào ca đó, ngựa vẫn bị chặn tập.
-            trainingDecisionService.block(horse, "Urgent veterinary care pending");
+        CareSchedule openCase = careScheduleService.findOpenIncidentCase(horse.getId()).orElse(null);
+        boolean escalate = serious && openCase != null && openCase.getCareType() == CareType.ROUTINE
+                && NOT_EXAMINED.contains(openCase.getStatus());
+
+        CareSchedule target = openCase;
+        if (openCase == null || escalate) {
+            target = createCase(horse, saved, serious);
         }
-        saved.setCareScheduleId(active.getId());
-        return incidentReportRepository.save(saved);
+        if (escalate) {
+            List<HorseIncidentReport> moved = incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(openCase.getId());
+            moved.forEach(report -> report.setCareScheduleId(saved.getCareScheduleId()));
+            incidentReportRepository.saveAll(moved);
+            careScheduleService.cancelSupersededCase(openCase);
+        }
+        saved.setCareScheduleId(target.getId());
+        incidentReportRepository.save(saved);
+
+        syncReportsWithCase(target);
+        return saved;
+    }
+
+    private CareSchedule createCase(Horse horse, HorseIncidentReport report, boolean serious) {
+        Long caseId = careScheduleService.createSchedule(horse.getId(), serious ? CareType.URGENT : CareType.ROUTINE,
+                report.getDescription(), null, report.getId()).id();
+        report.setCareScheduleId(caseId);
+        return careScheduleRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalStateException("Incident case was not created"));
+    }
+
+    /** Báo cáo hiển thị đúng người đang nhận ca, kể cả báo cáo gắn vào sau khi ca đã có Vet. */
+    private void syncReportsWithCase(CareSchedule incidentCase) {
+        Long vetId = incidentCase.getVeterinarianId();
+        LocalDateTime now = LocalDateTime.now();
+        List<HorseIncidentReport> reports = incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(incidentCase.getId());
+        for (HorseIncidentReport report : reports) {
+            if (Objects.equals(report.getHandledById(), vetId)) continue;
+            report.setStatus(vetId != null ? IncidentStatus.IN_REVIEW : IncidentStatus.REPORTED);
+            report.setHandledById(vetId);
+            report.setHandledAt(vetId != null ? now : null);
+        }
+        incidentReportRepository.saveAll(reports);
+    }
+
+    private void assertCanReport(Horse horse, AuthenticatedUser currentUser) {
+        if (horse.getCurrentStallId() == null) {
+            throw new ApiException(HttpStatus.CONFLICT, "HORSE_NOT_IN_STALL",
+                    "Incidents can only be reported for a horse currently in a stall");
+        }
+        if (isGroom(currentUser) && !stableStallRepository.existsByIdAndGroomId(horse.getCurrentStallId(), currentUser.getUserId())) {
+            throw new AccessDeniedException("You can only report incidents for horses in your stalls");
+        }
+        if (isTrainer(currentUser) && !isTrainerOf(horse.getId(), currentUser)) {
+            throw new AccessDeniedException("You can only report incidents for horses in your areas");
+        }
+    }
+
+    private boolean isTrainerOf(Long horseId, AuthenticatedUser currentUser) {
+        return horseRepository.findTrainerIdByHorseId(horseId).filter(currentUser.getUserId()::equals).isPresent();
+    }
+
+    private static boolean isGroom(AuthenticatedUser user) {
+        return "GROOM".equalsIgnoreCase(user.getRole());
+    }
+
+    private static boolean isTrainer(AuthenticatedUser user) {
+        return "HEAD_TRAINER".equalsIgnoreCase(user.getRole());
     }
 
     public List<HorseIncidentReport> getReports(Long horseId,
@@ -119,17 +163,15 @@ public class HorseIncidentReportService {
                                                 AuthenticatedUser currentUser) {
         List<HorseIncidentReport> base;
 
-        if (horseId != null) {
-            base = incidentReportRepository.findByHorseId(horseId);
-            if ("GROOM".equalsIgnoreCase(currentUser.getRole())) {
-                base = base.stream()
-                        .filter(r -> currentUser.getUserId().equals(r.getReportedById()))
-                        .toList();
-            }
-        } else if ("GROOM".equalsIgnoreCase(currentUser.getRole())) {
+        if (isGroom(currentUser)) {
             base = incidentReportRepository.findByReportedById(currentUser.getUserId());
+        } else if (isTrainer(currentUser)) {
+            base = incidentReportRepository.findVisibleToTrainer(currentUser.getUserId());
         } else {
-            base = incidentReportRepository.findAll();
+            base = horseId != null ? incidentReportRepository.findByHorseId(horseId) : incidentReportRepository.findAll();
+        }
+        if (horseId != null) {
+            base = base.stream().filter(r -> horseId.equals(r.getHorseId())).toList();
         }
 
         // Sắp xếp mới nhất lên đầu
@@ -144,7 +186,7 @@ public class HorseIncidentReportService {
         if (status != null) {
             base = base.stream().filter(r -> r.getStatus() == status).toList();
         }
-        return withHandlerNames(base);
+        return withHorseNames(withHandlerNames(base));
     }
 
     @Transactional
@@ -186,11 +228,14 @@ public class HorseIncidentReportService {
     public HorseIncidentReport getReportById(Long id, AuthenticatedUser currentUser) {
         HorseIncidentReport report = incidentReportRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Incident report not found with id: " + id));
-        if ("GROOM".equalsIgnoreCase(currentUser.getRole())
-                && !currentUser.getUserId().equals(report.getReportedById())) {
+        boolean ownReport = currentUser.getUserId().equals(report.getReportedById());
+        if (isGroom(currentUser) && !ownReport) {
             throw new AccessDeniedException("You can only view incident reports you submitted");
         }
-        withHandlerNames(List.of(report));
+        if (isTrainer(currentUser) && !ownReport && !isTrainerOf(report.getHorseId(), currentUser)) {
+            throw new AccessDeniedException("You can only view incident reports for horses in your areas");
+        }
+        withHorseNames(withHandlerNames(List.of(report)));
         return report;
     }
 
@@ -201,9 +246,11 @@ public class HorseIncidentReportService {
         HorseIncidentReport report = incidentReportRepository.findById(reportId)
                 .orElseThrow(() -> new RuntimeException("Incident report not found with id: " + reportId));
 
-        if ("GROOM".equalsIgnoreCase(currentUser.getRole())
-                && !currentUser.getUserId().equals(report.getReportedById())) {
+        if (!currentUser.getUserId().equals(report.getReportedById())) {
             throw new AccessDeniedException("You can only attach an image to a report you submitted");
+        }
+        if (report.getStatus() != IncidentStatus.REPORTED && report.getStatus() != IncidentStatus.IN_REVIEW) {
+            throw new ApiException(HttpStatus.CONFLICT, "INCIDENT_CLOSED", "This incident report is already closed");
         }
 
         String mediaType = file.getContentType() == null
@@ -236,6 +283,14 @@ public class HorseIncidentReportService {
 
     public MediaType imageMediaType(Long reportId, AuthenticatedUser currentUser) {
         return fileStorage.mediaType(getReportById(reportId, currentUser).getImageUrl());
+    }
+
+    private List<HorseIncidentReport> withHorseNames(List<HorseIncidentReport> reports) {
+        List<Long> horseIds = reports.stream().map(HorseIncidentReport::getHorseId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, String> names = horseRepository.findAllById(horseIds).stream()
+                .collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a));
+        reports.forEach(report -> report.setHorseName(names.get(report.getHorseId())));
+        return reports;
     }
 
     /**

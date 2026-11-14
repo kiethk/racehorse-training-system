@@ -11,7 +11,7 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.entity.Area;
@@ -21,8 +21,8 @@ import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.ManagerDashboardSummaryResponse;
 import com.rtms.backend.training.dto.ManagerDashboardSummaryResponse.*;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.enums.CourseRunStatus;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +37,7 @@ public class ManagerDashboardService {
     private final StableStallRepository stableStallRepository;
     private final AreaRepository areaRepository;
     private final HorseRepository horseRepository;
-    private final GroupPlanRepository groupPlanRepository;
+    private final CourseRunRepository courseRunRepository;
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
     private final HorseIncidentReportRepository horseIncidentReportRepository;
@@ -47,7 +47,7 @@ public class ManagerDashboardService {
             StableStallRepository stableStallRepository,
             AreaRepository areaRepository,
             HorseRepository horseRepository,
-            GroupPlanRepository groupPlanRepository,
+            CourseRunRepository courseRunRepository,
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
             HorseIncidentReportRepository horseIncidentReportRepository,
@@ -55,7 +55,7 @@ public class ManagerDashboardService {
         this.stableStallRepository = stableStallRepository;
         this.areaRepository = areaRepository;
         this.horseRepository = horseRepository;
-        this.groupPlanRepository = groupPlanRepository;
+        this.courseRunRepository = courseRunRepository;
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.horseIncidentReportRepository = horseIncidentReportRepository;
@@ -130,11 +130,11 @@ public class ManagerDashboardService {
         );
 
         // 2. Fleet Summary
-        long totalHorses = horseRepository.count();
         long activeEligible = horseRepository.countByCurrentStatus(HorseStatus.ELIGIBLE);
-        long inTraining = groupPlanRepository.countHorsesInTraining();
-        long medicalBlocked = horseRepository.countByTrainingDecision(TrainingDecision.BLOCKED);
+        long inTraining = courseRunRepository.countHorsesInTraining();
+        long medicalBlocked = horseRepository.countByCurrentStatusAndTrainingDecision(HorseStatus.ELIGIBLE, TrainingDecision.BLOCKED);
         long inactive = horseRepository.countByCurrentStatus(HorseStatus.INACTIVE);
+        long totalHorses = activeEligible;
 
         FleetSummary fleetSummary = new FleetSummary(
                 totalHorses,
@@ -147,10 +147,11 @@ public class ManagerDashboardService {
         // 3. Admission Pipeline & Actions
         long managerReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.MANAGER_REVIEW);
         long waitingArrivalCount = admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
+        long waitingStallCount = admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_STALL);
         long groomReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.GROOM_REVIEW);
         long vetReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.VET_REVIEW);
         long trainerReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.TRAINER_REVIEW);
-        long totalPending = managerReviewCount + waitingArrivalCount + groomReviewCount + vetReviewCount + trainerReviewCount;
+        long totalPending = managerReviewCount + waitingArrivalCount + waitingStallCount + groomReviewCount + vetReviewCount + trainerReviewCount;
 
         // Find admissions waiting for Manager review
         List<AdmissionApplication> managerReviewApps =
@@ -211,12 +212,12 @@ public class ManagerDashboardService {
             );
         }).toList();
 
-        // 4. Urgent Incidents: status in (REPORTED, IN_REVIEW) and severity in (HIGH, CRITICAL)
+        // 4. Urgent Incidents: status in (REPORTED, IN_REVIEW) and incident type TRAUMA
         List<IncidentStatus> openStatuses = List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW);
-        List<IncidentSeverity> urgentSeverities = List.of(IncidentSeverity.HIGH, IncidentSeverity.CRITICAL);
+        List<IncidentType> urgentTypes = List.of(IncidentType.TRAUMA);
 
         long openIncidents = horseIncidentReportRepository.countByStatusIn(openStatuses);
-        long criticalUrgentIncidents = horseIncidentReportRepository.countByStatusInAndSeverityIn(openStatuses, urgentSeverities);
+        long criticalUrgentIncidents = horseIncidentReportRepository.countByStatusInAndIncidentTypeIn(openStatuses, urgentTypes);
 
         IncidentSummary incidentSummary = new IncidentSummary(
                 openIncidents,
@@ -224,7 +225,7 @@ public class ManagerDashboardService {
         );
 
         List<HorseIncidentReport> urgentIncidentEntities =
-                horseIncidentReportRepository.findUrgentIncidents(openStatuses, urgentSeverities);
+                horseIncidentReportRepository.findUrgentIncidents(openStatuses, urgentTypes);
 
         // Batch resolve horses and reporters
         Set<Long> incidentHorseIds = urgentIncidentEntities.stream().map(HorseIncidentReport::getHorseId).collect(Collectors.toSet());
@@ -244,7 +245,7 @@ public class ManagerDashboardService {
                     horse != null ? horse.getName() : "Horse #" + inc.getHorseId(),
                     inc.getTitle(),
                     inc.getDescription(),
-                    inc.getSeverity() != null ? inc.getSeverity().name() : "HIGH",
+                    inc.getIncidentType() != null ? inc.getIncidentType().name() : "TRAUMA",
                     inc.getStatus().name(),
                     inc.getReportedAt(),
                     inc.getReportedById(),

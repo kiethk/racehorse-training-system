@@ -1,16 +1,16 @@
 import type { HorseSpecialty } from '@/features/horses/types';
-import type { PlanStatus } from '@/features/training/types';
+import type { CourseRunStatus } from '@/features/training/types';
 
-/** One horse of the dashboard: its current plan, recent performance and risk alerts. */
+/** One horse of the dashboard: its current course run, recent performance and risk alerts. */
 export interface DashboardHorse {
   horseId: number;
   horseName: string;
   breed: string | null;
   stallCode: string | null;
-  planId: number | null;
+  courseRunId: number | null;
   courseName: string;
-  /** NONE when the horse has no plan yet. */
-  planStatus: PlanStatus | 'NONE';
+  /** NONE when the horse has no course run yet. */
+  courseRunStatus: CourseRunStatus | 'NONE';
   completedSessions: number;
   totalSessions: number;
   /** Cancelled sessions; left out of the progress. */
@@ -133,7 +133,7 @@ export interface UrgentIncidentActionDto {
   horseName: string;
   title: string;
   description: string;
-  severity: string;
+  incidentType: string;
   status: string;
   reportedAt: string;
   reportedById: number;

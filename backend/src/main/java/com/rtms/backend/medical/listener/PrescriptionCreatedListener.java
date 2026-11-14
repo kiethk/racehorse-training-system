@@ -50,7 +50,7 @@ public class PrescriptionCreatedListener {
         int rxCount = event.prescriptionIds().size();
         String title = "Medication Prescribed: " + horseName;
         String message = "New prescription recorded for " + horseName + " (" + rxCount + " " + (rxCount == 1 ? "medication" : "medications")
-                + "). Review administration instructions and withdrawal guidelines.";
+                + "). Review administration instructions.";
 
         Set<Long> recipients = new HashSet<>();
 

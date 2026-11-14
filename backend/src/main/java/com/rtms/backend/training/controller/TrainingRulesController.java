@@ -5,7 +5,7 @@ import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.dto.TrainingRulesResponse;
 import com.rtms.backend.training.service.HorsePerformanceService;
-import com.rtms.backend.training.service.SubjectService;
+import com.rtms.backend.training.service.ExerciseService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,12 +29,12 @@ public class TrainingRulesController {
                 TrainingLimits.MAX_HORSES_PER_GROUP,
                 FarmSchedulePolicy.SESSION_START_STEP_MINUTES,
                 TrainingLimits.MAX_COURSE_SESSIONS,
-                TrainingLimits.MAX_COURSE_SUBJECTS,
-                TrainingLimits.MAX_HORSES_PER_PLAN,
-                SubjectService.MIN_DURATION_MINUTES,
-                SubjectService.MAX_DURATION_MINUTES,
-                HorsePerformanceService.MAX_HEART_RATE_LIMIT,
-                HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT,
-                HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT));
+                TrainingLimits.MAX_COURSE_EXERCISES,
+                TrainingLimits.MAX_HORSES_PER_COURSE_RUN,
+                ExerciseService.MIN_DURATION_MINUTES,
+                ExerciseService.MAX_DURATION_MINUTES,
+                TrainingLimits.MAX_HEART_RATE_LIMIT,
+                TrainingLimits.AVERAGE_HEART_RATE_LIMIT,
+                TrainingLimits.RECOVERY_HEART_RATE_LIMIT));
     }
 }

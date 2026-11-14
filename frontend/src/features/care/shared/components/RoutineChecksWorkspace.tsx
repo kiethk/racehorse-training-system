@@ -16,8 +16,10 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import { useAuth } from '@/context/AuthContext';
 import { formatDate } from '@/lib/display';
 import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
+import { getScheduleExamAction } from '@/features/care/lib/scheduleStatusDisplay';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
+import { useSynchronizedClock } from '@/lib/clockSync';
 
 export function RoutineChecksWorkspace() {
   const router = useRouter();
@@ -36,6 +38,9 @@ export function RoutineChecksWorkspace() {
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
+
   const loadData = useCallback(async () => {
     try {
       await Promise.resolve();
@@ -49,7 +54,10 @@ export function RoutineChecksWorkspace() {
         stableApi.getStalls(),
       ]);
 
-      setSchedules(schedulePage.content || []);
+      // Routine Checks tab strictly manages clinical routine exams and follow-ups.
+      // Preventive care (vaccinations & deworming) is managed in the Preventive Care tab.
+      const routineOnly = (schedulePage.content || []).filter((s) => s.purpose !== 'PREVENTIVE');
+      setSchedules(routineOnly);
       setHorses(horseList || []);
       setStalls(stallList || []);
     } catch (err) {
@@ -98,18 +106,14 @@ export function RoutineChecksWorkspace() {
   // Stats calculation
   const stats = useMemo(() => {
     let scheduled = 0;
-    let inProgress = 0;
-    let paused = 0;
     let completed = 0;
 
     for (const s of schedules) {
       if (s.status === 'SCHEDULED') scheduled++;
-      else if (s.status === 'IN_PROGRESS') inProgress++;
-      else if (s.status === 'PAUSED') paused++;
       else if (s.status === 'COMPLETED') completed++;
     }
 
-    return { total: schedules.length, scheduled, inProgress, paused, completed };
+    return { total: schedules.length, scheduled, completed };
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
@@ -124,8 +128,7 @@ export function RoutineChecksWorkspace() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        eyebrow="Clinical Operations"
-        title="Routine & Preventive Care"
+        title="Routine Checks"
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -143,16 +146,16 @@ export function RoutineChecksWorkspace() {
               onClick={() => setCreateModalOpen(true)}
               className="transition-all active:scale-[0.98]"
             >
-              Schedule Care
+              Schedule Routine Check
             </Button>
           </div>
         }
       />
 
       {/* Metric Cards Banner */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
         <MetricCard
-          label="Total Care Schedules"
+          label="Total Routine Schedules"
           value={stats.total}
           icon="calendar"
           tone={stats.total > 0 ? 'default' : 'neutral'}
@@ -164,17 +167,23 @@ export function RoutineChecksWorkspace() {
           tone={stats.scheduled > 0 ? 'warning' : 'neutral'}
         />
         <MetricCard
-          label="In Examination"
-          value={stats.inProgress}
-          icon="activity"
-          tone={stats.inProgress > 0 ? 'info' : 'neutral'}
-        />
-        <MetricCard
-          label="Completed Care"
+          label="Completed Checks"
           value={stats.completed}
           icon="check"
           tone={stats.completed > 0 ? 'success' : 'neutral'}
         />
+      </div>
+
+      {/* Policy Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center gap-2">
+          <Icon name="clock" size={14} className="text-[var(--color-primary)] shrink-0" />
+          <span>Routine Examination Window: <strong>13:30 – 15:30</strong></span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Icon name="activity" size={14} className="text-[var(--color-text-muted)] shrink-0" />
+          <span>Daily quota: <strong>Max 3 routine exams per vet</strong></span>
+        </div>
       </div>
 
       {/* Error banner */}
@@ -201,8 +210,6 @@ export function RoutineChecksWorkspace() {
           options={[
             { value: 'ALL', label: 'All', count: schedules.length },
             { value: 'SCHEDULED', label: 'Scheduled', count: stats.scheduled },
-            { value: 'IN_PROGRESS', label: 'In Progress', count: stats.inProgress },
-            { value: 'PAUSED', label: 'Paused', count: stats.paused },
             { value: 'COMPLETED', label: 'Completed', count: stats.completed },
           ]}
         />
@@ -241,7 +248,7 @@ export function RoutineChecksWorkspace() {
                 onClick={() => setCreateModalOpen(true)}
                 className="transition-all active:scale-[0.98]"
               >
-                Schedule Care
+                Schedule Routine Check
               </Button>
             }
           />
@@ -258,48 +265,69 @@ export function RoutineChecksWorkspace() {
               : cs.scheduledAt
               ? formatDate(cs.scheduledAt)
               : 'Unscheduled';
-            const tone = getCareTypeTone(cs.careType, cs.purpose);
-            const isCompleted = cs.status === 'COMPLETED';
+            const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
+            const isClosed = cs.status === 'COMPLETED';
+            const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+            const _d = currentClock;
+            const todayIso = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+            const isFuture = Boolean(!isClosed && rawDate && rawDate > todayIso);
+            // Window: ALL ROUTINE SCHEDULED exams (except PREVENTIVE) blocked outside 13:30–15:30, regardless of date
+            const _minNow = _d.getHours() * 60 + _d.getMinutes();
+            const isOutsideRoutineWindow =
+              cs.careType === 'ROUTINE' &&
+              cs.purpose !== 'PREVENTIVE' &&
+              cs.status === 'SCHEDULED' &&
+              (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+
+            const canExamine = cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
 
             return (
               <Panel
                 key={cs.id}
                 padded
-                onClick={() => handleOpenSchedule(cs)}
-                className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                onClick={() => {
+                  if (isClosed || canExamine) {
+                    handleOpenSchedule(cs);
+                  }
+                }}
+                className={`border border-[var(--color-border)] transition-all duration-200 ease-out ${
+                  isClosed || canExamine
+                    ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]'
+                    : 'cursor-not-allowed opacity-80'
+                }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   {/* Left: Avatar + Details */}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                          {horseName}
-                        </span>
+                      <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                        {horseName}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                           {tone.label}
                         </Pill>
-                        <Pill
-                          tone={
-                            cs.status === 'COMPLETED'
-                              ? 'success'
-                              : cs.status === 'PAUSED'
-                              ? 'warning'
-                              : cs.status === 'IN_PROGRESS'
-                              ? 'primary'
-                              : 'warning'
-                          }
-                          size="sm"
-                        >
-                          {cs.status === 'SCHEDULED'
-                            ? 'Scheduled'
-                            : cs.status === 'PAUSED'
-                            ? 'Paused'
-                            : cs.status === 'IN_PROGRESS'
-                            ? 'In Progress'
-                            : 'Completed'}
-                        </Pill>
+                        {cs.status === 'COMPLETED' && (
+                          <Pill tone="success" size="sm">
+                            Completed
+                          </Pill>
+                        )}
+                        {cs.status === 'IN_PROGRESS' && (
+                          <Pill tone="info" size="sm" icon="activity">
+                            In Progress
+                          </Pill>
+                        )}
+                        {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
+                          <Pill tone="warning" size="sm">
+                            Rolled {cs.rolloverCount}x
+                          </Pill>
+                        )}
+                        {cs.rescheduleReason === 'PEER_OFFLOAD' && (
+                          <Pill tone="neutral" size="sm">
+                            Transferred
+                          </Pill>
+                        )}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                         <span className="inline-flex items-center gap-1">
@@ -309,38 +337,34 @@ export function RoutineChecksWorkspace() {
                         <span>·</span>
                         <span className="inline-flex items-center gap-1">
                           <Icon name="building" size={12} />
-                          <span>Stall: <strong>{stallCode}</strong></span>
+                          <span>Stall <strong>{stallCode}</strong></span>
                         </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Right: Action Button */}
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col items-end gap-1">
                     <Button
-                      variant={isCompleted ? 'secondary' : 'primary'}
+                      variant={isClosed || cs.status === 'IN_PROGRESS' ? 'secondary' : 'primary'}
                       size="sm"
-                      icon={
-                        isCompleted
-                          ? 'file-text'
-                          : cs.status === 'IN_PROGRESS'
-                          ? 'activity'
-                          : 'chevron-right'
-                      }
+                      icon={isClosed ? 'file-text' : getScheduleExamAction(cs.status).icon}
+                      disabled={!isClosed && !canExamine}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleOpenSchedule(cs);
+                        if (isClosed || canExamine) {
+                          handleOpenSchedule(cs);
+                        }
                       }}
                       className="transition-all active:scale-[0.97]"
                     >
-                      {isCompleted
-                        ? 'View Record'
-                        : cs.status === 'PAUSED'
-                        ? 'Continue (Paused)'
-                        : cs.status === 'IN_PROGRESS'
-                        ? 'Continue Exam'
-                        : 'Start Exam'}
+                      {isClosed ? 'View Record' : getScheduleExamAction(cs.status).label}
                     </Button>
+                    {!isClosed && !canExamine && cs.status !== 'IN_PROGRESS' && (
+                      <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                        {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Panel>

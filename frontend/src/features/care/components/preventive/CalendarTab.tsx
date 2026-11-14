@@ -22,7 +22,7 @@ import { RescheduleModal } from './RescheduleModal';
 import { addDaysIso, todayIso } from './preventiveDisplay';
 
 type View = 'week' | 'month';
-const OPEN_STATUSES = new Set(['REQUESTED', 'SCHEDULED', 'IN_PROGRESS']);
+const OPEN_STATUSES = new Set(['SCHEDULED', 'IN_PROGRESS']);
 
 /** The day an appointment falls on: its booked slot, or the requested date while no vet is assigned. */
 const appointmentDay = (schedule: CareScheduleResponse) =>
@@ -105,7 +105,7 @@ export function CalendarTab() {
   // The backend checks this too; the button is hidden when the request would be refused.
   const canMove = (s: CareScheduleResponse) =>
     user?.role === 'CLUB_MANAGER'
-      ? s.status === 'REQUESTED' || s.status === 'SCHEDULED'
+      ? s.status === 'SCHEDULED'
       : user?.role === 'VETERINARIAN' && s.status === 'SCHEDULED' && s.veterinarianId === user.userId;
 
   return (
@@ -155,8 +155,8 @@ export function CalendarTab() {
                       <Pill tone="neutral" size="sm">
                         {s.purpose === 'PREVENTIVE' ? 'Vaccination' : 'Follow-up'}
                       </Pill>
-                      <Pill tone={s.status === 'REQUESTED' ? 'warning' : 'success'} size="sm">
-                        {s.status === 'REQUESTED' ? 'Awaiting vet' : formatEnumLabel(s.status)}
+                      <Pill tone={s.status === 'SCHEDULED' ? 'warning' : 'success'} size="sm">
+                        {formatEnumLabel(s.status)}
                       </Pill>
                       {s.rescheduleReason && (
                         <Pill tone="neutral" size="sm">Moved · {formatEnumLabel(s.rescheduleReason)}</Pill>
