@@ -78,6 +78,8 @@ public class CareScheduleController {
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             Pageable pageable,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        careScheduleService.careScheduleLifecycleSweep();
+        careScheduleService.assignRequestedSchedules();
         Long requestedById = null;
         if ("VETERINARIAN".equals(currentUser.getRole())) {
             veterinarianId = currentUser.getUserId();

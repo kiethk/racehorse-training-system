@@ -1,9 +1,10 @@
 import type { CareSchedule } from '../../admissions/types/index.ts';
 import type { VetWatchlistHorse } from '../types.ts';
+import { getSynchronizedNow } from '../../../lib/clockSync.ts';
 
 /** Local calendar date (YYYY-MM-DD) of "now" — the vet works in Asia/Ho_Chi_Minh, the app clock is local. */
 export function getTodayLocalDate(): string {
-  const now = new Date();
+  const now = getSynchronizedNow();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");

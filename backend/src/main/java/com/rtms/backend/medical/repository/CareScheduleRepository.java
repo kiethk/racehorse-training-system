@@ -124,12 +124,12 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
 
 
-    /** D1 EOD rollover: INITIAL/ROUTINE chưa hoàn tất còn nằm ở giờ đã qua. */
+    /** D1 EOD rollover: INITIAL/ROUTINE chưa hoàn tất của những ngày ĐÃ QUA (< now date, sau 00:00). */
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "
             + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
             + "com.rtms.backend.medical.enums.CareType.ROUTINE) "
-            + "AND ((cs.scheduledDate IS NOT NULL AND cs.scheduledDate <= cast(:now as date)) "
-            + "     OR (cs.scheduledDate IS NULL AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now))")
+            + "AND ((cs.scheduledDate IS NOT NULL AND cs.scheduledDate < cast(:now as date)) "
+            + "     OR (cs.scheduledDate IS NULL AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt < :now))")
     List<CareSchedule> findRollableEodCandidates(@Param("statuses") Collection<CareScheduleStatus> statuses,
             @Param("now") LocalDateTime now);
 

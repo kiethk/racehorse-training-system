@@ -176,7 +176,7 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
                 today.toLocalDate().atTime(9, 0));
 
-        LocalDateTime evening = today.toLocalDate().atTime(17, 5);
+        LocalDateTime evening = today.toLocalDate().plusDays(1).atTime(17, 5);
 
         careScheduleService.runLifecycleSweep(evening);
 
@@ -194,7 +194,7 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
         // Slot hợp lệ: sau giờ đóng cửa 17:05 và nằm trên lưới 30 phút của ngày làm việc kế.
 
-        assertTrue(rolled.getScheduledDate().isAfter(evening.toLocalDate()));
+        assertTrue(rolled.getScheduledDate().isAfter(today.toLocalDate()));
         assertNull(rolled.getScheduledAt());
 
     }

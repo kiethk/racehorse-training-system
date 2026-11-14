@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Notice } from '@/components/ui/Notice';
 import { Icon } from '@/components/ui/Icon';
+import { useSynchronizedClock } from '@/lib/clockSync';
 import { Input, Textarea, ChoiceInput } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { formatDate, formatDateTime } from '@/lib/display';
@@ -384,16 +385,33 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
-    const todayIso = new Date().toISOString().slice(0, 10);
+    // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+    const _now = useSynchronizedClock();
+    const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
     const rawScheduled = scheduledDate ? scheduledDate.slice(0, 10) : null;
     const isFutureRoutine = careType === 'ROUTINE' && Boolean(rawScheduled && rawScheduled > todayIso);
+
+    // Time-window guard: ROUTINE exams can only be STARTED (SCHEDULED→complete) between 13:30–15:30.
+    // If already IN_PROGRESS, the vet may finish past 15:30.
+    const VET_WINDOW_START_H = 13, VET_WINDOW_START_M = 30;
+    const VET_WINDOW_END_H   = 15, VET_WINDOW_END_M   = 30;
+    const _h = _now.getHours(), _m = _now.getMinutes();
+    const _minNow   = _h * 60 + _m;
+    const _minStart = VET_WINDOW_START_H * 60 + VET_WINDOW_START_M;
+    const _minEnd   = VET_WINDOW_END_H   * 60 + VET_WINDOW_END_M;
+    const isOutsideRoutineWindow =
+      careType === 'ROUTINE' &&
+      schedulePurpose !== 'PREVENTIVE' &&
+      scheduleStatus === 'SCHEDULED' &&
+      (_minNow < _minStart || _minNow > _minEnd);
 
     // Care Scheduling: SCHEDULED and IN_PROGRESS exams are open and directly editable.
     const isGated =
       (scheduleStatus != null &&
         scheduleStatus !== 'SCHEDULED' &&
         scheduleStatus !== 'IN_PROGRESS') ||
-      isFutureRoutine;
+      isFutureRoutine ||
+      isOutsideRoutineWindow;
     // A visit opened by an incident report needs a Follow-up only when the horse stays blocked.
     const followUpRequired = !fromIncident || trainingDecision === 'BLOCKED';
     const followUpActive = scheduleFollowUp || followUpRequired;
@@ -825,6 +843,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (isFutureRoutine && rawScheduled) {
         setFormError(
           `This routine check is scheduled for ${formatDate(rawScheduled)}. It can only be completed on or after the scheduled date.`,
+        );
+        return;
+      }
+      if (isOutsideRoutineWindow) {
+        setFormError(
+          `Routine examinations can only be started between 13:30 and 15:30. Please return during the examination window.`,
         );
         return;
       }
@@ -1465,6 +1489,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                 </Notice>
               )}
 
+              {isOutsideRoutineWindow && (
+                <Notice tone="warning">
+                  Routine examinations can only be started between <strong>13:30</strong> and <strong>15:30</strong>. Please return during the examination window.
+                </Notice>
+              )}
+
               {showTier1 && (
                 <div className="space-y-3 border-b border-[var(--color-border)] pb-4">
                   <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
@@ -1700,6 +1730,11 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         {isFutureRoutine && rawScheduled && (
           <Notice tone="warning">
             This routine check is scheduled for <strong>{formatDate(rawScheduled)}</strong>. It can only be completed on or after the scheduled date.
+          </Notice>
+        )}
+        {isOutsideRoutineWindow && (
+          <Notice tone="warning">
+            Routine examinations can only be started between <strong>13:30</strong> and <strong>15:30</strong>. Please return during the examination window.
           </Notice>
         )}
         {renderVitals()}

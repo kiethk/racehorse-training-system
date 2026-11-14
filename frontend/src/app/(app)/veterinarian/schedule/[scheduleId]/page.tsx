@@ -122,6 +122,7 @@ export default function ScheduleDetailPage() {
                 careScheduleId={detail.schedule.id}
                 careType={detail.schedule.careType}
                 scheduleStatus={detail.schedule.status}
+                scheduledDate={detail.schedule.scheduledDate ?? detail.schedule.scheduledAt}
                 schedulePurpose={detail.schedule.purpose}
                 candidateName={detail.horse?.name}
                 horseId={detail.schedule.horseId ?? undefined}

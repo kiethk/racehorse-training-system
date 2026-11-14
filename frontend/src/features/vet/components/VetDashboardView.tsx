@@ -28,6 +28,7 @@ import { VetImmediateAttention } from "./dashboard/VetImmediateAttention";
 import { VetClearanceWatchlist } from "./dashboard/VetClearanceWatchlist";
 import { VetExamActivityCard } from "./dashboard/VetExamActivityCard";
 import { KaplanMeierSurvivalChart } from "@/features/medical-analytics";
+import { useSynchronizedClock } from "@/lib/clockSync";
 
 export function VetDashboardView() {
   const router = useRouter();
@@ -43,7 +44,13 @@ export function VetDashboardView() {
 
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
-  const todayLocal = useMemo(() => getTodayLocalDate(), []);
+  const currentClock = useSynchronizedClock();
+  const todayLocal = useMemo(() => {
+    const year = currentClock.getFullYear();
+    const month = String(currentClock.getMonth() + 1).padStart(2, "0");
+    const day = String(currentClock.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, [currentClock]);
 
   const loadData = useCallback(async () => {
     try {

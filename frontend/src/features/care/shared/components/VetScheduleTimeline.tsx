@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
 import { formatDate, formatLocalDateIso } from '@/lib/display';
+import { useSynchronizedClock } from '@/lib/clockSync';
 import type { CareSchedule, CareType, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
 import {
@@ -34,6 +35,27 @@ export function VetScheduleTimeline() {
   const [stalls, setStalls] = useState<StableStall[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
+  const lastSystemDateRef = useRef<string>(formatLocalDateIso());
+
+  // Auto-align selectedDate ONLY when the operating system's current date actually changes
+  useEffect(() => {
+    const currentTodayIso = formatLocalDateIso(currentClock);
+    const previousSystemDate = lastSystemDateRef.current;
+
+    if (previousSystemDate !== currentTodayIso) {
+      lastSystemDateRef.current = currentTodayIso;
+      setSelectedDate((prev) => {
+        // If user was viewing what was previously "today", advance them to the new "today"
+        if (prev === previousSystemDate) {
+          return currentTodayIso;
+        }
+        return prev;
+      });
+    }
+  }, [currentClock]);
 
   // Filters (Urgent excluded by rule)
   const [careTypeFilter, setCareTypeFilter] = useState<CareType | 'PREVENTIVE' | 'ALL'>('ALL');
@@ -126,7 +148,9 @@ export function VetScheduleTimeline() {
   }, [todaySchedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
-    if (item.careType === 'INITIAL') {
+    if (item.status === 'COMPLETED') {
+      router.push(`/veterinarian/records?scheduleId=${item.id}&back=schedule`);
+    } else if (item.careType === 'INITIAL') {
       router.push(`/veterinarian/admissions?scheduleId=${item.id}`);
     } else if (item.purpose === 'PREVENTIVE') {
       router.push(`/veterinarian/preventive-care?horseId=${item.horseId}`);
@@ -259,8 +283,8 @@ export function VetScheduleTimeline() {
                     <span className="text-xl font-bold text-[var(--color-text-primary)]">
                       {stats.preventive}/3
                     </span>
-                    <Pill tone={stats.preventive >= 3 ? 'warning' : 'primary'} size="sm">
-                      Window 13:30 – 15:30
+                    <Pill tone="neutral" size="sm">
+                      Daytime Intake
                     </Pill>
                   </div>
                 </div>
@@ -342,12 +366,34 @@ export function VetScheduleTimeline() {
                 const statusDisplay = getScheduleStatusDisplay(cs.status);
                 const examAction = getScheduleExamAction(cs.status);
 
+                // Routine window check (13:30 - 15:30) for ROUTINE non-preventive
+                const _now = currentClock;
+                const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+                const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+                const isFuture = Boolean(!isCompleted && rawDate && rawDate > todayIso);
+                const _minNow = _now.getHours() * 60 + _now.getMinutes();
+                const isPreventive = cs.purpose === 'PREVENTIVE';
+                const isOutsideRoutineWindow =
+                  cs.careType === 'ROUTINE' &&
+                  !isPreventive &&
+                  cs.status === 'SCHEDULED' &&
+                  (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+                const canExamine = isPreventive || cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
+
                 return (
                   <Panel
                     key={cs.id}
                     padded
-                    onClick={() => handleOpenSchedule(cs)}
-                    className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                    onClick={() => {
+                      if (isCompleted || canExamine) {
+                        handleOpenSchedule(cs);
+                      }
+                    }}
+                    className={`border border-[var(--color-border)] transition-all duration-200 ease-out ${
+                      isCompleted || canExamine
+                        ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]'
+                        : 'cursor-not-allowed opacity-80'
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       {/* Left: Avatar + Details */}
@@ -396,19 +442,27 @@ export function VetScheduleTimeline() {
                       </div>
 
                       {/* Right: Action Button */}
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex flex-col items-end gap-1">
                         <Button
-                          variant={isCompleted ? 'secondary' : 'primary'}
+                          variant={isCompleted || cs.status === 'IN_PROGRESS' ? 'secondary' : 'primary'}
                           size="sm"
                           icon={examAction.icon}
+                          disabled={!isCompleted && !canExamine}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenSchedule(cs);
+                            if (isCompleted || canExamine) {
+                              handleOpenSchedule(cs);
+                            }
                           }}
                           className="transition-all active:scale-[0.97]"
                         >
                           {examAction.label}
                         </Button>
+                        {!isCompleted && !canExamine && cs.status !== 'IN_PROGRESS' && (
+                          <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                            {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Panel>
@@ -492,20 +546,35 @@ export function VetScheduleTimeline() {
                             : (cs.careType === 'INITIAL' ? 'Admission' : 'Routine');
                           const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
 
+                          // Block ROUTINE SCHEDULED before its date or outside 13:30–15:30.
+                          // IN_PROGRESS (Continue) and preventive visits stay open.
+                          const _now = currentClock;
+                          const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+                          const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+                          const isFuture = Boolean(cs.status !== 'COMPLETED' && rawDate && rawDate > todayIso);
+                          const _minNow = _now.getHours() * 60 + _now.getMinutes();
+                          const isRoutineBlocked =
+                            cs.careType === 'ROUTINE' &&
+                            cs.purpose !== 'PREVENTIVE' &&
+                            cs.status === 'SCHEDULED' &&
+                            (isFuture || _minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+
                           return (
                             <div
                               key={cs.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => handleOpenSchedule(cs)}
+                              role={isRoutineBlocked ? undefined : 'button'}
+                              tabIndex={isRoutineBlocked ? undefined : 0}
+                              onClick={() => { if (!isRoutineBlocked) handleOpenSchedule(cs); }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
+                                if (!isRoutineBlocked && (e.key === 'Enter' || e.key === ' ')) {
                                   e.preventDefault();
                                   handleOpenSchedule(cs);
                                 }
                               }}
-                              className={`p-2 rounded-[var(--radius-sm)] border cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text}`}
-                              title={`#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
+                              className={`p-2 rounded-[var(--radius-sm)] border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text} ${isRoutineBlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02] hover:shadow-xs'}`}
+                              title={isRoutineBlocked
+                                ? (isFuture ? 'This routine examination is scheduled for a later date.' : 'Routine exam window: 13:30 – 15:30')
+                                : `#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
                             >
                               <div className="flex items-center justify-between text-xs font-bold">
                                 <span>{timeStr}</span>
@@ -521,6 +590,11 @@ export function VetScheduleTimeline() {
                               <p className="text-xs truncate font-medium mt-1 text-[var(--color-text-primary)]">
                                 {horseName}
                               </p>
+                              {isRoutineBlocked && (
+                                <p className="text-xs mt-1 font-semibold text-[var(--color-text-muted)]">
+                                  {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
+                                </p>
+                              )}
                             </div>
                           );
                         })
