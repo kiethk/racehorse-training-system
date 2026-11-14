@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
 import { formatDate, formatLocalDateIso } from '@/lib/display';
+import { useSynchronizedClock } from '@/lib/clockSync';
 import type { CareSchedule, CareType, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
 import {
@@ -34,6 +35,27 @@ export function VetScheduleTimeline() {
   const [stalls, setStalls] = useState<StableStall[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
+  const lastSystemDateRef = useRef<string>(formatLocalDateIso());
+
+  // Auto-align selectedDate ONLY when the operating system's current date actually changes
+  useEffect(() => {
+    const currentTodayIso = formatLocalDateIso(currentClock);
+    const previousSystemDate = lastSystemDateRef.current;
+
+    if (previousSystemDate !== currentTodayIso) {
+      lastSystemDateRef.current = currentTodayIso;
+      setSelectedDate((prev) => {
+        // If user was viewing what was previously "today", advance them to the new "today"
+        if (prev === previousSystemDate) {
+          return currentTodayIso;
+        }
+        return prev;
+      });
+    }
+  }, [currentClock]);
 
   // Filters (Urgent excluded by rule)
   const [careTypeFilter, setCareTypeFilter] = useState<CareType | 'PREVENTIVE' | 'ALL'>('ALL');
@@ -345,7 +367,7 @@ export function VetScheduleTimeline() {
                 const examAction = getScheduleExamAction(cs.status);
 
                 // Routine window check (13:30 - 15:30) for ROUTINE non-preventive
-                const _now = new Date();
+                const _now = currentClock;
                 const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
                 const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
                 const isFuture = Boolean(!isCompleted && rawDate && rawDate > todayIso);
@@ -526,7 +548,7 @@ export function VetScheduleTimeline() {
 
                           // Block ROUTINE SCHEDULED before its date or outside 13:30–15:30.
                           // IN_PROGRESS (Continue) and preventive visits stay open.
-                          const _now = new Date();
+                          const _now = currentClock;
                           const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
                           const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
                           const isFuture = Boolean(cs.status !== 'COMPLETED' && rawDate && rawDate > todayIso);

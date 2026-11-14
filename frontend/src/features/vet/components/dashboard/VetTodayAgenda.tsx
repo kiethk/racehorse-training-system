@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Panel, SectionTitle } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +10,7 @@ import type { CareSchedule } from "@/features/admissions/types";
 import type { Horse } from "@/features/stable/types";
 import { getCareTypeTone } from "@/features/schedule/utils/timelineUtils";
 import { getScheduleExamAction, getScheduleStatusDisplay } from "@/features/care/lib/scheduleStatusDisplay";
+import { useSynchronizedClock } from "@/lib/clockSync";
 
 function formatAppointmentTime(scheduledAt?: string | null): string {
   if (!scheduledAt) return "--:--";
@@ -44,6 +46,9 @@ export function VetTodayAgenda({
   onBookRoutine,
 }: VetTodayAgendaProps) {
   const handleExamAction = onExamine ?? onStartExam ?? (() => {});
+
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
   return (
     <div className="space-y-4 lg:col-span-7">
       <Panel padded>
@@ -85,7 +90,7 @@ export function VetTodayAgenda({
               // Same availability rule as the Schedule/Routine lists: a SCHEDULED routine
               // exam opens only on/after its date and inside 13:30–15:30. IN_PROGRESS
               // (Continue) and preventive visits stay open outside that window.
-              const now = new Date();
+              const now = currentClock;
               const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
               const rawDate = schedule.scheduledDate || (schedule.scheduledAt ? schedule.scheduledAt.slice(0, 10) : null);
               const isFuture = Boolean(schedule.status !== "COMPLETED" && rawDate && rawDate > todayIso);

@@ -157,7 +157,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
       try {
         await preventiveCareService.recordForHorse(horse.horseId, {
           administeredOn: batchDate,
-          doses: horse.protocols.map((p) => ({ protocolId: p.protocolId, dosage: '' })),
+          doses: horse.protocols.map((p) => ({ protocolId: p.protocolId, dosage: 'Standard dose' })),
         });
       } catch (cause) {
         failed.push({ name: horse.horseName, message: displayError(cause, 'Could not record.') });

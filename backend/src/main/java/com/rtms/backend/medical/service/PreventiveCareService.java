@@ -194,6 +194,7 @@ public class PreventiveCareService {
                 throw new AccessDeniedException("You can only view schedules for horses you own");
             }
         }
+        care.assignRequestedSchedules();
         List<CareSchedule> list = schedules.findByHorseIdOrderByScheduledAtAsc(horseId);
         Set<Long> vetIds = list.stream()
                 .map(CareSchedule::getVeterinarianId)

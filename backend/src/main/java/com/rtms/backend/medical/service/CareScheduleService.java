@@ -1380,7 +1380,7 @@ public class CareScheduleService {
     // D1 — careScheduleLifecycleSweep (ROADMAP v2.2 §4.5; WF-01 §3.1.3-5, WF-03 §3.2)
     // ------------------------------------------------------------------
 
-    private static final LocalTime WORKDAY_START = LocalTime.of(8, 0);
+    private static final LocalTime WORKDAY_START = LocalTime.of(7, 0);
     private static final LocalTime WORKDAY_END = LocalTime.of(17, 0);
     /** AD-022: an exam still open 30 minutes past its appointment time becomes OVERDUE. */
     static final int OVERDUE_GRACE_MINUTES = 30;
@@ -1404,9 +1404,6 @@ public class CareScheduleService {
         LocalTime tod = now.toLocalTime();
         if (!tod.isBefore(WORKDAY_START) && tod.isBefore(WORKDAY_END)) {
             return;
-        }
-        if (tod.isBefore(WORKDAY_END)) {
-            return; // trước 17:00: không rollover/escalate
         }
 
         List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
@@ -2056,11 +2053,15 @@ public class CareScheduleService {
 
         return eligibleVets.stream()
                 .sorted(Comparator
-                        // 1. Cân bằng tải: Ưu tiên bác sĩ có ít ca hơn trong ngày hôm nay
-                        .comparingInt((User v) -> dailyCountByVet.getOrDefault(v.getId(), 0))
-                        // 2. Ưu tiên bác sĩ đã yêu cầu/tạo lịch khám này (Continuity of care)
-                        .thenComparing((User v) -> vetCache.creatorVetId != null && !Objects.equals(v.getId(), vetCache.creatorVetId))
-                        // 3. Deterministic tie-breaker
+                        // 1. Deprioritize creator vet so other active vets take the visit
+                        .comparing((User v) -> vetCache.creatorVetId != null && Objects.equals(v.getId(), vetCache.creatorVetId))
+                        // 2. Lowest number of horses assigned on the slot's day
+                        .thenComparingInt(v -> horsesByVet.getOrDefault(v.getId(), Set.of()).size())
+                        // 3. Lowest minutes booked on the slot's day
+                        .thenComparingInt(v -> minutesByVet.getOrDefault(v.getId(), 0))
+                        // 4. Cân bằng tải: Ưu tiên bác sĩ có ít ca hơn trong ngày hôm nay
+                        .thenComparingInt((User v) -> dailyCountByVet.getOrDefault(v.getId(), 0))
+                        // 5. Deterministic tie-breaker
                         .thenComparing(User::getId))
                 .toList();
     }

@@ -19,6 +19,7 @@ import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
 import { getScheduleExamAction } from '@/features/care/lib/scheduleStatusDisplay';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
+import { useSynchronizedClock } from '@/lib/clockSync';
 
 export function RoutineChecksWorkspace() {
   const router = useRouter();
@@ -36,6 +37,9 @@ export function RoutineChecksWorkspace() {
   const PAGE_SIZE = 8;
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
 
   const loadData = useCallback(async () => {
     try {
@@ -264,7 +268,7 @@ export function RoutineChecksWorkspace() {
             const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
             const isClosed = cs.status === 'COMPLETED';
             const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
-            const _d = new Date();
+            const _d = currentClock;
             const todayIso = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
             const isFuture = Boolean(!isClosed && rawDate && rawDate > todayIso);
             // Window: ALL ROUTINE SCHEDULED exams (except PREVENTIVE) blocked outside 13:30–15:30, regardless of date

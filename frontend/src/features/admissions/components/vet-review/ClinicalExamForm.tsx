@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Notice } from '@/components/ui/Notice';
 import { Icon } from '@/components/ui/Icon';
+import { useSynchronizedClock } from '@/lib/clockSync';
 import { Input, Textarea, ChoiceInput } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { formatDate, formatDateTime } from '@/lib/display';
@@ -384,7 +385,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
-    const _now = new Date();
+    // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+    const _now = useSynchronizedClock();
     const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
     const rawScheduled = scheduledDate ? scheduledDate.slice(0, 10) : null;
     const isFutureRoutine = careType === 'ROUTINE' && Boolean(rawScheduled && rawScheduled > todayIso);

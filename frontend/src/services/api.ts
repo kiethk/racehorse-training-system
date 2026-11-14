@@ -6,6 +6,8 @@
  * do not call fetch() directly in components.
  */
 
+import { getSynchronizedNow, recordServerResponseDate } from '../lib/clockSync.ts';
+
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 const API_URL = (configuredApiUrl || (process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '')).replace(/\/+$/, '');
 
@@ -156,7 +158,7 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   const finalOptions = { ...options };
   const headers = new Headers(options.headers || {});
   
-  headers.set('X-Client-Time', new Date().toISOString());
+  headers.set('X-Client-Time', getSynchronizedNow().toISOString());
 
   if (accessToken && !isAuthEndpoint) {
     headers.set('Authorization', `Bearer ${accessToken}`);
@@ -165,6 +167,9 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   finalOptions.headers = headers;
 
   let res = await fetch(getApiUrl(path), finalOptions);
+  if (res?.headers?.get) {
+    recordServerResponseDate(res.headers.get('date'));
+  }
 
   if (res.status === 401 && !isAuthEndpoint) {
     const refreshed = await refreshAccessToken();

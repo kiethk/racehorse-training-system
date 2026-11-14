@@ -52,6 +52,18 @@ public class CareRescheduleService {
     @Autowired
     public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
             AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus,
+            CareScheduleService careScheduleService, AuditLogService auditLogService, Clock clock) {
+        this.schedules = schedules;
+        this.users = users;
+        this.auditLogs = auditLogs;
+        this.preventiveStatus = preventiveStatus;
+        this.careScheduleService = careScheduleService;
+        this.auditLogService = auditLogService;
+        this.clock = clock;
+    }
+
+    public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
+            AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus,
             CareScheduleService careScheduleService, AuditLogService auditLogService) {
         this(schedules, users, auditLogs, preventiveStatus, careScheduleService, auditLogService, Clock.systemDefaultZone());
     }
@@ -70,18 +82,6 @@ public class CareRescheduleService {
     CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
             PreventiveStatusService preventiveStatus, Clock clock) {
         this(schedules, users, auditLogs, preventiveStatus, null, null, clock);
-    }
-
-    CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
-            PreventiveStatusService preventiveStatus, CareScheduleService careScheduleService,
-            AuditLogService auditLogService, Clock clock) {
-        this.schedules = schedules;
-        this.users = users;
-        this.auditLogs = auditLogs;
-        this.preventiveStatus = preventiveStatus;
-        this.careScheduleService = careScheduleService;
-        this.auditLogService = auditLogService;
-        this.clock = clock;
     }
 
     @Transactional

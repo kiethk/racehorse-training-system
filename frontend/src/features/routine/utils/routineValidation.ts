@@ -1,7 +1,8 @@
+import { getSynchronizedNow } from '../../../lib/clockSync.ts';
 import type { CareSchedule } from '@/features/admissions/types';
 
-export function getMinRoutineDate(): string {
-  const now = new Date();
+export function getMinRoutineDate(baseDate?: Date): string {
+  const now = new Date((baseDate ?? getSynchronizedNow()).getTime());
   // Backend CareScheduleService sets scheduled time to 14:00 on scheduledDate.
   // If local time is past 13:45, a same-day schedule would be rejected with 400 INVALID_DATE.
   if (now.getHours() > 13 || (now.getHours() === 13 && now.getMinutes() >= 45)) {
