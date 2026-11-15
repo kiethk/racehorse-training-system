@@ -64,7 +64,8 @@ export const careService = {
 
   getTreatmentPlans: async (healthRecordId: number): Promise<TreatmentPlan[]> => {
     const res = await apiGet<ApiResponse<TreatmentPlan[]>>(`/api/health-records/${healthRecordId}/treatment-plans`);
-    return res.data;
+    // CANCELLED vẫn có giá trị nghiệp vụ (analytics loại trừ) nhưng không hiển thị trên FE.
+    return res.data.filter((plan) => plan.status !== 'CANCELLED');
   },
 
   createTreatmentPlan: async (

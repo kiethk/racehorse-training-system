@@ -12,15 +12,11 @@ import { FilterChips, SearchInput, MetricCard, Notice, PageHeader, Tabs, type Ta
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { toast } from '@/lib/toast';
 import { InjuryCorrectionModal } from '@/features/health/components/InjuryCorrectionModal';
 import { TreatmentPlanModal } from '@/features/care/shared/components/TreatmentPlanModal';
 import { healthApi } from '@/features/health/services/healthApi';
 import { stableApi } from '@/features/stable/services/stableService';
 import { careService } from '@/features/care/services/careService';
-import { admissionsApi } from '@/features/admissions/services/api';
-import type { VetAdmissionQueueItem } from '@/features/admissions/types';
-import { useAuth } from '@/context/AuthContext';
 import { formatDate } from '@/lib/display';
 import type { InjuryRecord, HorseHealthSummary, HealthRecord } from '@/features/health/types';
 import type { Horse, StableStall } from '@/features/stable/types';
@@ -34,7 +30,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
@@ -49,7 +44,6 @@ interface HorseListItem {
 
 function HealthRecordsContent() {
   const router = useRouter();
-  const { user } = useAuth();
   const searchParams = useSearchParams();
   const paramHorseId = searchParams?.get('horseId');
 
@@ -57,7 +51,6 @@ function HealthRecordsContent() {
   const [error, setError] = useState<string | null>(null);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
-  const [vetAdmissions, setVetAdmissions] = useState<VetAdmissionQueueItem[]>([]);
   const [summaries, setSummaries] = useState<Record<number, HorseHealthSummary>>({});
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -90,6 +83,7 @@ function HealthRecordsContent() {
 
   useEffect(() => {
     if (paramTab && ['overview', 'vitals', 'records', 'injuries-preventive'].includes(paramTab)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the tab with ?tab= from the URL
       setActiveTab(paramTab);
     }
   }, [paramTab]);
@@ -113,17 +107,14 @@ function HealthRecordsContent() {
       setLoading(true);
       setError(null);
       try {
-        const [horseList, stallList, vetQueue] = await Promise.all([
+        const [horseList, stallList] = await Promise.all([
           stableApi.getHorses(),
           stableApi.getStalls(),
-          // Admission stage map for blocked-horse actions; optional, the list works without it.
-          admissionsApi.getVetQueue({ size: 50 }).catch(() => null),
         ]);
 
         if (ignore) return;
         setHorses(horseList || []);
         setStalls(stallList || []);
-        setVetAdmissions(vetQueue?.content || []);
       } catch (err: unknown) {
         if (!ignore) {
           const msg = err instanceof Error ? err.message : 'Failed to load stable health data';
@@ -187,6 +178,7 @@ function HealthRecordsContent() {
     if (paramHorseId) {
       const id = Number(paramHorseId);
       if (!Number.isNaN(id) && id > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the selection with ?horseId= from the URL
         setSelectedHorseId(id);
         void loadHorseDetail(id);
       }
@@ -215,15 +207,6 @@ function HealthRecordsContent() {
     }
     return map;
   }, [stalls]);
-
-  /** My admission queue items, keyed by horse, for blocked-horse intake actions. */
-  const admissionByHorse = useMemo(() => {
-    const map = new Map<number, VetAdmissionQueueItem>();
-    for (const item of vetAdmissions) {
-      if (item.horseId != null) map.set(item.horseId, item);
-    }
-    return map;
-  }, [vetAdmissions]);
 
   // Clicking a row opens the comprehensive in-page health profile for that horse.
   const handleHorseRow = (row: HorseListItem) => {

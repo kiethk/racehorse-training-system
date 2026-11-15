@@ -67,14 +67,14 @@ export function LocalFilePreviewModal({ file, previewUrl, onClose }: LocalFilePr
             <Icon name="download" />
             Download
           </a>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            icon="external-link"
             onClick={() => openBlobInTab(previewUrl, file.name, isPdf)}
-            className={actionClass}
           >
-            <Icon name="external-link" />
             Open in new tab
-          </button>
+          </Button>
           {!isPdf && (
             <div className="ml-auto flex items-center gap-1">
               <Button

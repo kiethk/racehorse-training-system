@@ -38,9 +38,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import org.junit.jupiter.api.Disabled;
-
-@Disabled("Preemption and pause feature abolished per 4-state lifecycle simplification")
 class CareSchedulePreemptionTest {
 
     private CareScheduleRepository schedules;
@@ -92,7 +89,7 @@ class CareSchedulePreemptionTest {
     }
 
     @Test
-    @DisplayName("WF-02 §3.2: When all vets are busy, preempt least-loaded vet with ROUTINE exam to PAUSED and assign URGENT")
+    @DisplayName("WF-02 §3.2: When all vets are busy, the least-loaded vet takes the URGENT case and keeps the routine exam IN_PROGRESS")
     void preemptsLeastLoadedVetWithRoutineExam() {
         User vet1 = eligibleVet(1L); // Load: 30 mins
         User vet2 = eligibleVet(2L); // Load: 60 mins

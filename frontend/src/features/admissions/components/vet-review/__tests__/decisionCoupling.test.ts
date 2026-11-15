@@ -1,21 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { CareType } from '../../../types/index.ts';
-import type { ExamVariant } from '../examVariantConfig.ts';
 import { applyMarkerCoupling, markerCouplingEnabled } from '../decisionCoupling.ts';
 
 describe('markerCouplingEnabled', () => {
-  it('applies to the standard INITIAL exam', () => {
-    assert.equal(markerCouplingEnabled('STANDARD' as ExamVariant, 'INITIAL' as CareType), true);
+  it('applies to the INITIAL exam', () => {
+    assert.equal(markerCouplingEnabled('INITIAL' as CareType), true);
   });
 
-  it('applies to the standard ROUTINE exam', () => {
-    assert.equal(markerCouplingEnabled('STANDARD' as ExamVariant, 'ROUTINE' as CareType), true);
+  it('applies to the ROUTINE exam', () => {
+    assert.equal(markerCouplingEnabled('ROUTINE' as CareType), true);
   });
 
-  it('never applies to the urgent variant', () => {
-    assert.equal(markerCouplingEnabled('URGENT' as ExamVariant, 'URGENT' as CareType), false);
-    assert.equal(markerCouplingEnabled('URGENT_LEGACY' as ExamVariant, 'INITIAL' as CareType), false);
+  it('never applies to the urgent exam', () => {
+    assert.equal(markerCouplingEnabled('URGENT' as CareType), false);
   });
 });
 

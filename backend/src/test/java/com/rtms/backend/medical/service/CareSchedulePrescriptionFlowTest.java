@@ -165,6 +165,31 @@ class CareSchedulePrescriptionFlowTest {
     }
 
     @Test
+    @DisplayName("Chỉ có note, không có thuốc: vẫn tạo TreatmentPlan để Groom thấy chỉ định (duyệt 14/11/2026)")
+    void noteOnly_createsTreatmentPlanWithoutPrescription() {
+        stubCompletion();
+        when(treatmentPlanRepository.save(any(TreatmentPlan.class))).thenAnswer(i -> {
+            TreatmentPlan p = i.getArgument(0);
+            p.setId(500L);
+            return p;
+        });
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
+        CompleteCareScheduleRequest req = baseRequest();
+        req.setGeneralCareInstructions("  Phenylbutazone 4.4 mg/kg IV once daily for 5 days  ");
+
+        service.completeCareSchedule(100L, req, 20L);
+
+        ArgumentCaptor<TreatmentPlan> planCap = ArgumentCaptor.forClass(TreatmentPlan.class);
+        verify(treatmentPlanRepository).save(planCap.capture());
+        assertEquals("Phenylbutazone 4.4 mg/kg IV once daily for 5 days", planCap.getValue().getInstructions());
+        assertEquals("ACTIVE", planCap.getValue().getStatus());
+        assertEquals(req.getNextSchedule().getScheduledAt().toLocalDate(), planCap.getValue().getEndDate(),
+                "plan note-only sống tới đúng buổi khám lại để banner Groom tự tắt");
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
+        verify(eventPublisher, never()).publishEvent(isA(PrescriptionCreatedEvent.class));
+    }
+
+    @Test
     @DisplayName("Medication names differing only by case are duplicates")
     void duplicateMedicationNamesIgnoringCase_areRejected() {
         CompleteCareScheduleRequest req = baseRequest();

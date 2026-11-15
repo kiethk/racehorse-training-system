@@ -19,7 +19,6 @@ import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.TrainingDecisionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,7 +63,6 @@ class HorseIncidentReportRoutingTest {
     @Mock FileStorageService files;
     @Mock CareScheduleRepository schedules;
     @Mock CareScheduleService careScheduleService;
-    @Mock TrainingDecisionService trainingDecisions;
     @Mock UserRepository users;
     @Mock StableStallRepository stalls;
 
@@ -79,7 +77,7 @@ class HorseIncidentReportRoutingTest {
     @BeforeEach
     void setUp() {
         service = new HorseIncidentReportService(reports, horses, files, schedules, careScheduleService,
-                trainingDecisions, users, stalls);
+                users, stalls);
 
         horse = new Horse();
         horse.setId(HORSE_ID);
@@ -112,7 +110,7 @@ class HorseIncidentReportRoutingTest {
 
         assertEquals(created.getId(), report.getCareScheduleId());
         assertEquals(IncidentStatus.REPORTED, report.getStatus());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test
@@ -124,7 +122,7 @@ class HorseIncidentReportRoutingTest {
 
         assertEquals(IncidentStatus.IN_REVIEW, report.getStatus());
         assertEquals(VET_ID, report.getHandledById());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test
@@ -135,7 +133,8 @@ class HorseIncidentReportRoutingTest {
 
         service.createReport(request(IncidentType.TRAUMA), groom);
 
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        assertNull(horse.getTrainingDecisionReason());
     }
 
     @Test
@@ -148,7 +147,7 @@ class HorseIncidentReportRoutingTest {
 
         assertEquals(100L, report.getCareScheduleId());
         assertEquals(IncidentStatus.IN_REVIEW, report.getStatus());
-        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong(), any());
+        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong());
     }
 
     @Test
@@ -162,11 +161,11 @@ class HorseIncidentReportRoutingTest {
         HorseIncidentReport report = service.createReport(request(IncidentType.TRAUMA), groom);
 
         verify(careScheduleService).interruptForUrgent(routine);
-        verify(careScheduleService).createSchedule(eq(HORSE_ID), eq(CareType.URGENT), any(), isNull(), anyLong(), eq(100L));
+        verify(careScheduleService).createSchedule(eq(HORSE_ID), eq(CareType.URGENT), any(), isNull(), anyLong());
         assertEquals(200L, report.getCareScheduleId());
         assertEquals(200L, earlier.getCareScheduleId());
         assertEquals(21L, earlier.getHandledById());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test
@@ -182,7 +181,7 @@ class HorseIncidentReportRoutingTest {
         verify(careScheduleService).interruptForUrgent(routine);
         assertEquals(200L, report.getCareScheduleId());
         assertEquals(200L, earlier.getCareScheduleId());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test
@@ -194,7 +193,7 @@ class HorseIncidentReportRoutingTest {
         HorseIncidentReport report = service.createReport(request(IncidentType.TRAUMA), groom);
 
         assertEquals(100L, report.getCareScheduleId());
-        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong(), any());
+        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong());
     }
 
     @Test
@@ -296,7 +295,7 @@ class HorseIncidentReportRoutingTest {
         CareSchedule created = schedule(id, type, CareScheduleStatus.SCHEDULED, vetId);
         CareScheduleResponse response = mock(CareScheduleResponse.class);
         when(response.id()).thenReturn(id);
-        when(careScheduleService.createSchedule(eq(HORSE_ID), eq(type), anyString(), isNull(), anyLong(), any())).thenReturn(response);
+        when(careScheduleService.createSchedule(eq(HORSE_ID), eq(type), anyString(), isNull(), anyLong())).thenReturn(response);
         when(schedules.findById(id)).thenReturn(Optional.of(created));
         return created;
     }

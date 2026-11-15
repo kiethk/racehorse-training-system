@@ -16,6 +16,15 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    // Underscore prefix = intentionally unused (mock parameters, discarded destructuring).
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
     files: ["src/features/**/*.tsx", "src/app/**/*.tsx"],
     rules: {
       "no-restricted-syntax": [
@@ -34,6 +43,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored assets: the PDF.js worker is minified third-party code (1566 false problems).
+    "public/**",
+    "**/*.min.*",
+    "coverage/**",
   ]),
 ]);
 

@@ -25,18 +25,6 @@ const reviewFeedback = [
   { label: 'Manager', field: 'managerFeedback', stage: 6 },
 ] as const;
 
-function currentReviewStage(status: OwnerAdmissionDetail['status']): number | null {
-  switch (status) {
-    case 'GROOM_REVIEW': return 0;
-    case 'WAITING_FOR_STALL': return 1;
-    case 'WAITING_FOR_ARRIVAL': return 2;
-    case 'ARRIVAL_EXPIRED': return 3;
-    case 'VET_REVIEW': return 4;
-    case 'TRAINER_REVIEW': return 5;
-    case 'MANAGER_REVIEW': return 6;
-    default: return null;
-  }
-}
 
 export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId: number; created: boolean }) {
   const { user } = useAuth();

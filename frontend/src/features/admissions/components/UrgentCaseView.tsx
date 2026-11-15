@@ -404,7 +404,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       {urgentCase.status === 'IN_PROGRESS' && (
         <ClinicalExamForm
           ref={formRef}
-          variant="STANDARD"
           admissionId={0}
           horseId={urgentCase.horseId}
           candidateName={urgentCase.horseName}
@@ -413,7 +412,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           scheduleStatus={urgentCase.status}
           asideTop={urgentAsideTop}
           onSuccess={handleSuccess}
-          prefillFindings={urgentCase.description}
           waitingFollowUpAt={waitingFollowUp?.at}
         />
       )}

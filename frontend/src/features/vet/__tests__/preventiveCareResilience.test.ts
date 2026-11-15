@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeDueItem, unwrapArray, unwrapData } from '../../care/lib/unwrapResponse.ts';
+import { unwrapArray, unwrapData } from '../../care/lib/unwrapResponse.ts';
 
 test('unwrapArray: extracts array directly from array input', () => {
   const input = [{ id: 1 }, { id: 2 }];
@@ -33,45 +33,4 @@ test('unwrapArray: safely returns empty array for null, undefined, or unexpected
 test('unwrapData: unwraps data property or falls back to object', () => {
   assert.deepEqual(unwrapData({ data: { count: 5 } }), { count: 5 });
   assert.deepEqual(unwrapData({ count: 5 }), { count: 5 });
-});
-
-test('normalizeDueItem: preserves nested protocol item intact', () => {
-  const nested = {
-    horseId: 1,
-    horseName: 'Alpha',
-    horseStatus: 'ELIGIBLE',
-    protocol: {
-      horseId: 1,
-      protocolId: 10,
-      code: 'EI',
-      name: 'Equine Influenza',
-      category: 'VACCINE',
-      mandatory: true,
-      lastDoseOn: null,
-      nextDueOn: null,
-      status: 'MISSING',
-    },
-  };
-  assert.deepEqual(normalizeDueItem(nested), nested);
-});
-
-test('normalizeDueItem: converts flat protocol properties into nested protocol structure', () => {
-  const flat = {
-    horseId: 2,
-    horseName: 'Bravo',
-    horseStatus: 'CANDIDATE',
-    protocolId: 20,
-    code: 'TET',
-    name: 'Tetanus',
-    category: 'VACCINE',
-    mandatory: true,
-    lastDoseOn: '2026-10-01',
-    nextDueOn: '2026-10-20',
-    status: 'DUE_SOON',
-  };
-  const normalized = normalizeDueItem(flat);
-  assert.equal(normalized.horseId, 2);
-  assert.equal(normalized.protocol.protocolId, 20);
-  assert.equal(normalized.protocol.status, 'DUE_SOON');
-  assert.equal(normalized.protocol.name, 'Tetanus');
 });

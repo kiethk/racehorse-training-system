@@ -52,11 +52,8 @@ export function VetReviewForm({
   onDirtyChange,
   documents,
 }: VetReviewFormProps) {
-  const variant = careType === 'URGENT' ? 'URGENT_LEGACY' : 'STANDARD';
-
   return (
     <ClinicalExamForm
-      variant={variant}
       admissionId={admissionId}
       horseId={horseId}
       candidateName={candidateName}

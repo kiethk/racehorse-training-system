@@ -3,7 +3,6 @@ package com.rtms.backend.incident.service;
 import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
-import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
@@ -19,7 +18,6 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.TrainingDecisionService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -43,7 +41,6 @@ public class HorseIncidentReportService {
     private final FileStorageService fileStorage;
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
-    private final TrainingDecisionService trainingDecisionService;
     private final UserRepository userRepository;
     private final StableStallRepository stableStallRepository;
 
@@ -52,7 +49,6 @@ public class HorseIncidentReportService {
                                       FileStorageService fileStorage,
                                       CareScheduleRepository careScheduleRepository,
                                       CareScheduleService careScheduleService,
-                                      TrainingDecisionService trainingDecisionService,
                                       UserRepository userRepository,
                                       StableStallRepository stableStallRepository) {
         this.incidentReportRepository = incidentReportRepository;
@@ -60,13 +56,13 @@ public class HorseIncidentReportService {
         this.fileStorage = fileStorage;
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
-        this.trainingDecisionService = trainingDecisionService;
         this.userRepository = userRepository;
         this.stableStallRepository = stableStallRepository;
     }
 
     /**
-     * Mức độ quyết định ca khám: LOW, MEDIUM thành ca ROUTINE, ngựa vẫn tập. HIGH, CRITICAL thành ca URGENT và chặn tập.
+     * Mức độ quyết định ca khám: LOW, MEDIUM thành ca ROUTINE, ngựa vẫn tập. HIGH, CRITICAL thành ca URGENT nhưng KHÔNG
+     * chặn tập: quyền quyết định nằm ở lần khám của Vet (duyệt 14/11/2026).
      * Mỗi ngựa chỉ có một ca sự cố đang mở: báo cáo mới gắn vào ca đó. Ca ROUTINE đang khám mà gặp TRAUMA thì
      * tạm dừng (vẫn mở, giữ Vet để khám tiếp sau) và mở ca URGENT song song.
      */
@@ -90,11 +86,11 @@ public class HorseIncidentReportService {
 
         CareSchedule target = openCase;
         if (escalate) {
-            // Tạm dừng trước khi gán ca URGENT: Vet đang khám không bị coi là bận, và ca này không bị offload.
+            // Tạm dừng trước khi gán ca URGENT: ca routine về SCHEDULED, Vet khám tiếp sau khi xong cấp cứu.
             careScheduleService.interruptForUrgent(openCase);
-            target = createCase(horse, saved, serious, openCase.getId());
+            target = createCase(horse, saved, serious);
         } else if (openCase == null) {
-            target = createCase(horse, saved, serious, null);
+            target = createCase(horse, saved, serious);
         }
         if (escalate) {
             List<HorseIncidentReport> moved = incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(openCase.getId());
@@ -109,9 +105,9 @@ public class HorseIncidentReportService {
         return saved;
     }
 
-    private CareSchedule createCase(Horse horse, HorseIncidentReport report, boolean serious, Long supersededCaseId) {
+    private CareSchedule createCase(Horse horse, HorseIncidentReport report, boolean serious) {
         Long caseId = careScheduleService.createSchedule(horse.getId(), serious ? CareType.URGENT : CareType.ROUTINE,
-                report.getDescription(), null, report.getId(), supersededCaseId).id();
+                report.getDescription(), null, report.getId()).id();
         report.setCareScheduleId(caseId);
         return careScheduleRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Incident case was not created"));

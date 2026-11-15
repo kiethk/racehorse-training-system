@@ -144,8 +144,8 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("Khám xong kết luận ALLOWED: ngựa giữ BLOCKED chờ ca ROUTINE tái khám theo WF-02, đóng sự cố")
-    void testCompleteUrgentSchedule_allowed_keepsBlockUntilRoutineRecheck() {
+    @DisplayName("Khám xong kết luận ALLOWED: ngựa được tập lại ngay, đóng sự cố")
+    void testCompleteUrgentSchedule_allowed_releasesTheBlock() {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
         horse.setTrainingDecisionReason("Urgent veterinary care pending");
@@ -157,13 +157,13 @@ class UrgentCareCompletionTest {
                 completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, response.status());
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
-        assertFalse(horse.canTrain());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+        assertNull(horse.getTrainingDecisionReason());
+        assertTrue(horse.canTrain());
         assertEquals(IncidentStatus.RESOLVED, incident.getStatus());
         assertNotNull(incident.getHandlerNote(), "the reporting Groom should be told the outcome");
         assertTrue(incident.getHandlerNote().startsWith("Diagnosis: "));
-        assertTrue(incident.getHandlerNote().contains("Training: blocked"));
+        assertTrue(incident.getHandlerNote().contains("Training: allowed"));
         verify(healthRecordRepository).save(any(HealthRecord.class));
         verify(workoutService, never()).exitAnyGroup(anyLong());
     }
@@ -205,12 +205,12 @@ class UrgentCareCompletionTest {
 
         assertTrue(incident.getHandlerNote().contains("Treatment: Cold hosing and NSAID for five days"));
         assertTrue(incident.getHandlerNote().contains("Assessment: Mild flexor strain; recheck before returning to work."));
-        assertTrue(incident.getHandlerNote().contains("Training: blocked"));
+        assertTrue(incident.getHandlerNote().contains("Training: allowed"));
     }
 
     @Test
-    @DisplayName("WF-02: đóng ca khẩn cấp ALLOWED không gọi restoreTrainingDecisionBeforeUrgent, giữ nguyên block-at-report")
-    void testCompleteUrgentSchedule_restoresPreviousBlock() {
+    @DisplayName("WF-02: đóng ca khẩn cấp ALLOWED mở khóa theo đúng kết luận của Vet")
+    void testCompleteUrgentSchedule_usesTheVetsDecision() {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
         horse.setTrainingDecisionReason("Urgent veterinary care pending");
@@ -222,12 +222,11 @@ class UrgentCareCompletionTest {
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
-        assertFalse(horse.canTrain());
-        // Groom and Trainer must be told the effective state, not the raw ALLOWED conclusion.
-        assertTrue(incident.getHandlerNote().contains("Training: blocked"));
-        assertTrue(incident.getHandlerNote().contains("Urgent veterinary care pending"));
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+        assertNull(horse.getTrainingDecisionReason());
+        assertTrue(horse.canTrain());
+        // Groom and Trainer must be told the effective state, not the previous block.
+        assertTrue(incident.getHandlerNote().contains("Training: allowed"));
         verify(notificationService).sendAssignmentNotification(
                 eq(55L),
                 eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
@@ -235,16 +234,7 @@ class UrgentCareCompletionTest {
                 eq(horse.getId()),
                 eq(NotificationTypes.URGENT_CASE_CLOSED),
                 anyString(),
-                contains("BLOCKED")
-        );
-        verify(notificationService).sendAssignmentNotification(
-                eq(55L),
-                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
-                eq(urgentSchedule.getId()),
-                eq(horse.getId()),
-                eq(NotificationTypes.URGENT_CASE_CLOSED),
-                anyString(),
-                contains("Urgent veterinary care pending")
+                contains("ALLOWED")
         );
     }
 

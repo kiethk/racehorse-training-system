@@ -199,8 +199,8 @@ class RoutineCadenceTest {
     // ---- 4. INITIAL / URGENT không nối chuỗi ----
 
     @Test
-    @DisplayName("Ca INITIAL hoàn tất không có lịch khám lại -> không tạo lịch AUTO")
-    void initialExamDoesNotChain() {
+    @DisplayName("Ca INITIAL hoàn tất bắt buộc có lịch khám lại; chỉ tạo đúng lịch Vet đặt, không nối AUTO")
+    void initialExamRequiresFollowUpAndDoesNotChain() {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
         exam.setCareType(CareType.INITIAL);
         exam.setAdmissionId(500L);
@@ -209,12 +209,38 @@ class RoutineCadenceTest {
         admission.setHorseId(horse.getId());
         admission.setStatus(AdmissionStatus.VET_REVIEW);
         when(admissions.findByIdForUpdate(500L)).thenReturn(Optional.of(admission));
+        when(admissions.findById(500L)).thenReturn(Optional.of(admission));
         stubCompletion(exam);
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(3)));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
-        verify(schedules, never()).saveAndFlush(any());
+        verify(schedules, times(1)).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Ca INITIAL không có lịch khám lại -> 400 FOLLOW_UP_REQUIRED")
+    void initialExamWithoutFollowUpIsRejected() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        exam.setCareType(CareType.INITIAL);
+        exam.setAdmissionId(500L);
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(500L);
+        admission.setHorseId(horse.getId());
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+        when(admissions.findByIdForUpdate(500L)).thenReturn(Optional.of(admission));
+        when(admissions.findById(500L)).thenReturn(Optional.of(admission));
+        stubCompletion(exam);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+        assertEquals("FOLLOW_UP_REQUIRED", error.getErrorCode());
+        verify(healthRecords, never()).save(any());
     }
 
     @Test
@@ -331,6 +357,14 @@ class RoutineCadenceTest {
         when(horses.findTrainerIdByHorseId(horse.getId())).thenReturn(Optional.empty());
     }
 
+    private static CreateNextScheduleRequest nextFollowUp(LocalDateTime at) {
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledAt(at.withSecond(0).withNano(0));
+        next.setDescription("Incident follow-up");
+        return next;
+    }
+
     private static CompleteCareScheduleRequest request(TrainingDecision decision) {
         CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
         req.setFindings("Examined");
@@ -348,18 +382,35 @@ class RoutineCadenceTest {
     }
 
     @Test
-    @DisplayName("Ca ROUTINE từ báo cáo sự cố: ngựa sốt vẫn hoàn tất được và không tự nối lịch 14 ngày")
+    @DisplayName("Ca ROUTINE từ báo cáo sự cố: bắt buộc đặt lịch kế tiếp, không tự nối thêm lịch 14 ngày")
     void incidentVisitAcceptsAbnormalVitalsAndDoesNotChain() {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
         exam.setSourceIncidentId(700L);
         stubCompletion(exam);
         CompleteCareScheduleRequest fever = request(TrainingDecision.ALLOWED);
         fever.getMetrics().get(0).setTemperature(BigDecimal.valueOf(39.2));
+        fever.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(7)));
 
         service.completeCareSchedule(exam.getId(), fever, vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
-        verify(schedules, never()).saveAndFlush(any(CareSchedule.class));
+        // Đúng 1 lịch do Vet đặt; auto-cadence 14 ngày không áp cho ca từ sự cố.
+        verify(schedules, times(1)).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE từ báo cáo sự cố không có lịch kế tiếp bị từ chối 400 FOLLOW_UP_REQUIRED")
+    void incidentVisitWithoutFollowUpIsRejected() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        exam.setSourceIncidentId(700L);
+        stubCompletion(exam);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+        assertEquals("FOLLOW_UP_REQUIRED", error.getErrorCode());
+        verify(healthRecords, never()).save(any());
     }
 
     @Test
@@ -393,7 +444,10 @@ class RoutineCadenceTest {
 
         horse.setTrainingDecisionReason("Box rest");
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(7)));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         org.mockito.ArgumentCaptor<HealthRecord> record = org.mockito.ArgumentCaptor.forClass(HealthRecord.class);
@@ -410,7 +464,10 @@ class RoutineCadenceTest {
         exam.setSourceIncidentId(700L);
         stubCompletion(exam);
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(7)));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }

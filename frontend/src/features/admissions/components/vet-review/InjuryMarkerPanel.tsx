@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import {
@@ -60,6 +61,11 @@ export interface InjuryMarkerPanelProps {
 export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
   const { markers, setMarkers, bodyRegions, readOnly, onAppendToFindings, fieldErrors, setFieldErrors } = props;
   const [isAddMode, setIsAddMode] = useState(false);
+  // The 3D canvas pulls a multi-megabyte model, so it loads only when the vet needs it.
+  const [show3D, setShow3D] = useState(readOnly || markers.length > 0);
+  const [modelReady, setModelReady] = useState(false);
+  // A restored draft can bring markers back after mount, so the canvas follows the marker list too.
+  const showViewer = show3D || markers.length > 0;
 
   const clearMarkerErrors = () => {
     if (setFieldErrors && fieldErrors?.injuryMarkers) {
@@ -121,7 +127,14 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
           <Button
             type="button"
             variant={isAddMode ? 'primary' : 'secondary'}
-            onClick={() => setIsAddMode((prev) => !prev)}
+            onClick={() => {
+              if (!show3D) {
+                setShow3D(true);
+                setIsAddMode(true);
+                return;
+              }
+              setIsAddMode((prev) => !prev);
+            }}
             icon={isAddMode ? 'target' : 'plus'}
           >
             {isAddMode ? 'Adding marker: click horse' : 'Add injury marker'}
@@ -132,14 +145,44 @@ export function InjuryMarkerPanel(props: InjuryMarkerPanelProps) {
         </span>
       </div>
 
-      <UrgentHorseInjuryViewer
-        injuries={markers.map((m) => ({ ...m, label: zoneLabelOf(m) }))}
-        isAddMode={isAddMode}
-        readOnly={readOnly}
-        onPointerHit={handleInjuryHit}
-        onDeleteInjury={handleDeleteMarker}
-        onUpdateInjury={handleUpdateMarker}
-      />
+      {showViewer ? (
+        <div className="relative">
+          <UrgentHorseInjuryViewer
+            injuries={markers.map((m) => ({ ...m, label: zoneLabelOf(m) }))}
+            isAddMode={isAddMode}
+            readOnly={readOnly}
+            onPointerHit={handleInjuryHit}
+            onDeleteInjury={handleDeleteMarker}
+            onUpdateInjury={handleUpdateMarker}
+            onModelReady={() => setModelReady(true)}
+          />
+          {!modelReady && (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)]">
+              <Spinner />
+              <span className="text-xs text-[var(--color-text-muted)]">Loading 3D model…</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex h-[420px] w-full flex-col items-center justify-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-center">
+          <p className="text-xs font-semibold text-[var(--color-text-primary)]">
+            3D anatomy model is not loaded yet.
+          </p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Load it to mark injury locations on the horse.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setShow3D(true);
+              setIsAddMode(true);
+            }}
+          >
+            Load 3D model
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">

@@ -20,7 +20,7 @@ interface ReportIncidentDialogProps {
 
 const INCIDENT_TYPE_OPTIONS: { value: IncidentType; label: string }[] = [
   { value: 'PROBLEM', label: 'Problem — Next routine vet slot, keeps training' },
-  { value: 'TRAUMA', label: 'Trauma — Vet called now, stops training and leaves its group' },
+  { value: 'TRAUMA', label: 'Trauma — Vet called now; training is decided after the examination' },
 ];
 
 export function ReportIncidentDialog({

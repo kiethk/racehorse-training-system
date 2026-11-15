@@ -54,6 +54,7 @@ export function CreatableCombobox({
     : options;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets keyboard highlight when the popover closes
     if (!open) setHighlight(-1);
   }, [open]);
 
@@ -86,6 +87,7 @@ export function CreatableCombobox({
         aria-expanded={open}
         aria-autocomplete="list"
         role="combobox"
+        aria-controls={`${id}-listbox`}
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
@@ -106,6 +108,7 @@ export function CreatableCombobox({
       {open && filtered.length > 0 && (
         <ul
           ref={listRef}
+          id={`${id}-listbox`}
           role="listbox"
           className="absolute z-[var(--z-dropdown)] mt-1 max-h-60 w-full overflow-auto rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-[var(--shadow-popover)]"
         >

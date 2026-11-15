@@ -18,7 +18,7 @@ import type { IncidentReport, IncidentType } from '../types';
 
 const INCIDENT_TYPE_OPTIONS: { value: IncidentType; label: string; hint: string; tone: string }[] = [
   { value: 'PROBLEM', label: 'Problem', hint: 'Vet checks at the next routine slot. The horse keeps training.', tone: 'text-[var(--color-info)]' },
-  { value: 'TRAUMA', label: 'Trauma', hint: 'Vet called now, even from another exam. The horse stops training and leaves its group.', tone: 'text-[var(--color-danger)] font-semibold' },
+  { value: 'TRAUMA', label: 'Trauma', hint: 'Vet called now. Training is decided after the examination.', tone: 'text-[var(--color-danger)] font-semibold' },
 ];
 
 export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {}) {
@@ -250,7 +250,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                     Emergency Urgent Care Alert:
                   </div>
                   <p className="mt-1 font-medium leading-relaxed">
-                    The system immediately pauses training clearance (BLOCKED) and triggers a real-time urgent alert directly to the on-duty veterinarian.
+                    The veterinarian is alerted now.
                   </p>
                 </div>
               )}
@@ -299,11 +299,12 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
 
                 {previewUrl && (
                   <div className="relative mt-2 inline-block max-w-xs">
-                    <button
+                    <Button
                       type="button"
+                      variant="tertiary"
                       onClick={() => setViewingPreview(true)}
                       aria-label="Preview full size image"
-                      className="group block cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                      className="group block h-auto p-0 cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -311,7 +312,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                         alt="Image preview"
                         className="max-h-48 object-cover transition-transform group-hover:scale-105"
                       />
-                    </button>
+                    </Button>
                     <IconButton
                       icon="x"
                       size="sm"
