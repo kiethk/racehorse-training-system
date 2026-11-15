@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClassName } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { PdfViewer } from '@/components/ui/PdfViewer';
 import { openBlobInTab, openProtectedFile } from '@/lib/protectedFile';
@@ -13,7 +13,6 @@ import { useAdmissionDocumentFile } from './useAdmissionDocumentFile';
 export function AdmissionDocumentPreview({ document, label, onClose }: {
   document: AdmissionDocument;
   label: string;
-  fileUrl?: string;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -35,8 +34,6 @@ export function AdmissionDocumentPreview({ document, label, onClose }: {
     };
   }, []);
 
-  const actionClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
-
   return (
     <dialog
       ref={dialogRef}
@@ -56,7 +53,7 @@ export function AdmissionDocumentPreview({ document, label, onClose }: {
         </header>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-2 sm:px-5">
-          {file && <a href={file.url} download={filename} className={actionClass}><Icon name="download" />Download</a>}
+          {file && <a href={file.url} download={filename} className={buttonClassName()}><Icon name="download" />Download</a>}
           <Button
             type="button"
             variant="secondary"
@@ -67,7 +64,7 @@ export function AdmissionDocumentPreview({ document, label, onClose }: {
                   toast.error(displayError(err, 'Unable to open file in new tab.'));
                 });
               } else if (file?.url) {
-                openBlobInTab(file.url, filename, file.kind === 'pdf');
+                openBlobInTab(file.url, filename);
               }
             }}
           >

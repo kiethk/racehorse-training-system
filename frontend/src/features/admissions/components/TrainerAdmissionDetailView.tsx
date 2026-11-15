@@ -251,7 +251,7 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
                 id: 'documents',
                 label: 'Documents',
                 count: detail.documents.length,
-                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+                content: <AdmissionDocumentsSection documents={detail.documents} />,
               },
               { id: 'medical', label: 'Medical Findings', content: healthSection },
               { id: 'history', label: 'Review History', content: reviewHistorySection },

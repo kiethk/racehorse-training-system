@@ -1,24 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyState, Icon, ListSkeleton, Notice, Panel, Pill } from '@/components/ui';
+import { useEffect, useState } from 'react';
+import { Button, EmptyState, ListSkeleton, Notice, Panel, Pill } from '@/components/ui';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { formatDateTime } from '@/lib/display';
 import { incidentApi } from '@/features/groom/services/incidentService';
-import { assignedVetLabel } from '@/features/groom/lib/assignedVet';
-import type { IncidentReport, IncidentStatus } from '@/features/groom/types';
-import { INCIDENT_TYPE_MAP } from '@/features/groom/lib/incidentDisplay';
+import type { IncidentReport } from '@/features/groom/types';
+import {
+  INCIDENT_STATUS_MAP,
+  INCIDENT_TYPE_MAP,
+  incidentVetText,
+} from '@/features/groom/lib/incidentDisplay';
 import { ReportIncidentDialog } from './ReportIncidentDialog';
-
-const STATUS_MAP: Record<
-  IncidentStatus,
-  { tone: 'warning' | 'info' | 'success' | 'neutral'; label: string }
-> = {
-  REPORTED: { tone: 'warning', label: 'Reported — Awaiting Vet Review' },
-  IN_REVIEW: { tone: 'info', label: 'Under Vet Review' },
-  RESOLVED: { tone: 'success', label: 'Resolved' },
-  DISMISSED: { tone: 'neutral', label: 'Closed' },
-};
 
 export function TrainerHorseIncidentsTab({
   horseId,
@@ -33,24 +26,32 @@ export function TrainerHorseIncidentsTab({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  // Bumped after a new report is sent, to load the list again.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const fetchReports = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const list = await incidentApi.list({ horseId });
-      setReports(list);
-    } catch (err) {
-      console.error('Unable to load horse incidents:', err);
-      setError('Unable to load incident reports for this horse.');
-    } finally {
-      setLoading(false);
-    }
-  }, [horseId]);
-
+  // State only changes once the request answers. `loading` starts true for the first load; a reload keeps the
+  // current list on screen until the new one arrives.
   useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
+    let active = true;
+    incidentApi
+      .list({ horseId })
+      .then((list) => {
+        if (!active) return;
+        setReports(list);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error('Unable to load horse incidents:', err);
+        setError('Unable to load incident reports for this horse.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [horseId, reloadKey]);
 
   return (
     <div className="space-y-4">
@@ -88,7 +89,8 @@ export function TrainerHorseIncidentsTab({
       ) : (
         <div className="space-y-3">
           {reports.map((report) => {
-            const statusConfig = STATUS_MAP[report.status] ?? { tone: 'neutral', label: report.status };
+            const statusConfig = INCIDENT_STATUS_MAP[report.status] ?? { tone: 'neutral', label: report.status };
+            const vetText = incidentVetText(report);
             const severityConfig = INCIDENT_TYPE_MAP[report.incidentType] ?? { tone: 'neutral', label: report.incidentType };
             const imgPath = incidentApi.imageSrc(report);
 
@@ -105,7 +107,7 @@ export function TrainerHorseIncidentsTab({
                       {report.reportedByName && (
                         <span> • Reported by: <strong>{report.reportedByName}</strong></span>
                       )}
-                      {assignedVetLabel(report) && <span> • {assignedVetLabel(report)}</span>}
+                      {vetText && <span> • Vet: {vetText}</span>}
                     </p>
                   </div>
                   <Pill tone={statusConfig.tone} size="sm">{statusConfig.label}</Pill>
@@ -148,7 +150,7 @@ export function TrainerHorseIncidentsTab({
         open={isReportOpen}
         onClose={() => setIsReportOpen(false)}
         onSuccess={() => {
-          void fetchReports();
+          setReloadKey((key) => key + 1);
           onReported?.();
         }}
       />

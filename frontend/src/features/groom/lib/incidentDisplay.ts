@@ -21,6 +21,16 @@ export const INCIDENT_TYPE_MAP: Record<
 };
 
 /**
+ * Who took the case: the vet's name, "Awaiting assignment" while a reported case has no vet yet,
+ * or null when there is nothing useful to say (e.g. dismissed before any vet was assigned).
+ */
+export function incidentVetText(report: Pick<IncidentReport, 'status' | 'handlerName'>): string | null {
+  if (report.status === 'DISMISSED') return null;
+  if (report.handlerName) return report.handlerName;
+  return report.status === 'REPORTED' ? 'Awaiting assignment' : null;
+}
+
+/**
  * Horse name for an incident. A Groom only sees the horses they currently look after, so an older
  * report may name a horse that is no longer in `/api/horses`; fall back to the name stored on the report.
  */

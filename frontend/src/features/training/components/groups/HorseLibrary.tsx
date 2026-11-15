@@ -11,7 +11,6 @@ interface HorseLibraryProps {
   horses: Horse[];
   groups: TrainingGroup[];
   loading?: boolean;
-  onAddHorse?: (group: TrainingGroup, horseId: number) => Promise<void>;
   onRemoveHorse?: (horse: DraggableHorseItem) => void;
   disabled?: boolean;
 }
@@ -20,7 +19,6 @@ export function HorseLibrary({
   horses,
   groups,
   loading = false,
-  onAddHorse,
   onRemoveHorse,
   disabled = false,
 }: HorseLibraryProps) {

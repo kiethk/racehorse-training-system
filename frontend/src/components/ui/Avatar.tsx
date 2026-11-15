@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
+import { fileVariantUrl } from '@/lib/fileVariant';
 import { useProtectedFileUrl } from '@/lib/protectedFile';
 
 function getInitials(name: string): string {
@@ -26,7 +27,7 @@ export function Avatar({
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }) {
-  const { url } = useProtectedFileUrl(image);
+  const { url } = useProtectedFileUrl(fileVariantUrl(image, 'THUMB'));
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const sizes = { sm: 'h-7 w-7 text-[11px]', md: 'h-8 w-8 text-xs', lg: 'h-24 w-24 text-2xl' };
   if (url && failedImage !== image) {
