@@ -253,7 +253,9 @@ public class CourseRunServiceImpl implements CourseRunService {
         List<TrainingSession> sessions = sessionRepository.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.getId());
         // Cancelled Sessions stay in the total: the total is what the course run was created with.
         int total = sessions.size();
-        List<TrainingWorkout> workouts = workoutRepository.findBySessionIdIn(sessions.stream().map(TrainingSession::getId).toList());
+        // Ngựa chỉ còn Workout đã hủy thì không hiện. (A horse left with only cancelled Workouts is not listed.)
+        List<TrainingWorkout> workouts = workoutRepository.findBySessionIdIn(sessions.stream().map(TrainingSession::getId).toList()).stream()
+                .filter(workout -> workout.getStatus() != WorkoutStatus.CANCELLED).toList();
         Map<Long, String> names = horseNames(workouts);
         Map<Long, Long> attended = workouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.RAN)
                 .collect(Collectors.groupingBy(TrainingWorkout::getHorseId, Collectors.counting()));

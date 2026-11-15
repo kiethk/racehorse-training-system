@@ -102,7 +102,7 @@ public class TrainerAssignmentService {
                 admission.getHorseId(),
                 NotificationTypes.ADMISSION_TRAINER_ASSIGNED,
                 "New horse assignment",
-                "You have been assigned to candidate horse " + horseName + " for racing readiness assessment.");
+                "You have been assigned to candidate horse " + horseName + " for review.");
 
         return Optional.of(trainer.getId());
     }

@@ -23,7 +23,6 @@ public class DynamicToolRegistryService {
             Map.entry("getHorseTrainingSummary", "getMyHorseTrainingProgress"),
             Map.entry("analyzeWorkoutLoadAndOvertrainingRisk", "getHorseFitnessTrend"),
             Map.entry("getCourseCurriculumOverview", "getTrainerPlansSummary"),
-            Map.entry("getRacingReadinessAssessment", "getTrainerRiskAlerts"),
             Map.entry("recommendOptimalRaceDistanceAndTrack", "recommendTrainerStrategy"),
             Map.entry("recommendNextWorkoutAdjustment", "recommendTrainerStrategy"),
             Map.entry("getActivePrescriptions", "getHorseMedicalHistory"),

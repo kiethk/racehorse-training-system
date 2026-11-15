@@ -33,7 +33,7 @@ export const trainerAdmissionsApi = {
     return res.data;
   },
 
-  /** Submit the evaluation -> the backend moves the admission to MANAGER_REVIEW ITSELF. */
+  /** Submit the feedback -> the backend moves the admission to MANAGER_REVIEW ITSELF. */
   submitReview: async (id: number, body: TrainerReviewRequest): Promise<void> => {
     await apiPost<ApiResponse<unknown>>(
       `/api/admissions/${id}/trainer-review`,

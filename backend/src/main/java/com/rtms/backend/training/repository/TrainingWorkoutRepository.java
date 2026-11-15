@@ -83,16 +83,17 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     List<TrainingWorkout> findByHorseIdAndSessionIdIsNotNull(Long horseId);
 
     /**
-     * Lịch tập của MỘT con ngựa trong khoảng ngày, kể cả buổi đã hủy, theo thứ tự ngày rồi giờ.
-     * (One horse schedule over a date range, cancelled Sessions included, in date then time order.)
+     * Lịch tập của MỘT con ngựa trong khoảng ngày, không kể Workout đã hủy, theo thứ tự ngày rồi giờ.
+     * (One horse schedule over a date range, without cancelled Workouts, in date then time order.)
      */
     @Query("""
            SELECT new com.rtms.backend.training.dto.HorseScheduleItemResponse(
-                      s.id, s.sessionDate, s.startTime, s.endTime, sub.name, s.status, w.status)
+                      s.id, s.sessionDate, s.startTime, s.endTime, sub.name, w.status)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId = :horseId
+             AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
              AND s.sessionDate BETWEEN :fromDate AND :toDate
            ORDER BY s.sessionDate ASC, s.startTime ASC
            """)

@@ -14,39 +14,13 @@ import type {
 export interface TrainerAdmissionQueue {
   /** Admissions in TRAINER_REVIEW that the system assigned to me. */
   pending: AdmissionSummaryResponse[];
-  /** Admissions I have evaluated — every later status, including rejected by the Manager. */
+  /** Admissions I have reviewed — every later status, including rejected by the Manager. */
   reviewed: AdmissionSummaryResponse[];
   /** Horses I look after now: horses in my areas plus admissions assigned to me that are not finished. */
   activeHorseCount: number;
   /** Load limit; at this count the system assigns me no new admissions. */
   horseLimit: number;
   atCapacity: boolean;
-}
-
-/**
- * Matches enums/RacingReadinessStatus.java.
- * The DB has CHECK constraint chk_rra_status that accepts exactly these 3 values.
- *
- * UNSUITABLE was renamed from NOT_READY (V47) because the old name could not be told apart from
- * NEEDS_MORE_TRAINING. This is the ONLY channel for the Trainer to signal "we should not
- * take this horse" — the Trainer cannot reject an admission.
- */
-export type RacingReadinessStatus = 'READY' | 'NEEDS_MORE_TRAINING' | 'UNSUITABLE';
-
-export interface RacingReadinessAssessment {
-  id: number;
-  horseId: number;
-  readinessStatus: RacingReadinessStatus;
-  conformationScore: number | null;
-  temperamentScore: number | null;
-  gaitQualityScore: number | null;
-  estimatedMonthsToRace: number | null;
-  assessmentDate: string;
-  remarks: string | null;
-  trainerId: number | null;
-  /** The admission this evaluation was made for. */
-  admissionId: number | null;
-  createdAt: string;
 }
 
 export interface HorseSummary {
@@ -63,21 +37,15 @@ export interface HorseSummary {
 
 export interface TrainerAdmissionView {
   admission: AdmissionDetailResponse;
-  /** null if the Groom step has not created the Horse record. The evaluation CANNOT be submitted then. */
+  /** null if the Groom step has not created the Horse record. The feedback CANNOT be submitted then. */
   horse: HorseSummary | null;
   /** The vet's examination data. */
   healthRecords: HealthRecord[];
   /** Vital signs data (temperature, heart rate, respiratory rate...). */
   healthMetrics: HorseHealthMetricResponse[];
-  /** Non-null = already evaluated -> the form becomes read-only. */
-  existingAssessment: RacingReadinessAssessment | null;
 }
 
+/** Matches dto/TrainerAdmissionReviewRequest.java: one required written feedback. */
 export interface TrainerReviewRequest {
-  readinessStatus: RacingReadinessStatus;
-  conformationScore?: number | null;
-  temperamentScore?: number | null;
-  gaitQualityScore?: number | null;
-  estimatedMonthsToRace?: number | null;
-  remarks?: string | null;
+  trainerFeedback: string;
 }

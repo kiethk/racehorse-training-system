@@ -126,7 +126,9 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
             throw new ApiException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "Session not found!");
         }
 
-        List<TrainingWorkout> shown = workouts.stream().filter(visible).toList();
+        // Workout đã hủy không hiện, nên buổi bị hủy có danh sách ngựa trống. (Cancelled Workouts are not shown, so a cancelled Session lists no horses.)
+        List<TrainingWorkout> shown = workouts.stream().filter(visible)
+                .filter(workout -> workout.getStatus() != WorkoutStatus.CANCELLED).toList();
         Map<Long, String> horseNames = horseRepository
                 .findAllById(shown.stream().map(TrainingWorkout::getHorseId).toList()).stream()
                 .collect(Collectors.toMap(Horse::getId, Horse::getName));
