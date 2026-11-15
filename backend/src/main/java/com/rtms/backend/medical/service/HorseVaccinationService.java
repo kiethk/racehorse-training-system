@@ -7,9 +7,13 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.HorseVaccinationRequest;
 import com.rtms.backend.medical.dto.HorseVaccinationResult;
 import com.rtms.backend.medical.dto.VaccinationRequest;
+import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.VaccinationSource;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.PreventiveProtocolRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -40,24 +45,26 @@ public class HorseVaccinationService {
     private final HealthRecordRepository healthRecords;
     private final PreventiveVaccinationService vaccinations;
     private final PreventiveStatusService preventiveStatus;
+    private final CareScheduleRepository careSchedules;
     private final Clock clock;
 
     @Autowired
     public HorseVaccinationService(PreventiveProtocolRepository protocols, HorseRepository horses,
             HealthRecordRepository healthRecords, PreventiveVaccinationService vaccinations,
-            PreventiveStatusService preventiveStatus) {
-        this(protocols, horses, healthRecords, vaccinations, preventiveStatus, Clock.systemDefaultZone());
-    }
-
-    HorseVaccinationService(PreventiveProtocolRepository protocols, HorseRepository horses,
-            HealthRecordRepository healthRecords, PreventiveVaccinationService vaccinations,
-            PreventiveStatusService preventiveStatus, Clock clock) {
+            PreventiveStatusService preventiveStatus, CareScheduleRepository careSchedules, Clock clock) {
         this.protocols = protocols;
         this.horses = horses;
         this.healthRecords = healthRecords;
         this.vaccinations = vaccinations;
         this.preventiveStatus = preventiveStatus;
+        this.careSchedules = careSchedules;
         this.clock = clock;
+    }
+
+    HorseVaccinationService(PreventiveProtocolRepository protocols, HorseRepository horses,
+            HealthRecordRepository healthRecords, PreventiveVaccinationService vaccinations,
+            PreventiveStatusService preventiveStatus, Clock clock) {
+        this(protocols, horses, healthRecords, vaccinations, preventiveStatus, null, clock);
     }
 
     @Transactional
@@ -110,6 +117,25 @@ public class HorseVaccinationService {
         record.setExaminedAt(LocalDateTime.now(clock));
         record.setTreatment(doses.stream().map(d -> d.protocol().getName()).collect(Collectors.joining(", ")));
         record.setNotes(instructions);
+
+        if (careSchedules != null) {
+            Optional<CareSchedule> activeScheduleOpt = careSchedules.findFirstByHorseIdAndPurposeAndStatusIn(
+                    horseId, CareSchedulePurpose.PREVENTIVE, CareScheduleStatus.OPEN);
+            if (activeScheduleOpt.isPresent()) {
+                CareSchedule activeSchedule = activeScheduleOpt.get();
+                activeSchedule.setStatus(CareScheduleStatus.COMPLETED);
+                activeSchedule.setCompletedAt(LocalDateTime.now(clock));
+                if (activeSchedule.getVeterinarianId() == null) {
+                    activeSchedule.setVeterinarianId(vetId);
+                }
+                if (activeSchedule.getScheduledDate() == null) {
+                    activeSchedule.setScheduledDate(administeredOn);
+                }
+                careSchedules.save(activeSchedule);
+                record.setCareScheduleId(activeSchedule.getId());
+            }
+        }
+
         HealthRecord saved = healthRecords.save(record);
 
         vaccinations.record(saved.getId(), doses);

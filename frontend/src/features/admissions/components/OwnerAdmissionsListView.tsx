@@ -24,7 +24,6 @@ const EMPTY_FILTERS: OwnerListFilters = { search: '', status: 'ALL', from: '', t
 const STATUS_OPTIONS: ReadonlyArray<{ value: AdmissionStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All statuses' },
   { value: 'GROOM_REVIEW', label: 'Groom Review' },
-  { value: 'WAITING_FOR_STALL', label: 'Waiting for Stall' },
   { value: 'WAITING_FOR_ARRIVAL', label: 'Waiting for Arrival' },
   { value: 'ARRIVAL_EXPIRED', label: 'Arrival Expired' },
   { value: 'VET_REVIEW', label: 'Vet Review' },

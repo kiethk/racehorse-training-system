@@ -12,9 +12,9 @@ import java.time.LocalDateTime;
 
 /**
  * Một chiến mã trong một nhóm. Mỗi ngựa chỉ có tối đa một dòng (một nhóm một lúc); groomId là ảnh chụp Groom của chuồng
- * lúc vào nhóm, để BR-09 (không hai ngựa cùng Groom trong một nhóm) được DB giữ bằng một chỉ mục duy nhất.
+ * lúc vào nhóm. Một Groom có thể dắt nhiều ngựa của cùng một nhóm.
  * (A horse in a group. A horse has at most one row (one group at a time); groomId is a snapshot of the stall Groom at the
- * time of joining, so BR-09 (no two horses of one Groom in a group) is held by a unique index.)
+ * time of joining. One Groom may lead several horses of a group.)
  */
 @Entity
 @Table(name = "training_group_members")

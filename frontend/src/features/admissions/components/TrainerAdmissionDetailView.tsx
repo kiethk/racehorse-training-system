@@ -14,6 +14,8 @@ import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayou
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionInfoSection, InfoGroupTitle, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { Notice } from '@/components/ui/Notice';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
@@ -106,11 +108,11 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
       <div className="pt-2 border-t border-[var(--color-border)] space-y-3">
         <InfoRow
           label="Quarantine Stall"
-          value={detail.quarantineStallCode ? `Stall ${detail.quarantineStallCode}` : 'Unassigned'}
+          value={detail.quarantineStallCode ? <EntityLink href={entityHref('stall', detail.quarantineStallCode, 'HEAD_TRAINER')}>Stall {detail.quarantineStallCode}</EntityLink> : 'Unassigned'}
         />
         <InfoRow
           label="Horse Profile"
-          value={horse ? `#${horse.id} · ${horse.currentStatus}` : 'Not created yet'}
+          value={horse ? <EntityLink href={entityHref('horse', horse.id, 'HEAD_TRAINER')}>#{horse.id} · {horse.currentStatus}</EntityLink> : 'Not created yet'}
         />
         {candidate.pedigreeNotes && (
           <div className="mt-2 text-[var(--color-text-secondary)] italic">
@@ -249,7 +251,7 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
                 id: 'documents',
                 label: 'Documents',
                 count: detail.documents.length,
-                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+                content: <AdmissionDocumentsSection documents={detail.documents} />,
               },
               { id: 'medical', label: 'Medical Findings', content: healthSection },
               { id: 'history', label: 'Review History', content: reviewHistorySection },

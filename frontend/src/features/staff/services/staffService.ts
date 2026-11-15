@@ -20,7 +20,30 @@ export async function createStaff(request: StaffCreationRequest): Promise<ApiRes
   return apiPost<ApiResponse<StaffCreationResponse>>('/api/staff', request);
 }
 
-export async function updateStaffStatus(id: number, active: boolean): Promise<ApiResponse<StaffSummary>> {
-  return apiPatch<ApiResponse<StaffSummary>>(`/api/staff/${id}/status`, { active });
+export interface EligibleReplacementTrainer {
+  id: number;
+  trainerId?: number;
+  fullName: string;
+  email: string;
+  managedAreasCount: number;
+  remainingCapacity: number;
+  canAccept: boolean;
+}
+
+export async function getEligibleReplacementTrainers(
+  id: number
+): Promise<ApiResponse<EligibleReplacementTrainer[]>> {
+  return apiGet<ApiResponse<EligibleReplacementTrainer[]>>(`/api/staff/trainers/${id}/eligible-replacements`);
+}
+
+export async function updateStaffStatus(
+  id: number,
+  active: boolean,
+  replacementTrainerId?: number
+): Promise<ApiResponse<StaffSummary>> {
+  return apiPatch<ApiResponse<StaffSummary>>(`/api/staff/${id}/status`, {
+    active,
+    replacementTrainerId,
+  });
 }
 

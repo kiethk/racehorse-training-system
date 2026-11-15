@@ -179,20 +179,31 @@ public class HorseEditRequestService {
     /** The horse's most recent request (any status), or null; drives the owner's pending/rejected banner. */
     @Transactional(readOnly = true)
     public HorseEditRequestResponse latestForOwner(Long ownerId, Long horseId) {
+        assertOwner(ownerId, horseId);
+        return requests.findFirstByHorseIdOrderByCreatedAtDescIdDesc(horseId).map(this::toResponse).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<HorseEditRequestResponse> listForOwner(Long ownerId, Long horseId) {
+        assertOwner(ownerId, horseId);
+        return requests.findByHorseIdOrderByCreatedAtDescIdDesc(horseId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private void assertOwner(Long ownerId, Long horseId) {
         Horse horse = horses.findById(horseId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Horse not found"));
         if (!Objects.equals(horse.getOwnerId(), ownerId)) {
             throw new AccessDeniedException("You can only view horses you own");
         }
-        return requests.findFirstByHorseIdOrderByCreatedAtDescIdDesc(horseId).map(this::toResponse).orElse(null);
     }
 
     // ── Groom ────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<HorseEditRequestResponse> listForGroom(Long groomId, HorseEditRequestStatus status) {
-        return requests.findVisibleToGroom(groomId, status != null,
-                        status == null ? HorseEditRequestStatus.PENDING : status).stream()
+        return requests.findVisibleToGroom(groomId, status != null, status).stream()
                 .map(this::toResponse)
                 .toList();
     }

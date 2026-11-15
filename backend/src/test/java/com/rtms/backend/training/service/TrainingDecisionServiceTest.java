@@ -30,7 +30,7 @@ class TrainingDecisionServiceTest {
     private CareScheduleRepository careScheduleRepository;
 
     @Mock
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
 
     private TrainingDecisionService service;
     private Horse horse;
@@ -57,7 +57,7 @@ class TrainingDecisionServiceTest {
     }
 
     @Test
-    @DisplayName("allow: back to ALLOWED, clears the reason, leaves plans untouched")
+    @DisplayName("allow: back to ALLOWED, clears the reason, leaves course runs untouched")
     void allow_clearsReason() {
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
         horse.setTrainingDecisionReason("Tendon strain");

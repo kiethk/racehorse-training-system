@@ -11,7 +11,7 @@ import { FilterChips } from '@/components/ui/SegmentedControl';
 import { EmptyState } from '@/components/ui/states';
 import { incidentApi } from '../services/incidentService';
 import {
-  INCIDENT_SEVERITY_MAP,
+  INCIDENT_TYPE_MAP,
   INCIDENT_STATUS_MAP,
   formatIncidentReportedAt,
   incidentHorseName,
@@ -102,7 +102,7 @@ export function IncidentList() {
       id: 'severity',
       header: 'Severity',
       render: (report) => {
-        const cfg = INCIDENT_SEVERITY_MAP[report.severity] || { tone: 'neutral', label: report.severity };
+        const cfg = INCIDENT_TYPE_MAP[report.incidentType] || { tone: 'neutral', label: report.incidentType };
         return <Pill tone={cfg.tone} size="sm">{cfg.label}</Pill>;
       },
     },

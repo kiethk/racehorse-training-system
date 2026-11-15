@@ -18,6 +18,8 @@ public class AdmissionSummaryResponse {
     private Long quarantineStallId;
     private String quarantineStallCode;
     private String imageUrl;
+    private LocalDateTime groomReviewDueAt;
+    private boolean assignedGroomFull;
 
 
     /**
@@ -167,4 +169,8 @@ public class AdmissionSummaryResponse {
     public LocalDateTime getTrainerReviewedAt() {
         return trainerReviewedAt;
     }
+    public LocalDateTime getGroomReviewDueAt() { return groomReviewDueAt; }
+    public void setGroomReviewDueAt(LocalDateTime value) { groomReviewDueAt = value; }
+    public boolean isAssignedGroomFull() { return assignedGroomFull; }
+    public void setAssignedGroomFull(boolean value) { assignedGroomFull = value; }
 }

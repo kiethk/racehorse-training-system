@@ -36,7 +36,7 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("Ngưỡng nhận thức Cognitive Sweet Spot: mỗi vai trò <= 12 tool, riêng Trainer 13 vì có thêm Training Group")
+    @DisplayName("Ngưỡng nhận thức Cognitive Sweet Spot: mỗi vai trò <= 12 tool, riêng Trainer 11")
     void testCognitiveSweetSpotToolLimits() {
         List<AiToolDefinition> ownerTools = registryService.getToolsForRole("HORSE_OWNER");
         assertEquals(9, ownerTools.size(), "HORSE_OWNER phải có đúng 9 tools (<= 12)");
@@ -45,7 +45,7 @@ class DynamicToolRegistryServiceTest {
         assertEquals(8, groomTools.size(), "GROOM phải có đúng 8 tools (<= 12)");
 
         List<AiToolDefinition> trainerTools = registryService.getToolsForRole("HEAD_TRAINER");
-        assertEquals(13, trainerTools.size(), "HEAD_TRAINER phải có đúng 13 tools (12 + Training Group)");
+        assertEquals(11, trainerTools.size(), "HEAD_TRAINER phải có đúng 11 tools");
 
         List<AiToolDefinition> vetTools = registryService.getToolsForRole("VETERINARIAN");
         assertEquals(11, vetTools.size(), "VETERINARIAN phải có đúng 11 tools (<= 12)");
@@ -55,11 +55,11 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER có 13 công cụ (kể cả Training Group) và hỗ trợ tương thích ngược qua alias")
+    @DisplayName("HEAD_TRAINER có 11 công cụ (kể cả Training Group) và hỗ trợ tương thích ngược qua alias")
     void testHeadTrainerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("HEAD_TRAINER");
         assertNotNull(tools);
-        assertEquals(13, tools.size());
+        assertEquals(11, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getTrainerHorses"));
@@ -70,9 +70,7 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getTrainerPlansSummary"));
         assertTrue(toolNames.contains("getHorseSpecialtyAnalysis"));
         assertTrue(toolNames.contains("getTrainerRiskAlerts"));
-        assertTrue(toolNames.contains("checkGroomConflict"));
         assertTrue(toolNames.contains("getTrainerAssignedGrooms"));
-        assertTrue(toolNames.contains("getMyHorseRaceRegistrations"));
         assertTrue(toolNames.contains("getAssignedAdmissionReviews"));
         assertTrue(toolNames.contains("recommendTrainerStrategy"));
 
@@ -216,7 +214,6 @@ class DynamicToolRegistryServiceTest {
         // Owner không thể gọi tool quản lý/thú y/huấn luyện
         assertFalse(registryService.isToolAllowedForRole("getStableOccupancyMetrics", "HORSE_OWNER"));
         assertFalse(registryService.isToolAllowedForRole("searchClinicalKnowledge", "HORSE_OWNER"));
-        assertFalse(registryService.isToolAllowedForRole("checkGroomConflict", "HORSE_OWNER"));
         assertFalse(registryService.isToolAllowedForRole("getTodayAggregatedTasks", "HORSE_OWNER"));
 
         // Groom không thể gọi tool thú y hoặc quản lý

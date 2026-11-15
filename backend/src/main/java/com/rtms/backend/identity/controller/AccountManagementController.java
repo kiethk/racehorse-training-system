@@ -50,13 +50,19 @@ public class AccountManagementController {
         return ApiResponse.success(accountManagementService.createAccount(request));
     }
 
+    @GetMapping("/trainers/{id}/eligible-replacements")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    public ApiResponse<List<EligibleReplacementTrainerResponse>> getEligibleReplacements(@PathVariable Long id) {
+        return ApiResponse.success(accountManagementService.getEligibleReplacementTrainers(id));
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<AccountSummaryResponse> updateAccountStatus(
             @PathVariable Long id,
             @RequestBody StaffStatusUpdateRequest request) {
         Long currentUserId = getCurrentUserId();
-        return ApiResponse.success(accountManagementService.updateAccountStatus(currentUserId, id, request.isActive()));
+        return ApiResponse.success(accountManagementService.updateAccountStatus(currentUserId, id, request.isActive(), request.getReplacementTrainerId()));
     }
 
     private Long getCurrentUserId() {

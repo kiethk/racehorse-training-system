@@ -99,7 +99,7 @@ export function AccountManagementView() {
     }
   }
 
-  async function handleToggleStatus(userId: number, currentStatus: boolean) {
+  async function handleToggleStatus(userId: number, currentStatus: boolean, replacementTrainerId?: number) {
     if (userId === currentUser?.userId && currentStatus) {
       toast.error('You cannot deactivate your own administrator account.');
       return;
@@ -107,11 +107,12 @@ export function AccountManagementView() {
 
     setActionLoadingId(userId);
     try {
-      await updateAccountStatus(userId, !currentStatus);
+      await updateAccountStatus(userId, !currentStatus, replacementTrainerId);
       setAccounts((prev) =>
         prev.map((acc) => (acc.userId === userId ? { ...acc, active: !currentStatus } : acc))
       );
       toast.success('Account status updated');
+      void fetchAccounts();
     } catch (err: unknown) {
       toast.error(displayError(err, 'Unable to update account status.'));
     } finally {

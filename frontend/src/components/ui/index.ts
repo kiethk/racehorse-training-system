@@ -11,6 +11,7 @@ export { ChipButton } from './ChipButton';
 export { ConfirmDialog } from './ConfirmDialog';
 export { CreatableCombobox, type CreatableComboboxOption } from './CreatableCombobox';
 export { DataTable } from './DataTable';
+export { EntityLink } from './EntityLink';
 export { createDragDrop } from './DragDrop';
 export {
   DropdownMenu,
@@ -37,6 +38,7 @@ export { ProtectedImage } from './ProtectedImage';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export { PageSection, ScreenLayout } from './ScreenLayout';
 export { ScoreScale } from './ScoreScale';
+export { SearchCombobox, type SearchComboboxOption } from './SearchCombobox';
 export { FilterChips, SegmentedControl, type SegmentOption } from './SegmentedControl';
 export { SelectableCard } from './SelectableCard';
 export { Skeleton } from './Skeleton';
@@ -46,6 +48,7 @@ export { PeriodBarChart, type PeriodBarChartProps } from './PeriodBarChart';
 export { Pill, StatusBadge } from './StatusBadge';
 export { Table, TBody, Td, Th, THead, Tr } from './Table';
 export { Tabs, type TabItem } from './Tabs';
+export { TurnstileWidget, type TurnstileWidgetHandle } from './TurnstileWidget';
 export { Tooltip } from './Tooltip';
 export { CapacityBar, type CapacityBarProps } from './CapacityBar';
 export { DonutChart, type DonutChartProps, type DonutSegment } from './DonutChart';

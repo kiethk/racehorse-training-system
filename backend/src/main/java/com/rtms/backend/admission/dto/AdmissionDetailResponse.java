@@ -26,6 +26,12 @@ public class AdmissionDetailResponse {
     private List<AdmissionDocumentResponse> documents;
     private AdmissionCapacitySummary capacity;
 
+    private Long assignedGroomId;
+    private String assignedGroomName;
+    private LocalDateTime groomAssignedAt;
+    private LocalDateTime groomReviewDueAt;
+    private boolean assignedGroomFull;
+
     private Long groomId;
     private String groomName;
     private ReviewDecision groomDecision;
@@ -320,4 +326,19 @@ public class AdmissionDetailResponse {
     public void setHealthRecords(List<HealthRecord> healthRecords) {
         this.healthRecords = healthRecords;
     }
+    public Long getAssignedGroomId() { return assignedGroomId; }
+    public void setAssignedGroomId(Long assignedGroomId) { this.assignedGroomId = assignedGroomId; }
+
+    public String getAssignedGroomName() { return assignedGroomName; }
+    public void setAssignedGroomName(String assignedGroomName) { this.assignedGroomName = assignedGroomName; }
+
+    public LocalDateTime getGroomAssignedAt() { return groomAssignedAt; }
+    public void setGroomAssignedAt(LocalDateTime groomAssignedAt) { this.groomAssignedAt = groomAssignedAt; }
+
+    public LocalDateTime getGroomReviewDueAt() { return groomReviewDueAt; }
+    public void setGroomReviewDueAt(LocalDateTime groomReviewDueAt) { this.groomReviewDueAt = groomReviewDueAt; }
+
+    public boolean isAssignedGroomFull() { return assignedGroomFull; }
+    public void setAssignedGroomFull(boolean assignedGroomFull) { this.assignedGroomFull = assignedGroomFull; }
+
 }

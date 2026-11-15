@@ -1,6 +1,7 @@
 package com.rtms.backend.identity.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class StaffSummaryResponse {
     private Long userId;
@@ -14,6 +15,7 @@ public class StaffSummaryResponse {
 
     // Optional straightforward profile summary
     private String profileSummary;
+    private List<String> managedAreaCodes;
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
@@ -41,4 +43,7 @@ public class StaffSummaryResponse {
 
     public String getProfileSummary() { return profileSummary; }
     public void setProfileSummary(String profileSummary) { this.profileSummary = profileSummary; }
+
+    public List<String> getManagedAreaCodes() { return managedAreaCodes; }
+    public void setManagedAreaCodes(List<String> managedAreaCodes) { this.managedAreaCodes = managedAreaCodes; }
 }

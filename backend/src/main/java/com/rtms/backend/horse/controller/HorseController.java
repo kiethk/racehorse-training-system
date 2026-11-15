@@ -1,5 +1,6 @@
 package com.rtms.backend.horse.controller;
 
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.horse.dto.CreateHorseRequest;
 import jakarta.validation.Valid;
@@ -107,7 +108,7 @@ public class HorseController {
         return ApiResponse.success(response);
     }
 
-    @PreAuthorize("hasAuthority('HORSE_CREATE')")
+    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('HORSE_CREATE')")
     @PostMapping
     public ApiResponse<Horse> createHorse(@Valid @RequestBody CreateHorseRequest request) {
         return ApiResponse.success(horseService.createHorse(request));
@@ -150,12 +151,13 @@ public class HorseController {
     @GetMapping("/{id}/photo")
     public ResponseEntity<Resource> getPhoto(
             @PathVariable Long id,
+            @RequestParam(required = false) FileVariant size,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         // Re-use getHorseById access check (owner sees only their horse).
         horseService.getHorseById(id, currentUser);
 
         // Resolve document once — both Resource and MediaType from the same lookup.
-        HorsePhotoService.PhotoResult photo = photoService.resolvePhoto(id);
+        HorsePhotoService.PhotoResult photo = photoService.resolvePhoto(id, size);
 
         ContentDisposition disposition = ContentDisposition.inline()
                 .filename("horse-" + id + "-photo", StandardCharsets.UTF_8)

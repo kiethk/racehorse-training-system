@@ -217,6 +217,7 @@ public class AdmissionReviewService {
         compReq.setFindings(request.getFindings() != null ? request.getFindings() : "Exam completed");
         compReq.setDiagnosis(request.getDiagnosis() != null ? request.getDiagnosis() : "Quarantine physical exam");
         compReq.setTreatment(request.getTreatment());
+        compReq.setGeneralCareInstructions(request.getGeneralCareInstructions());
         compReq.setNotes(request.getNotes() != null ? request.getNotes() : request.getFeedback());
         compReq.setMetrics(request.getMetrics());
         compReq.setInjuryMarkers(request.getInjuryMarkers());
@@ -285,7 +286,6 @@ public class AdmissionReviewService {
         admissionNotificationService.notifyManagersOfAdmissionRejection(admission, horseName,
                 "Veterinary Clinical Review", reason);
 
-        admissionGroomReviewService.allocateWaitingAdmissions();
 
         if (auditLogService != null) {
             auditLogService.recordDomainEvent(DomainAuditEvent.builder()

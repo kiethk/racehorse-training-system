@@ -24,9 +24,11 @@ public interface HorseEditRequestRepository extends JpaRepository<HorseEditReque
     /** Latest request of a horse, whatever its status: drives the owner's pending/rejected banner. */
     Optional<HorseEditRequest> findFirstByHorseIdOrderByCreatedAtDescIdDesc(Long horseId);
 
+    List<HorseEditRequest> findByHorseIdOrderByCreatedAtDescIdDesc(Long horseId);
+
     /**
      * Requests a groom may see: horses currently in one of their stalls, plus requests they reviewed.
-     * Oldest first, matching the other review queues.
+     * Newest first so the latest decisions appear first in history.
      */
     @Query("""
             SELECT r FROM HorseEditRequest r
@@ -34,7 +36,7 @@ public interface HorseEditRequestRepository extends JpaRepository<HorseEditReque
               AND (r.reviewerId = :groomId
                    OR EXISTS (SELECT 1 FROM Horse h, StableStall s
                               WHERE h.id = r.horseId AND s.id = h.currentStallId AND s.groomId = :groomId))
-            ORDER BY r.createdAt ASC, r.id ASC
+            ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<HorseEditRequest> findVisibleToGroom(@Param("groomId") Long groomId,
                                               @Param("filterStatus") boolean filterStatus,

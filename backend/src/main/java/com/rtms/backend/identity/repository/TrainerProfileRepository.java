@@ -17,4 +17,8 @@ public interface TrainerProfileRepository extends JpaRepository<TrainerProfile, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT tp FROM TrainerProfile tp WHERE tp.userId IN :userIds ORDER BY tp.userId ASC")
     List<TrainerProfile> findByUserIdsForUpdate(@Param("userIds") Collection<Long> userIds);
+
+    boolean existsByCertificationNumber(String certificationNumber);
+
+    boolean existsByCertificationNumberAndUserIdNot(String certificationNumber, Long userId);
 }

@@ -7,6 +7,7 @@ import type {
   CareScheduleStatus,
   CareType,
   VetReviewResponse,
+  AdmissionDocument,
 } from '../types';
 
 export interface VetReviewFormProps {
@@ -17,6 +18,7 @@ export interface VetReviewFormProps {
   careScheduleId?: number | null;
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
+  scheduledDate?: string | null;
   /** PREVENTIVE: the system-booked vaccination visit; it can defer vaccination instead of giving it. */
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   fromIncident?: boolean;
@@ -27,6 +29,7 @@ export interface VetReviewFormProps {
   asideTop?: ReactNode;
   onSuccess: (result: VetReviewResponse | CareSchedule, completionKind: 'INITIAL' | 'CARE_SCHEDULE') => void;
   onDirtyChange?: (dirty: boolean) => void;
+  documents?: AdmissionDocument[];
 }
 
 export function VetReviewForm({
@@ -38,6 +41,7 @@ export function VetReviewForm({
   careScheduleId,
   careType = 'INITIAL',
   scheduleStatus,
+  scheduledDate,
   schedulePurpose,
   fromIncident,
   blockHeldUntil,
@@ -46,18 +50,17 @@ export function VetReviewForm({
   asideTop,
   onSuccess,
   onDirtyChange,
+  documents,
 }: VetReviewFormProps) {
-  const variant = careType === 'URGENT' ? 'URGENT_LEGACY' : 'STANDARD';
-
   return (
     <ClinicalExamForm
-      variant={variant}
       admissionId={admissionId}
       horseId={horseId}
       candidateName={candidateName}
       careScheduleId={careScheduleId}
       careType={careType}
       scheduleStatus={scheduleStatus}
+      scheduledDate={scheduledDate}
       schedulePurpose={schedulePurpose}
       fromIncident={fromIncident}
       blockHeldUntil={blockHeldUntil}
@@ -66,6 +69,7 @@ export function VetReviewForm({
       asideTop={asideTop}
       onSuccess={(result, kind) => onSuccess(result, kind)}
       onDirtyChange={onDirtyChange}
+      documents={documents}
     />
   );
 }

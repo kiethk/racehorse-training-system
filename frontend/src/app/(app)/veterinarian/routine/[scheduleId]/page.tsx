@@ -44,6 +44,8 @@ export default function RoutineDetailPage() {
     }
   }, [scheduleId]);
 
+  const autoStartedRef = useRef(false);
+
   useEffect(() => {
     let active = true;
     Promise.resolve().then(() => {
@@ -53,6 +55,23 @@ export default function RoutineDetailPage() {
       active = false;
     };
   }, [loadDetail]);
+
+  // Auto-start routine exam to transition SCHEDULED -> IN_PROGRESS when vet opens the page
+  useEffect(() => {
+    if (!detail?.schedule || autoStartedRef.current) return;
+    const _now = new Date();
+    const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    const isFuture = Boolean(detail.schedule.scheduledDate && detail.schedule.scheduledDate > todayIso);
+    if (detail.schedule.status === 'SCHEDULED' && !isFuture) {
+      autoStartedRef.current = true;
+      admissionsApi.startCareSchedule(scheduleId)
+        .then(() => admissionsApi.getCareScheduleDetail(scheduleId))
+        .then((res) => setDetail(res))
+        .catch((err) => {
+          console.warn('Auto-start routine care schedule skipped/failed:', err);
+        });
+    }
+  }, [detail?.schedule, scheduleId]);
 
   const handleStartExam = useCallback(async () => {
     try {
@@ -78,6 +97,14 @@ export default function RoutineDetailPage() {
   }, [router, scheduleId]);
 
   const isCompleted = detail?.schedule?.status === 'COMPLETED';
+  const isUrgent = detail?.schedule?.careType === 'URGENT';
+
+  // An urgent visit has its own screen; this route only serves ROUTINE/PREVENTIVE work.
+  useEffect(() => {
+    if (isUrgent && !Number.isNaN(scheduleId)) {
+      router.replace(`/veterinarian/urgent/${scheduleId}`);
+    }
+  }, [isUrgent, scheduleId, router]);
 
   // Completed schedules share the unified View Record screen (Routine/Health/Schedule).
   useEffect(() => {
@@ -135,6 +162,7 @@ export default function RoutineDetailPage() {
                 careScheduleId={detail.schedule.id}
                 careType={detail.schedule.careType}
                 scheduleStatus={detail.schedule.status}
+                scheduledDate={detail.schedule.scheduledDate ?? detail.schedule.scheduledAt}
                 schedulePurpose={detail.schedule.purpose}
                 fromIncident={Boolean(detail.schedule.sourceIncidentId)}
                 blockHeldUntil={detail.blockHeldUntil}

@@ -1,6 +1,7 @@
 package com.rtms.backend.common.storage;
 
 import com.cloudinary.Cloudinary;
+import com.cloudinary.Transformation;
 import com.cloudinary.utils.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -60,6 +62,8 @@ public class FileStorageService {
     private static final Pattern CLOUDINARY_FILE_URL = Pattern.compile(
             "^https://res\\.cloudinary\\.com/[^/]+/image/(upload|authenticated)/(?:s--[^/]+--/)?(?:v(\\d+)/)?(.+)\\.([a-z0-9]+)$");
     private static final String PRIVATE_TYPE = "authenticated";
+    /** Đuôi file Cloudinary thu nhỏ được; PDF luôn trả bản gốc. (Extensions Cloudinary may resize; PDFs stay original.) */
+    private static final Set<String> IMAGE_FORMATS = Set.of("jpg", "jpeg", "png", "webp");
 
     private final Path uploadRoot;
     /** Null when no Cloudinary URL is configured: files then stay on local disk. */
@@ -134,6 +138,16 @@ public class FileStorageService {
      * that the current user may read the record this file belongs to.
      */
     public Resource load(String key) {
+        return load(key, null);
+    }
+
+    /**
+     * Như {@link #load(String)}, nhưng ảnh trên Cloudinary được trả ở cỡ {@code variant} (null là bản gốc). PDF, file trên
+     * ổ đĩa local và ảnh không thu nhỏ được thì vẫn trả bản gốc, nên màn hình nào xin cỡ nhỏ cũng không bị lỗi.
+     * (Like {@link #load(String)}, but a Cloudinary image comes back at size {@code variant}; null is the original. PDFs,
+     * local files and images that cannot be resized come back as the original, so asking for a size never fails.)
+     */
+    public Resource load(String key, FileVariant variant) {
         if (isLocal(key)) {
             Path path = resolve(key);
             if (!Files.isRegularFile(path)) {
@@ -141,11 +155,7 @@ public class FileStorageService {
             }
             return new FileSystemResource(path);
         }
-        Matcher matcher = key == null ? null : CLOUDINARY_FILE_URL.matcher(key);
-        if (matcher == null || !matcher.matches()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document file not found");
-        }
-        return new ByteArrayResource(download(deliveryUrl(key, matcher)));
+        return new ByteArrayResource(download(deliveryUrl(key, variant)));
     }
 
     /** Content type of a stored file, taken from the extension its key was given at upload. */
@@ -224,15 +234,27 @@ public class FileStorageService {
     }
 
     /** The URL the backend itself fetches: signed for private assets, the key itself for older public ones. */
-    private String deliveryUrl(String key, Matcher matcher) {
-        if (!PRIVATE_TYPE.equals(matcher.group(1))) return key;
+    String deliveryUrl(String key, FileVariant variant) {
+        Matcher matcher = key == null ? null : CLOUDINARY_FILE_URL.matcher(key);
+        if (matcher == null || !matcher.matches()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document file not found");
+        }
+        String type = matcher.group(1);
+        String format = matcher.group(4);
+        // Chỉ thu nhỏ ảnh, và chỉ khi ký được URL. (Only images are resized, and only when the URL can be signed.)
+        boolean resize = variant != null && cloudinary != null && IMAGE_FORMATS.contains(format);
+        if (!PRIVATE_TYPE.equals(type) && !resize) return key;
         if (cloudinary == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                     "This document is in cloud storage, which is not configured on this server");
         }
-        var url = cloudinary.url().secure(true).resourceType("image").type(PRIVATE_TYPE)
-                .format(matcher.group(4)).signed(true);
+        // Phép biến đổi nằm trong chữ ký, nên không ai sửa được cỡ trên URL. (The transformation is part of the signature.)
+        var url = cloudinary.url().secure(true).resourceType("image").type(type).format(format).signed(true);
         if (matcher.group(2) != null) url = url.version(matcher.group(2));
+        if (resize) {
+            url = url.transformation(new Transformation().crop("limit")
+                    .width(variant.maxSide()).height(variant.maxSide()).quality("auto"));
+        }
         return url.generate(matcher.group(3));
     }
 

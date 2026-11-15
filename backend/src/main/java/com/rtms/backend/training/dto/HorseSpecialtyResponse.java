@@ -3,6 +3,7 @@ package com.rtms.backend.training.dto;
 import com.rtms.backend.training.enums.DistanceBand;
 import com.rtms.backend.training.enums.SurfaceType;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -11,6 +12,8 @@ import java.util.List;
  *
  * @param minWorkoutsPerGroup số buổi tối thiểu mỗi nhóm cần có, để giao diện hiện "2/3" mà không tự hard-code
  *                            (the minimum workouts a group needs, so the UI can show "2/3" without hard-coding it)
+ * @param minAverageRating    điểm trung bình tối thiểu để một nhóm được huy hiệu, để giao diện vẽ vạch mốc mà không tự hard-code
+ *                            (the minimum average rating a band needs for a badge, so the UI can draw the marker without hard-coding it)
  * @param strongDistances     các nhóm cự ly ngựa làm tốt, rỗng nếu chưa có nhóm nào đạt; có thể nhiều nhóm
  *                            (the bands the horse does well in; empty when none qualifies; may hold several)
  * @param preferredSurface    mặt sân ưa thích, null nếu chưa rõ (the preferred surface; null when unclear)
@@ -18,6 +21,7 @@ import java.util.List;
  *                            (statistics of every band that has data, including those with too few workouts)
  */
 public record HorseSpecialtyResponse(int minWorkoutsPerGroup,
+                                     BigDecimal minAverageRating,
                                      List<DistanceBand> strongDistances,
                                      SurfaceType preferredSurface,
                                      List<DistanceStat> distanceStats) {

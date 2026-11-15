@@ -16,14 +16,17 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -51,7 +54,7 @@ class CareScheduleDirectAssignmentTest {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     private CareScheduleService service;
 
     @BeforeEach
@@ -62,7 +65,7 @@ class CareScheduleDirectAssignmentTest {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(GroupWorkoutSyncService.class);
+        workoutService = mock(TrainingGroupService.class);
         service = new CareScheduleService(
                 schedules,
                 horses,
@@ -78,10 +81,10 @@ class CareScheduleDirectAssignmentTest {
                 mock(EntityManager.class),
                 mock(NotificationService.class),
                 new TrainingDecisionService(horses, schedules, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper());
+                mock(PreventiveVaccinationService.class),
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class));
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
@@ -276,7 +279,7 @@ class CareScheduleDirectAssignmentTest {
         incident.setGroomId(8L);
         incident.setHorseId(99L);
         incident.setTitle("Acute lameness");
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now());
         when(incidents.findByIdForUpdate(incidentId)).thenReturn(Optional.of(incident));
@@ -317,7 +320,7 @@ class CareScheduleDirectAssignmentTest {
         incident.setHorseId(99L);
         incident.setTitle("Acute lameness");
         incident.setDescription("Horse cannot bear weight on the left foreleg.");
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         incident.setStatus(IncidentStatus.REPORTED);
         incident.setReportedAt(LocalDateTime.now());
         when(incidents.findByIdForUpdate(700L)).thenReturn(Optional.of(incident));
@@ -334,7 +337,7 @@ class CareScheduleDirectAssignmentTest {
         assertEquals(2L, incident.getHandledById());
         assertNotNull(incident.getHandledAt());
         verify(incidents).saveAll(List.of(incident));
-        verify(events).publishEvent(any(com.rtms.backend.event.UrgentAssignmentCommittedEvent.class));
+        verify(events).publishEvent(any(UrgentAssignmentCommittedEvent.class));
     }
 
     @Test

@@ -65,12 +65,13 @@ export function StaffManagementView() {
     }
   }
 
-  async function handleToggleStatus(userId: number, currentStatus: boolean) {
+  async function handleToggleStatus(userId: number, currentStatus: boolean, replacementTrainerId?: number) {
     setActionLoadingId(userId);
     try {
-      await updateStaffStatus(userId, !currentStatus);
+      await updateStaffStatus(userId, !currentStatus, replacementTrainerId);
       // Update local state directly to be snappy
       setStaff(prev => prev.map(s => s.userId === userId ? { ...s, active: !currentStatus } : s));
+      void fetchStaff();
       setSuccessMsg('Status updated successfully.');
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err: unknown) {

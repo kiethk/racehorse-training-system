@@ -166,6 +166,18 @@ class HttpAuditInterceptorTest {
         verify(auditLogService).recordHttpRequest(null, "POST", "/api/horses", 500);
     }
 
+    @Test
+    void givenStatus409WithAuditErrorMessage_thenPassedToAuditService() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/accounts");
+        when(response.getStatus()).thenReturn(409);
+        when(request.getAttribute("AUDIT_ERROR_MESSAGE")).thenReturn("Certification number already in use");
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verify(auditLogService).recordHttpRequest(null, "POST", "/api/accounts", 409, "Certification number already in use");
+    }
+
     // 10. Excluded auth endpoint → no audit call
     @Test
     void givenLoginEndpoint_thenNoAuditCall() throws Exception {
@@ -258,7 +270,7 @@ class HttpAuditInterceptorTest {
     @Test
     void givenPlanPreviewEndpoint_thenNoAuditCall() throws Exception {
         when(request.getMethod()).thenReturn("POST");
-        when(request.getRequestURI()).thenReturn("/api/group-plans/preview");
+        when(request.getRequestURI()).thenReturn("/api/course-runs/preview");
         when(response.getStatus()).thenReturn(200);
 
         interceptor.afterCompletion(request, response, null, null);

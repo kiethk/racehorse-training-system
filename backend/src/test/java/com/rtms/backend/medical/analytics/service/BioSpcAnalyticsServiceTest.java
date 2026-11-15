@@ -11,7 +11,7 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.service.HorseViewAccessService;
+import com.rtms.backend.training.service.TrainingAccessPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ class BioSpcAnalyticsServiceTest {
     private HorseRepository horseRepository;
 
     @Mock
-    private HorseViewAccessService accessService;
+    private TrainingAccessPolicy accessPolicy;
 
     @Mock
     private UserRepository userRepository;
@@ -57,7 +57,7 @@ class BioSpcAnalyticsServiceTest {
         service = new BioSpcAnalyticsService(
                 metricRepository,
                 horseRepository,
-                accessService,
+                accessPolicy,
                 userRepository,
                 notificationService
         );
@@ -95,7 +95,7 @@ class BioSpcAnalyticsServiceTest {
         assertEquals(3, response.sampleCount());
         assertEquals(3, response.points().size());
 
-        verify(accessService).assertCanViewHorse(100L, mockVet);
+        verify(accessPolicy).assertCanViewHorse(100L, mockVet);
         verify(notificationService, never()).createNotification(any(), any(), any(), any(), any(), any(), any());
     }
 

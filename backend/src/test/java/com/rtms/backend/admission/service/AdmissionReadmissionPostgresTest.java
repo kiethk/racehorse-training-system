@@ -21,6 +21,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -56,6 +58,11 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @EnabledIfEnvironmentVariable(named = "RTMS_UELN_TEST_DB_URL",
         matches = "jdbc:postgresql://localhost:5433/rtms_ueln_test_[a-zA-Z0-9_]+")
 class AdmissionReadmissionPostgresTest {
+    private static MockMultipartFile arrivalPhoto() {
+        byte[] png = Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4ZkAAAAASUVORK5CYII=");
+        return new MockMultipartFile("files", "arrival.png", "image/png", png);
+    }
     @Autowired private OwnerAdmissionService owners;
     @Autowired private AdmissionGroomReviewService groom;
     @Autowired private AdmissionApplicationRepository admissions;
@@ -196,7 +203,7 @@ class AdmissionReadmissionPostgresTest {
             admissions.saveAndFlush(admission);
         });
 
-        var arrived = groom.confirmArrival(newAdmission.admissionId(), groomId);
+        var arrived = groom.confirmArrival(newAdmission.admissionId(), groomId, List.of(arrivalPhoto()));
         assertEquals(horseId, arrived.getHorseId());
         Horse currentHorse = horses.findById(horseId).orElseThrow();
         assertEquals(newOwner, currentHorse.getOwnerId());
@@ -227,7 +234,7 @@ class AdmissionReadmissionPostgresTest {
         assertEquals(HorseSex.FEMALE, created.candidate().sex());
         assertEquals("FEMALE", jdbc.queryForObject(
                 "SELECT sex FROM candidate_horse_profiles WHERE admission_id = ?", String.class, created.admissionId()));
-        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+        assertThrows(DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE candidate_horse_profiles SET sex = 'OTHER' WHERE admission_id = ?", created.admissionId()));
         assertEquals("YES", jdbc.queryForObject("""
                 SELECT is_nullable FROM information_schema.columns
@@ -258,7 +265,7 @@ class AdmissionReadmissionPostgresTest {
             admission.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
             admissions.saveAndFlush(admission);
         });
-        var arrived = groom.confirmArrival(created.admissionId(), groomId);
+        var arrived = groom.confirmArrival(created.admissionId(), groomId, List.of(arrivalPhoto()));
         Horse horse = horses.findById(arrived.getHorseId()).orElseThrow();
         assertEquals(HorseSex.FEMALE, horse.getSex());
         assertEquals(HorseStatus.CANDIDATE, horse.getCurrentStatus());
@@ -273,9 +280,9 @@ class AdmissionReadmissionPostgresTest {
         mvc.perform(get("/api/owner/admissions/{id}", created.admissionId()).with(authentication(auth)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.candidate.sex").value("FEMALE"));
 
-        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+        assertThrows(DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE horses SET sex = 'GELDING' WHERE id = ?", horse.getId()));
-        var locked = assertThrows(org.springframework.dao.DataAccessException.class,
+        var locked = assertThrows(DataAccessException.class,
                 () -> jdbc.update("UPDATE candidate_horse_profiles SET sex = 'MALE' WHERE admission_id = ?", created.admissionId()));
         assertTrue(locked.getMessage().contains("snapshot is locked"));
         assertEquals(HorseSex.FEMALE, owners.getMyAdmission(ownerIds.getFirst(), created.admissionId()).candidate().sex());

@@ -13,10 +13,10 @@ import java.time.LocalTime;
  * @param groupCapacity               sức chứa mặc định của một session (default capacity of a session)
  * @param sessionStartStepMinutes       session chỉ bắt đầu ở bội số của số phút này (a session only starts on multiples of these minutes)
  * @param maxCourseSessions         số buổi tối đa của một khóa (most sessions of one course)
- * @param maxCourseSubjects         số môn tối đa của một khóa (most subjects of one course)
- * @param maxHorsesPerPlan          số ngựa tối đa mỗi lần ghi danh (most horses per enrollment)
- * @param minSubjectDurationMinutes thời lượng tối thiểu của một bài tập (shortest allowed subject duration)
- * @param maxSubjectDurationMinutes thời lượng tối đa của một bài tập (longest allowed subject duration)
+ * @param maxCourseExercises         số môn tối đa của một khóa (most exercises of one course)
+ * @param maxHorsesPerCourseRun          số ngựa tối đa mỗi lần ghi danh (most horses per enrollment)
+ * @param minExerciseDurationMinutes thời lượng tối thiểu của một bài tập (shortest allowed exercise duration)
+ * @param maxExerciseDurationMinutes thời lượng tối đa của một bài tập (longest allowed exercise duration)
  * @param maxHeartRateLimit         nhịp tim tối đa an toàn, vượt thì cảnh báo (safe maximum heart rate)
  * @param averageHeartRateLimit     nhịp tim trung bình an toàn, vượt thì cảnh báo (safe average heart rate)
  * @param recoveryHeartRateLimit    nhịp tim hồi phục an toàn, vượt thì cảnh báo (safe recovery heart rate)
@@ -26,10 +26,10 @@ public record TrainingRulesResponse(LocalTime goldenHoursStart,
                                     int groupCapacity,
                                     int sessionStartStepMinutes,
                                     int maxCourseSessions,
-                                    int maxCourseSubjects,
-                                    int maxHorsesPerPlan,
-                                    int minSubjectDurationMinutes,
-                                    int maxSubjectDurationMinutes,
+                                    int maxCourseExercises,
+                                    int maxHorsesPerCourseRun,
+                                    int minExerciseDurationMinutes,
+                                    int maxExerciseDurationMinutes,
                                     int maxHeartRateLimit,
                                     int averageHeartRateLimit,
                                     int recoveryHeartRateLimit) {

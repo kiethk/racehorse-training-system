@@ -11,8 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,9 +53,10 @@ public class AccessControlService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Permission codes list cannot be null");
         }
 
-        List<Permission> newPermissions = permissionRepository.findByCodeIn(request.getPermissionCodes());
+        Set<String> distinctCodes = new LinkedHashSet<>(request.getPermissionCodes());
+        List<Permission> newPermissions = permissionRepository.findByCodeIn(new ArrayList<>(distinctCodes));
         
-        if (newPermissions.size() != request.getPermissionCodes().size()) {
+        if (newPermissions.size() != distinctCodes.size()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "UNKNOWN_PERMISSION", "One or more requested permission codes are invalid");
         }
 
@@ -64,6 +64,11 @@ public class AccessControlService {
             boolean hasUserManage = newPermissions.stream().anyMatch(p -> "USER_MANAGE".equals(p.getCode()));
             if (!hasUserManage) {
                 throw new ApiException(HttpStatus.CONFLICT, "LOCKED_OUT", "CLUB_MANAGER must retain USER_MANAGE permission to prevent lock-out.");
+            }
+        } else {
+            boolean hasUserManage = newPermissions.stream().anyMatch(p -> "USER_MANAGE".equals(p.getCode()));
+            if (hasUserManage) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "PRIVILEGE_ESCALATION", "Only CLUB_MANAGER role is permitted to hold USER_MANAGE permission.");
             }
         }
 

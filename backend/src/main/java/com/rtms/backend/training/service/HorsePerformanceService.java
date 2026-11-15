@@ -1,18 +1,19 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
-import com.rtms.backend.training.dto.DashboardHorseRow;
-import com.rtms.backend.training.dto.DashboardPlanRow;
+import com.rtms.backend.training.repository.projection.DashboardHorseRow;
+import com.rtms.backend.training.repository.projection.DashboardCourseRunRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import com.rtms.backend.training.dto.PerformanceSessionRow;
+import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
-import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
+import com.rtms.backend.training.enums.CourseRunStatus;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,27 +41,21 @@ public class HorsePerformanceService {
 
     private static final int RECENT_WORKOUT_DAYS = 30;
     private static final int TREND_WEEKS = 12;
-    public static final int MAX_HEART_RATE_LIMIT = 220;
-    public static final int AVERAGE_HEART_RATE_LIMIT = 180;
-    public static final int RECOVERY_HEART_RATE_LIMIT = 100;
     private static final LocalTime DEFAULT_END_TIME = LocalTime.of(10, 0);
 
     private final TrainingWorkoutRepository workoutRepository;
-    private final GroupPlanRepository planRepository;
-    private final HorseViewAccessService accessService;
+    private final CourseRunRepository courseRunRepository;
+    private final TrainingAccessPolicy accessPolicy;
     private final HorseSpecialtyService specialtyService;
-    private final HorseScopeService scopeService;
 
     public HorsePerformanceService(TrainingWorkoutRepository workoutRepository,
-                                   GroupPlanRepository planRepository,
-                                   HorseViewAccessService accessService,
-                                   HorseSpecialtyService specialtyService,
-                                   HorseScopeService scopeService) {
+                                   CourseRunRepository courseRunRepository,
+                                   TrainingAccessPolicy accessPolicy,
+                                   HorseSpecialtyService specialtyService) {
         this.workoutRepository = workoutRepository;
-        this.planRepository = planRepository;
-        this.accessService = accessService;
+        this.courseRunRepository = courseRunRepository;
+        this.accessPolicy = accessPolicy;
         this.specialtyService = specialtyService;
-        this.scopeService = scopeService;
     }
 
     // =================================================================
@@ -74,7 +69,7 @@ public class HorsePerformanceService {
     @Transactional(readOnly = true)
     public List<HorseFitnessTrendItemResponse> getFitnessTrend(Long horseId, LocalDate fromDate,
                                                                LocalDate toDate, AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
 
         // Bỏ trống thì dùng mốc bao trùm, để câu truy vấn luôn có BETWEEN cụ thể và khỏi phải viết
         // "(:from IS NULL OR ...)" vốn hay lỗi ép kiểu tham số null trên PostgreSQL.
@@ -92,7 +87,7 @@ public class HorsePerformanceService {
     @Transactional(readOnly = true)
     public List<HorseScheduleItemResponse> getHorseSchedule(Long horseId, LocalDate from, LocalDate to,
                                                             AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
         if (to.isBefore(from)) {
             throw new IllegalArgumentException("The end date cannot be before the start date");
         }
@@ -109,7 +104,7 @@ public class HorsePerformanceService {
      */
     @Transactional(readOnly = true)
     public List<HorseAlertResponse> getHorseAlerts(Long horseId, AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
 
         List<RecentWorkoutRow> recent = workoutRepository.findRecentCompletedWorkouts(
                 List.of(horseId), LocalDate.now().minusDays(RECENT_WORKOUT_DAYS));
@@ -122,7 +117,7 @@ public class HorsePerformanceService {
      *
      * Luật "khối lượng tăng đột biến" đã bị bỏ: khóa XOAY VÒNG bài tập có cự ly rất khác nhau nên tổng cự ly
      * tuần dao động theo lịch xoay chứ không theo tải thật, gây báo động giả.
-     * (The "sudden volume spike" rule was dropped: the course ROTATES subjects of very different distance, so
+     * (The "sudden volume spike" rule was dropped: the course ROTATES exercises of very different distance, so
      * weekly distance varies with the rotation rather than the real load, causing false alarms.)
      *
      * Luật "sự cố lặp lại" cũng đã bị bỏ: nó đếm cả báo cáo do chính Trainer gửi từ thẻ cảnh báo, nên một lần
@@ -141,49 +136,49 @@ public class HorsePerformanceService {
     /** Luật 1: nhịp tim tối đa vượt ngưỡng; chỉ báo mốc gần nhất. (Rule 1: max heart rate over the limit; newest only.) */
     private Optional<HorseAlertResponse> maxHeartRateAlert(List<RecentWorkoutRow> recent) {
         return recent.stream()
-                .filter(r -> r.maxHeartRate() != null && r.maxHeartRate() > MAX_HEART_RATE_LIMIT)
+                .filter(r -> r.maxHeartRate() != null && r.maxHeartRate() > TrainingLimits.MAX_HEART_RATE_LIMIT)
                 .findFirst()
                 .map(r -> new HorseAlertResponse(
                         "MAX_HEART_RATE_EXCEEDED",
                         "Maximum heart rate above safe limit",
                         String.format("Recorded a maximum heart rate of %d bpm (safe limit <= %d bpm) on %s.",
-                                r.maxHeartRate(), MAX_HEART_RATE_LIMIT, r.sessionDate()),
+                                r.maxHeartRate(), TrainingLimits.MAX_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.maxHeartRate().doubleValue(),
-                        (double) MAX_HEART_RATE_LIMIT));
+                        (double) TrainingLimits.MAX_HEART_RATE_LIMIT));
     }
 
     /** Luật 2: hồi phục tim kém. (Rule 2: poor heart-rate recovery.) */
     private Optional<HorseAlertResponse> recoveryHeartRateAlert(List<RecentWorkoutRow> recent) {
         return recent.stream()
-                .filter(r -> r.recoveryHeartRate() != null && r.recoveryHeartRate() > RECOVERY_HEART_RATE_LIMIT)
+                .filter(r -> r.recoveryHeartRate() != null && r.recoveryHeartRate() > TrainingLimits.RECOVERY_HEART_RATE_LIMIT)
                 .findFirst()
                 .map(r -> new HorseAlertResponse(
                         "POOR_RECOVERY_HEART_RATE",
                         "Poor heart-rate recovery",
                         String.format("Post-workout recovery heart rate is abnormally high (%d bpm, safe limit <= %d bpm) on %s.",
-                                r.recoveryHeartRate(), RECOVERY_HEART_RATE_LIMIT, r.sessionDate()),
+                                r.recoveryHeartRate(), TrainingLimits.RECOVERY_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.recoveryHeartRate().doubleValue(),
-                        (double) RECOVERY_HEART_RATE_LIMIT));
+                        (double) TrainingLimits.RECOVERY_HEART_RATE_LIMIT));
     }
 
     /** Luật 3: nhịp tim trung bình vượt ngưỡng; chỉ báo mốc gần nhất. (Rule 3: average heart rate over the limit; newest only.) */
     private Optional<HorseAlertResponse> averageHeartRateAlert(List<RecentWorkoutRow> recent) {
         return recent.stream()
-                .filter(r -> r.averageHeartRate() != null && r.averageHeartRate() > AVERAGE_HEART_RATE_LIMIT)
+                .filter(r -> r.averageHeartRate() != null && r.averageHeartRate() > TrainingLimits.AVERAGE_HEART_RATE_LIMIT)
                 .findFirst()
                 .map(r -> new HorseAlertResponse(
                         "AVERAGE_HEART_RATE_EXCEEDED",
                         "Elevated average heart rate",
                         String.format("Recorded an average heart rate of %d bpm (safe limit <= %d bpm) on %s.",
-                                r.averageHeartRate(), AVERAGE_HEART_RATE_LIMIT, r.sessionDate()),
+                                r.averageHeartRate(), TrainingLimits.AVERAGE_HEART_RATE_LIMIT, r.sessionDate()),
                         "WARNING",
                         triggeredAt(r),
                         r.averageHeartRate().doubleValue(),
-                        (double) AVERAGE_HEART_RATE_LIMIT));
+                        (double) TrainingLimits.AVERAGE_HEART_RATE_LIMIT));
     }
 
     private LocalDateTime triggeredAt(RecentWorkoutRow row) {
@@ -202,19 +197,19 @@ public class HorsePerformanceService {
      *
      * Số truy vấn là HẰNG SỐ, không phụ thuộc số ngựa: ngựa trong khu, kế hoạch, buổi tập 30 ngày,
      * buổi tập tính sở trường, đều lấy một lượt rồi ghép theo horseId.
-     * (The number of queries is CONSTANT, independent of the horse count: area horses, plans, 30-day
+     * (The number of queries is CONSTANT, independent of the horse count: area horses, course runs, 30-day
      * workouts and the specialty workouts are each fetched once and joined by horseId.)
      */
     @Transactional(readOnly = true)
     public List<DashboardHorseResponse> getDashboard(AuthenticatedUser currentUser) {
-        List<DashboardHorseRow> horses = scopeService.horsesOf(currentUser);
+        List<DashboardHorseRow> horses = accessPolicy.horsesOf(currentUser);
         if (horses.isEmpty()) {
             return Collections.emptyList();
         }
         List<Long> horseIds = horses.stream().map(DashboardHorseRow::horseId).toList();
 
-        Map<Long, List<DashboardPlanRow>> plansByHorse = planRepository.findDashboardPlans(horseIds).stream()
-                .collect(Collectors.groupingBy(DashboardPlanRow::horseId));
+        Map<Long, List<DashboardCourseRunRow>> courseRunsByHorse = courseRunRepository.findDashboardCourseRuns(horseIds).stream()
+                .collect(Collectors.groupingBy(DashboardCourseRunRow::horseId));
         Map<Long, List<RecentWorkoutRow>> recentByHorse = workoutRepository
                 .findRecentCompletedWorkouts(horseIds, LocalDate.now().minusDays(RECENT_WORKOUT_DAYS)).stream()
                 .collect(Collectors.groupingBy(RecentWorkoutRow::horseId));
@@ -223,14 +218,14 @@ public class HorsePerformanceService {
         return horses.stream()
                 .map(horse -> buildDashboardRow(
                         horse,
-                        plansByHorse.getOrDefault(horse.horseId(), List.of()),
+                        courseRunsByHorse.getOrDefault(horse.horseId(), List.of()),
                         recentByHorse.getOrDefault(horse.horseId(), List.of()),
                         specialtyByHorse.get(horse.horseId())))
                 .toList();
     }
 
     private DashboardHorseResponse buildDashboardRow(DashboardHorseRow horse,
-                                                            List<DashboardPlanRow> plans,
+                                                            List<DashboardCourseRunRow> courseRuns,
                                                             List<RecentWorkoutRow> recent,
                                                             HorseSpecialtyResponse specialty) {
         DashboardHorseResponse response = new DashboardHorseResponse();
@@ -239,7 +234,7 @@ public class HorsePerformanceService {
         response.setBreed(horse.breed());
         response.setStallCode(horse.stallCode());
 
-        fillPlanProgress(response, pickCurrentPlan(plans));
+        fillCourseRunProgress(response, pickCurrentCourseRun(courseRuns));
         fillRatingStats(response, recent);
 
         List<HorseAlertResponse> alerts = evaluateAlerts(recent);
@@ -259,7 +254,7 @@ public class HorsePerformanceService {
     public PerformanceTrendResponse getPerformanceTrend(AuthenticatedUser currentUser) {
         LocalDate to = LocalDate.now();
         LocalDate from = PerformanceTrendCalculator.weekStartOf(to).minusWeeks(TREND_WEEKS - 1L);
-        List<Long> horseIds = scopeService.horseIdsOf(currentUser);
+        List<Long> horseIds = accessPolicy.horseIdsOf(currentUser);
         List<PerformanceSessionRow> sessions = horseIds.isEmpty()
                 ? List.of()
                 : workoutRepository.findPerformanceSessions(horseIds, from, to);
@@ -269,31 +264,31 @@ public class HorsePerformanceService {
     /**
      * Kế hoạch ưu tiên, chọn theo NGÀY chứ không theo thứ tự tạo: kế hoạch đang chạy; nếu không có thì kế hoạch sắp tới
      * bắt đầu sớm nhất; nếu không có thì kế hoạch đã kết thúc gần đây nhất. null nếu ngựa chưa có kế hoạch.
-     * (Preferred plan, chosen by DATE rather than creation order: the running plan; otherwise the upcoming plan that
-     * starts first; otherwise the plan that ended most recently. null if the horse has no plan.)
+     * (Preferred course run, chosen by DATE rather than creation order: the running course run; otherwise the upcoming course run that
+     * starts first; otherwise the course run that ended most recently. null if the horse has no course run.)
      */
-    static DashboardPlanRow pickCurrentPlan(List<DashboardPlanRow> plans) {
-        Optional<DashboardPlanRow> active = plans.stream()
-                .filter(plan -> plan.status() == TrainingPlanStatus.ACTIVE)
-                .min(Comparator.comparing(DashboardPlanRow::startDate));
+    static DashboardCourseRunRow pickCurrentCourseRun(List<DashboardCourseRunRow> courseRuns) {
+        Optional<DashboardCourseRunRow> active = courseRuns.stream()
+                .filter(courseRun -> courseRun.status() == CourseRunStatus.ACTIVE)
+                .min(Comparator.comparing(DashboardCourseRunRow::startDate));
         if (active.isPresent()) {
             return active.get();
         }
-        Optional<DashboardPlanRow> nextUpcoming = plans.stream()
-                .filter(plan -> plan.status() == TrainingPlanStatus.UPCOMING)
-                .min(Comparator.comparing(DashboardPlanRow::startDate));
+        Optional<DashboardCourseRunRow> nextUpcoming = courseRuns.stream()
+                .filter(courseRun -> courseRun.status() == CourseRunStatus.UPCOMING)
+                .min(Comparator.comparing(DashboardCourseRunRow::startDate));
         if (nextUpcoming.isPresent()) {
             return nextUpcoming.get();
         }
-        return plans.stream()
-                .max(Comparator.comparing(DashboardPlanRow::endDate))
+        return courseRuns.stream()
+                .max(Comparator.comparing(DashboardCourseRunRow::endDate))
                 .orElse(null);
     }
 
-    private void fillPlanProgress(DashboardHorseResponse response, DashboardPlanRow plan) {
-        if (plan == null) {
-            response.setPlanStatus("NONE");
-            response.setCourseName("No plan yet");
+    private void fillCourseRunProgress(DashboardHorseResponse response, DashboardCourseRunRow courseRun) {
+        if (courseRun == null) {
+            response.setCourseRunStatus("NONE");
+            response.setCourseName("No course run yet");
             response.setCompletedSessions(0);
             response.setTotalSessions(0);
             response.setCancelledSessions(0);
@@ -301,24 +296,22 @@ public class HorsePerformanceService {
             return;
         }
 
-        int total = plan.totalSessions() != null ? plan.totalSessions() : 0;
-        int completed = plan.completedSessions().intValue();
-        int cancelled = plan.cancelledSessions().intValue();
-        // Giống trang Plan: buổi bị hủy ra khỏi mẫu số (khóa 6 buổi hủy 2 đạt 100% khi tập đủ 4), trừ khi cả kế hoạch bị
-        // hủy giữa chừng: khi đó tập 3 trên 6 là 50%, không phải 100%.
-        // (Like the Plan page: cancelled sessions leave the denominator (a 6-session plan with 2 cancelled reaches 100%
-        // after 4), unless the whole plan was dropped part-way: then 3 held of 6 is 50%, not 100%.)
-        int counted = plan.status() == TrainingPlanStatus.CANCELLED ? total : Math.max(total - cancelled, 0);
+        int total = courseRun.totalSessions() != null ? courseRun.totalSessions() : 0;
+        int completed = courseRun.completedSessions().intValue();
+        int cancelled = courseRun.cancelledSessions().intValue();
+        // Mẫu số là MỌI buổi của kế hoạch lúc tạo, kể cả buổi bị hủy: khóa 6 buổi hủy 2, ngựa chạy 4 thì là 4/6, không bao giờ đủ.
+        // (The denominator is EVERY Session the course run was created with, cancelled ones included: a 6-session course run with 2
+        // cancelled and 4 ran reads 4/6, never full.)
 
-        response.setPlanId(plan.planId());
-        response.setPlanStatus(plan.status().name());
-        response.setStartDate(plan.startDate());
-        response.setEndDate(plan.endDate());
-        response.setCourseName(plan.courseName());
+        response.setCourseRunId(courseRun.courseRunId());
+        response.setCourseRunStatus(courseRun.status().name());
+        response.setStartDate(courseRun.startDate());
+        response.setEndDate(courseRun.endDate());
+        response.setCourseName(courseRun.courseName());
         response.setCompletedSessions(completed);
         response.setTotalSessions(total > 0 ? total : completed);
         response.setCancelledSessions(cancelled);
-        response.setProgressPercent(counted > 0 ? round1(Math.min(completed * 100.0 / counted, 100.0)) : 0.0);
+        response.setProgressPercent(total > 0 ? round1(Math.min(completed * 100.0 / total, 100.0)) : 0.0);
     }
 
     /** Điểm phong độ mới nhất và trung bình 30 ngày. (Latest rating and the 30-day average.) */

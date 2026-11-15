@@ -1,6 +1,6 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.training.dto.PerformanceSessionRow;
+import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceWeekResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

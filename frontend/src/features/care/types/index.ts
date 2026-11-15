@@ -23,9 +23,6 @@ export interface CareScheduleResponse {
   rescheduleReason: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'URGENT_PREEMPTION' | 'TIME_EXCEEDED' | 'PEER_OFFLOAD' | 'OTHER' | null;
   rescheduleNote: string | null;
   rolloverCount?: number;
-  /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
-  overdue?: boolean;
-  pausedFrom?: string | null;
 }
 
 export interface CareScheduleDetailResponse {
@@ -119,6 +116,8 @@ export interface Prescription {
   startDate: string;
   endDate: string;
   instructions: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  administeredByRole: 'GROOM' | 'VETERINARIAN';
 }
 
 export interface CreatePrescriptionRequest {
@@ -151,8 +150,9 @@ export interface PrescriptionJsonItem {
   dosage: string;
   frequency: string;
   route: PrescriptionRoute;
-  duration: number;
-  notes?: string;
+  startDate: string;
+  endDate: string;
+  instructions: string;
 }
 
 export interface CreateTreatmentPlanRequest {
@@ -170,23 +170,14 @@ export interface PageResponse<T> {
   number: number;
 }
 
-export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'INJECTION_IV' | 'INJECTION_IM' | 'FEED_ADDITIVE';
-
-export interface MedicationCatalogItem {
-  id: number;
-  name: string;
-  therapeuticClass: string;
-  defaultRoute: string;
-  standardWithdrawalDays: number;
-  defaultDosage: string | null;
-  defaultFrequency: string | null;
-}
+export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'FEED_ADDITIVE';
 
 export interface PrescriptionItemRequest {
   medicationName: string;
   dosage: string;
   route: MedicationRoute;
   frequency: string;
-  duration: number;
-  notes?: string;
+  startDate: string;
+  endDate: string;
+  instructions: string;
 }

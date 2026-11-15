@@ -9,7 +9,7 @@ function item(overrides: Partial<HorseScheduleItem> = {}): HorseScheduleItem {
     sessionDate: '2026-10-29',
     startTime: '06:00:00',
     endTime: '07:00:00',
-    subjectName: 'Gallop',
+    exerciseName: 'Gallop',
     sessionStatus: 'SCHEDULED',
     workoutStatus: 'SCHEDULED',
     ...overrides,

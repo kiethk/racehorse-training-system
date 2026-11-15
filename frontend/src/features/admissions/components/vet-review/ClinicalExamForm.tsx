@@ -9,17 +9,17 @@ import {
   useState,
   type FormEvent,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
-import { z } from 'zod';
+import { businessDateFromToday, tomorrowBusinessDate } from './businessDate';
+import { validateExam } from './examValidation';
 import { VitalsSection } from './VitalsSection';
 import { DiagnosisSection } from './DiagnosisSection';
 import { TrainingDecisionSection } from './TrainingDecisionSection';
 import { FollowUpMergeNotice, FollowUpSection } from './FollowUpSection';
 import {
   PrescriptionSection,
-  toPrescriptionRequests,
   computeSuggestedRecheckDate,
-  type PrescriptionFormItem,
 } from '@/features/medical';
 import { ActiveConditionsSection } from './ActiveConditionsSection';
 import { ApiError } from '@/services/api';
@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Notice } from '@/components/ui/Notice';
 import { Icon } from '@/components/ui/Icon';
+import { useSynchronizedClock } from '@/lib/clockSync';
 import { Input, Textarea, ChoiceInput } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { formatDate, formatDateTime } from '@/lib/display';
@@ -34,13 +35,13 @@ import { admissionsApi } from '../../services/api';
 import {
   ExamVaccinationSection,
   toVaccinationRequests,
-  validateVaccinationDrafts,
   type VaccinationDraft,
 } from '@/features/care/components/preventive/ExamVaccinationSection';
 import { randomizeUrgentVitals, pickFindingScenario } from './urgentSimulation';
+import { applyMarkerCoupling, markerCouplingEnabled } from './decisionCoupling';
+import { markerZoneLabel } from '@/features/vet/lib/injuryZones';
 import {
   emptyMetrics,
-  metricConfigs,
   normalSystemFindings,
   type MetricField,
   type ExamMode,
@@ -48,14 +49,12 @@ import {
 } from './constants';
 import { toast } from '@/lib/toast';
 import {
-  EXAM_VARIANT_CONFIG,
-  sixVitalsRequired,
-  validateSixVitals,
+  EXAM_CONFIG,
   tier1VerdictEnabled,
-  type ExamVariant,
 } from './examVariantConfig';
 import { healthApi } from '@/features/health/services/healthApi';
 import type { HorseBodyRegion, InjuryRecord } from '@/features/health/types';
+import { AdmissionDocumentPanel } from '../../shared/components/AdmissionDocumentPanel';
 import {
   InjuryMarkerPanel,
   buildInjuryMarkerRequests,
@@ -71,6 +70,7 @@ import {
 } from '../../shared/components/AdmissionDetailLayout';
 import type {
   CareType,
+  AdmissionDocument,
   CareSchedule,
   CareScheduleStatus,
   CompleteCareScheduleRequest,
@@ -81,31 +81,6 @@ import type {
   VetReviewRequest,
   VetReviewResponse,
 } from '../../types';
-
-const BUSINESS_TIME_ZONE = 'Asia/Ho_Chi_Minh';
-
-export function businessDateFromToday(dayOffset: number) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const year = Number(parts.find((part) => part.type === 'year')?.value);
-  const month = Number(parts.find((part) => part.type === 'month')?.value);
-  const day = Number(parts.find((part) => part.type === 'day')?.value);
-  const target = new Date(Date.UTC(year, month - 1, day + dayOffset));
-
-  return [
-    target.getUTCFullYear(),
-    String(target.getUTCMonth() + 1).padStart(2, '0'),
-    String(target.getUTCDate()).padStart(2, '0'),
-  ].join('-');
-}
-
-function tomorrowBusinessDate() {
-  return businessDateFromToday(1);
-}
 
 function newIdempotencyKey() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -118,13 +93,13 @@ export interface ClinicalExamFormHandle {
 }
 
 export interface ClinicalExamFormProps {
-  variant: ExamVariant;
   admissionId: number;
   horseId?: number | null;
   candidateName?: string;
   careScheduleId?: number | null;
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
+  scheduledDate?: string | null;
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   /** The visit was opened by an incident report, so Follow-up rules do not apply. */
   fromIncident?: boolean;
@@ -142,48 +117,48 @@ export interface ClinicalExamFormProps {
   onDirtyChange?: (dirty: boolean) => void;
   prefillFindings?: string | null;
   injuryMarkers?: CreateInjuryMarkerRequest[];
+  documents?: AdmissionDocument[];
 }
 
 export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamFormProps>(
   function ClinicalExamForm(props, ref) {
     const {
-      variant,
       admissionId,
       horseId,
       candidateName = 'Candidate horse',
       careScheduleId,
       careType = 'INITIAL',
       scheduleStatus,
+      scheduledDate,
       schedulePurpose,
       fromIncident,
       blockHeldUntil,
       waitingFollowUpAt,
-      onStartExam,
       asideTop,
       onSuccess,
       onDirtyChange,
       prefillFindings,
       injuryMarkers,
+      documents = [],
     } = props;
 
-    const config = EXAM_VARIANT_CONFIG[variant];
+    const config = EXAM_CONFIG;
     const isPrescriptionActive = config.prescription || careType === 'ROUTINE' || careType === 'URGENT';
 
     const draftStorageKey = careScheduleId
       ? `draft:care-schedule:${careScheduleId}`
       : `draft:admission:${admissionId}`;
 
-    const showTier1 = tier1VerdictEnabled(variant, careType);
+    const showTier1 = tier1VerdictEnabled(careType);
     const [verdict, setVerdict] = useState<VetReviewDecision>('ACCEPT');
+    const [openDocumentId, setOpenDocumentId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState('');
 
     const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>(careType === 'URGENT' ? 'BLOCKED' : config.defaultDecision);
     const [restrictionDetails, setRestrictionDetails] = useState('');
     const [scheduleFollowUp, setScheduleFollowUp] = useState(false);
-    const defaultFollowUpDate = variant === 'URGENT' ? businessDateFromToday(3) : '';
-    const defaultFollowUpDescription =
-      variant === 'URGENT' ? 'Follow-up after the urgent examination' : 'Routine follow-up examination';
-    const [followUpDate, setFollowUpDate] = useState(defaultFollowUpDate);
+    const defaultFollowUpDescription = 'Routine follow-up examination';
+    const [followUpDate, setFollowUpDate] = useState('');
     // The follow-up reason is not asked: a blocked horse reuses the Assessment note so the next Vet sees why,
     // every other case gets the standard wording the backend requires.
     const followUpDescription =
@@ -193,10 +168,13 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const [markers, setMarkers] = useState<InjuryMarker[]>([]);
     const [bodyRegions, setBodyRegions] = useState<HorseBodyRegion[]>([]);
     const [anatomyTab, setAnatomyTab] = useState<'form' | 'anatomy3d'>('form');
+    /** True when a marker placed in this session is the reason the decision is BLOCKED. */
+    const [blockedByMarker, setBlockedByMarker] = useState(false);
+    const [showMarkerBlockDialog, setShowMarkerBlockDialog] = useState(false);
+    const markerCoupling = markerCouplingEnabled(careType);
+    const allowLocked = markerCoupling && blockedByMarker && markers.length > 0;
 
-    const show3DTab =
-      (variant === 'STANDARD' && careType === 'INITIAL' && trainingDecision === 'BLOCKED') ||
-      variant === 'URGENT';
+    const show3DTab = careType === 'INITIAL' && trainingDecision === 'BLOCKED';
 
     const [physicalExamConfirmed, setPhysicalExamConfirmed] = useState(true);
     const [examMode, setExamMode] = useState<ExamMode>('NORMAL');
@@ -208,11 +186,44 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const [findings, setFindings] = useState('');
     const [diagnosis, setDiagnosis] = useState('');
 
+    // Keeps the coupling step synchronous: the wrapper reads this ref instead of state.
+    const markersRef = useRef<InjuryMarker[]>([]);
+
+    useEffect(() => {
+      markersRef.current = markers;
+    }, [markers]);
+
+    /** setMarkers wrapper that runs the marker-to-decision coupling (see decisionCoupling.ts). */
+    const setMarkersWithCoupling = useCallback(
+      (action: SetStateAction<InjuryMarker[]>) => {
+        const prev = markersRef.current;
+        const next = typeof action === 'function' ? action(prev) : action;
+        markersRef.current = next;
+        setMarkers(next);
+        if (!markerCoupling) return;
+        const result = applyMarkerCoupling(prev.length, next.length, trainingDecision, blockedByMarker);
+        if (result.autoSwitch === 'TO_BLOCKED') {
+          setTrainingDecision('BLOCKED');
+          setBlockedByMarker(true);
+          if (!followUpDate) setFollowUpDate(businessDateFromToday(7));
+          if (examMode === 'NORMAL') {
+            setExamMode('ABNORMAL');
+            setStructuredDiagnosis((prevD) =>
+              prevD === 'Clinically healthy' ? 'Minor clinical condition' : prevD,
+            );
+          }
+        } else if (result.autoSwitch === 'TO_ALLOWED') {
+          setTrainingDecision('ALLOWED');
+          setBlockedByMarker(false);
+        }
+      },
+      [markerCoupling, trainingDecision, blockedByMarker, followUpDate, examMode],
+    );
+
     const [metrics, setMetrics] = useState<Record<MetricField, string>>(emptyMetrics);
 
     const [activeInjuries, setActiveInjuries] = useState<InjuryRecord[]>([]);
     const [resolvedConditionIds, setResolvedConditionIds] = useState<number[]>([]);
-    const [prescriptions, setPrescriptions] = useState<PrescriptionFormItem[]>([]);
     const [generalCareInstructions, setGeneralCareInstructions] = useState('');
     const [vaccinationDrafts, setVaccinationDrafts] = useState<VaccinationDraft[]>([]);
     const [deferVaccinationDays, setDeferVaccinationDays] = useState<number | null>(null);
@@ -221,7 +232,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [formError, setFormError] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [startingExam, setStartingExam] = useState(false);
+    const startingExam = false;
     const [showApproveConfirm, setShowApproveConfirm] = useState(false);
     const [draftSavedTime, setDraftSavedTime] = useState<string | null>(null);
     const [availableDraft, setAvailableDraft] = useState<{
@@ -239,6 +250,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       followUpIdempotencyKey?: string;
       markers?: InjuryMarker[];
       resolvedConditionIds?: number[];
+      blockedByMarker?: boolean;
+      vaccinations?: VaccinationDraft[];
+      generalCareInstructions?: string;
+      deferVaccinationDays?: number | null;
       timestamp: string;
     } | null>(() => {
       if (!config.draft || typeof window === 'undefined') return null;
@@ -301,7 +316,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             setMarkers((prev) =>
               prev.length > 0
                 ? prev
-                : injuries.map((inj, idx) => {
+                : injuries.map((inj) => {
                     const worldPos = resolveInjuryWorldPosition(inj);
                     const normal =
                       inj.normalX != null && inj.normalY != null && inj.normalZ != null
@@ -315,10 +330,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                       position: worldPos,
                       normal,
                       zoneId: inj.zoneId ?? undefined,
-                      injuryType: inj.injuryType || `Injury ${idx + 1}`,
                       bodyRegionId: inj.bodyRegionId ?? null,
-                      severity: inj.severity || 'MODERATE',
-                      description: inj.description ?? undefined,
+                      description: inj.description || inj.injuryType || '',
                     };
                   }),
             );
@@ -336,13 +349,36 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
+    // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+    const _now = useSynchronizedClock();
+    const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    const rawScheduled = scheduledDate ? scheduledDate.slice(0, 10) : null;
+    const isFutureRoutine = careType === 'ROUTINE' && Boolean(rawScheduled && rawScheduled > todayIso);
+
+    // Time-window guard: ROUTINE exams can only be STARTED (SCHEDULED→complete) between 13:30–15:30.
+    // If already IN_PROGRESS, the vet may finish past 15:30.
+    const VET_WINDOW_START_H = 13, VET_WINDOW_START_M = 30;
+    const VET_WINDOW_END_H   = 15, VET_WINDOW_END_M   = 30;
+    const _h = _now.getHours(), _m = _now.getMinutes();
+    const _minNow   = _h * 60 + _m;
+    const _minStart = VET_WINDOW_START_H * 60 + VET_WINDOW_START_M;
+    const _minEnd   = VET_WINDOW_END_H   * 60 + VET_WINDOW_END_M;
+    const isOutsideRoutineWindow =
+      careType === 'ROUTINE' &&
+      schedulePurpose !== 'PREVENTIVE' &&
+      scheduleStatus === 'SCHEDULED' &&
+      (_minNow < _minStart || _minNow > _minEnd);
+
     // Care Scheduling: SCHEDULED and IN_PROGRESS exams are open and directly editable.
     const isGated =
-      scheduleStatus != null &&
-      scheduleStatus !== 'SCHEDULED' &&
-      scheduleStatus !== 'IN_PROGRESS';
-    // A visit opened by an incident report needs a Follow-up only when the horse stays blocked.
-    const followUpRequired = !fromIncident || trainingDecision === 'BLOCKED';
+      (scheduleStatus != null &&
+        scheduleStatus !== 'SCHEDULED' &&
+        scheduleStatus !== 'IN_PROGRESS') ||
+      isFutureRoutine ||
+      isOutsideRoutineWindow;
+    // Mọi ca khám hoàn tất đều phải đặt lịch cho lần khám kế tiếp (duyệt 14/11/2026), kể cả ca mở từ
+    // báo cáo sự cố. Nhờ vậy TreatmentPlan note-only luôn có endDate và banner Groom tự tắt.
+    const followUpRequired = true;
     const followUpActive = scheduleFollowUp || followUpRequired;
     const isFormDisabled = submitting || startingExam || isGated;
 
@@ -407,6 +443,14 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (availableDraft.resolvedConditionIds) {
         setResolvedConditionIds(availableDraft.resolvedConditionIds);
       }
+      if (availableDraft.blockedByMarker !== undefined) {
+        setBlockedByMarker(availableDraft.blockedByMarker);
+      }
+      if (availableDraft.vaccinations) setVaccinationDrafts(availableDraft.vaccinations);
+      if (availableDraft.generalCareInstructions !== undefined)
+        setGeneralCareInstructions(availableDraft.generalCareInstructions);
+      if (availableDraft.deferVaccinationDays !== undefined)
+        setDeferVaccinationDays(availableDraft.deferVaccinationDays);
       setDraftSavedTime(availableDraft.timestamp);
       setAvailableDraft(null);
     };
@@ -447,6 +491,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           followUpIdempotencyKey,
           markers,
           resolvedConditionIds,
+          blockedByMarker,
+          vaccinations: vaccinationDrafts,
+          generalCareInstructions,
+          deferVaccinationDays,
           timestamp,
         };
         localStorage.setItem(draftStorageKey, JSON.stringify(payload));
@@ -476,6 +524,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       followUpIdempotencyKey,
       markers,
       resolvedConditionIds,
+      blockedByMarker,
+      vaccinationDrafts,
+      generalCareInstructions,
+      deferVaccinationDays,
     ]);
 
     const handleClearDraft = () => {
@@ -496,8 +548,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       setTrainingDecision(config.defaultDecision);
       setRestrictionDetails('');
       setScheduleFollowUp(false);
-      setFollowUpDate(defaultFollowUpDate);
+      setFollowUpDate('');
       setMarkers([]);
+      setBlockedByMarker(false);
       setResolvedConditionIds([]);
       setVerdict('ACCEPT');
       setRejectReason('');
@@ -613,164 +666,47 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     };
 
     function validate(): Record<string, string> {
-      const errors: Record<string, string> = {};
-
-      if (showTier1 && verdict === 'REJECT') {
-        if (!rejectReason.trim()) {
-          errors.rejectReason = 'Reason for rejection is required when rejecting admission.';
-        }
-        return errors;
-      }
-
-      const schema = z
-        .object({
-          physicalExamConfirmed: z.boolean(),
-          effectiveFindings: z.string().min(1, config.findingsRequiredMessage),
-          effectiveDiagnosis: z.string().min(1, config.diagnosisRequiredMessage),
-          restrictionDetails: z.string(),
-          followUpDate: z.string(),
-        })
-        .superRefine((data, ctx) => {
-          if (config.section2Mode === 'structured' && !physicalExamConfirmed) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['physicalExamConfirmed'],
-              message: 'In-person physical examination confirmation is required.',
-            });
-          }
-          if (
-            config.section2Mode === 'structured' &&
-            examMode === 'ABNORMAL' &&
-            config.abnormalFindingsRequiredMessage &&
-            !abnormalFindings.trim()
-          ) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['abnormalFindings'],
-              message: config.abnormalFindingsRequiredMessage,
-            });
-          }
-          if (trainingDecision === 'BLOCKED' && !data.restrictionDetails.trim()) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['restrictionDetails'],
-              message: config.restrictionZodMessage,
-            });
-          }
-          if (followUpActive) {
-            if (!data.followUpDate) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['followUpDate'],
-                message: config.followUpDateRequiredMessage ?? 'Follow-up date is required.',
-              });
-            } else if (data.followUpDate < tomorrowBusinessDate()) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['followUpDate'],
-                message:
-                  config.followUpDateMinMessage ?? 'Follow-up date must be at least one day in the future.',
-              });
-            }
-          }
-        });
-
-      const parsed = schema.safeParse({
+      const result = validateExam({
+        config,
+        careType,
+        schedulePurpose,
+        fromIncident,
+        showTier1,
+        verdict,
+        rejectReason,
         physicalExamConfirmed,
+        examMode,
+        abnormalFindings,
         effectiveFindings,
         effectiveDiagnosis,
+        trainingDecision,
         restrictionDetails,
+        followUpActive,
         followUpDate,
+        metrics,
+        markerCount: markers.length,
+        horseId,
+        vaccinationDrafts,
+        deferVaccinationDays,
       });
-      if (!parsed.success) {
-        for (const issue of parsed.error.issues) {
-          const field = String(issue.path[0] ?? '');
-          if (field && !errors[field]) errors[field] = issue.message;
-        }
-      }
-
-      if (isPrescriptionActive && prescriptions.length > 0) {
-        for (const rx of prescriptions) {
-          if (!rx.medicationName.trim()) {
-            errors["rx." + rx.id + ".medicationName"] = "Medication name is required.";
-          }
-          if (!rx.dosage.trim()) {
-            errors["rx." + rx.id + ".dosage"] = "Dosage is required.";
-          }
-          if (!rx.frequency.trim()) {
-            errors["rx." + rx.id + ".frequency"] = "Frequency is required.";
-          }
-          if (!rx.duration || rx.duration < 1) {
-            errors["rx." + rx.id + ".duration"] = "Duration must be at least 1 day.";
-          }
-        }
-      }
-
-      const isSixVitalsMandatory = sixVitalsRequired(variant, careType, schedulePurpose, fromIncident);
-      if (isSixVitalsMandatory) {
-        const vitalErrors = validateSixVitals(metrics);
-        if (Object.keys(vitalErrors).length > 0) {
-          Object.assign(errors, vitalErrors);
-          errors.metrics = 'All six vital signs are required before completing this examination.';
-        }
-      } else {
-        for (const cfg of metricConfigs) {
-          const val = metrics[cfg.key];
-          if (val && val.trim()) {
-            const num = Number(val);
-            if (Number.isNaN(num) || num <= 0) {
-              errors[cfg.key] = `${cfg.label} must be a valid positive number.`;
-            }
-          }
-        }
-
-        const hasVital =
-          metricConfigs.some((cfg) => metrics[cfg.key]?.trim()) || metrics.hydrationStatus?.trim();
-        if (!hasVital) {
-          errors.metrics = 'At least one vital sign is required before submitting.';
-        }
-      }
-
-      if (
-        variant === 'STANDARD' &&
-        careType === 'INITIAL' &&
-        trainingDecision === 'BLOCKED'
-      ) {
-        if (markers.length === 0) {
-          errors.injuryMarkers =
-            'An injury or condition record is required when blocking a newly admitted horse.';
-        } else {
-          for (const m of markers) {
-            if (!m.injuryType.trim()) {
-              errors[`injuryType:${m.id}`] = 'Injury type is required.';
-            }
-            if (m.bodyRegionId == null) {
-              errors[`bodyRegionId:${m.id}`] = 'Body region is required.';
-            }
-          }
-        }
-      }
-
-      if (config.vaccination && horseId != null) {
-        const doseErrors = validateVaccinationDrafts(vaccinationDrafts);
-        setVaccinationErrors(doseErrors);
-        if (Object.keys(doseErrors).length > 0) {
-          errors.vaccinations = 'Complete or remove the vaccinations before submitting.';
-        } else if (
-          schedulePurpose === 'PREVENTIVE' &&
-          vaccinationDrafts.length === 0 &&
-          deferVaccinationDays == null
-        ) {
-          errors.vaccinations =
-            'Please record at least one vaccination or select deferral days for preventive care.';
-        }
-      }
-
-      return errors;
+      if (result.vaccinationErrors) setVaccinationErrors(result.vaccinationErrors);
+      return result.errors;
     }
 
     function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
+      if (isFutureRoutine && rawScheduled) {
+        setFormError(
+          `This routine check is scheduled for ${formatDate(rawScheduled)}. It can only be completed on or after the scheduled date.`,
+        );
+        return;
+      }
+      if (isOutsideRoutineWindow) {
+        setFormError(
+          `Routine examinations can only be started between 13:30 and 15:30. Please return during the examination window.`,
+        );
+        return;
+      }
       const openStatuses = ['SCHEDULED', 'IN_PROGRESS'];
       if (scheduleStatus && !openStatuses.includes(scheduleStatus)) {
         setFormError(
@@ -870,6 +806,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             metrics: Object.keys(metricValues).length ? [metricValues] : undefined,
             vaccinations: vaccinationDrafts.length ? toVaccinationRequests(vaccinationDrafts) : undefined,
             injuryMarkers: markers.length ? buildInjuryMarkerRequests(markers) : undefined,
+            generalCareInstructions:
+              isPrescriptionActive && generalCareInstructions.trim()
+                ? generalCareInstructions.trim()
+                : undefined,
           };
           result = await admissionsApi.vetReview(admissionId, request as VetReviewRequest);
           completionKind = 'INITIAL';
@@ -887,10 +827,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             vaccinations: vaccinationDrafts.length ? toVaccinationRequests(vaccinationDrafts) : undefined,
             deferVaccinationDays: deferVaccinationDays ?? undefined,
             injuryMarkers: markers.length ? buildInjuryMarkerRequests(markers) : injuryMarkers,
-            prescriptions:
-              isPrescriptionActive && prescriptions.length > 0
-                ? toPrescriptionRequests(prescriptions)
-                : undefined,
             generalCareInstructions:
               isPrescriptionActive && generalCareInstructions.trim()
                 ? generalCareInstructions.trim()
@@ -914,6 +850,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         setShowApproveConfirm(false);
         onSuccess(result, completionKind, request);
       } catch (cause) {
+        if (cause instanceof ApiError) {
+          toast.error(cause.message);
+        }
         if (config.errorMapping === 'formatted' && cause instanceof ApiError) {
           const errorMsg = `${cause.status === 403 ? 'Permission denied' : cause.status === 409 ? 'Review state conflict' : 'Review failed'} (${cause.status}${cause.errorCode ? ` · ${cause.errorCode}` : ''}): ${cause.message}`;
           setFormError(errorMsg);
@@ -968,8 +907,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       return (
         <PrescriptionSection
           isFormDisabled={isFormDisabled}
-          prescriptions={prescriptions}
-          setPrescriptions={setPrescriptions}
           generalCareInstructions={generalCareInstructions}
           setGeneralCareInstructions={setGeneralCareInstructions}
           fieldErrors={fieldErrors}
@@ -995,6 +932,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
               setAbnormalFindings={setAbnormalFindings}
               fieldErrors={fieldErrors}
               setFieldErrors={setFieldErrors}
+              normalLocked={allowLocked}
+              onLockedNormalAttempt={() => setShowMarkerBlockDialog(true)}
             />
           </div>
         );
@@ -1096,6 +1035,13 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             followUpDate={followUpDate}
             setFollowUpDate={setFollowUpDate}
             businessDateFromToday={businessDateFromToday}
+            allowLocked={allowLocked}
+            markerNotice={
+              allowLocked
+                ? 'Injury marker placed — training decision set to BLOCKED.'
+                : null
+            }
+            onLockedAllowAttempt={() => setShowMarkerBlockDialog(true)}
           />
         );
       }
@@ -1190,20 +1136,13 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
               </div>
             </div>
           )}
-
-          {variant === 'URGENT' && (
-            <div className="mt-4">
-              {renderFollowUps()}
-            </div>
-          )}
         </div>
       );
     };
 
     const renderFollowUps = () => {
-      const activeRxDurations = prescriptions.map((p) => p.duration).filter((d): d is number => typeof d === 'number' && d > 0);
       const activeInjuryRecoveryDates = activeInjuries.map((inj) => inj.expectedRecoveryDate).filter(Boolean) as string[];
-      const suggestedRecheckDate = computeSuggestedRecheckDate(activeRxDurations, activeInjuryRecoveryDates);
+      const suggestedRecheckDate = computeSuggestedRecheckDate(activeInjuryRecoveryDates);
 
       return (
         <FollowUpSection
@@ -1253,7 +1192,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           </p>
           <InjuryMarkerPanel
             markers={markers}
-            setMarkers={setMarkers}
+            setMarkers={setMarkersWithCoupling}
             bodyRegions={bodyRegions}
             readOnly={isFormDisabled}
             fieldErrors={fieldErrors}
@@ -1273,6 +1212,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       return (
         <div>
           <ExamVaccinationSection
+            documents={documents}
+            onViewDocument={setOpenDocumentId}
             horseId={horseId}
             careType={careType}
             purpose={schedulePurpose}
@@ -1369,7 +1310,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         {renderDraftBanner()}
         {renderDraftSaved()}
 
-        <div className={admissionDetailGridClassName}>
+        <div className={openDocumentId == null ? admissionDetailGridClassName : 'grid min-w-0 gap-5'}>
           <div className="min-w-0 space-y-5">
             {renderVitals()}
             {renderSection2()}
@@ -1387,6 +1328,18 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                   {config.decisionPanelTitle}
                 </h3>
               </div>
+
+              {isFutureRoutine && rawScheduled && (
+                <Notice tone="warning">
+                  This routine check is scheduled for <strong>{formatDate(rawScheduled)}</strong>. It can only be completed on or after the scheduled date.
+                </Notice>
+              )}
+
+              {isOutsideRoutineWindow && (
+                <Notice tone="warning">
+                  Routine examinations can only be started between <strong>13:30</strong> and <strong>15:30</strong>. Please return during the examination window.
+                </Notice>
+              )}
 
               {showTier1 && (
                 <div className="space-y-3 border-b border-[var(--color-border)] pb-4">
@@ -1493,18 +1446,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                 >
                   {showTier1 && verdict === 'REJECT' ? 'Confirm Reject' : config.submitLabel}
                 </Button>
-                {config.draft && (!showTier1 || verdict !== 'REJECT') && (
-                  <Button
-                    type="button"
-                    variant="tertiary"
-                    size="sm"
-                    className="w-full"
-                    disabled={submitting}
-                    onClick={handleSaveDraft}
-                  >
-                    Save draft locally
-                  </Button>
-                )}
               </div>
             </div>
           </div>
@@ -1586,12 +1527,44 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             onCancel={() => setShowApproveConfirm(false)}
           />
         )}
+
+        {allowLocked && (
+          <ConfirmDialog
+            open={showMarkerBlockDialog}
+            title="Training cannot be allowed"
+            description={
+              <div className="space-y-2 text-sm">
+                <p>
+                  {markers.length} marker{markers.length === 1 ? '' : 's'} placed:{' '}
+                  {markers.map((marker) => markerZoneLabel(bodyRegions, marker) ?? 'Unspecified').join(', ')}
+                </p>
+                <p className="text-xs font-medium text-[var(--color-warning)]">
+                  Remove markers to allow training.
+                </p>
+              </div>
+            }
+            confirmLabel="Keep BLOCKED"
+            cancelLabel="Close"
+            onConfirm={() => setShowMarkerBlockDialog(false)}
+            onCancel={() => setShowMarkerBlockDialog(false)}
+          />
+        )}
       </form>
     );
 
     const renderStackedForm = () => (
       <form onSubmit={handleFormSubmit} noValidate className="space-y-6">
         {renderFormError()}
+        {isFutureRoutine && rawScheduled && (
+          <Notice tone="warning">
+            This routine check is scheduled for <strong>{formatDate(rawScheduled)}</strong>. It can only be completed on or after the scheduled date.
+          </Notice>
+        )}
+        {isOutsideRoutineWindow && (
+          <Notice tone="warning">
+            Routine examinations can only be started between <strong>13:30</strong> and <strong>15:30</strong>. Please return during the examination window.
+          </Notice>
+        )}
         {renderVitals()}
         {renderSection2()}
         {renderInjuryMarkers()}
@@ -1603,6 +1576,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             type="submit"
             variant="primary"
             loading={submitting}
+            disabled={submitting || startingExam || isGated}
             icon="check"
             className="w-full transition-all active:scale-[0.97] sm:w-auto"
           >
@@ -1612,8 +1586,19 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       </form>
     );
 
-    return config.layout === 'split-sticky-decision-panel'
+    const form = config.layout === 'split-sticky-decision-panel'
       ? renderSplitStickyForm()
       : renderStackedForm();
+    return openDocumentId == null ? form : (
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,40%)]">
+        <div className="min-w-0">{form}</div>
+        <AdmissionDocumentPanel
+          documents={documents}
+          documentId={openDocumentId}
+          onSelectDocument={setOpenDocumentId}
+          onClose={() => setOpenDocumentId(null)}
+        />
+      </div>
+    );
   },
 );

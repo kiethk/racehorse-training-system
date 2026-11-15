@@ -35,7 +35,6 @@ const MODULE_OPTIONS = [
   { label: 'Horse Lifecycle', value: 'HORSES' },
   { label: 'Staff & Accounts', value: 'STAFF' },
   { label: 'Training & Courses', value: 'TRAINING' },
-  { label: 'Racing & Registration', value: 'RACING' },
   { label: 'System & Admin', value: 'SYSTEM' },
 ] as const;
 
@@ -231,8 +230,8 @@ export function ManagerAuditLogView() {
             onClick={() => setIsArchiveModalOpen(true)}
             className={
               archiveStatus?.requiresMaintenance
-                ? 'border-rose-400 text-rose-700 bg-rose-50/50 hover:bg-rose-100/50 dark:border-rose-800 dark:text-rose-300 dark:bg-rose-950/30'
-                : ''
+                ? 'bg-transparent border border-dashed border-rose-300 dark:border-rose-800 text-[var(--color-text-secondary)] hover:border-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10'
+                : 'hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10'
             }
             title={
               archiveStatus?.requiresMaintenance
@@ -241,12 +240,12 @@ export function ManagerAuditLogView() {
             }
           >
             {archiveStatus?.requiresMaintenance && (
-              <span className="relative flex size-2 mr-1">
+              <span className="relative flex size-2 mr-0.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
                 <span className="relative inline-flex size-2 rounded-full bg-rose-600" />
               </span>
             )}
-            <Icon name="archive" className="size-4 mr-1.5" />
+            <Icon name="archive" className="size-4 mr-1 text-[var(--color-text-muted)] group-hover:text-rose-600" />
             Archive &amp; Purge
           </Button>
           <Button
@@ -348,7 +347,7 @@ export function ManagerAuditLogView() {
               <TBody>
                 {data.content.map((log) => {
                   const displayAction = formatAction(log.action, log.httpMethod, log.requestPath);
-                  const targetEntityUrl = resolveEntityUrl(log.entityName, log.entityId);
+                  const targetEntityUrl = resolveEntityUrl(log.entityName, log.entityId, log.requestPath);
                   const moduleName = resolveLogModule(log.module, log.entityName, log.requestPath, log.action);
 
                   return (
@@ -398,28 +397,21 @@ export function ManagerAuditLogView() {
                       {/* 4. Target Entity with link */}
                       <Td className="px-5 py-3.5">
                         {log.entityName ? (
-                          targetEntityUrl ? (
+                          targetEntityUrl && log.entityId != null ? (
                             <Link
                               href={targetEntityUrl}
                               onClick={(e) => e.stopPropagation()}
                               className="font-medium text-sm text-[var(--color-primary)] hover:underline inline-flex items-center gap-1.5 max-w-[11rem] truncate"
-                              title={`View ${log.entityName} ${log.entityId != null ? '#' + log.entityId : ''}`}
+                              title={`View ${log.entityName} #${log.entityId}`}
                             >
                               <span>{log.entityName}</span>
-                              {log.entityId != null && (
-                                <span className="bg-[var(--color-primary-soft)] px-1.5 py-0.2 rounded font-mono text-[11px] font-semibold">
-                                  #{log.entityId}
-                                </span>
-                              )}
+                              <span className="bg-[var(--color-primary-soft)] px-1.5 py-0.2 rounded font-mono text-[11px] font-semibold">
+                                #{log.entityId}
+                              </span>
                             </Link>
                           ) : (
-                            <div className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-primary)]">
+                            <div className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]">
                               <span>{log.entityName}</span>
-                              {log.entityId != null && (
-                                <span className="bg-[var(--color-surface-muted)] px-1.5 py-0.2 rounded font-mono text-[11px] text-[var(--color-text-secondary)]">
-                                  #{log.entityId}
-                                </span>
-                              )}
                             </div>
                           )
                         ) : (

@@ -1,6 +1,7 @@
 package com.rtms.backend.scheduler;
 
 import com.rtms.backend.admission.service.AdmissionGroomReviewService;
+import com.rtms.backend.admission.service.GroomAssignmentTriggers;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -9,8 +10,17 @@ public class AdmissionArrivalScheduler {
 
     private final AdmissionGroomReviewService admissionGroomReviewService;
 
-    public AdmissionArrivalScheduler(AdmissionGroomReviewService admissionGroomReviewService) {
+    private final GroomAssignmentTriggers groomAssignmentTriggers;
+
+    public AdmissionArrivalScheduler(AdmissionGroomReviewService admissionGroomReviewService,
+                                     GroomAssignmentTriggers groomAssignmentTriggers) {
+        this.groomAssignmentTriggers = groomAssignmentTriggers;
         this.admissionGroomReviewService = admissionGroomReviewService;
+    }
+
+    @Scheduled(fixedRate = 60000, initialDelay = 20000)
+    public void assignGroomReviews() {
+        groomAssignmentTriggers.runPeriodicJobs();
     }
 
     @Scheduled(fixedRate = 60000)
@@ -18,9 +28,4 @@ public class AdmissionArrivalScheduler {
         admissionGroomReviewService.expireOverdueArrivalReservations();
     }
 
-    /** Safety net: every capacity change already triggers allocation, this catches anything skipped (e.g. SKIP LOCKED). */
-    @Scheduled(fixedRate = 60000, initialDelay = 30000)
-    public void allocateWaitingAdmissions() {
-        admissionGroomReviewService.allocateWaitingAdmissions();
-    }
 }

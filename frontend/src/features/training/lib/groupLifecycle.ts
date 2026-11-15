@@ -12,11 +12,11 @@ export function groupLabel(name: string | null, disbanded: boolean): string {
   return disbanded ? `${name} (Disbanded)` : name;
 }
 
-/** Plans and not-yet-started Sessions that disbanding a group will cancel. */
+/** Course runs and not-yet-started Sessions that disbanding a group will cancel. */
 export interface DisbandImpact {
-  plans: number;
+  courseRuns: number;
   sessions: number;
-  /** Whether the group has any plan at all, finished ones included; without one the group is removed entirely. */
+  /** Whether the group has any course run at all, finished ones included; without one the group is removed entirely. */
   hasHistory: boolean;
 }
 
@@ -24,21 +24,21 @@ export interface DisbandImpact {
 export function disbandMessage(groupName: string, impact: DisbandImpact): string {
   const horses = 'Its horses leave the group.';
   if (!impact.hasHistory) return `Disband ${groupName}? This group has no history and will be removed. ${horses}`;
-  if (impact.plans === 0) return `Disband ${groupName}? ${horses}`;
-  return `Disband ${groupName}? ${plural(impact.plans, 'plan')} and ${plural(impact.sessions, 'session')} not yet started will be cancelled. ${horses}`;
+  if (impact.courseRuns === 0) return `Disband ${groupName}? ${horses}`;
+  return `Disband ${groupName}? ${plural(impact.courseRuns, 'course run')} and ${plural(impact.sessions, 'session')} not yet started will be cancelled. ${horses}`;
 }
 
 /** Confirmation text for a horse leaving a group (removed, or moved to another): says when its upcoming workouts are cancelled. */
 export function leaveMessage(
   horseName: string,
-  from: { name: string; currentPlanStatus: string | null },
+  from: { name: string; currentCourseRunStatus: string | null },
   to?: { name: string },
 ): string {
   const question = to ? `Move ${horseName} from ${from.name} to ${to.name}?` : `Remove ${horseName} from ${from.name}?`;
-  return from.currentPlanStatus ? `${question} Its workouts in sessions not yet started will be cancelled.` : question;
+  return from.currentCourseRunStatus ? `${question} Its workouts in sessions not yet started will be cancelled.` : question;
 }
 
-/** A CANCELLED plan, or the plan of a Disbanded group, only shows its history: no cancel or reschedule actions. */
-export function isViewOnlyPlan(status: string, groupDisbanded: boolean): boolean {
+/** A CANCELLED course run, or the course run of a Disbanded group, only shows its history: no cancel or reschedule actions. */
+export function isViewOnlyCourseRun(status: string, groupDisbanded: boolean): boolean {
   return groupDisbanded || status === 'CANCELLED';
 }

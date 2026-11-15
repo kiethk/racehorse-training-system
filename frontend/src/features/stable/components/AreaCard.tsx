@@ -16,6 +16,8 @@ interface Props {
   draft: AssignmentDraft;
   horses: ReturnType<typeof horseMap>;
   highlightedStallIds?: Set<number>;
+  isAreaHighlighted?: boolean;
+  selectedStallId?: number | null;
   disabled: boolean;
   onPick: (target: AssignmentTarget) => void;
   onRemove: (target: AssignmentTarget) => void;
@@ -24,7 +26,18 @@ interface Props {
   onDelete: () => void;
 }
 
-export function AreaCard({ view, data, draft, horses, highlightedStallIds, onSelectStall, onDelete, ...assignment }: Props) {
+export function AreaCard({
+  view,
+  data,
+  draft,
+  horses,
+  highlightedStallIds,
+  isAreaHighlighted = false,
+  selectedStallId = null,
+  onSelectStall,
+  onDelete,
+  ...assignment
+}: Props) {
   const { area, occupied, stalls, blocks, missingTrainer, hasGrooms, attention } = view;
   const trainerId = draft.trainers[area.id];
   const trainerReason = trainerChangeReason(data, area.id);
@@ -34,8 +47,16 @@ export function AreaCard({ view, data, draft, horses, highlightedStallIds, onSel
     onDrop: staff => assignment.onAssign({ kind: 'trainer', areaId: area.id }, staff),
   });
   return (
-    <Panel data-area-card={area.code} tone={attention ? 'warning' : 'default'} className="min-w-0 overflow-hidden"
-      {...dropProps}>
+    <Panel
+      id={`area-card-${area.id}`}
+      data-area-card={area.code}
+      tone={attention ? 'warning' : 'default'}
+      className={cn(
+        'min-w-0 overflow-hidden transition-all duration-300',
+        isAreaHighlighted && 'ring-2 ring-[var(--color-primary)] ring-offset-1 shadow-sm'
+      )}
+      {...dropProps}
+    >
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--color-border)]/50">
         <h2 className="text-base font-semibold text-[var(--color-text-primary)] flex items-baseline gap-1.5">
           <span>Area {area.code}</span>
@@ -44,6 +65,7 @@ export function AreaCard({ view, data, draft, horses, highlightedStallIds, onSel
           </span>
         </h2>
         <div className="flex items-center gap-1.5">
+          {isAreaHighlighted && <Pill tone="primary" size="sm">Target Area</Pill>}
           {attention > 0 && <Pill tone="warning" size="sm">Needs assignment</Pill>}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -69,7 +91,7 @@ export function AreaCard({ view, data, draft, horses, highlightedStallIds, onSel
                     key={stall.id}
                     stall={stall}
                     horse={horses.get(stall.id)}
-                    selected={false}
+                    selected={selectedStallId === stall.id}
                     onSelect={onSelectStall}
                     highlighted={highlightedStallIds?.has(stall.id)}
                     dimmed={Boolean(highlightedStallIds && highlightedStallIds.size > 0 && !highlightedStallIds.has(stall.id))}

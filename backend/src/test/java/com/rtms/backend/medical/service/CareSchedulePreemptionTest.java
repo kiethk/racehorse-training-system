@@ -10,10 +10,9 @@ import com.rtms.backend.identity.entity.VeterinarianProfile;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
@@ -23,7 +22,7 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,9 +38,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import org.junit.jupiter.api.Disabled;
-
-@Disabled("Preemption and pause feature abolished per 4-state lifecycle simplification")
 class CareSchedulePreemptionTest {
 
     private CareScheduleRepository schedules;
@@ -63,7 +59,7 @@ class CareSchedulePreemptionTest {
         events = mock(ApplicationEventPublisher.class);
         notifications = mock(NotificationService.class);
 
-        GroupWorkoutSyncService groupSync = mock(GroupWorkoutSyncService.class);
+        TrainingGroupService groupSync = mock(TrainingGroupService.class);
         TrainingDecisionService trainingDecisionService = new TrainingDecisionService(horses, schedules, groupSync);
 
         service = new CareScheduleService(
@@ -84,7 +80,7 @@ class CareSchedulePreemptionTest {
                 mock(PreventiveVaccinationService.class),
                 mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
                 mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper()
+                mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
         );
 
         when(schedules.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -93,7 +89,7 @@ class CareSchedulePreemptionTest {
     }
 
     @Test
-    @DisplayName("WF-02 §3.2: When all vets are busy, preempt least-loaded vet with ROUTINE exam to PAUSED and assign URGENT")
+    @DisplayName("WF-02 §3.2: When all vets are busy, the least-loaded vet takes the URGENT case and keeps the routine exam IN_PROGRESS")
     void preemptsLeastLoadedVetWithRoutineExam() {
         User vet1 = eligibleVet(1L); // Load: 30 mins
         User vet2 = eligibleVet(2L); // Load: 60 mins
@@ -132,7 +128,7 @@ class CareSchedulePreemptionTest {
         HorseIncidentReport incident = new HorseIncidentReport();
         incident.setId(500L);
         incident.setStatus(IncidentStatus.REPORTED);
-        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setIncidentType(IncidentType.TRAUMA);
         when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(incident));
 
         CareSchedule urgent = urgentRequest(999L, 500L);
@@ -249,7 +245,7 @@ class CareSchedulePreemptionTest {
         CareSchedule booked = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
         booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -268,7 +264,7 @@ class CareSchedulePreemptionTest {
         CareSchedule booked = activeExam(10L, 1L, 101L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
         booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         service.assignRequestedSchedule(urgentRequest(999L, 500L));
 
@@ -288,7 +284,7 @@ class CareSchedulePreemptionTest {
         CareSchedule booked = activeExam(11L, 1L, 102L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
         booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -308,7 +304,7 @@ class CareSchedulePreemptionTest {
         CareSchedule otherUrgent = activeExam(11L, 1L, 102L, CareType.URGENT, CareScheduleStatus.SCHEDULED);
         otherUrgent.setScheduledAt(LocalDateTime.now().plusMinutes(10));
         when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(otherUrgent));
-        report(IncidentSeverity.CRITICAL);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -327,7 +323,7 @@ class CareSchedulePreemptionTest {
         when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
                 current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(stale, current) : List.of(stale));
         when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -347,7 +343,7 @@ class CareSchedulePreemptionTest {
         when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
                 current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(forgotten, current) : List.of(forgotten));
         when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
-        report(IncidentSeverity.HIGH);
+        report(IncidentType.TRAUMA);
 
         CareSchedule urgent = urgentRequest(999L, 500L);
         service.assignRequestedSchedule(urgent);
@@ -357,15 +353,18 @@ class CareSchedulePreemptionTest {
     }
 
     @Test
-    @DisplayName("Ca ROUTINE bị thay bằng ca khẩn cấp: xóa ca cũ (AD-022) và báo Vet cũ")
-    void theVetOfASupersededVisitIsTold() {
-        CareSchedule routine = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+    @DisplayName("Ca ROUTINE bị ca khẩn cấp chen ngang: trả về SCHEDULED, giữ Vet và báo Vet khám tiếp")
+    void theVetOfAPausedVisitIsToldToResume() {
+        CareSchedule routine = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
 
-        service.cancelSupersededCase(routine);
+        service.interruptForUrgent(routine);
 
-        verify(schedules).delete(routine);
+        assertEquals(CareScheduleStatus.SCHEDULED, routine.getStatus());
+        assertEquals(1L, routine.getVeterinarianId());
+        assertNull(routine.getScheduledAt());
+        verify(schedules, never()).delete(any());
         verify(notifications).sendAssignmentNotification(eq(1L), any(), eq(10L), eq(101L),
-                eq(NotificationTypes.CARE_SCHEDULE_CANCELLED), any(), any());
+                eq(NotificationTypes.CARE_SCHEDULE_PAUSED), any(), any());
     }
 
     private User busyVet() {
@@ -376,11 +375,11 @@ class CareSchedulePreemptionTest {
         return vet;
     }
 
-    private HorseIncidentReport report(IncidentSeverity severity) {
+    private HorseIncidentReport report(IncidentType severity) {
         HorseIncidentReport report = new HorseIncidentReport();
         report.setId(500L);
         report.setStatus(IncidentStatus.REPORTED);
-        report.setSeverity(severity);
+        report.setIncidentType(severity);
         when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(report));
         return report;
     }

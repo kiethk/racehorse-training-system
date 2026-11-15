@@ -12,13 +12,14 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Panel, Button, Spinner, Notice, Icon, Pill } from '@/components/ui';
+import { Panel, Button, Spinner, Notice, Pill } from '@/components/ui';
+import { FormField } from '@/components/ui/FormField';
+import { Select } from '@/components/ui/Input';
+import { Table, THead, TBody, Tr, Th, Td } from '@/components/ui/Table';
 import { medicalEdaService } from '../services/medicalEdaService';
 import type {
   SurvivalStratifyBy,
   SurvivalEdaResponse,
-  SurvivalStratum,
-  KaplanMeierStep,
 } from '../types/medicalEda';
 
 const STRATUM_COLORS = [
@@ -53,6 +54,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
   }, [stratifyBy]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load; the fetch owns its loading flag
     void fetchData();
   }, [fetchData]);
 
@@ -106,32 +108,25 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
       {/* Header & Stratification Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div>
-          <div className="flex items-center gap-2">
-            <Icon name="activity" size={18} className="text-[var(--color-primary)]" />
-            <h3 className="text-base font-bold text-[var(--color-text-primary)]">
-              Injury Recovery Survival Analysis (Kaplan-Meier)
-            </h3>
-          </div>
+          <h3 className="text-base font-bold text-[var(--color-text-primary)]">
+            Injury Recovery Timeline by Treatment
+          </h3>
           <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-            Empirical product-limit estimator with right-censoring for time-to-recovery
+            Time required for horses to recover and return to full training.
           </p>
         </div>
 
         {/* Stratification Selector */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="stratify-select" className="text-xs font-semibold text-[var(--color-text-secondary)]">
-            Stratify By:
-          </label>
-          <select
+        <FormField label="Compare By" htmlFor="stratify-select" className="w-56">
+          <Select
             id="stratify-select"
             value={stratifyBy}
             onChange={(e) => setStratifyBy(e.target.value as SurvivalStratifyBy)}
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] shadow-sm focus:border-[var(--color-primary)] focus:outline-none"
           >
             <option value="TREATMENT_PLAN">Compare by Treatment Plan</option>
             <option value="BODY_ZONE">Compare by Body Zone</option>
-          </select>
-        </div>
+          </Select>
+        </FormField>
       </div>
 
       {error && (
@@ -151,7 +146,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
         </div>
       ) : !data || data.strata.length === 0 ? (
         <div className="py-12 text-center text-xs text-[var(--color-text-muted)]">
-          No injury recovery records available for survival analysis.
+          No injury recovery records available for recovery timeline analysis.
         </div>
       ) : (
         <div className="space-y-4">
@@ -162,7 +157,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                 data={chartData}
                 margin={{ top: 15, right: 30, left: 10, bottom: 20 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" opacity={0.6} />
+                <CartesianGrid vertical={false} stroke="var(--color-border, #e5e7eb)" strokeDasharray="3 3" opacity={0.4} />
 
                 <XAxis
                   dataKey="day"
@@ -184,7 +179,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                   tick={{ fontSize: 11, fill: 'var(--color-text-muted, #6b7280)' }}
                   unit="%"
                   label={{
-                    value: 'Probability Not Recovered (%)',
+                    value: 'Horses Still Recovering (%)',
                     angle: -90,
                     position: 'insideLeft',
                     fontSize: 11,
@@ -227,19 +222,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                   wrapperStyle={{ paddingBottom: '10px', fontSize: '11px' }}
                 />
 
-                {/* 50% Median Recovery Reference Line */}
-                <ReferenceLine
-                  y={50}
-                  stroke="#9ca3af"
-                  strokeDasharray="4 4"
-                  strokeWidth={1}
-                  label={{
-                    value: '50% Median Recovery Threshold',
-                    fill: '#6b7280',
-                    fontSize: 10,
-                    position: 'insideBottomRight',
-                  }}
-                />
+                
 
                 {/* Stepped lines for each stratum */}
                 {data.strata.map((stratum, idx) => (
@@ -254,24 +237,36 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                     activeDot={{ r: 5 }}
                   />
                 ))}
+                {/* 50% Median Recovery Reference Line */}
+                <ReferenceLine
+                  y={50}
+                  stroke="#9ca3af"
+                  strokeDasharray="4 4"
+                  strokeWidth={1}
+                  label={{
+                    value: 'Typical 50% Recovery Mark',
+                    fill: '#6b7280',
+                    fontSize: 10,
+                    position: 'insideBottomRight',
+                  }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           {/* Stratum Summary Table */}
-          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
-            <table className="w-full text-left text-xs text-[var(--color-text-primary)]">
-              <thead className="bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] font-semibold border-b border-[var(--color-border)]">
-                <tr>
-                  <th className="px-3 py-2">Stratum</th>
-                  <th className="px-3 py-2 text-right">Total Cases (N)</th>
-                  <th className="px-3 py-2 text-right">Recovered</th>
-                  <th className="px-3 py-2 text-right">Censored</th>
-                  <th className="px-3 py-2 text-right">Recovery Rate</th>
-                  <th className="px-3 py-2 text-right">Median Recovery Days</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
+          <Table className="text-xs">
+            <THead>
+              <Tr>
+                <Th className="px-3 py-2">{stratifyBy === 'TREATMENT_PLAN' ? 'Treatment Plan' : 'Body Zone'}</Th>
+                <Th className="px-3 py-2 text-right">Cases Under Care</Th>
+                <Th className="px-3 py-2 text-right">Recovered</Th>
+                <Th className="px-3 py-2 text-right">Still Recovering</Th>
+                <Th className="px-3 py-2 text-right">Recovery Rate</Th>
+                <Th className="px-3 py-2 text-right">Typical Recovery (Days)</Th>
+              </Tr>
+            </THead>
+            <TBody>
                 {data.strata.map((stratum, idx) => {
                   const rate =
                     stratum.totalCases > 0
@@ -280,23 +275,23 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                   const color = STRATUM_COLORS[idx % STRATUM_COLORS.length];
 
                   return (
-                    <tr key={stratum.stratumId} className="hover:bg-[var(--color-surface-subtle)]">
-                      <td className="px-3 py-2 font-medium flex items-center gap-2">
+                    <Tr key={stratum.stratumId} className="hover:bg-[var(--color-surface-subtle)]">
+                      <Td className="px-3 py-2 font-medium flex items-center gap-2">
                         <span
                           className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
                           style={{ backgroundColor: color }}
                         />
                         <span>{stratum.stratumName}</span>
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">{stratum.totalCases}</td>
-                      <td className="px-3 py-2 text-right font-mono text-emerald-600 font-semibold">
+                      </Td>
+                      <Td className="px-3 py-2 text-right font-mono">{stratum.totalCases}</Td>
+                      <Td className="px-3 py-2 text-right font-mono text-[var(--color-success)] font-semibold">
                         {stratum.recoveredCount}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-amber-600 font-semibold">
+                      </Td>
+                      <Td className="px-3 py-2 text-right font-mono text-[var(--color-warning)] font-semibold">
                         {stratum.censoredCount}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">{rate}%</td>
-                      <td className="px-3 py-2 text-right font-mono font-bold">
+                      </Td>
+                      <Td className="px-3 py-2 text-right font-mono">{rate}%</Td>
+                      <Td className="px-3 py-2 text-right font-mono font-bold">
                         {stratum.medianRecoveryDays != null ? (
                           <Pill tone="info" size="sm">
                             {stratum.medianRecoveryDays.toFixed(1)} days
@@ -304,13 +299,12 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                         ) : (
                           <span className="text-[var(--color-text-muted)] italic">Not reached (&gt;50% active)</span>
                         )}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+            </TBody>
+          </Table>
         </div>
       )}
     </Panel>

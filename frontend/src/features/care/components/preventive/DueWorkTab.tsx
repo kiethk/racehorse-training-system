@@ -115,6 +115,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     // Check if horse is in already loaded rows
     const match = rows.find((r) => r.horseId === hId);
     if (match) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the deep-linked horse's completion modal
       setCompleting(match);
       return;
     }
@@ -157,7 +158,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
       try {
         await preventiveCareService.recordForHorse(horse.horseId, {
           administeredOn: batchDate,
-          doses: horse.protocols.map((p) => ({ protocolId: p.protocolId, dosage: '' })),
+          doses: horse.protocols.map((p) => ({ protocolId: p.protocolId, dosage: 'Standard dose' })),
         });
       } catch (cause) {
         failed.push({ name: horse.horseName, message: displayError(cause, 'Could not record.') });

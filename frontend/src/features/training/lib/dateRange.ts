@@ -50,3 +50,6 @@ export function rangeLabel(preset: DatePreset, custom: DateRange, format: (date:
   if (custom.to) return `Until ${format(custom.to)}`;
   return PRESET_LABEL.ALL;
 }
+
+/** How a day is written in headings and lists: "Mon 09/11". */
+export const DAY_HEADING_FORMAT: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };

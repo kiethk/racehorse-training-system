@@ -6,7 +6,7 @@ import com.rtms.backend.medical.dto.HealthReadingRow;
 import com.rtms.backend.medical.dto.HealthTrendResponse;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.service.HorseScopeService;
+import com.rtms.backend.training.service.TrainingAccessPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,18 +40,18 @@ public class HealthTrendService {
     static final int WINDOW_DAYS = 30;
 
     private final HorseHealthMetricRepository metricRepository;
-    private final HorseScopeService scopeService;
+    private final TrainingAccessPolicy accessPolicy;
 
-    public HealthTrendService(HorseHealthMetricRepository metricRepository, HorseScopeService scopeService) {
+    public HealthTrendService(HorseHealthMetricRepository metricRepository, TrainingAccessPolicy accessPolicy) {
         this.metricRepository = metricRepository;
-        this.scopeService = scopeService;
+        this.accessPolicy = accessPolicy;
     }
 
     @Transactional(readOnly = true)
     public HealthTrendResponse getTrend(AuthenticatedUser currentUser) {
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(WINDOW_DAYS - 1L);
-        List<Long> horseIds = scopeService.horseIdsOf(currentUser);
+        List<Long> horseIds = accessPolicy.horseIdsOf(currentUser);
         List<HealthReadingRow> readings = horseIds.isEmpty()
                 ? List.of()
                 : metricRepository.findHealthReadings(horseIds, from.atStartOfDay(), to.plusDays(1).atStartOfDay());

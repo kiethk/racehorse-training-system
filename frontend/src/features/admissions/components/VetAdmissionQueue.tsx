@@ -7,6 +7,8 @@ import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 import { Icon } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
@@ -23,7 +25,6 @@ import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayou
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
-import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
 import { CareRecordDetailModal } from '@/features/care/components/CareRecordDetailModal';
@@ -58,22 +59,6 @@ function formatLabel(value: string) {
   return value.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function calculateAge(dateOfBirth: string | null | undefined): string {
-  if (!dateOfBirth) return 'Age unavailable';
-  const dob = new Date(dateOfBirth);
-  if (Number.isNaN(dob.getTime())) return 'Age unavailable';
-  const now = new Date();
-  let years = now.getFullYear() - dob.getFullYear();
-  const m = now.getMonth() - dob.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
-    years--;
-  }
-  if (years < 1) {
-    const months = Math.max(0, (now.getFullYear() - dob.getFullYear()) * 12 + now.getMonth() - dob.getMonth());
-    return `${months} mo`;
-  }
-  return `${years} yo`;
-}
 
 function getPriorityBadge(careType: CareType | undefined, purpose?: string | null) {
   const tone = getCareTypeTone(careType ?? 'ROUTINE', purpose);
@@ -84,25 +69,6 @@ function isVetStageCompleted(status: AdmissionStatus | string | null | undefined
   return status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW' || status === 'APPROVED';
 }
 
-function MedicalNoteBlock({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null | undefined;
-}) {
-  if (!value) return null;
-  return (
-    <div className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
-      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-        {label}
-      </span>
-      <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-text-primary)]">
-        {value}
-      </p>
-    </div>
-  );
-}
 
 export function VetAdmissionQueue() {
   const { user } = useAuth();
@@ -131,8 +97,9 @@ export function VetAdmissionQueue() {
   // Detail data for opened admission
   const [detail, setDetail] = useState<AdmissionDetailResponse | null>(null);
   const [documents, setDocuments] = useState<AdmissionDocument[]>([]);
-  const [metrics, setMetrics] = useState<HorseHealthMetricResponse[]>([]);
   const [careSchedules, setCareSchedules] = useState<CareSchedule[]>([]);
+  // Metrics are fetched for the record view but not rendered in this queue; the setter keeps the fetch wired.
+  const [, setMetrics] = useState<HorseHealthMetricResponse[]>([]);
   const [stallCodes, setStallCodes] = useState<Record<number, string>>({});
   const [activeTab, setActiveTab] = useState<string>('exam');
 
@@ -467,37 +434,7 @@ export function VetAdmissionQueue() {
       assignedVetId === user?.userId,
   );
 
-  const latestMetrics = metrics[0] ?? null;
-
-  const selectedHistory = useMemo(() => {
-    const list: Array<{
-      id: number;
-      label: string;
-      status: CareScheduleStatus;
-      description: string;
-      scheduledAt: string | null;
-      assignedVetId: number | null;
-      createdAt?: string;
-    }> = [];
-
-    careSchedules
-      .filter((cs) => cs.admissionId === selectedId)
-      .forEach((cs) => {
-        list.push({
-          id: cs.id,
-          label: `${formatLabel(cs.careType)} Care Schedule #${cs.id}`,
-          status: cs.status,
-          description: cs.description || `${formatLabel(cs.careType)} care schedule`,
-          scheduledAt: cs.scheduledAt || cs.scheduledDate || null,
-          assignedVetId: cs.veterinarianId ?? cs.assignedVetId ?? null,
-          createdAt: cs.createdAt,
-        });
-      });
-
-    return list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
-  }, [careSchedules, selectedId, detail]);
-
-  const handleOpenAdmission = (id: number, schedule: CareSchedule | null, _forceViewRecord = false) => {
+  const handleOpenAdmission = (id: number, schedule: CareSchedule | null) => {
     setTargetScheduleId(schedule?.id ?? null);
     setDeepLinkedSchedule(null);
     setSelectedId(id);
@@ -589,7 +526,7 @@ export function VetAdmissionQueue() {
     if (isVetApproved) {
       const targetSchedule =
         row.careSchedule?.careType === 'INITIAL' ? row.careSchedule : null;
-      handleOpenAdmission(row.admissionId, targetSchedule, true);
+      handleOpenAdmission(row.admissionId, targetSchedule);
       return;
     }
     // Examine = go straight to the examination workspace (it auto-starts the
@@ -611,7 +548,7 @@ export function VetAdmissionQueue() {
       <InfoRow label="Priority" value={selectedRow ? getPriorityBadge(selectedRow.careSchedule?.careType, selectedRow.careSchedule?.purpose).label : 'Standard'} />
       <InfoRow label="Schedule" value={currentActiveSchedule ? getScheduleStatusDisplay(currentActiveSchedule.status).label : 'Not scheduled'} />
       <InfoRow label="Quarantine stall" value={detail.quarantineStallCode || 'Not assigned'} />
-      <InfoRow label="Trainer" value={detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')} />
+      <InfoRow label="Trainer" value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'VETERINARIAN') : null}>{detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')}</EntityLink>} />
       {(currentActiveSchedule?.scheduledDate || currentActiveSchedule?.scheduledAt) && (
         <InfoRow label="Scheduled" value={formatDate((currentActiveSchedule.scheduledDate || currentActiveSchedule.scheduledAt)!)} />
       )}
@@ -637,6 +574,7 @@ export function VetAdmissionQueue() {
           options={[
             { value: 'ACTIVE', label: 'Active', count: summary.active ?? summary.total },
             { value: 'APPROVED', label: 'Approved', count: summary.approved ?? 0 },
+            { value: 'REVIEWED', label: 'Reviewed', count: summary.reviewed ?? 0 },
           ]}
         />
         <Button type="button" onClick={handleRefresh} disabled={loading} icon="refresh" variant="secondary" size="sm" className="transition-all active:scale-[0.98]">
@@ -695,9 +633,7 @@ export function VetAdmissionQueue() {
                 ? ({ label: 'View Record', icon: 'file-text' as const, primary: false })
                 : ({ label: examAction.label, icon: examAction.icon, primary: examAction.label === 'Examine' });
 
-              const rowVetId = row.careSchedule?.veterinarianId ?? row.careSchedule?.assignedVetId ?? null;
-              const isAssignedToMe = Boolean(rowVetId && user?.userId && rowVetId === user.userId);
-
+            
               return (
                 <Panel
                   key={row.careSchedule?.id ? `schedule-${row.careSchedule.id}` : `admission-${row.admissionId}`}
@@ -710,8 +646,10 @@ export function VetAdmissionQueue() {
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <HorseAvatar name={row.candidateName} image={row.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                          {row.candidateName}
+                        <div className="truncate">
+                          <EntityLink href={row.horseId ? entityHref('horse', row.horseId, 'VETERINARIAN') : null} className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                            {row.candidateName}
+                          </EntityLink>
                         </div>
                         {((status && status !== 'SCHEDULED' && status !== 'IN_PROGRESS') ||
                           Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) ||
@@ -805,7 +743,7 @@ export function VetAdmissionQueue() {
             />
           ) : (
             <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm font-semibold text-[var(--color-text-primary)]">
-              {selectedRow?.candidateName ?? 'Loading admission'}
+              <EntityLink href={selectedRow?.horseId ? entityHref('horse', selectedRow.horseId, 'VETERINARIAN') : null}>{selectedRow?.candidateName ?? 'Loading admission'}</EntityLink>
             </div>
           )}
           pipeline={detail ? <AdmissionPipeline detail={detail} /> : <DetailSkeleton />}
@@ -934,6 +872,7 @@ export function VetAdmissionQueue() {
                         asideTop={examDetailsCard}
                         onSuccess={handleReviewSuccess}
                         onDirtyChange={handleDirtyChange}
+                        documents={documents}
                       />
                     ) : (
                       <div className="p-8 text-center text-[var(--color-text-muted)]">
@@ -964,7 +903,7 @@ export function VetAdmissionQueue() {
                   {activeTab === 'documents' && (
                     <div className="grid gap-5 xl:grid-cols-2">
                       <div>
-                        <AdmissionDocumentsSection documents={documents} assetUrl={admissionsApi.assetUrl} />
+                        <AdmissionDocumentsSection documents={documents} />
                       </div>
 
                       <div className="space-y-4">

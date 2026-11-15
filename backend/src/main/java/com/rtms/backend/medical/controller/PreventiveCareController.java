@@ -1,6 +1,7 @@
 package com.rtms.backend.medical.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompletePreventiveCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreatePreventiveCareScheduleRequest;
 import com.rtms.backend.horse.entity.Horse;
@@ -44,7 +45,7 @@ public class PreventiveCareController {
 
     @PreAuthorize("hasAuthority('PREVENTIVE_CARE_VIEW')")
     @GetMapping
-    public ApiResponse<List<CareSchedule>> getUpcomingByHorse(@RequestParam Long horseId)
+    public ApiResponse<List<CareScheduleResponse>> getUpcomingByHorse(@RequestParam Long horseId)
             throws AccessDeniedException {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();

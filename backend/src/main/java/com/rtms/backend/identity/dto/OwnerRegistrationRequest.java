@@ -27,6 +27,8 @@ public class OwnerRegistrationRequest {
     @Size(max = 255, message = "Address must be at most 255 characters")
     private String address;
 
+    private String captchaToken;
+
     // Getters and Setters
 
     public String getFullName() {
@@ -67,5 +69,13 @@ public class OwnerRegistrationRequest {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getCaptchaToken() {
+        return captchaToken;
+    }
+
+    public void setCaptchaToken(String captchaToken) {
+        this.captchaToken = captchaToken;
     }
 }

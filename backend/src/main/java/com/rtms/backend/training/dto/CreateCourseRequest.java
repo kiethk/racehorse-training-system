@@ -12,8 +12,8 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * Tạo một khóa học. Chủ của khóa luôn là người đang đăng nhập (không có trainerId trong request, như CreateSubjectRequest).
- * (Creates a course. The owner is always the signed-in user, with no trainerId in the request, like CreateSubjectRequest.)
+ * Tạo một khóa học. Chủ của khóa luôn là người đang đăng nhập (không có trainerId trong request, như CreateExerciseRequest).
+ * (Creates a course. The owner is always the signed-in user, with no trainerId in the request, like CreateExerciseRequest.)
  */
 public class CreateCourseRequest {
 
@@ -29,9 +29,9 @@ public class CreateCourseRequest {
     @Max(value = TrainingLimits.MAX_COURSE_SESSIONS, message = "A course can have at most 60 sessions")
     private Integer totalSessions;
 
-    @NotEmpty(message = "Select at least one subject for the course")
-    @Size(max = TrainingLimits.MAX_COURSE_SUBJECTS, message = "A course can have at most 30 subjects")
-    private List<@NotNull(message = "A subject entry is empty") @Valid CourseSubjectItemRequest> subjects;
+    @NotEmpty(message = "Select at least one exercise for the course")
+    @Size(max = TrainingLimits.MAX_COURSE_EXERCISES, message = "A course can have at most 30 exercises")
+    private List<@NotNull(message = "An exercise entry is empty") @Valid CourseExerciseItemRequest> exercises;
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -42,6 +42,6 @@ public class CreateCourseRequest {
     public Integer getTotalSessions() { return totalSessions; }
     public void setTotalSessions(Integer totalSessions) { this.totalSessions = totalSessions; }
 
-    public List<CourseSubjectItemRequest> getSubjects() { return subjects; }
-    public void setSubjects(List<CourseSubjectItemRequest> subjects) { this.subjects = subjects; }
+    public List<CourseExerciseItemRequest> getExercises() { return exercises; }
+    public void setExercises(List<CourseExerciseItemRequest> exercises) { this.exercises = exercises; }
 }

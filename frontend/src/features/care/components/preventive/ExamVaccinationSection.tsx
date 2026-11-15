@@ -17,6 +17,7 @@ import { preventiveCareService } from '../../services/preventiveCareService';
 import type { HorsePreventiveStatus, PreventiveProtocol } from '../../types/preventive';
 import { DueStatusPill, FEVER_THRESHOLD_C, isDueForCombinedVisit, todayIso } from './preventiveDisplay';
 import { lastDoseDraft, lastDoseKey, type VaccinationDraft } from './vaccinationDrafts';
+import type { AdmissionDocument } from '@/features/admissions/types';
 
 // The draft logic lives in a plain .ts file (testable without JSX); re-exported for existing imports.
 export { toVaccinationRequests, validateVaccinationDrafts, type VaccinationDraft } from './vaccinationDrafts';
@@ -36,6 +37,8 @@ interface ExamVaccinationSectionProps {
   deferDays: number | null;
   onDeferChange: (days: number | null) => void;
   errors?: Record<string, string>;
+  documents?: AdmissionDocument[];
+  onViewDocument?: (documentId: number) => void;
 }
 
 /**
@@ -56,6 +59,8 @@ export function ExamVaccinationSection({
   deferDays,
   onDeferChange,
   errors = {},
+  documents = [],
+  onViewDocument,
 }: ExamVaccinationSectionProps) {
   const [status, setStatus] = useState<HorsePreventiveStatus | null>(null);
   const [protocols, setProtocols] = useState<PreventiveProtocol[]>([]);
@@ -138,9 +143,21 @@ export function ExamVaccinationSection({
         <Notice tone="error">{loadError}</Notice>
       ) : isAdmission ? (
         <div className="space-y-2">
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Enter the date of the last vaccination or deworming from the horse&apos;s passport. Leave it empty when there is no record.
-          </p>
+          {onViewDocument && (
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {([
+                ['VACCINATION_RECORD', 'View vaccination record'],
+                ['DEWORMING_RECORD', 'View deworming record'],
+                ['REGISTRATION_DOCUMENT', 'View passport'],
+                ['HEALTH_CERTIFICATE', 'View health certificate'],
+              ] as const).map(([type, label]) => {
+                const document = documents.find((item) => item.documentType === type);
+                return document ? (
+                  <Button key={type} type="button" variant="link" onClick={() => onViewDocument(document.id)}>{label}</Button>
+                ) : null;
+              })}
+            </div>
+          )}
           <ul className="divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
             {protocols.map((protocol) => {
               const draft = lastDoseOf(protocol.id);

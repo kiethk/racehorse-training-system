@@ -55,17 +55,17 @@ public class PreventiveCareQueryService {
 
     @Autowired
     public PreventiveCareQueryService(PreventiveProtocolRepository protocols, HorseRepository horses,
-            CareScheduleRepository schedules, PreventiveStatusService preventiveStatus) {
-        this(protocols, horses, schedules, preventiveStatus, Clock.systemDefaultZone());
-    }
-
-    PreventiveCareQueryService(PreventiveProtocolRepository protocols, HorseRepository horses,
             CareScheduleRepository schedules, PreventiveStatusService preventiveStatus, Clock clock) {
         this.protocols = protocols;
         this.horses = horses;
         this.schedules = schedules;
         this.preventiveStatus = preventiveStatus;
         this.clock = clock;
+    }
+
+    public PreventiveCareQueryService(PreventiveProtocolRepository protocols, HorseRepository horses,
+            CareScheduleRepository schedules, PreventiveStatusService preventiveStatus) {
+        this(protocols, horses, schedules, preventiveStatus, Clock.systemDefaultZone());
     }
 
     @Transactional(readOnly = true)

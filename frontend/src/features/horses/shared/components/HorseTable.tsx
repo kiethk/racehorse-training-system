@@ -2,7 +2,9 @@
 
 import { useCallback, useState, type ReactNode } from 'react';
 
-import { DataTable, HorseAvatar, Pill, StatusBadge, Tooltip } from '@/components/ui';
+import { DataTable, EntityLink, HorseAvatar, Pill, StatusBadge, Tooltip } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
+import { entityHref } from '@/lib/entityRoute';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import type { Horse } from '@/features/stable/types';
 import { HorseSpecialtyBadges } from './HorseSpecialtyBadges';
@@ -66,6 +68,7 @@ export function HorseTable({
   showSpecialty = false,
   onRowClick,
 }: HorseTableProps) {
+  const { user } = useAuth();
   const [internalSearch, setInternalSearch] = useState('');
   const activeSearch = searchValue !== undefined ? searchValue : internalSearch;
   const handleSearchChange = useCallback(
@@ -84,7 +87,7 @@ export function HorseTable({
       render: (h) => (
         <div className="flex items-center gap-2.5">
           <HorseAvatar name={h.name} image={h.imageUrl} size={32} rounded="md" />
-          <span className="font-medium text-[var(--color-text-primary)]">{h.name}</span>
+          <EntityLink href={entityHref('horse', h.id, user?.role)} className="text-[var(--color-text-primary)]">{h.name}</EntityLink>
         </div>
       ),
     },

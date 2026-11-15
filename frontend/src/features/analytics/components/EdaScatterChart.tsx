@@ -10,6 +10,7 @@ import {
   ZAxis,
   Tooltip,
   Cell,
+  CartesianGrid,
 } from 'recharts';
 import { calculateTrendLinePoints } from '../lib/edaTransform';
 
@@ -135,14 +136,14 @@ export function EdaScatterChart({
           {data.isOutlier && (
             <div className="mt-1.5 pt-1.5 border-t border-[var(--color-danger)]/30 text-[11px] text-[var(--color-danger)] space-y-0.5">
               <div className="flex justify-between items-center gap-2 font-medium">
-                <span>⚠️ Outlier:</span>
+                <span>Outlier:</span>
                 <span className="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-[var(--color-danger-subtle)] text-[var(--color-danger)]">
                   Anomaly
                 </span>
               </div>
               <div className="font-normal text-[10px] text-[var(--color-text-primary)] mt-0.5">
                 <span className="text-[var(--color-text-secondary)]">Reason: </span>
-                {data.outlierReason || 'Outlier deviation > 1.5 IQR'}
+                {data.outlierReason || 'Unusual workout reading'}
               </div>
             </div>
           )}
@@ -176,7 +177,8 @@ export function EdaScatterChart({
 
       <div className="w-full h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 15, right: 25, bottom: 30, left: 30 }}>
+          <ScatterChart margin={{ top: 15, right: 25, bottom: 40, left: 50 }}>
+            <CartesianGrid vertical={false} stroke="var(--color-border)" strokeDasharray="3 3" opacity={0.5} />
             <XAxis
               type="number"
               dataKey="x"
@@ -197,7 +199,7 @@ export function EdaScatterChart({
                 position: 'insideLeft',
                 textAnchor: 'middle',
                 style: { textAnchor: 'middle', fill: 'var(--color-text-secondary)', fontSize: 11 },
-                offset: -10,
+                offset: -35,
               }}
               tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
               tickMargin={8}

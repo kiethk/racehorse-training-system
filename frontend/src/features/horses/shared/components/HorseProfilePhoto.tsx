@@ -3,12 +3,15 @@
 import { useState } from 'react';
 import { HorseAvatar, Icon, Skeleton } from '@/components/ui';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { fileVariantUrl } from '@/lib/fileVariant';
 import { useProtectedFileUrl } from '@/lib/protectedFile';
 
 /** Protected portrait with full lightbox preview on click. */
 export function HorseProfilePhoto({ name, image }: { name: string; image?: string | null }) {
-  const { url, failed } = useProtectedFileUrl(image);
+  // The 128 px portrait uses the small copy; the original is only downloaded when the lightbox opens.
+  const { url, failed } = useProtectedFileUrl(fileVariantUrl(image, 'THUMB'));
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const { url: originalUrl } = useProtectedFileUrl(lightboxOpen ? image : null);
 
   if (image && !url && !failed) {
     return <Skeleton className="h-32 w-32 shrink-0 rounded-[var(--radius-lg)]" />;
@@ -32,7 +35,7 @@ export function HorseProfilePhoto({ name, image }: { name: string; image?: strin
 
         {lightboxOpen && (
           <ImageLightbox
-            images={[{ src: url, alt: `${name}'s official photo` }]}
+            images={[{ src: originalUrl ?? url, alt: `${name}'s official photo` }]}
             index={0}
             onIndexChange={() => undefined}
             onClose={() => setLightboxOpen(false)}

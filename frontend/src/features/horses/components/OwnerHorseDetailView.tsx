@@ -20,34 +20,31 @@ import {
 } from '@/components/ui';
 import { horseService } from '../services/horseService';
 import { trainingService } from '@/features/training/services/trainingService';
-import { racingService } from '@/features/racing/services/racingService';
 import { HorseSpecialtyBadges } from '../shared/components/HorseSpecialtyBadges';
 import { HorseOverviewPedigreeTable } from './HorseOverviewPedigreeTable';
 import { HorseHealthSummary } from './HorseHealthSummary';
-import { HorseRacingHistory } from './HorseRacingHistory';
-import { HorseAttendanceList } from '@/features/training/components/HorseAttendanceList';
-import { HorseFitnessTrendView } from '@/features/training/components/HorseFitnessTrendView';
-import { HorseScheduleView } from '@/features/training/components/HorseScheduleDialog';
+import { HorseAttendanceList } from '@/features/training/components/horses/HorseAttendanceList';
+import { HorseFitnessTrendView } from '@/features/training/components/horses/HorseFitnessTrendView';
+import { HorseScheduleView } from '@/features/training/components/schedule/HorseScheduleView';
 import { toIsoDate } from '@/features/training/lib/dateRange';
 import type { Horse } from '@/features/stable/types';
 import type { HorseDocumentSlot, HorseEditRequest, HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
 import { horseEditRequestService } from '../services/horseEditRequestService';
 import { DocumentSlotGrid } from './DocumentSlotGrid';
 import { EditHorseRequestModal, initialFields } from './EditHorseRequestModal';
+import { OwnerHorseChangeHistory } from './OwnerHorseChangeHistory';
 import { normalizeFields } from '../lib/horseEdit';
 import type { HorseDocumentType } from '../types';
 import { toast } from '@/lib/toast';
 import type { HorseAlert } from '@/features/training/types';
-import type { RaceRegistrationResponse } from '@/features/racing/types';
 import { displayError, formatDate } from '@/lib/display';
 
 const tabs: TabItem[] = [
   { id: 'overview', label: 'Overview & Pedigree', icon: 'file-text' },
   { id: 'training-schedule', label: 'Training schedule', icon: 'calendar' },
-  { id: 'training-plans', label: 'Training plans', icon: 'clipboard' },
+  { id: 'course-runs', label: 'Course runs', icon: 'clipboard' },
   { id: 'fitness-trends', label: 'Fitness & Trends', icon: 'activity' },
   { id: 'health', label: 'Health & Care', icon: 'heart-pulse' },
-  { id: 'racing', label: 'Racing History', icon: 'flag' },
 ];
 
 export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
@@ -65,12 +62,10 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
   const [healthMetrics, setHealthMetrics] = useState<HorseHealthMetric[]>([]);
   const [preventiveCare, setPreventiveCare] = useState<any[]>([]);
 
-  // Racing data
-  const [raceRegistrations, setRaceRegistrations] = useState<RaceRegistrationResponse[]>([]);
-
   // Documents and change requests
   const [documentSlots, setDocumentSlots] = useState<HorseDocumentSlot[]>([]);
   const [latestRequest, setLatestRequest] = useState<HorseEditRequest | null>(null);
+  const [changeHistory, setChangeHistory] = useState<HorseEditRequest[]>([]);
   const [editing, setEditing] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -92,9 +87,9 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         alertData,
         metricsData,
         preventiveData,
-        racingData,
         slotData,
         requestData,
+        historyData,
       ] = await Promise.all([
         horseService.getById(horseId),
         horseService.getSpecialty(horseId).catch(() => null),
@@ -102,9 +97,9 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         trainingService.getHorseAlerts(horseId).catch(() => []),
         horseService.getHealthMetrics(horseId).catch(() => []),
         horseService.getPreventiveCare(horseId).catch(() => []),
-        racingService.listMine(horseId).catch(() => []),
         horseEditRequestService.documents(horseId).catch(() => []),
         horseEditRequestService.latest(horseId).catch(() => null),
+        horseEditRequestService.listForOwner(horseId).catch(() => []),
       ]);
 
       setHorse(horseData);
@@ -113,9 +108,9 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       setAlerts(alertData);
       setHealthMetrics(metricsData);
       setPreventiveCare(preventiveData);
-      setRaceRegistrations(racingData);
       setDocumentSlots(slotData);
       setLatestRequest(requestData);
+      setChangeHistory(historyData);
     } catch (cause) {
       setError(displayError(cause, 'Unable to load horse details.'));
     } finally {
@@ -132,9 +127,11 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
     if (!latestRequest) return;
     setCancelling(true);
     try {
-      setLatestRequest(await horseEditRequestService.cancel(horseId, latestRequest.id));
+      const cancelled = await horseEditRequestService.cancel(horseId, latestRequest.id);
+      setLatestRequest(cancelled);
+      setChangeHistory((current) => current.map((request) => request.id === cancelled.id ? cancelled : request));
       setConfirmCancel(false);
-      toast.success('Change request cancelled', 'You can submit a new one at any time.');
+      toast.success('Change request cancelled');
     } catch (cause) {
       const message = displayError(cause, 'Unable to cancel the change request.');
       setConfirmCancel(false);
@@ -153,8 +150,9 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       // Details are sent unchanged, so only the documents are up for review.
       const request = await horseEditRequestService.submit(horse.id, normalizeFields(initialFields(horse, pedigree)), uploads);
       setLatestRequest(request);
+      setChangeHistory((current) => [request, ...current]);
       setPageFiles({});
-      toast.success('Documents sent for review', 'They replace the current ones once the groom approves.');
+      toast.success('Documents sent for review');
     } catch (cause) {
       toast.error('Documents not sent', displayError(cause, 'Unable to submit the documents.'));
     } finally {
@@ -275,6 +273,9 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
             {latestRequest.reviewFeedback || 'No reason was given.'}
           </Notice>
         )}
+        {latestRequest?.status === 'APPROVED' && (
+          <Notice tone="success" title="Your last change request was approved" />
+        )}
 
         {/* Veterinary Training Restriction Notice */}
         {horse.trainingDecision === 'BLOCKED' && (
@@ -323,6 +324,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
               </div>
             )}
           </Panel>
+          <OwnerHorseChangeHistory requests={changeHistory} />
         </div>
       )}
 
@@ -333,8 +335,8 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         </div>
       )}
 
-      {/* Tab 3: Training plans */}
-      {activeTab === 'training-plans' && (
+      {/* Tab 3: Course runs */}
+      {activeTab === 'course-runs' && (
         <HorseAttendanceList horseId={horse.id} />
       )}
 
@@ -352,11 +354,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         />
       )}
 
-      {/* Tab 6: Racing History */}
-      {activeTab === 'racing' && (
-        <HorseRacingHistory registrations={raceRegistrations} />
-      )}
-
       {editing && (
         <EditHorseRequestModal
           open
@@ -367,6 +364,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
           onSubmitted={(request) => {
             setEditing(false);
             setLatestRequest(request);
+            setChangeHistory((current) => [request, ...current]);
           }}
         />
       )}

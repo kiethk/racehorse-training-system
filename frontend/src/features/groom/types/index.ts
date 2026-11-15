@@ -8,6 +8,7 @@ export interface TodayTaskItem {
   endTime: string | null;
   horseId: number;
   horseName: string;
+  stallCode?: string | null;
   title: string;
   note: string | null;
   status: TaskStatus;
@@ -22,7 +23,7 @@ export interface TodayTaskItem {
   completionPhotoUrls?: string[];
 }
 
-export type IncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type IncidentType = 'PROBLEM' | 'TRAUMA';
 /**
  * Must match enums/IncidentStatus.java and the chk_incident_status constraint
  * in migration V45. A mismatch causes a 400 response when filtering by status;
@@ -42,7 +43,7 @@ export interface IncidentReport {
   title: string;
   description: string;
   imageUrl: string | null;
-  severity: IncidentSeverity;
+  incidentType: IncidentType;
   status: IncidentStatus;
   handledById?: number | null;
   handlerId?: number | null;
@@ -56,5 +57,5 @@ export interface CreateIncidentRequest {
   horseId: number;
   title: string;
   description: string;
-  severity: IncidentSeverity;
+  incidentType: IncidentType;
 }

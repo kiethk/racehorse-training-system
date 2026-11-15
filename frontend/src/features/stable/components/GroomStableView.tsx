@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   Button,
@@ -33,6 +34,7 @@ function isDone(task: TodayTaskItem) {
 
 /** The Groom's view of the stable: where their horses are and what each still needs today. */
 export function GroomStableView() {
+  const stallCode = useSearchParams().get('stall');
   const { user } = useAuth();
   const [areas, setAreas] = useState<Area[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
@@ -42,6 +44,13 @@ export function GroomStableView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStallId, setSelectedStallId] = useState<number | null>(null);
+  const appliedStallCode = useRef<string | null>(null);
+  useEffect(() => {
+    if (!stallCode || loading || appliedStallCode.current === stallCode) return;
+    const stall = stalls.find((item) => item.stallCode === stallCode);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stall) { appliedStallCode.current = stallCode; setSelectedStallId(stall.id); }
+  }, [stallCode, loading, stalls]);
   const [specialty, setSpecialty] = useState<{ horseId: number; value: HorseSpecialty } | null>(null);
 
   const loadAll = useCallback(async () => {

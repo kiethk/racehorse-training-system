@@ -163,7 +163,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerGroups",
-                        "Tra cứu các Nhóm huấn luyện (Training Group) của HLV: mỗi nhóm tối đa 6 ngựa ra sân cùng nhau, gồm danh sách ngựa kèm Groom, khóa đang chạy hoặc sắp chạy (Group Plan) và thời gian; kèm danh sách nhóm đã giải tán (Disbanded) với những ngựa có mặt lúc giải tán. Dùng khi hỏi nhóm nào có những ngựa nào, ngựa X thuộc nhóm nào, nhóm nào đang rảnh.",
+                        "Tra cứu các Nhóm huấn luyện (Training Group) của HLV: mỗi nhóm tối đa 6 ngựa ra sân cùng nhau, gồm danh sách ngựa kèm Groom, khóa đang chạy hoặc sắp chạy (Course Run) và thời gian; kèm danh sách nhóm đã giải tán (Disbanded) với những ngựa có mặt lúc giải tán. Dùng khi hỏi nhóm nào có những ngựa nào, ngựa X thuộc nhóm nào, nhóm nào đang rảnh.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -194,7 +194,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerPlansSummary",
-                        "Tra cứu các khóa (Group Plan) mà ngựa của HLV đã và đang tham gia, mỗi dòng một ngựa một khóa: Tên khóa, Nhóm, Mục tiêu, Trạng thái phần của con ngựa và Attendance X/Y (số buổi đã chạy trên tổng số buổi không bị hủy cả buổi), giống màn hình lịch sử huấn luyện.",
+                        "Tra cứu các khóa (Course Run) mà ngựa của HLV đã và đang tham gia, mỗi dòng một ngựa một khóa: Tên khóa, Nhóm, Mục tiêu, Trạng thái phần của con ngựa và Attendance X/Y (số buổi đã chạy trên tổng số buổi không bị hủy cả buổi), giống màn hình lịch sử huấn luyện.",
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Trạng thái kế hoạch (ACTIVE, UPCOMING, COMPLETED)"),
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
@@ -219,27 +219,9 @@ public class DynamicToolRegistryService {
                         ))
                 ),
                 new AiToolDefinition(
-                        "checkGroomConflict",
-                        "Kiểm tra quy tắc BR-09 trước khi giao một Groom cho một ngựa: liệt kê các buổi sắp tới mà Groom đó đã dắt một ngựa khác trong cùng Nhóm huấn luyện (một Groom chỉ dắt một ngựa mỗi nhóm).",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)"),
-                                "groomId", Map.of("type", "integer", "description", "ID của Groom cần kiểm tra"),
-                                "date", Map.of("type", "string", "description", "Ngày bắt đầu kiểm tra (YYYY-MM-DD, mặc định hôm nay)")
-                        ))
-                ),
-                new AiToolDefinition(
                         "getTrainerAssignedGrooms",
                         "Tra cứu danh sách nhân viên Groom phụ trách các khu vực/chuồng thuộc quản lý của huấn luyện viên bao gồm thông tin liên hệ (số điện thoại, email), các chuồng phụ trách và ngựa đang chăm sóc.",
                         buildParamSchema(Map.of())
-                ),
-                new AiToolDefinition(
-                        "getMyHorseRaceRegistrations",
-                        "Tra cứu các lượt đăng ký giải đua của ngựa thuộc quyền quản lý của HLV, xem trạng thái phê duyệt (PROPOSED, CONFIRMED, REJECTED).",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
-                        ))
                 ),
                 new AiToolDefinition(
                         "getAssignedAdmissionReviews",

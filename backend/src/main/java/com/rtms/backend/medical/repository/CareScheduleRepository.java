@@ -65,11 +65,12 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     @Query(value = """
             SELECT cs.* FROM care_schedule cs
             LEFT JOIN horse_incident_reports gir ON gir.id = cs.source_incident_id
-            WHERE cs.status = 'SCHEDULED' AND cs.veterinarian_id IS NULL
+            WHERE cs.status = 'SCHEDULED'
+              AND (cs.veterinarian_id IS NULL OR (cs.scheduled_date IS NULL AND cs.scheduled_at IS NULL))
               AND (cs.care_type IN ('URGENT', 'INITIAL') OR cs.requested_at IS NULL OR cs.requested_at < :horizon)
             ORDER BY CASE cs.care_type WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
                      CASE WHEN cs.care_type = 'URGENT' THEN
-                       CASE gir.severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END
+                       CASE gir.severity WHEN 'TRAUMA' THEN 0 WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END
                      ELSE 0 END,
                      cs.created_at ASC, cs.id ASC
             LIMIT :batchSize
@@ -123,23 +124,13 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND (cs.scheduledDate IS NOT NULL OR cs.scheduledAt IS NOT NULL)")
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
 
-    /** D1 auto-activate: mọi ca SCHEDULED đã đến giờ (job chạy trong 08:00–17:00). */
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE CareSchedule cs SET cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.IN_PROGRESS, "
-            + "cs.updatedAt = :now "
-            + "WHERE cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED "
-            + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
-            + "com.rtms.backend.medical.enums.CareType.ROUTINE, "
-            + "com.rtms.backend.medical.enums.CareType.URGENT) "
-            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
-    int autoActivateDueSchedules(@Param("now") LocalDateTime now);
 
-    /** D1 EOD rollover: INITIAL/ROUTINE chưa hoàn tất còn nằm ở giờ đã qua. */
+    /** D1 EOD rollover: INITIAL/ROUTINE chưa hoàn tất của những ngày ĐÃ QUA (< now date, sau 00:00). */
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "
             + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
             + "com.rtms.backend.medical.enums.CareType.ROUTINE) "
-            + "AND ((cs.scheduledDate IS NOT NULL AND cs.scheduledDate <= cast(:now as date)) "
-            + "     OR (cs.scheduledDate IS NULL AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now))")
+            + "AND ((cs.scheduledDate IS NOT NULL AND cs.scheduledDate < cast(:now as date)) "
+            + "     OR (cs.scheduledDate IS NULL AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt < :now))")
     List<CareSchedule> findRollableEodCandidates(@Param("statuses") Collection<CareScheduleStatus> statuses,
             @Param("now") LocalDateTime now);
 
@@ -228,7 +219,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
                OR (:scheduleStatus IS NULL
-                   AND (:admissionStatus IS NOT NULL OR :pill = 'APPROVED' OR cs.status <> 'COMPLETED')))
+                   AND (:admissionStatus IS NOT NULL OR :pill IN ('REVIEWED', 'APPROVED') OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
@@ -262,6 +253,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
                        com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
                        com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
                        com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'REVIEWED' AND cs.status = 'COMPLETED')
                OR (:pill = 'APPROVED'
                    AND ((cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
                          AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.REJECTED
@@ -297,7 +289,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
                OR (:scheduleStatus IS NULL
-                   AND (:admissionStatus IS NOT NULL OR :pill = 'APPROVED' OR cs.status <> 'COMPLETED')))
+                   AND (:admissionStatus IS NOT NULL OR :pill IN ('REVIEWED', 'APPROVED') OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
@@ -331,6 +323,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
                        com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
                        com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
                        com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'REVIEWED' AND cs.status = 'COMPLETED')
                OR (:pill = 'APPROVED'
                    AND ((cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
                          AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.REJECTED
@@ -393,6 +386,13 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     """)
     long countApprovedVetQueueItems(@Param("vetId") Long vetId, @Param("statuses") Collection<CareScheduleStatus> statuses);
 
+    @Query("""
+        SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a, CandidateHorseProfile c
+        WHERE cs.admissionId = a.id AND c.admissionId = a.id AND cs.veterinarianId = :vetId
+          AND cs.status = 'COMPLETED'
+    """)
+    long countReviewedVetQueueItems(@Param("vetId") Long vetId);
+
 
     boolean existsByHorseIdAndStatusInAndIdNot(Long horseId, Collection<CareScheduleStatus> statuses, Long id);
 
@@ -418,4 +418,13 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             """)
     LocalDateTime findNextExamTime(@Param("horseId") Long horseId,
                                    @Param("statuses") Collection<CareScheduleStatus> statuses);
+    @Query("""
+            SELECT cs FROM CareSchedule cs
+            WHERE cs.veterinarianId IS NOT NULL
+              AND (cs.scheduledDate >= :sinceDate OR (cs.scheduledDate IS NULL AND cs.createdAt >= :sinceDateTime))
+            ORDER BY cs.scheduledDate ASC, cs.id ASC
+            """)
+    List<CareSchedule> findAssignedSchedulesSince(
+            @Param("sinceDate") java.time.LocalDate sinceDate,
+            @Param("sinceDateTime") java.time.LocalDateTime sinceDateTime);
 }

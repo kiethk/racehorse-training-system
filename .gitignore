@@ -2,8 +2,10 @@
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
 
-# Frontend (Next.js)
+# Frontend & Node
+node_modules/
 frontend/node_modules/
+test-results/
 **/.next/
 pnpm-lock.yaml
 pnpm-workspace.yaml
@@ -39,11 +41,11 @@ artifacts/
 ui-reference/
 tutorials/
 docs/
+docs/bmad/
 !backend/docs/
 backend/docs/*
 !backend/docs/CLOUD_DEMO_SEED.md
 !backend/docs/HORSE_SEX.md
-!backend/docs/LOCAL_DEMO_SEED.md
 !backend/docs/STABLE_AREA_LIFECYCLE.md
 .codex/
 uploads/

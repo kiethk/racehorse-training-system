@@ -25,7 +25,7 @@ export interface HorseFilterBarProps<S extends string = HorseStatus> {
   searchPlaceholder?: string;
   status: S | '';
   onStatusChange: (status: S | '') => void;
-  /** Statuses in the dropdown; defaults to the horse statuses (another list of horses passes its own, e.g. plan status). */
+  /** Statuses in the dropdown; defaults to the horse statuses (another list of horses passes its own, e.g. course run status). */
   statusOptions?: StatusOption<S>[];
   onApply: () => void;
   onClear: () => void;

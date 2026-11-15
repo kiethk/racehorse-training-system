@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button, ConfirmDialog, EmptyState, FilterBar, IconButton, LinkButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SearchInput, SegmentedControl, Tabs } from '@/components/ui';
 import type { Area, AreaType, StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff } from '../types/manager';
@@ -24,6 +25,12 @@ export function ManagerStableView() {
 }
 
 function ManagerStableContent() {
+  const searchParams = useSearchParams();
+  const stallCode = searchParams.get('stall');
+  const targetAreaId = searchParams.get('areaId') ? Number(searchParams.get('areaId')) : null;
+  const targetStallId = searchParams.get('stallId') ? Number(searchParams.get('stallId')) : null;
+  const targetStallCode = searchParams.get('stallCode')?.trim() || null;
+
   const state = useManagerStable();
   const { data, draft, setDraft, loading, saving, creating, deleting, loadError, actionError, needsReload,
     reload, discard, save, addArea, deleteArea, setActionError } = state;
@@ -37,10 +44,22 @@ function ManagerStableContent() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
+  const appliedStallCode = useRef<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   // Cards hold the drag-and-drop staffing; the map shows the same (draft) state as a plan or 3D barn.
   const [layout, setLayout] = useState<'cards' | 'map'>('cards');
+  useEffect(() => {
+    if (!stallCode || !data || appliedStallCode.current === stallCode) return;
+    const stall = data.stalls.find((item) => item.stallCode === stallCode);
+    if (!stall) return;
+    appliedStallCode.current = stallCode;
+    const area = data.areas.find((item) => item.id === stall.areaId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (area) setActiveTab(area.type);
+    setSelectedStall(stall);
+    setLayout('map');
+  }, [stallCode, data]);
   const count = data && draft ? editCount(data, draft) : 0;
   const dirty = count > 0;
   const busy = loading || saving || creating || deleting;
@@ -99,8 +118,57 @@ function ManagerStableContent() {
   if (data && draft && dragging?.source) {
     try { planAssignment(data, draft, dragging.source, null); canReturn = true; } catch { /* A staffed occupied block can only be swapped. */ }
   }
+  useEffect(() => {
+    if (!data) return;
+
+    if (targetStallId || targetStallCode) {
+      const stall = data.stalls.find(
+        (s) =>
+          (targetStallId && s.id === targetStallId) ||
+          (targetStallCode && s.stallCode.toLowerCase() === targetStallCode.toLowerCase())
+      );
+      if (stall) {
+        const area = data.areas.find((a) => a.id === stall.areaId);
+        if (area && area.type !== activeTab) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setActiveTab(area.type);
+        }
+        setSelectedStall(stall);
+        const timer = setTimeout(() => {
+          const el = document.getElementById(`stall-cell-${stall.id}`) || document.getElementById(`area-card-${stall.areaId}`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 200);
+        return () => clearTimeout(timer);
+      } else {
+        toast.info(`Stall #${targetStallId || targetStallCode} was not found.`);
+      }
+    }
+
+    if (targetAreaId) {
+      const area = data.areas.find((a) => a.id === targetAreaId);
+      if (area) {
+        if (area.type !== activeTab) {
+          setActiveTab(area.type);
+        }
+        const timer = setTimeout(() => {
+          const el = document.getElementById(`area-card-${targetAreaId}`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 200);
+        return () => clearTimeout(timer);
+      } else {
+        toast.info(`Area #${targetAreaId} was removed or does not exist.`);
+      }
+    }
+  }, [data, targetAreaId, targetStallId, targetStallCode]);
+
   const highlightedStallIds = useMemo(() => {
     const ids = new Set<number>();
+    if (targetStallId) ids.add(targetStallId);
+    if (targetStallCode && data) {
+      const found = data.stalls.find((s) => s.stallCode.toLowerCase() === targetStallCode.toLowerCase());
+      if (found) ids.add(found.id);
+    }
+    if (selectedStall) ids.add(selectedStall.id);
     const q = search.trim().toLowerCase();
     if (!q || !data) return ids;
     data.stalls.forEach(stall => {
@@ -112,10 +180,10 @@ function ManagerStableContent() {
       }
     });
     return ids;
-  }, [search, data, horses]);
+  }, [search, data, horses, targetStallId, targetStallCode]);
 
   const displayed = useMemo(() => {
-    let list = attentionOnly ? views.filter(v => v.attention > 0) : views;
+    const list = attentionOnly ? views.filter(v => v.attention > 0) : views;
     const q = search.trim().toLowerCase();
     if (!q || !data) return list;
     return list.filter(v => {
@@ -275,7 +343,10 @@ function ManagerStableContent() {
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_15rem]">
           <div className="min-w-0">
             {displayed.length ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {displayed.map(view => <AreaCard key={view.area.id} view={view} data={data} draft={draft} horses={horses} highlightedStallIds={highlightedStallIds}
+              {displayed.map(view => <AreaCard key={view.area.id} view={view} data={data} draft={draft} horses={horses}
+                highlightedStallIds={highlightedStallIds}
+                isAreaHighlighted={targetAreaId === view.area.id}
+                selectedStallId={selectedStall?.id}
                 disabled={editDisabled} onPick={pick}
                 onDelete={() => guard(() => { cancelDrag(); setSelectedStaff(null); setActionError(null); setDeleteTarget(view.area); })}
                 onAssign={assign} onRemove={target => propose(target, null)} onSelectStall={setSelectedStall} />)}

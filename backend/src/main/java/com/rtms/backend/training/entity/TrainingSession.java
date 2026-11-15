@@ -19,7 +19,7 @@ import java.time.LocalTime;
 /**
  * Một lần nhóm ra sân trong một ngày, chạy một bài. trainerId được lặp lại từ kế hoạch để DB chặn hai buổi của cùng một
  * Trainer chồng giờ bằng một ràng buộc loại trừ.
- * (One outing of a group on one day, running one Subject. trainerId is repeated from the plan so the DB can refuse two
+ * (One outing of a group on one day, running one Exercise. trainerId is repeated from the course run so the DB can refuse two
  * overlapping Sessions of one Trainer with an exclusion constraint.)
  */
 @Entity
@@ -30,11 +30,11 @@ public class TrainingSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "group_plan_id", nullable = false)
-    private Long groupPlanId;
+    @Column(name = "course_run_id", nullable = false)
+    private Long courseRunId;
 
-    @Column(name = "subject_id", nullable = false)
-    private Long subjectId;
+    @Column(name = "exercise_id", nullable = false)
+    private Long exerciseId;
 
     @Column(name = "trainer_id", nullable = false)
     private Long trainerId;
@@ -83,11 +83,11 @@ public class TrainingSession {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Long getGroupPlanId() { return groupPlanId; }
-    public void setGroupPlanId(Long groupPlanId) { this.groupPlanId = groupPlanId; }
+    public Long getCourseRunId() { return courseRunId; }
+    public void setCourseRunId(Long courseRunId) { this.courseRunId = courseRunId; }
 
-    public Long getSubjectId() { return subjectId; }
-    public void setSubjectId(Long subjectId) { this.subjectId = subjectId; }
+    public Long getExerciseId() { return exerciseId; }
+    public void setExerciseId(Long exerciseId) { this.exerciseId = exerciseId; }
 
     public Long getTrainerId() { return trainerId; }
     public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }

@@ -1,5 +1,6 @@
 package com.rtms.backend.incident.controller;
 
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.incident.dto.CreateIncidentReportRequest;
 import com.rtms.backend.incident.dto.HandleIncidentRequest;
@@ -87,8 +88,9 @@ public class HorseIncidentReportController {
     @PreAuthorize("hasAuthority('GROOM_INCIDENT_REPORT_VIEW')")
     public ResponseEntity<Resource> getImage(
             @PathVariable Long id,
+            @RequestParam(required = false) FileVariant size,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        Resource file = incidentReportService.loadImage(id, currentUser);
+        Resource file = incidentReportService.loadImage(id, currentUser, size);
         return ResponseEntity.ok()
                 .contentType(incidentReportService.imageMediaType(id, currentUser))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=incident-" + id)

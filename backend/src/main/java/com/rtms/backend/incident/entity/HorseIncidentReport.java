@@ -1,7 +1,7 @@
 package com.rtms.backend.incident.entity;
 
-import com.rtms.backend.incident.enums.IncidentSeverity;
 import com.rtms.backend.incident.enums.IncidentStatus;
+import com.rtms.backend.incident.enums.IncidentType;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -33,8 +33,8 @@ public class HorseIncidentReport {
     private String imageUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 50)
-    private IncidentSeverity severity = IncidentSeverity.MEDIUM;
+    @Column(name = "severity", length = 50)
+    private IncidentType incidentType = IncidentType.PROBLEM;
 
     @Column(name = "reported_at")
     private LocalDateTime reportedAt;
@@ -57,6 +57,18 @@ public class HorseIncidentReport {
     @Transient
     private String handlerName;
 
+    /** Tên người gửi báo cáo (reportedById). Chỉ để trả ra API, không lưu DB. (Reporter's name, API only.) */
+    @Transient
+    private String reportedByName;
+
+    public String getReportedByName() {
+        return reportedByName;
+    }
+
+    public void setReportedByName(String reportedByName) {
+        this.reportedByName = reportedByName;
+    }
+
     /** Tên ngựa, vì Groom không còn thấy ngựa đã rời chuồng của mình. Chỉ để trả ra API, không lưu DB. */
     @Transient
     private String horseName;
@@ -73,12 +85,12 @@ public class HorseIncidentReport {
     }
 
     public HorseIncidentReport(Long reportedById, Long horseId, String title, String description,
-                               IncidentSeverity severity) {
+                               IncidentType incidentType) {
         this.reportedById = reportedById;
         this.horseId = horseId;
         this.title = title;
         this.description = description;
-        this.severity = severity != null ? severity : IncidentSeverity.MEDIUM;
+        this.incidentType = incidentType != null ? incidentType : IncidentType.PROBLEM;
         this.reportedAt = LocalDateTime.now();
         this.status = IncidentStatus.REPORTED;
     }
@@ -150,12 +162,12 @@ public class HorseIncidentReport {
         this.imageUrl = imageUrl;
     }
 
-    public IncidentSeverity getSeverity() {
-        return severity;
+    public IncidentType getIncidentType() {
+        return incidentType;
     }
 
-    public void setSeverity(IncidentSeverity severity) {
-        this.severity = severity;
+    public void setIncidentType(IncidentType incidentType) {
+        this.incidentType = incidentType;
     }
 
     public LocalDateTime getReportedAt() {

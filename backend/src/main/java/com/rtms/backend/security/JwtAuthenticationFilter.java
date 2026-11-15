@@ -1,6 +1,7 @@
 package com.rtms.backend.security;
 
 import com.rtms.backend.identity.repository.RoleRepository;
+import com.rtms.backend.identity.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,10 +23,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, RoleRepository roleRepository) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, RoleRepository roleRepository, UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
         this.roleRepository = roleRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -40,22 +43,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String role = claims.get("role", String.class);
             Long userId = claims.get("userId", Number.class).longValue();
 
-            AuthenticatedUser authenticatedUser = new AuthenticatedUser(userId, email, role);
+            if (userRepository.existsByIdAndIsActiveTrue(userId)) {
+                AuthenticatedUser authenticatedUser = new AuthenticatedUser(userId, email, role);
 
-            List<GrantedAuthority> authorities = roleRepository.findByName(role)
-                    .map(r -> {
-                        List<GrantedAuthority> auths = r.getPermissions().stream()
-                                .map(p -> (GrantedAuthority) new SimpleGrantedAuthority(p.getCode()))
-                                .collect(Collectors.toList());
-                        if (role != null) {
-                            auths.add(new SimpleGrantedAuthority("ROLE_" + role));
-                        }
-                        return auths;
-                    })
-                    .orElseGet(() -> role != null ? List.of(new SimpleGrantedAuthority("ROLE_" + role)) : List.of());
+                List<GrantedAuthority> authorities = roleRepository.findByName(role)
+                        .map(r -> {
+                            List<GrantedAuthority> auths = (r.getPermissions() != null ? r.getPermissions().stream() : java.util.stream.Stream.<com.rtms.backend.identity.entity.Permission>empty())
+                                    .map(p -> (GrantedAuthority) new SimpleGrantedAuthority(p.getCode()))
+                                    .collect(Collectors.toList());
+                            if (role != null) {
+                                auths.add(new SimpleGrantedAuthority("ROLE_" + role));
+                            }
+                            return auths;
+                        })
+                        .orElseGet(() -> role != null ? List.of(new SimpleGrantedAuthority("ROLE_" + role)) : List.of());
 
-            var authentication = new UsernamePasswordAuthenticationToken(authenticatedUser, null, authorities);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                var authentication = new UsernamePasswordAuthenticationToken(authenticatedUser, null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
 
         filterChain.doFilter(request, response);

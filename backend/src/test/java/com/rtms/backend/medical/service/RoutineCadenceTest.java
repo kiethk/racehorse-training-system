@@ -5,6 +5,7 @@ import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.config.ClientTimeContext;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -24,12 +25,16 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,8 +48,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -82,7 +87,7 @@ class RoutineCadenceTest {
     @Mock ApplicationEventPublisher events;
     @Mock EntityManager entityManager;
     @Mock NotificationService notifications;
-    @Mock GroupWorkoutSyncService workouts;
+    @Mock TrainingGroupService workouts;
     @Mock PreventiveVaccinationService vaccinations;
 
     private CareScheduleService service;
@@ -94,9 +99,9 @@ class RoutineCadenceTest {
         service = new CareScheduleService(schedules, horses, healthRecords, metrics, admissions, stalls, users,
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper());
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -196,8 +201,8 @@ class RoutineCadenceTest {
     // ---- 4. INITIAL / URGENT không nối chuỗi ----
 
     @Test
-    @DisplayName("Ca INITIAL hoàn tất không có lịch khám lại -> không tạo lịch AUTO")
-    void initialExamDoesNotChain() {
+    @DisplayName("Ca INITIAL hoàn tất bắt buộc có lịch khám lại; chỉ tạo đúng lịch Vet đặt, không nối AUTO")
+    void initialExamRequiresFollowUpAndDoesNotChain() {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
         exam.setCareType(CareType.INITIAL);
         exam.setAdmissionId(500L);
@@ -206,12 +211,38 @@ class RoutineCadenceTest {
         admission.setHorseId(horse.getId());
         admission.setStatus(AdmissionStatus.VET_REVIEW);
         when(admissions.findByIdForUpdate(500L)).thenReturn(Optional.of(admission));
+        when(admissions.findById(500L)).thenReturn(Optional.of(admission));
         stubCompletion(exam);
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(3)));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
-        verify(schedules, never()).saveAndFlush(any());
+        verify(schedules, times(1)).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Ca INITIAL không có lịch khám lại -> 400 FOLLOW_UP_REQUIRED")
+    void initialExamWithoutFollowUpIsRejected() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        exam.setCareType(CareType.INITIAL);
+        exam.setAdmissionId(500L);
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(500L);
+        admission.setHorseId(horse.getId());
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+        when(admissions.findByIdForUpdate(500L)).thenReturn(Optional.of(admission));
+        when(admissions.findById(500L)).thenReturn(Optional.of(admission));
+        stubCompletion(exam);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+        assertEquals("FOLLOW_UP_REQUIRED", error.getErrorCode());
+        verify(healthRecords, never()).save(any());
     }
 
     @Test
@@ -275,6 +306,42 @@ class RoutineCadenceTest {
         verify(vaccinations).refreshMilestone(horse.getId(), 999L, vet.getId(), CareType.ROUTINE);
     }
 
+    @Test
+    @DisplayName("Ca ROUTINE có ngày hẹn ở tương lai -> bị từ chối 400 ROUTINE_EXAM_TOO_EARLY")
+    void routineExamInTheFutureIsRejected() {
+        CareSchedule exam = routineExam(CareScheduleStatus.SCHEDULED);
+        exam.setScheduledDate(LocalDate.now().plusDays(2));
+        stubCompletion(exam);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+        assertEquals("ROUTINE_EXAM_TOO_EARLY", error.getErrorCode());
+        verify(healthRecords, never()).save(any());
+    }
+
+    @AfterEach
+    void clearClientTime() {
+        ClientTimeContext.clear();
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE quá hạn (ngày hẹn trong quá khứ) -> được phép hoàn tất")
+    void routineExamOverdueIsAccepted() {
+        // The exam window follows the client clock; pin it inside 13:30-15:30 so this
+        // test stays deterministic when the suite runs outside the window.
+        ClientTimeContext.set(LocalDateTime.now().withHour(14).withMinute(0).withSecond(0).withNano(0));
+        CareSchedule exam = routineExam(CareScheduleStatus.SCHEDULED);
+        exam.setScheduledDate(LocalDate.now().minusDays(2));
+        stubCompletion(exam);
+
+        var response = service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+
+        assertEquals(CareScheduleStatus.COMPLETED, response.status());
+        verify(healthRecords).save(any());
+    }
+
     // ---- helpers ----
 
     private CareSchedule routineExam(CareScheduleStatus status) {
@@ -300,6 +367,14 @@ class RoutineCadenceTest {
         when(horses.findTrainerIdByHorseId(horse.getId())).thenReturn(Optional.empty());
     }
 
+    private static CreateNextScheduleRequest nextFollowUp(LocalDateTime at) {
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledAt(at.withSecond(0).withNano(0));
+        next.setDescription("Incident follow-up");
+        return next;
+    }
+
     private static CompleteCareScheduleRequest request(TrainingDecision decision) {
         CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
         req.setFindings("Examined");
@@ -317,18 +392,35 @@ class RoutineCadenceTest {
     }
 
     @Test
-    @DisplayName("Ca ROUTINE từ báo cáo sự cố: ngựa sốt vẫn hoàn tất được và không tự nối lịch 14 ngày")
+    @DisplayName("Ca ROUTINE từ báo cáo sự cố: bắt buộc đặt lịch kế tiếp, không tự nối thêm lịch 14 ngày")
     void incidentVisitAcceptsAbnormalVitalsAndDoesNotChain() {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
         exam.setSourceIncidentId(700L);
         stubCompletion(exam);
         CompleteCareScheduleRequest fever = request(TrainingDecision.ALLOWED);
         fever.getMetrics().get(0).setTemperature(BigDecimal.valueOf(39.2));
+        fever.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(7)));
 
         service.completeCareSchedule(exam.getId(), fever, vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
-        verify(schedules, never()).saveAndFlush(any(CareSchedule.class));
+        // Đúng 1 lịch do Vet đặt; auto-cadence 14 ngày không áp cho ca từ sự cố.
+        verify(schedules, times(1)).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE từ báo cáo sự cố không có lịch kế tiếp bị từ chối 400 FOLLOW_UP_REQUIRED")
+    void incidentVisitWithoutFollowUpIsRejected() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        exam.setSourceIncidentId(700L);
+        stubCompletion(exam);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+        assertEquals("FOLLOW_UP_REQUIRED", error.getErrorCode());
+        verify(healthRecords, never()).save(any());
     }
 
     @Test
@@ -362,7 +454,10 @@ class RoutineCadenceTest {
 
         horse.setTrainingDecisionReason("Box rest");
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(7)));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         org.mockito.ArgumentCaptor<HealthRecord> record = org.mockito.ArgumentCaptor.forClass(HealthRecord.class);
@@ -379,7 +474,10 @@ class RoutineCadenceTest {
         exam.setSourceIncidentId(700L);
         stubCompletion(exam);
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextFollowUp(LocalDateTime.now().plusDays(7)));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }

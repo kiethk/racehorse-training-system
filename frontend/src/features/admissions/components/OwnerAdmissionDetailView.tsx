@@ -16,6 +16,7 @@ import { AdmissionInfoSection, AdmissionSideCard, InfoGroupTitle, InfoRow } from
 import { EditAdmissionModal } from './EditAdmissionModal';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { ArrivalPhotosBlock } from '../shared/components/ArrivalPhotosBlock';
 
 const reviewFeedback = [
   { label: 'Groom', field: 'groomFeedback', stage: 0 },
@@ -24,18 +25,6 @@ const reviewFeedback = [
   { label: 'Manager', field: 'managerFeedback', stage: 6 },
 ] as const;
 
-function currentReviewStage(status: OwnerAdmissionDetail['status']): number | null {
-  switch (status) {
-    case 'GROOM_REVIEW': return 0;
-    case 'WAITING_FOR_STALL': return 1;
-    case 'WAITING_FOR_ARRIVAL': return 2;
-    case 'ARRIVAL_EXPIRED': return 3;
-    case 'VET_REVIEW': return 4;
-    case 'TRAINER_REVIEW': return 5;
-    case 'MANAGER_REVIEW': return 6;
-    default: return null;
-  }
-}
 
 export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId: number; created: boolean }) {
   const { user } = useAuth();
@@ -148,7 +137,7 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
                 id: 'documents',
                 label: 'Documents',
                 count: detail.documents.length,
-                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+                content: <AdmissionDocumentsSection documents={detail.documents} />,
               },
               {
                 id: 'history',
@@ -184,6 +173,7 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
                             {detail.arrivedAt && (
                               <InfoRow label="Checked In At" value={formatDateTime(detail.arrivedAt)} />
                             )}
+                            {detail.arrivedAt && <ArrivalPhotosBlock documents={detail.documents} />}
                             <InfoRow
                               label="Groom Notes"
                               value={detail.groomFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}

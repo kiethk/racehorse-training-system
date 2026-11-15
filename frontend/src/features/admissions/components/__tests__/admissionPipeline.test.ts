@@ -176,6 +176,26 @@ describe('AdmissionPipeline Mapper Unit Tests (6 Steps)', () => {
     }
   });
 
+  it('9b. REJECTED by Vet: Vet Review marked rejected, message cites Veterinary Review, later steps pending', () => {
+    const res = mapAdmissionPipeline({
+      status: 'REJECTED',
+      submittedAt: '2026-10-01T08:00:00Z',
+      groomReviewedAt: '2026-10-01T09:00:00Z',
+      groomDecision: 'APPROVED',
+      arrivedAt: '2026-10-02T10:00:00Z',
+      vetReviewedAt: '2026-10-03T11:00:00Z',
+    });
+
+    assert.equal(res.isRejected, true);
+    assert.match(res.rejectionMessage ?? '', /Veterinary Review/);
+    assert.equal(res.steps[0].state, 'completed');
+    assert.equal(res.steps[1].state, 'completed');
+    assert.equal(res.steps[2].state, 'completed');
+    assert.equal(res.steps[3].state, 'rejected');
+    assert.equal(res.steps[4].state, 'pending');
+    assert.equal(res.steps[5].state, 'pending');
+  });
+
   it('10. REJECTED by Manager: Manager Review marked rejected, message cites Manager Review', () => {
     const res = mapAdmissionPipeline({
       status: 'REJECTED',

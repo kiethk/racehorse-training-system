@@ -17,12 +17,16 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.admission.service.TrainerAssignmentService;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.identity.entity.GroomProfile;
+import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
@@ -47,6 +51,9 @@ class AccountManagementServiceTest {
     private CareScheduleRepository careScheduleRepository;
     private AdmissionApplicationRepository admissionApplicationRepository;
     private NotificationService notificationService;
+    private TrainerAssignmentService trainerAssignmentService;
+    private CareScheduleService careScheduleService;
+    private TrainerHandoverService trainerHandoverService;
 
     private AccountManagementService accountService;
 
@@ -66,6 +73,9 @@ class AccountManagementServiceTest {
         careScheduleRepository = mock(CareScheduleRepository.class);
         admissionApplicationRepository = mock(AdmissionApplicationRepository.class);
         notificationService = mock(NotificationService.class);
+        trainerAssignmentService = mock(TrainerAssignmentService.class);
+        careScheduleService = mock(CareScheduleService.class);
+        trainerHandoverService = mock(TrainerHandoverService.class);
 
         when(validator.validate(any())).thenReturn(Collections.emptySet());
 
@@ -83,7 +93,11 @@ class AccountManagementServiceTest {
                 stableStallRepository,
                 careScheduleRepository,
                 admissionApplicationRepository,
-                notificationService
+                notificationService,
+                null,
+                trainerAssignmentService,
+                careScheduleService,
+                trainerHandoverService
         );
     }
 
@@ -310,6 +324,47 @@ class AccountManagementServiceTest {
     }
 
     @Test
+    void updateAccountStatus_headTrainerWithReplacement_executesHandoverAndDeactivates() {
+        Long currentAdminId = 1L;
+        Long trainerId = 6L;
+        Long replacementTrainerId = 7L;
+
+        User user = new User();
+        user.setId(trainerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HEAD_TRAINER");
+        user.setRole(role);
+
+        Area area = new Area();
+        area.setCode("Area A");
+
+        when(userRepository.findById(trainerId)).thenReturn(Optional.of(user));
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainerId)).thenReturn(List.of(area));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AccountSummaryResponse res = accountService.updateAccountStatus(currentAdminId, trainerId, false, replacementTrainerId);
+
+        assertNotNull(res);
+        assertFalse(res.isActive());
+        verify(trainerHandoverService).executeHandover(trainerId, replacementTrainerId);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void getEligibleReplacementTrainers_delegatesToHandoverService() {
+        Long trainerId = 6L;
+        EligibleReplacementTrainerResponse option = new EligibleReplacementTrainerResponse(7L, "Trainer 7", "t7@test.com", 1, 1, true);
+        when(trainerHandoverService.getEligibleReplacements(trainerId)).thenReturn(List.of(option));
+
+        List<EligibleReplacementTrainerResponse> result = accountService.getEligibleReplacementTrainers(trainerId);
+
+        assertEquals(1, result.size());
+        assertEquals(7L, result.get(0).getId());
+        verify(trainerHandoverService).getEligibleReplacements(trainerId);
+    }
+
+    @Test
     void updateAccountStatus_horseOwnerWithPendingAdmissions_throwsConflict() {
         Long currentAdminId = 1L;
         Long ownerId = 7L;
@@ -384,6 +439,179 @@ class AccountManagementServiceTest {
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
         assertTrue(ex.getReason().contains("pending or in-progress care schedules"));
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_trainerWithPendingAdmissions_noOtherActiveTrainer_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long trainerId = 3L;
+
+        User user = new User();
+        user.setId(trainerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HEAD_TRAINER");
+        user.setRole(role);
+
+        when(userRepository.findById(trainerId)).thenReturn(Optional.of(user));
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainerId)).thenReturn(List.of());
+        when(admissionApplicationRepository.existsByTrainerIdAndStatus(trainerId, AdmissionStatus.TRAINER_REVIEW)).thenReturn(true);
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(user)); // only trainer 3
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, trainerId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("pending admission applications awaiting their assessment"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_trainerWithPendingAdmissions_autoReassignsToOtherTrainer() {
+        Long currentAdminId = 1L;
+        Long trainerId = 3L;
+
+        User user = new User();
+        user.setId(trainerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HEAD_TRAINER");
+        user.setRole(role);
+
+        User otherTrainer = new User();
+        otherTrainer.setId(5L);
+        otherTrainer.setActive(true);
+        otherTrainer.setRole(role);
+
+        when(userRepository.findById(trainerId)).thenReturn(Optional.of(user));
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainerId)).thenReturn(List.of());
+        when(admissionApplicationRepository.existsByTrainerIdAndStatus(trainerId, AdmissionStatus.TRAINER_REVIEW)).thenReturn(true);
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(user, otherTrainer));
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(10L);
+        app.setTrainerId(trainerId);
+        app.setStatus(AdmissionStatus.TRAINER_REVIEW);
+        when(admissionApplicationRepository.findByTrainerIdAndStatusOrderBySubmittedAtAscIdAsc(trainerId, AdmissionStatus.TRAINER_REVIEW))
+                .thenReturn(List.of(app));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        AccountSummaryResponse res = accountService.updateAccountStatus(currentAdminId, trainerId, false);
+
+        assertFalse(res.isActive());
+        verify(admissionApplicationRepository).save(argThat(a -> a.getTrainerId() == null));
+        verify(trainerAssignmentService).assignIfNeeded(10L);
+    }
+
+    @Test
+    void updateAccountStatus_headTrainerWithRegularAreas_noReplacement_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long trainerId = 3L;
+
+        User user = new User();
+        user.setId(trainerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HEAD_TRAINER");
+        user.setRole(role);
+
+        Area area = new Area();
+        area.setCode("A");
+        area.setType(AreaType.REGULAR);
+
+        when(userRepository.findById(trainerId)).thenReturn(Optional.of(user));
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainerId)).thenReturn(List.of(area));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, trainerId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot deactivate Head Trainer while they are assigned to areas"));
+        verify(trainerHandoverService, never()).executeHandover(any(), any());
+    }
+
+    @Test
+    void updateAccountStatus_headTrainerWithRegularAreas_withReplacement_executesHandover() {
+        Long currentAdminId = 1L;
+        Long trainerId = 3L;
+        Long replacementId = 7L;
+
+        User user = new User();
+        user.setId(trainerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HEAD_TRAINER");
+        user.setRole(role);
+
+        Area area = new Area();
+        area.setCode("A");
+        area.setType(AreaType.REGULAR);
+
+        when(userRepository.findById(trainerId)).thenReturn(Optional.of(user));
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainerId))
+                .thenReturn(List.of(area)) // during validation
+                .thenReturn(Collections.emptyList()); // after handover
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        AccountSummaryResponse res = accountService.updateAccountStatus(currentAdminId, trainerId, false, replacementId);
+
+        assertNotNull(res);
+        assertFalse(res.isActive());
+        verify(trainerHandoverService).executeHandover(trainerId, replacementId);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void getEligibleReplacementTrainers_delegatesToTrainerHandoverService() {
+        Long trainerId = 3L;
+        EligibleReplacementTrainerResponse candidate = new EligibleReplacementTrainerResponse(7L, "Trainer 7", "t7@rtms.com", 1, 1, true);
+        when(trainerHandoverService.getEligibleReplacements(trainerId)).thenReturn(List.of(candidate));
+
+        List<EligibleReplacementTrainerResponse> result = accountService.getEligibleReplacementTrainers(trainerId);
+
+        assertEquals(1, result.size());
+        assertEquals(7L, result.get(0).getId());
+        verify(trainerHandoverService).getEligibleReplacements(trainerId);
+    }
+
+    @Test
+    void updateAccountStatus_vetWithPendingSchedules_autoReassignsToOtherVet() {
+        Long currentAdminId = 1L;
+        Long vetId = 4L;
+
+        User user = new User();
+        user.setId(vetId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("VETERINARIAN");
+        user.setRole(role);
+
+        User otherVet = new User();
+        otherVet.setId(6L);
+        otherVet.setActive(true);
+        otherVet.setRole(role);
+
+        when(userRepository.findById(vetId)).thenReturn(Optional.of(user));
+        when(careScheduleRepository.existsByVeterinarianIdAndStatusIn(eq(vetId), eq(CareScheduleStatus.OPEN))).thenReturn(true);
+        when(userRepository.findActiveVeterinarians()).thenReturn(List.of(user, otherVet));
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(100L);
+        schedule.setVeterinarianId(vetId);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        when(careScheduleRepository.findByVeterinarianIdAndStatusIn(vetId, CareScheduleStatus.OPEN))
+                .thenReturn(List.of(schedule));
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        AccountSummaryResponse res = accountService.updateAccountStatus(currentAdminId, vetId, false);
+
+        assertFalse(res.isActive());
+        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
+        assertNull(schedule.getVeterinarianId());
+        verify(careScheduleService).assignRequestedSchedule(schedule);
     }
 
     @Test

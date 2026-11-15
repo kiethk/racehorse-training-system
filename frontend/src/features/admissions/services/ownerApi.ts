@@ -1,6 +1,6 @@
 import { apiGet, apiUpload } from '@/services/api';
 import type { AdmissionSummaryResponse, AdmissionStatus, TrainingDecision } from '../types';
-import type { CreateOwnerAdmissionRequest, AdmissionDocumentUpload } from '../types/owner';
+import type { CreateOwnerAdmissionRequest, AdmissionDocumentUpload, AdmissionDocumentType } from '../types/owner';
 import type { HorseSex } from '@/types/horse';
 
 export type CandidateForm = {
@@ -13,7 +13,7 @@ export type CandidateForm = {
 };
 
 export type AdmissionDocument = {
-  id: number; documentType: string; fileUrl: string; recordDate: string | null;
+  id: number; documentType: AdmissionDocumentType; fileUrl: string; recordDate: string | null;
   note: string | null; uploadedAt: string; medical: boolean;
   originalFileName: string | null;
 };

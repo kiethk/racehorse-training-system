@@ -39,5 +39,8 @@ export function getScheduleExamAction(status: CareScheduleStatus | string | null
   if (status === 'COMPLETED') {
     return { label: 'View Record', icon: 'file-text' };
   }
+  if (status === 'IN_PROGRESS') {
+    return { label: 'Continue', icon: 'activity' };
+  }
   return { label: 'Examine', icon: 'activity' };
 }

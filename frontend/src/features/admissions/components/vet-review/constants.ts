@@ -52,15 +52,19 @@ export const symptomOptions = [
   'Neurological signs',
 ];
 
-export const diagnosisOptions = [
-  'Clinically healthy',
-  'Minor clinical condition',
-  'Treatment required',
-  'Follow-up examination required',
-  'Infectious disease suspected',
-  'Musculoskeletal condition suspected',
-  'Medically unsuitable for admission',
-];
+export const CLINICAL_DIAGNOSIS_MAP = {
+  CLINICALLY_HEALTHY: 'Clinically healthy',
+  MINOR_CONDITION: 'Minor clinical condition',
+  TREATMENT_REQUIRED: 'Treatment required',
+  FOLLOW_UP_REQUIRED: 'Follow-up examination required',
+  INFECTIOUS_SUSPECTED: 'Infectious disease suspected',
+  MUSCULOSKELETAL_SUSPECTED: 'Musculoskeletal condition suspected',
+  MEDICALLY_UNSUITABLE: 'Medically unsuitable for admission',
+} as const;
+
+export type ClinicalDiagnosisCode = keyof typeof CLINICAL_DIAGNOSIS_MAP;
+
+export const diagnosisOptions = Object.values(CLINICAL_DIAGNOSIS_MAP);
 
 export interface TrainingDecisionOption {
   value: import('../../types').TrainingDecision;

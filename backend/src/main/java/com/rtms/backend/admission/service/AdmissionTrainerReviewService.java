@@ -29,7 +29,7 @@ import java.time.LocalDateTime;
  * MANAGER_REVIEW, Manager mới quyết định cuối cùng.
  *
  * Bước này KHÔNG đụng tới Horse.currentStatus (vẫn CANDIDATE), chuồng cách ly,
- * hay Course / GroupPlan / TrainingWorkout.
+ * hay Course / CourseRun / TrainingWorkout.
  */
 @Service
 public class AdmissionTrainerReviewService {

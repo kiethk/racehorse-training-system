@@ -11,25 +11,29 @@ import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.medical.dto.InjuryMarkerRequest;
 import com.rtms.backend.medical.dto.PrescriptionItemRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
+import com.rtms.backend.medical.entity.Prescription;
 import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.MedicationRoute;
+import com.rtms.backend.medical.event.PrescriptionCreatedEvent;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +45,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -49,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** Track 0 (ROADMAP v3.0): kê đơn tự do, JSON vào treatment_plans.instructions. */
+/** Track 0 (ROADMAP v2.2): kê đơn từ danh mục chuẩn + resolvedConditionIds + rollback US-2. */
 @ExtendWith(MockitoExtension.class)
 class CareSchedulePrescriptionFlowTest {
 
@@ -66,10 +71,11 @@ class CareSchedulePrescriptionFlowTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
     @Mock private NotificationService notificationService;
-    @Mock private GroupWorkoutSyncService groupSync;
+    @Mock private TrainingGroupService groupSync;
     @Mock private PreventiveVaccinationService preventiveVaccinationService;
     @Mock private InjuryRecordRepository injuryRecordRepository;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
+    @Mock private PrescriptionRepository prescriptionRepository;
 
     private CareScheduleService service;
     private Horse horse;
@@ -84,7 +90,7 @@ class CareSchedulePrescriptionFlowTest {
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, groupSync),
                 preventiveVaccinationService, injuryRecordRepository,
-                treatmentPlanRepository, new ObjectMapper());
+                treatmentPlanRepository, prescriptionRepository);
 
         horse = new Horse();
         horse.setId(10L);
@@ -120,26 +126,47 @@ class CareSchedulePrescriptionFlowTest {
         req.setTrainingDecision(TrainingDecision.ALLOWED);
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
-        next.setScheduledAt(LocalDateTime.now().plusDays(2));
+        next.setScheduledAt(LocalDateTime.now().plusDays(7).withHour(14).withMinute(0).withSecond(0).withNano(0));
         next.setDescription("Follow-up recheck");
         req.setNextSchedule(next);
         return req;
     }
 
-    private PrescriptionItemRequest rxItem(String name, MedicationRoute route, int duration) {
+    private PrescriptionItemRequest rxItem(String medicationName, MedicationRoute route) {
         PrescriptionItemRequest item = new PrescriptionItemRequest();
-        item.setMedicationName(name);
+        item.setMedicationName(medicationName);
         item.setDosage("10ml");
         item.setRoute(route);
         item.setFrequency("BID");
-        item.setDuration(duration);
-        item.setNotes("With food");
+        item.setStartDate(LocalDate.of(2026, 11, 1));
+        item.setEndDate(LocalDate.of(2026, 11, 5));
         return item;
     }
 
     @Test
-    @DisplayName("Kê đơn thành công: plan ACTIVE, instructions là JSON snake_case, không lưu prescriptions, không phát event")
-    void prescriptions_persistAsJsonInstructions_noPrescriptionTableNoEvent() {
+    @DisplayName("Free-text medication name is saved trimmed")
+    void freeTextMedicationName_isSavedTrimmed() {
+        stubCompletion();
+        when(treatmentPlanRepository.save(any(TreatmentPlan.class))).thenAnswer(i -> {
+            TreatmentPlan p = i.getArgument(0);
+            p.setId(500L);
+            return p;
+        });
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(i -> i.getArgument(0));
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
+        CompleteCareScheduleRequest req = baseRequest();
+        req.setPrescriptions(List.of(rxItem("  Free text medicine  ", MedicationRoute.ORAL)));
+
+        service.completeCareSchedule(100L, req, 20L);
+
+        ArgumentCaptor<Prescription> rxCap = ArgumentCaptor.forClass(Prescription.class);
+        verify(prescriptionRepository).save(rxCap.capture());
+        assertEquals("Free text medicine", rxCap.getValue().getMedicationName());
+    }
+
+    @Test
+    @DisplayName("Chỉ có note, không có thuốc: vẫn tạo TreatmentPlan để Groom thấy chỉ định (duyệt 14/11/2026)")
+    void noteOnly_createsTreatmentPlanWithoutPrescription() {
         stubCompletion();
         when(treatmentPlanRepository.save(any(TreatmentPlan.class))).thenAnswer(i -> {
             TreatmentPlan p = i.getArgument(0);
@@ -147,11 +174,67 @@ class CareSchedulePrescriptionFlowTest {
             return p;
         });
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
+        CompleteCareScheduleRequest req = baseRequest();
+        req.setGeneralCareInstructions("  Phenylbutazone 4.4 mg/kg IV once daily for 5 days  ");
 
+        service.completeCareSchedule(100L, req, 20L);
+
+        ArgumentCaptor<TreatmentPlan> planCap = ArgumentCaptor.forClass(TreatmentPlan.class);
+        verify(treatmentPlanRepository).save(planCap.capture());
+        assertEquals("Phenylbutazone 4.4 mg/kg IV once daily for 5 days", planCap.getValue().getInstructions());
+        assertEquals("ACTIVE", planCap.getValue().getStatus());
+        assertEquals(req.getNextSchedule().getScheduledAt().toLocalDate(), planCap.getValue().getEndDate(),
+                "plan note-only sống tới đúng buổi khám lại để banner Groom tự tắt");
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
+        verify(eventPublisher, never()).publishEvent(isA(PrescriptionCreatedEvent.class));
+    }
+
+    @Test
+    @DisplayName("Medication names differing only by case are duplicates")
+    void duplicateMedicationNamesIgnoringCase_areRejected() {
         CompleteCareScheduleRequest req = baseRequest();
         req.setPrescriptions(List.of(
-                rxItem("Flunixin Meglumine", MedicationRoute.INJECTION_IV, 4),
-                rxItem("Phenylbutazone", MedicationRoute.ORAL, 7)));
+                rxItem("  Medicine A ", MedicationRoute.ORAL),
+                rxItem("medicine a", MedicationRoute.ORAL)));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, req, 20L));
+        assertEquals("DUPLICATE_MEDICATION", ex.getErrorCode());
+        assertEquals("Medication medicine a is already prescribed in this examination", ex.getMessage());
+        verify(careScheduleRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    @DisplayName("Injection route is rejected with INJECTION_NOT_ALLOWED before state changes")
+    void injectionRoute_isRejected() {
+        CompleteCareScheduleRequest req = baseRequest();
+        req.setPrescriptions(List.of(rxItem("Flunixin Meglumine", MedicationRoute.INJECTION_IV)));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, req, 20L));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("INJECTION_NOT_ALLOWED", ex.getErrorCode());
+        assertEquals("Treatment plans cannot contain injections", ex.getMessage());
+        verify(careScheduleRepository, never()).findByIdForUpdate(any());
+        verify(treatmentPlanRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Kê đơn thành công: plan ACTIVE với MIN/MAX dates, oral rx -> GROOM, event AFTER_COMMIT")
+    void prescriptions_persistAtomically_withRoleSplitAndPlanRange() {
+        stubCompletion();
+        when(treatmentPlanRepository.save(any(TreatmentPlan.class))).thenAnswer(i -> {
+            TreatmentPlan p = i.getArgument(0);
+            p.setId(500L);
+            return p;
+        });
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(i -> i.getArgument(0));
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
+
+        CompleteCareScheduleRequest req = baseRequest();
+        PrescriptionItemRequest iv = rxItem("Flunixin Meglumine", MedicationRoute.ORAL);
+        PrescriptionItemRequest oral = rxItem("Phenylbutazone", MedicationRoute.ORAL);
+        oral.setStartDate(LocalDate.of(2026, 11, 2));
+        oral.setEndDate(LocalDate.of(2026, 11, 9));
+        req.setPrescriptions(List.of(iv, oral));
 
         service.completeCareSchedule(100L, req, 20L);
 
@@ -159,31 +242,36 @@ class CareSchedulePrescriptionFlowTest {
         verify(treatmentPlanRepository).save(planCap.capture());
         TreatmentPlan plan = planCap.getValue();
         assertEquals("ACTIVE", plan.getStatus());
-        assertNotNull(plan.getInstructions());
-        assertTrue(plan.getInstructions().contains("\"medication_name\""));
-        assertTrue(plan.getInstructions().contains("Flunixin Meglumine"));
-        assertTrue(plan.getInstructions().contains("Phenylbutazone"));
-        assertTrue(plan.getInstructions().contains("\"duration\""));
-        verify(eventPublisher, never()).publishEvent(any());
+        assertEquals(LocalDate.of(2026, 11, 1), plan.getStartDate());
+        assertEquals(LocalDate.of(2026, 11, 9), plan.getEndDate());
+
+        ArgumentCaptor<Prescription> rxCap = ArgumentCaptor.forClass(Prescription.class);
+        verify(prescriptionRepository, times(2)).save(rxCap.capture());
+        assertEquals("GROOM", rxCap.getAllValues().get(0).getAdministeredByRole());
+        assertEquals("GROOM", rxCap.getAllValues().get(1).getAdministeredByRole());
+        assertEquals("Flunixin Meglumine", rxCap.getAllValues().get(0).getMedicationName());
+
+        verify(eventPublisher).publishEvent(any(PrescriptionCreatedEvent.class));
     }
 
     @Test
-    @DisplayName("US-2 (C1): save HealthRecord ném exception => không có plan, ca vẫn IN_PROGRESS")
+    @DisplayName("US-2 (C1): save HealthRecord ném exception => không có plan/rx/event, ca vẫn IN_PROGRESS")
     void exceptionAfterRecordSave_leavesNoPartialWrites() {
         when(careScheduleRepository.findById(100L)).thenReturn(Optional.of(schedule));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(careScheduleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(schedule));
         when(healthRecordRepository.save(any(HealthRecord.class)))
-                .thenThrow(new RuntimeException("simulated FK violation"));
+                .thenThrow(new RuntimeException("simulated FK violation on prescriptions"));
 
         CompleteCareScheduleRequest req = baseRequest();
-        req.setPrescriptions(List.of(rxItem("Flunixin Meglumine", MedicationRoute.INJECTION_IV, 4)));
+        req.setPrescriptions(List.of(rxItem("Flunixin Meglumine", MedicationRoute.ORAL)));
 
         assertThrows(RuntimeException.class, () -> service.completeCareSchedule(100L, req, 20L));
 
         assertEquals(CareScheduleStatus.IN_PROGRESS, schedule.getStatus(),
                 "no COMPLETED status may be flushed before the exception rolls the tx back");
         verify(treatmentPlanRepository, never()).save(any());
+        verify(prescriptionRepository, never()).save(any());
         verify(careScheduleRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
@@ -222,19 +310,54 @@ class CareSchedulePrescriptionFlowTest {
     }
 
     @Test
-    @DisplayName("D4: severity ngoài MILD/MODERATE/SEVERE/CRITICAL bị chặn trước khi khóa ca")
-    void injuryMarkerWithLegacySeverity_isRejected() {
+    @DisplayName("Coupling marker => BLOCKED: ca ROUTINE có marker mà chọn ALLOWED bị chặn 400")
+    void injuryMarkersWithAllowedDecisionOnRoutineExam_isRejected() {
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setPurpose(CareSchedulePurpose.FOLLOW_UP);
+        schedule.setSourceIncidentId(5L);
+        when(careScheduleRepository.findById(100L)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(schedule));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+
         CompleteCareScheduleRequest req = baseRequest();
-        com.rtms.backend.medical.dto.InjuryMarkerRequest marker = new com.rtms.backend.medical.dto.InjuryMarkerRequest();
-        marker.setInjuryType("TENDON");
+        InjuryMarkerRequest marker = new InjuryMarkerRequest();
         marker.setBodyRegionId(1L);
-        marker.setSeverity("LOW");
-        marker.setDescription("old vocabulary");
+        marker.setDescription("Swelling over the left forelimb");
         req.setInjuryMarkers(List.of(marker));
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.completeCareSchedule(100L, req, 20L));
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        verify(careScheduleRepository, never()).findByIdForUpdate(any());
+        assertEquals("MARKERS_BLOCK_TRAINING", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("3D marker chỉ gửi vị trí (bodyRegionId, zoneId) + ghi chú (description) vẫn lưu thành công")
+    void injuryMarkerWithPositionAndNoteOnly_persistsNoteDirectly() {
+        stubCompletion();
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
+        com.rtms.backend.medical.entity.HorseBodyRegion region = new com.rtms.backend.medical.entity.HorseBodyRegion();
+        region.setId(5L);
+        region.setCode("foreleg_left");
+        region.setDisplayName("Left forelimb");
+        when(entityManager.find(com.rtms.backend.medical.entity.HorseBodyRegion.class, 5L)).thenReturn(region);
+
+        CompleteCareScheduleRequest req = baseRequest();
+        com.rtms.backend.medical.dto.InjuryMarkerRequest marker = new com.rtms.backend.medical.dto.InjuryMarkerRequest();
+        marker.setBodyRegionId(5L);
+        marker.setZoneId("foreleg_left");
+        marker.setDescription("Swelling and heat over left superficial digital flexor tendon");
+        req.setInjuryMarkers(List.of(marker));
+
+        service.completeCareSchedule(100L, req, 20L);
+
+        ArgumentCaptor<InjuryRecord> captor = ArgumentCaptor.forClass(InjuryRecord.class);
+        verify(injuryRecordRepository).save(captor.capture());
+        InjuryRecord saved = captor.getValue();
+        assertEquals(5L, saved.getBodyRegionId());
+        assertEquals("foreleg_left", saved.getZoneId());
+        assertEquals("Swelling and heat over left superficial digital flexor tendon", saved.getDescription());
+        assertEquals("Left forelimb", saved.getInjuryType());
+        assertEquals("MODERATE", saved.getSeverity());
     }
 }

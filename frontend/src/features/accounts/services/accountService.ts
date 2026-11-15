@@ -29,9 +29,29 @@ export async function createAccount(
   return apiPost<ApiResponse<AccountCreationResponse>>('/api/accounts', request);
 }
 
+export interface EligibleReplacementTrainer {
+  id: number;
+  trainerId?: number;
+  fullName: string;
+  email: string;
+  managedAreasCount: number;
+  remainingCapacity: number;
+  canAccept: boolean;
+}
+
+export async function getEligibleReplacementTrainers(
+  id: number
+): Promise<ApiResponse<EligibleReplacementTrainer[]>> {
+  return apiGet<ApiResponse<EligibleReplacementTrainer[]>>(`/api/accounts/trainers/${id}/eligible-replacements`);
+}
+
 export async function updateAccountStatus(
   id: number,
-  active: boolean
+  active: boolean,
+  replacementTrainerId?: number
 ): Promise<ApiResponse<AccountSummary>> {
-  return apiPatch<ApiResponse<AccountSummary>>(`/api/accounts/${id}/status`, { active });
+  return apiPatch<ApiResponse<AccountSummary>>(`/api/accounts/${id}/status`, {
+    active,
+    replacementTrainerId,
+  });
 }

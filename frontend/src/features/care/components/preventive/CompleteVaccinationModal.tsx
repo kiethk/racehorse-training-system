@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { z } from 'zod';
-import { Button, Checkbox, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
+import { Button, Checkbox, ConfirmDialog, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
 import { displayError, formatDate } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { preventiveCareService } from '../../services/preventiveCareService';
@@ -63,6 +63,9 @@ function CompleteVaccinationForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [earlyConfirmProtocols, setEarlyConfirmProtocols] = useState<
+    Array<{ name: string; nextDue?: string | null }>
+  >([]);
 
   const listed = new Set(lines.map((line) => line.protocolId));
   const addable = protocols.filter((p) => !listed.has(p.id));
@@ -70,6 +73,33 @@ function CompleteVaccinationForm({
   const protocolName = (protocolId: number) => protocols.find((p) => p.id === protocolId)?.name ?? `Protocol #${protocolId}`;
   const update = (protocolId: number, patch: Partial<DoseLine>) =>
     setLines((current) => current.map((line) => (line.protocolId === protocolId ? { ...line, ...patch } : line)));
+
+  const executeRecord = async (chosen: DoseLine[]) => {
+    setFieldErrors({});
+    setError(null);
+    setSubmitting(true);
+    try {
+      await preventiveCareService.recordForHorse(horse.horseId, {
+        administeredOn,
+        instructions: instructions.trim() || undefined,
+        doses: chosen.map((line) => ({
+          protocolId: line.protocolId,
+          dosage: line.dosage.trim(),
+          route: line.route.trim() || undefined,
+        })),
+      });
+      toast.success(
+        `Vaccination recorded for ${horse.horseName}`,
+        `${chosen.length} protocol${chosen.length === 1 ? '' : 's'} completed. The next due date is updated.`,
+      );
+      onRecorded();
+      onClose();
+    } catch (cause) {
+      setError(displayError(cause, 'Could not record the vaccination. Nothing was saved.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,28 +136,20 @@ function CompleteVaccinationForm({
       return;
     }
 
-    setFieldErrors({});
-    setError(null);
-    setSubmitting(true);
-    try {
-      await preventiveCareService.recordForHorse(horse.horseId, {
-        administeredOn,
-        instructions: instructions.trim() || undefined,
-        doses: chosen.map((line) => ({
-          protocolId: line.protocolId,
-          dosage: line.dosage.trim(),
-          route: line.route.trim() || undefined,
-        })),
-      });
-      toast.success(`Vaccination recorded for ${horse.horseName}`,
-        `${chosen.length} protocol${chosen.length === 1 ? '' : 's'} completed. The next due date is updated.`);
-      onRecorded();
-      onClose();
-    } catch (cause) {
-      setError(displayError(cause, 'Could not record the vaccination. Nothing was saved.'));
-    } finally {
-      setSubmitting(false);
+    // Kiểm tra xem có phác đồ nào đang ở trạng thái an toàn OK (chưa tới hạn tiêm) không
+    const early = chosen
+      .filter((line) => dueStatus(line.protocolId)?.status === 'OK')
+      .map((line) => ({
+        name: protocolName(line.protocolId),
+        nextDue: dueStatus(line.protocolId)?.nextDueOn,
+      }));
+
+    if (early.length > 0) {
+      setEarlyConfirmProtocols(early);
+      return;
     }
+
+    await executeRecord(chosen);
   };
 
   return (
@@ -191,6 +213,36 @@ function CompleteVaccinationForm({
           <Textarea rows={2} value={instructions} onChange={(e) => setInstructions(e.target.value)} />
         </FormField>
       </form>
+
+      <ConfirmDialog
+        open={earlyConfirmProtocols.length > 0}
+        title="Confirm early vaccination"
+        description={
+          <div className="space-y-2 text-sm text-[var(--color-text-secondary)]">
+            <p>The following protocols are still active and not yet due:</p>
+            <ul className="list-disc pl-5 space-y-1 text-[var(--color-text-primary)] font-medium">
+              {earlyConfirmProtocols.map((p, idx) => (
+                <li key={idx}>
+                  {p.name} {p.nextDue ? `(Next due: ${formatDate(p.nextDue)})` : ''}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[var(--color-text-muted)]">
+              Are you sure you want to record an early vaccination for this horse?
+            </p>
+          </div>
+        }
+        confirmLabel="Confirm early vaccination"
+        cancelLabel="Cancel"
+        tone="primary"
+        loading={submitting}
+        onConfirm={() => {
+          const chosen = lines.filter((line) => line.selected);
+          setEarlyConfirmProtocols([]);
+          void executeRecord(chosen);
+        }}
+        onCancel={() => setEarlyConfirmProtocols([])}
+      />
     </Modal>
   );
 }

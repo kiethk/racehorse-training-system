@@ -7,14 +7,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class InjuryMarkerRequest {
-    @NotBlank
-    private String injuryType;
     @NotNull
     private Long bodyRegionId;
-    @NotBlank
-    private String severity;
     private String description;
-    @NotNull
     private LocalDateTime diagnosedAt;
     private BigDecimal positionX;
     private BigDecimal positionY;
@@ -26,14 +21,9 @@ public class InjuryMarkerRequest {
     private BigDecimal normalX;
     private BigDecimal normalY;
     private BigDecimal normalZ;
-    private String meshName;
 
-    public String getInjuryType() { return injuryType; }
-    public void setInjuryType(String injuryType) { this.injuryType = injuryType; }
     public Long getBodyRegionId() { return bodyRegionId; }
     public void setBodyRegionId(Long bodyRegionId) { this.bodyRegionId = bodyRegionId; }
-    public String getSeverity() { return severity; }
-    public void setSeverity(String severity) { this.severity = severity; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public LocalDateTime getDiagnosedAt() { return diagnosedAt; }
@@ -58,6 +48,4 @@ public class InjuryMarkerRequest {
     public void setNormalY(BigDecimal normalY) { this.normalY = normalY; }
     public BigDecimal getNormalZ() { return normalZ; }
     public void setNormalZ(BigDecimal normalZ) { this.normalZ = normalZ; }
-    public String getMeshName() { return meshName; }
-    public void setMeshName(String meshName) { this.meshName = meshName; }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Panel, SectionTitle } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +10,7 @@ import type { CareSchedule } from "@/features/admissions/types";
 import type { Horse } from "@/features/stable/types";
 import { getCareTypeTone } from "@/features/schedule/utils/timelineUtils";
 import { getScheduleExamAction, getScheduleStatusDisplay } from "@/features/care/lib/scheduleStatusDisplay";
+import { useSynchronizedClock } from "@/lib/clockSync";
 
 function formatAppointmentTime(scheduledAt?: string | null): string {
   if (!scheduledAt) return "--:--";
@@ -44,6 +46,9 @@ export function VetTodayAgenda({
   onBookRoutine,
 }: VetTodayAgendaProps) {
   const handleExamAction = onExamine ?? onStartExam ?? (() => {});
+
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
   return (
     <div className="space-y-4 lg:col-span-7">
       <Panel padded>
@@ -81,17 +86,41 @@ export function VetTodayAgenda({
               const tone = getCareTypeTone(schedule.careType, schedule.purpose, schedule.sourceIncidentId);
               const status = getScheduleStatusDisplay(schedule.status);
               const action = getScheduleExamAction(schedule.status);
+
+              // Same availability rule as the Schedule/Routine lists: a SCHEDULED routine
+              // exam opens only on/after its date and inside 13:30–15:30. IN_PROGRESS
+              // (Continue) and preventive visits stay open outside that window.
+              const now = currentClock;
+              const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+              const rawDate = schedule.scheduledDate || (schedule.scheduledAt ? schedule.scheduledAt.slice(0, 10) : null);
+              const isFuture = Boolean(schedule.status !== "COMPLETED" && rawDate && rawDate > todayIso);
+              const isPreventive = schedule.purpose === "PREVENTIVE";
+              const minutesNow = now.getHours() * 60 + now.getMinutes();
+              const isOutsideRoutineWindow =
+                schedule.careType === "ROUTINE" &&
+                !isPreventive &&
+                schedule.status === "SCHEDULED" &&
+                (minutesNow < 13 * 60 + 30 || minutesNow > 15 * 60 + 30);
+              const canOpen =
+                schedule.status === "COMPLETED" ||
+                schedule.status === "IN_PROGRESS" ||
+                isPreventive ||
+                (!isFuture && !isOutsideRoutineWindow);
+
               // Whole-row click mirrors the action button, so compute once for mouse + keyboard.
-              const openRow = () =>
-                schedule.status === "COMPLETED"
-                  ? onViewFindings(schedule)
-                  : handleExamAction(schedule);
+              const openRow = () => {
+                if (schedule.status === "COMPLETED") {
+                  onViewFindings(schedule);
+                  return;
+                }
+                if (canOpen) handleExamAction(schedule);
+              };
 
               return (
                 <div
                   key={schedule.id}
-                  role="button"
-                  tabIndex={0}
+                  role={canOpen ? "button" : undefined}
+                  tabIndex={canOpen ? 0 : undefined}
                   onClick={openRow}
                   onKeyDown={(event) => {
                     // Guard: Enter on an inner button bubbles here too — only act when the row itself is focused.
@@ -101,7 +130,11 @@ export function VetTodayAgenda({
                       openRow();
                     }
                   }}
-                  className="flex cursor-pointer flex-col gap-3 rounded-[var(--radius-sm)] py-3.5 transition-colors first:pt-0 last:pb-0 hover:bg-[var(--color-surface-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] sm:flex-row sm:items-center sm:justify-between"
+                  className={`flex flex-col gap-3 rounded-[var(--radius-sm)] py-3.5 transition-colors first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between ${
+                    canOpen
+                      ? "cursor-pointer hover:bg-[var(--color-surface-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                      : "cursor-not-allowed opacity-80"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
                     <HorseAvatar
@@ -147,9 +180,11 @@ export function VetTodayAgenda({
                     )}
 
                     <Button
-                      variant={schedule.status === "COMPLETED" ? "secondary" : "primary"}
+                      variant={schedule.status === "COMPLETED" || schedule.status === "IN_PROGRESS" ? "secondary" : "primary"}
                       size="sm"
                       icon={action.icon}
+                      disabled={!canOpen}
+                      title={!canOpen ? (isFuture ? "This routine examination is scheduled for a later date." : "Routine examinations can only be started between 13:30 and 15:30.") : undefined}
                       onClick={(event) => {
                         event.stopPropagation();
                         openRow();
@@ -157,6 +192,11 @@ export function VetTodayAgenda({
                     >
                       {action.label}
                     </Button>
+                    {!canOpen && (
+                      <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+                        {isFuture ? "Scheduled for a later date" : "Opens 13:30 – 15:30"}
+                      </span>
+                    )}
                   </div>
                 </div>
               );

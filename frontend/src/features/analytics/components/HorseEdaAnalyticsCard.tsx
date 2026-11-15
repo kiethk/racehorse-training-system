@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Panel, SectionTitle, SegmentedControl, Skeleton, EmptyState } from '@/components/ui';
+import { Panel, SectionTitle, SegmentedControl, Skeleton, EmptyState, Tooltip, Icon, Notice } from '@/components/ui';
 import { edaAnalyticsService } from '../services/edaAnalyticsService';
 import type { FleetEdaResponse, IndividualHorseEdaResponse } from '../types/eda';
 import { CorrelationBadge } from './CorrelationBadge';
@@ -164,14 +164,9 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div>
-          <div className="flex items-center gap-2">
-            <SectionTitle>EDA Correlation & Feature Analysis</SectionTitle>
-            <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]">
-              AI Analytics
-            </span>
-          </div>
+          <SectionTitle>Cardio Fitness & Speed Correlation</SectionTitle>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Explore correlation between workout speed and recovery heart rate, with automated Tukey 1.5×IQR outlier detection.
+            Explore how workout speed affects recovery heart rate, with automated detection of unusual sessions.
           </p>
         </div>
 
@@ -232,11 +227,26 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
               pearsonR={activeStats.correlation.pearsonR}
             />
 
-            <div className="text-right text-xs text-[var(--color-text-secondary)]">
-              <div>
-                Regression Equation: <code className="text-[var(--color-text-primary)] font-semibold">y = {activeStats.correlation.slope.toFixed(2)}x + {activeStats.correlation.intercept.toFixed(1)}</code>
+            <div className="text-right text-xs text-[var(--color-text-secondary)] space-y-1">
+              <div className="flex items-center justify-end gap-1.5">
+                <span>
+                  Cardiac Response:{' '}
+                  <strong className="text-[var(--color-text-primary)] font-medium">
+                    +{activeStats.correlation.slope.toFixed(1)} bpm
+                  </strong>{' '}
+                  per km/h speed increase
+                </span>
+                <Tooltip content={`Linear model: HR = ${activeStats.correlation.slope.toFixed(2)} × speed + ${activeStats.correlation.intercept.toFixed(1)}`}>
+                  <button
+                    type="button"
+                    aria-label="Regression formula details"
+                    className="inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors focus:outline-none"
+                  >
+                    <Icon name="info" size={14} />
+                  </button>
+                </Tooltip>
               </div>
-              <div className="text-[11px] mt-0.5">
+              <div className="text-[11px]">
                 Sample Size: <b>{activeStats.correlation.sampleSize}</b> data points
               </div>
             </div>
@@ -264,18 +274,15 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
 
           {/* Outlier Insights Panel if any */}
           {outliersList.length > 0 && (
-            <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)]/30 bg-[var(--color-warning-subtle)]/40 p-3 text-xs">
-              <div className="flex items-center gap-1.5 font-semibold text-[var(--color-warning)] mb-1">
-                <span>⚠️ Detected {outliersList.length} outlier data point(s) (Tukey's Outliers):</span>
-              </div>
-              <ul className="list-disc list-inside space-y-0.5 text-[var(--color-text-secondary)]">
+            <Notice tone="warning" title={`Detected ${outliersList.length} unusual workout session(s):`}>
+              <ul className="list-disc list-inside space-y-0.5 text-xs text-[var(--color-text-secondary)] mt-1">
                 {outliersList.map((p) => (
                   <li key={p.id}>
                     <b className="text-[var(--color-text-primary)]">{p.label}</b>: {p.outlierReason} ({p.x} km/h, {p.y} bpm)
                   </li>
                 ))}
               </ul>
-            </div>
+            </Notice>
           )}
         </div>
       )}

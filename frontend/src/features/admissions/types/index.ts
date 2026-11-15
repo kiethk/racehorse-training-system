@@ -1,5 +1,6 @@
 import type { PrescriptionItemRequest } from '@/features/care/types';
 import type { VaccinationRequest } from '@/features/care/types/preventive';
+import type { AdmissionDocumentType } from './owner';
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
@@ -30,7 +31,7 @@ export interface AdmissionSummaryResponse {
 
 export interface AdmissionDocument {
   id: number;
-  documentType: string;
+  documentType: AdmissionDocumentType;
   fileUrl: string;
   recordDate: string | null;
   note: string | null;
@@ -95,6 +96,11 @@ export interface AdmissionDetailResponse {
 
   groomId: number | null;
   groomName?: string | null;
+  assignedGroomId: number | null;
+  assignedGroomName: string | null;
+  groomAssignedAt: string | null;
+  groomReviewDueAt: string | null;
+  assignedGroomFull: boolean;
   groomDecision: string | null;
   groomFeedback: string | null;
   groomReviewedAt: string | null;
@@ -209,7 +215,7 @@ export interface UrgentAssignmentAlert {
   reportedByName: string | null;
   reportedByRole?: string | null;
   reportedAt: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  incidentType: 'PROBLEM' | 'TRAUMA';
   title: string;
   description: string;
   imageUrl: string | null;
@@ -227,7 +233,7 @@ export interface UrgentCaseReport {
   reportedByName: string | null;
   reportedByRole: string | null;
   reportedAt: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  incidentType: 'PROBLEM' | 'TRAUMA';
   title: string;
   description: string;
   imageUrl: string | null;
@@ -256,9 +262,6 @@ export interface CareSchedule {
   requestedAt?: string | null;
   rescheduleReason?: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'URGENT_PREEMPTION' | 'TIME_EXCEEDED' | 'PEER_OFFLOAD' | 'OTHER' | null;
   rescheduleNote?: string | null;
-  /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
-  overdue?: boolean;
-  pausedFrom?: string | null;
 }
 
 export type CareScheduleResponse = CareSchedule;
@@ -329,10 +332,10 @@ export interface CompleteCareScheduleRequest {
 }
 
 export interface CreateInjuryMarkerRequest {
-  injuryType: string;
+  injuryType?: string;
   bodyRegionId: number;
-  severity: string;
-  description?: string;
+  severity?: string;
+  description: string;
   diagnosedAt: string;
   positionX?: number | null;
   positionY?: number | null;
@@ -344,7 +347,6 @@ export interface CreateInjuryMarkerRequest {
   normalX?: number | null;
   normalY?: number | null;
   normalZ?: number | null;
-  meshName?: string | null;
 }
 
 export interface VetAdmissionQueueItem {
@@ -371,13 +373,14 @@ export interface VetQueueSummary {
   awaiting: number;
   inProgress: number;
   approved?: number;
+  reviewed?: number;
 }
 
 export type VetQueueSummaryResponse = VetQueueSummary;
 
 export interface VetQueueFilters {
   search?: string;
-  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'PAUSED' | 'APPROVED';
+  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'PAUSED' | 'APPROVED' | 'REVIEWED';
   admissionStatus?: AdmissionStatus | 'ALL';
   scheduleStatus?: CareScheduleStatus | 'ALL';
   careType?: CareType | 'ALL';
@@ -470,8 +473,30 @@ export interface GroomQueueFilters {
   page: number;
 }
 
+export interface GroomQueueItem extends AdmissionSummaryResponse {
+  groomReviewDueAt: string | null;
+  assignedGroomFull: boolean;
+}
+
+export interface GroomAssignmentHistoryItem {
+  id: number;
+  groomId: number;
+  groomName: string;
+  assignedAt: string;
+  endedAt: string | null;
+  endReason: 'DECIDED' | 'OVERDUE' | 'FULL' | 'LOST_QUARANTINE' | 'MANUAL' | 'REOPENED' | null;
+  assignedByName: string | null;
+}
+
+export interface QuarantineGroomOption {
+  groomId: number;
+  name: string;
+  workload: number;
+  full: boolean;
+}
+
 export interface GroomQueueResponse {
-  content: AdmissionSummaryResponse[];
+  content: GroomQueueItem[];
   page: number;
   size: number;
   totalElements: number;

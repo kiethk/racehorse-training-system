@@ -19,8 +19,7 @@ const PERMISSION_GROUPS = [
   { key: 'training', label: 'Training' },
   { key: 'admission', label: 'Admission Management' },
   { key: 'stable', label: 'Stable Management' },
-  { key: 'groom', label: 'Groom Operations' },
-  { key: 'race', label: 'Race Management' }
+  { key: 'groom', label: 'Groom Operations' }
 ];
 
 const OTHER_GROUP_KEY = 'other';
@@ -53,7 +52,6 @@ function getPermissionGroupKey(permissionCode: string): string {
   
   if (permissionCode.startsWith('GROOM_')) return 'groom';
   
-  if (permissionCode.startsWith('RACE_REGISTRATION_')) return 'race';
   
   // Specific HORSE_* prefixes have already been caught above.
   if (permissionCode.startsWith('HORSE_')) return 'horse';

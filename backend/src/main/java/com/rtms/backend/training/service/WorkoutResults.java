@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.entity.TrainingWorkout;
 
@@ -33,16 +34,16 @@ public final class WorkoutResults {
         if (request.getAverageSpeedKmh().compareTo(request.getTopSpeedKmh()) > 0) {
             throw new IllegalArgumentException("Average speed cannot exceed top speed!");
         }
-        if (request.getAverageHeartRate() < 30 || request.getAverageHeartRate() > 240
-                || request.getMaxHeartRate() < 30 || request.getMaxHeartRate() > 240
-                || request.getRecoveryHeartRate() < 30 || request.getRecoveryHeartRate() > 240) {
-            throw new IllegalArgumentException("Heart rate values must be between 30 and 240 bpm!");
+        if (request.getAverageHeartRate() < TrainingLimits.MIN_HEART_RATE_BPM || request.getAverageHeartRate() > TrainingLimits.MAX_HEART_RATE_BPM
+                || request.getMaxHeartRate() < TrainingLimits.MIN_HEART_RATE_BPM || request.getMaxHeartRate() > TrainingLimits.MAX_HEART_RATE_BPM
+                || request.getRecoveryHeartRate() < TrainingLimits.MIN_HEART_RATE_BPM || request.getRecoveryHeartRate() > TrainingLimits.MAX_HEART_RATE_BPM) {
+            throw new IllegalArgumentException("Heart rate values must be between " + TrainingLimits.MIN_HEART_RATE_BPM + " and " + TrainingLimits.MAX_HEART_RATE_BPM + " bpm!");
         }
         if (request.getAverageHeartRate() > request.getMaxHeartRate()) {
             throw new IllegalArgumentException("Average heart rate cannot exceed maximum heart rate!");
         }
-        if (request.getTrainerFeedback() != null && request.getTrainerFeedback().length() > 2000) {
-            throw new IllegalArgumentException("Trainer feedback cannot exceed 2000 characters!");
+        if (request.getTrainerFeedback() != null && request.getTrainerFeedback().length() > TrainingLimits.MAX_TRAINER_FEEDBACK_LENGTH) {
+            throw new IllegalArgumentException("Trainer feedback cannot exceed " + TrainingLimits.MAX_TRAINER_FEEDBACK_LENGTH + " characters!");
         }
     }
 

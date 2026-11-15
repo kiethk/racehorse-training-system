@@ -1,6 +1,6 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.HorseStallInfo;
+import com.rtms.backend.training.repository.projection.HorseStallInfo;
 import com.rtms.backend.training.entity.TrainingGroupMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,8 +15,6 @@ import java.util.Optional;
 public interface TrainingGroupMemberRepository extends JpaRepository<TrainingGroupMember, Long> {
 
     List<TrainingGroupMember> findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(Long groupId);
-
-    List<TrainingGroupMember> findByGroupIdInAndLeftAtIsNull(Collection<Long> groupIds);
 
     Optional<TrainingGroupMember> findByHorseIdAndLeftAtIsNull(Long horseId);
 
@@ -45,7 +43,7 @@ public interface TrainingGroupMemberRepository extends JpaRepository<TrainingGro
      * (Stall and area of many horses with ONE JOIN. A horse without a stall does not appear.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.HorseStallInfo(h.id, ss.stallCode, ss.groomId, a.code, a.trainerId)
+           SELECT new com.rtms.backend.training.repository.projection.HorseStallInfo(h.id, ss.stallCode, ss.groomId, a.code, a.trainerId)
            FROM Horse h
            JOIN StableStall ss ON h.currentStallId = ss.id
            JOIN Area a ON ss.areaId = a.id

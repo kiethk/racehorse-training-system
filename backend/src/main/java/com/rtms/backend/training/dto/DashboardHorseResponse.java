@@ -9,9 +9,9 @@ public class DashboardHorseResponse {
     private String horseName;
     private String breed;
     private String stallCode;
-    private Long planId;
+    private Long courseRunId;
     private String courseName;
-    private String planStatus; // "ACTIVE", "UPCOMING", "COMPLETED", "NONE"
+    private String courseRunStatus; // "ACTIVE", "UPCOMING", "COMPLETED", "NONE"
     private Integer completedSessions;
     private Integer totalSessions;
     /** Buổi bị hủy; không tính vào tiến độ. (Cancelled sessions; left out of the progress.) */
@@ -60,12 +60,12 @@ public class DashboardHorseResponse {
         this.stallCode = stallCode;
     }
 
-    public Long getPlanId() {
-        return planId;
+    public Long getCourseRunId() {
+        return courseRunId;
     }
 
-    public void setPlanId(Long planId) {
-        this.planId = planId;
+    public void setCourseRunId(Long courseRunId) {
+        this.courseRunId = courseRunId;
     }
 
     public String getCourseName() {
@@ -76,12 +76,12 @@ public class DashboardHorseResponse {
         this.courseName = courseName;
     }
 
-    public String getPlanStatus() {
-        return planStatus;
+    public String getCourseRunStatus() {
+        return courseRunStatus;
     }
 
-    public void setPlanStatus(String planStatus) {
-        this.planStatus = planStatus;
+    public void setCourseRunStatus(String courseRunStatus) {
+        this.courseRunStatus = courseRunStatus;
     }
 
     public Integer getCompletedSessions() {

@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import type { CareScheduleResponse, CareScheduleDetailResponse, TreatmentPlan, Prescription } from '@/features/care/types';
+import type { CareScheduleDetailResponse, TreatmentPlan, Prescription } from '@/features/care/types';
 
 describe('Verification-First Team: Vet Actor Acceptance Tests', () => {
 
@@ -87,6 +87,8 @@ describe('Verification-First Team: Vet Actor Acceptance Tests', () => {
         startDate: '2026-10-23',
         endDate: '2026-10-30',
         instructions: 'Mix with morning sweet feed',
+        status: 'ACTIVE',
+        administeredByRole: 'GROOM',
       };
 
       const plan: TreatmentPlan = {

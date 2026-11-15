@@ -56,27 +56,36 @@ BEGIN
 
         UPDATE care_schedule SET scheduled_at = NULL WHERE care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE';
 
-        -- Lấy các ca Routine lâm sàng (purpose != 'PREVENTIVE') hôm nay của VT01
+        -- Dời các ca Preventive đã hoàn tất hôm nay về hôm qua để hôm nay không bị tràn quota (> 3)
+        UPDATE care_schedule
+           SET scheduled_date = pg_temp.today() - 1,
+               completed_at = (pg_temp.today() - 1) + TIME '14:20'
+         WHERE veterinarian_id = pg_temp.uid('VT01')
+           AND purpose = 'PREVENTIVE'
+           AND status = 'COMPLETED'
+           AND scheduled_date = pg_temp.today();
+
+        -- Lấy các ca Routine lâm sàng (purpose != 'PREVENTIVE') hôm nay của VT01 đang SCHEDULED
         SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_routine_ids
           FROM (SELECT id FROM care_schedule
                  WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
-                   AND purpose != 'PREVENTIVE'
+                   AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
                    AND scheduled_date = pg_temp.today()
                  LIMIT 3) s;
 
-        -- Nếu chưa đủ 2 ca Routine lâm sàng, kéo từ ngày mai về
+        -- Nếu chưa đủ 2 ca Routine lâm sàng, kéo từ tương lai về hôm nay
         IF COALESCE(array_length(v_routine_ids, 1), 0) < 2 THEN
             FOR v_cs IN SELECT id FROM care_schedule
                          WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
                            AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
                            AND scheduled_date > pg_temp.today()
-                         ORDER BY id ASC LIMIT (2 - COALESCE(array_length(v_routine_ids, 1), 0)) LOOP
+                         ORDER BY scheduled_date ASC, id ASC LIMIT (2 - COALESCE(array_length(v_routine_ids, 1), 0)) LOOP
                 UPDATE care_schedule SET scheduled_date = pg_temp.today(), scheduled_at = NULL WHERE id = v_cs.id;
             END LOOP;
             SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_routine_ids
               FROM (SELECT id FROM care_schedule
                      WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
-                       AND purpose != 'PREVENTIVE'
+                       AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
                        AND scheduled_date = pg_temp.today()
                      LIMIT 3) s;
         END IF;
@@ -92,32 +101,32 @@ BEGIN
         IF v_routine_ids[2] IS NOT NULL THEN
             UPDATE care_schedule
                SET status = 'SCHEDULED', rollover_count = 1,
-                   reschedule_reason = 'TIME_EXCEEDED',
-                   reschedule_note = 'Routine examination window closed at 15:30, rescheduled to next day'
+                    reschedule_reason = 'TIME_EXCEEDED',
+                    reschedule_note = 'Routine examination window closed at 15:30, rescheduled to next day'
              WHERE id = v_routine_ids[2];
         END IF;
 
-        -- Lấy các ca Preventive tiêm phòng (purpose = 'PREVENTIVE') hôm nay của VT01
+        -- Lấy các ca Preventive tiêm phòng (purpose = 'PREVENTIVE') hôm nay của VT01 đang SCHEDULED
         SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_prev_ids
           FROM (SELECT id FROM care_schedule
                  WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
-                   AND purpose = 'PREVENTIVE'
+                   AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
                    AND scheduled_date = pg_temp.today()
                  LIMIT 3) s;
 
-        -- Nếu chưa đủ 2 ca Preventive, kéo từ ngày mai về
+        -- Nếu chưa đủ 2 ca Preventive, kéo từ tương lai về hôm nay
         IF COALESCE(array_length(v_prev_ids, 1), 0) < 2 THEN
             FOR v_cs IN SELECT id FROM care_schedule
                          WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
                            AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
                            AND scheduled_date > pg_temp.today()
-                         ORDER BY id ASC LIMIT (2 - COALESCE(array_length(v_prev_ids, 1), 0)) LOOP
+                         ORDER BY scheduled_date ASC, id ASC LIMIT (2 - COALESCE(array_length(v_prev_ids, 1), 0)) LOOP
                 UPDATE care_schedule SET scheduled_date = pg_temp.today(), scheduled_at = NULL WHERE id = v_cs.id;
             END LOOP;
             SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_prev_ids
               FROM (SELECT id FROM care_schedule
                      WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
-                       AND purpose = 'PREVENTIVE'
+                       AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
                        AND scheduled_date = pg_temp.today()
                      LIMIT 3) s;
         END IF;
@@ -133,8 +142,8 @@ BEGIN
         IF v_prev_ids[2] IS NOT NULL THEN
             UPDATE care_schedule
                SET status = 'SCHEDULED', rollover_count = 0,
-                   reschedule_reason = 'PEER_OFFLOAD',
-                   reschedule_note = 'Transferred from Dr. Emily Wilson (VT02) due to emergency case workload'
+                    reschedule_reason = 'PEER_OFFLOAD',
+                    reschedule_note = 'Transferred from Dr. Emily Wilson (VT02) due to emergency case workload'
              WHERE id = v_prev_ids[2];
         END IF;
 
@@ -142,20 +151,28 @@ BEGIN
         IF v_prev_ids[3] IS NOT NULL THEN
             UPDATE care_schedule
                SET status = 'SCHEDULED', rollover_count = 1,
-                   reschedule_reason = 'TIME_EXCEEDED',
-                   reschedule_note = 'Preventive vaccination window closed at 15:30, rescheduled to next day'
+                    reschedule_reason = 'TIME_EXCEEDED',
+                    reschedule_note = 'Preventive vaccination window closed at 15:30, rescheduled to next day'
              WHERE id = v_prev_ids[3];
         END IF;
 
-        -- Làm đẹp thêm cho ngày mai (Saturday 2026-11-07): xếp 1 ca Routine và 1 ca Preventive
+        -- Làm đẹp thêm cho ngày mai: xếp 1 ca Routine và 1 ca Preventive nếu có ca tương lai
         UPDATE care_schedule
-           SET status = 'SCHEDULED', scheduled_at = NULL,
+           SET scheduled_at = NULL,
                scheduled_date = pg_temp.today() + 1
-         WHERE id = (SELECT id FROM care_schedule WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND purpose != 'PREVENTIVE' AND scheduled_date > pg_temp.today() + 1 ORDER BY id ASC LIMIT 1);
+         WHERE id = (SELECT id FROM care_schedule
+                      WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                        AND purpose != 'PREVENTIVE' AND status = 'SCHEDULED'
+                        AND scheduled_date > pg_temp.today() + 1
+                      ORDER BY scheduled_date ASC, id ASC LIMIT 1);
 
         UPDATE care_schedule
-           SET status = 'SCHEDULED', scheduled_at = NULL,
+           SET scheduled_at = NULL,
                scheduled_date = pg_temp.today() + 1
-         WHERE id = (SELECT id FROM care_schedule WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND purpose = 'PREVENTIVE' AND scheduled_date > pg_temp.today() + 1 ORDER BY id ASC LIMIT 1);
+         WHERE id = (SELECT id FROM care_schedule
+                      WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                        AND purpose = 'PREVENTIVE' AND status = 'SCHEDULED'
+                        AND scheduled_date > pg_temp.today() + 1
+                      ORDER BY scheduled_date ASC, id ASC LIMIT 1);
     END;
 END $$;

@@ -8,6 +8,7 @@ export interface StaffSummary {
   active: boolean;
   createdAt: string;
   profileSummary?: string;
+  managedAreaCodes?: string[] | null;
 }
 
 export interface StaffCreationRequest {

@@ -1,7 +1,9 @@
 package com.rtms.backend.identity.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.dto.ChangePasswordRequest;
+import com.rtms.backend.identity.dto.ChangePasswordResponse;
 import com.rtms.backend.identity.dto.LoginRequest;
 import com.rtms.backend.identity.dto.LoginResponse;
 import com.rtms.backend.identity.dto.OwnerRegistrationRequest;
@@ -11,6 +13,7 @@ import com.rtms.backend.identity.service.AuthService;
 import com.rtms.backend.identity.service.AuthService.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -50,7 +53,7 @@ public class AuthController {
             HttpServletResponse response) {
         
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new com.rtms.backend.config.ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
         }
 
         AuthService.RefreshResult result = authService.refresh(refreshToken);
@@ -84,25 +87,33 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    public ApiResponse<String> changePassword(
+    public ApiResponse<ChangePasswordResponse> changePassword(
             @jakarta.validation.Valid @RequestBody ChangePasswordRequest request,
             HttpServletResponse response) {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
 
-        authService.changePassword(currentUser.getUserId(), request);
+        AuthService.LoginResult result = authService.changePassword(currentUser.getUserId(), request);
 
-        // Expire refresh token cookie so user logs in afresh
-        setRefreshCookie(response, "deleted", 0);
+        // Keep current session valid with fresh refresh token cookie
+        setRefreshCookie(response, result.refreshToken(), refreshExpirationMs / 1000);
 
-        return ApiResponse.success("Password changed successfully. Please sign in with your new password.");
+        return ApiResponse.success(new ChangePasswordResponse(
+                result.token(),
+                "Password changed successfully."
+        ));
     }
 
     @Operation(security = {})
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<OwnerRegistrationResponse>> register(
-            @jakarta.validation.Valid @RequestBody OwnerRegistrationRequest request) {
-        OwnerRegistrationResponse response = authService.registerOwner(request);
+            @RequestBody OwnerRegistrationRequest request,
+            HttpServletRequest httpRequest) {
+        String forwardedFor = httpRequest.getHeader("X-Forwarded-For");
+        String clientIp = forwardedFor == null || forwardedFor.isBlank()
+                ? httpRequest.getRemoteAddr()
+                : forwardedFor.split(",", 2)[0].trim();
+        OwnerRegistrationResponse response = authService.registerOwner(request, clientIp);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
     }

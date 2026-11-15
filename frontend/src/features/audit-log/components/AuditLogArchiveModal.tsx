@@ -45,6 +45,9 @@ export function AuditLogArchiveModal({
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  // eslint-disable-next-line react-hooks/purity
+  const thirtyDaysAgoStr = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+
   // Reset to initial step when opened
   useEffect(() => {
     if (open) {
@@ -64,6 +67,9 @@ export function AuditLogArchiveModal({
   })();
 
   const isCustomInvalidRange = Boolean(preset === 'custom' && fromDate && toDate && fromDate > toDate);
+  const isCustomRetentionViolation = Boolean(
+    preset === 'custom' && ((toDate && toDate > thirtyDaysAgoStr) || (fromDate && fromDate > thirtyDaysAgoStr))
+  );
 
   const getPresetDescription = () => {
     if (preset === '30_days') {
@@ -87,6 +93,10 @@ export function AuditLogArchiveModal({
       }
       if (fromDate && toDate && fromDate > toDate) {
         toast.error('Invalid date range', 'From Date cannot be later than To Date. Please swap the dates.');
+        return;
+      }
+      if (isCustomRetentionViolation) {
+        toast.error('Retention policy violation', 'Audit logs within the last 30 days cannot be purged (BR-MGR-19).');
         return;
       }
     }
@@ -180,8 +190,14 @@ export function AuditLogArchiveModal({
               <Button
                 variant="destructive"
                 onClick={handleNextStep}
-                disabled={submitting || (preset !== 'custom' && isSelectionEmpty)}
-                title={preset !== 'custom' && isSelectionEmpty ? 'No matching logs available to purge' : undefined}
+                disabled={submitting || (preset !== 'custom' && isSelectionEmpty) || isCustomRetentionViolation}
+                title={
+                  isCustomRetentionViolation
+                    ? 'Logs within the last 30 days must be retained'
+                    : preset !== 'custom' && isSelectionEmpty
+                    ? 'No matching logs available to purge'
+                    : undefined
+                }
               >
                 Review &amp; Purge &rarr;
               </Button>
@@ -325,9 +341,10 @@ export function AuditLogArchiveModal({
                     <input
                       type="date"
                       value={fromDate}
+                      max={thirtyDaysAgoStr}
                       onChange={(e) => setFromDate(e.target.value)}
                       className={`w-full h-8 px-2 rounded border ${
-                        isCustomInvalidRange
+                        isCustomInvalidRange || (fromDate && fromDate > thirtyDaysAgoStr)
                           ? 'border-rose-400 dark:border-rose-600'
                           : 'border-[var(--color-border)]'
                       } bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]`}
@@ -340,14 +357,20 @@ export function AuditLogArchiveModal({
                     <input
                       type="date"
                       value={toDate}
+                      max={thirtyDaysAgoStr}
                       onChange={(e) => setToDate(e.target.value)}
                       className={`w-full h-8 px-2 rounded border ${
-                        isCustomInvalidRange
+                        isCustomInvalidRange || (toDate && toDate > thirtyDaysAgoStr)
                           ? 'border-rose-400 dark:border-rose-600'
                           : 'border-[var(--color-border)]'
                       } bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]`}
                     />
                   </div>
+                  {isCustomRetentionViolation && (
+                    <div className="col-span-2 text-[11px] text-rose-500 dark:text-rose-400 pt-0.5">
+                      Cutoff date must be at least 30 days ago (on or before {thirtyDaysAgoStr}).
+                    </div>
+                  )}
                   {isCustomInvalidRange && (
                     <div className="col-span-2 flex items-center justify-between text-[11px] text-rose-500 dark:text-rose-400 pt-0.5">
                       <span>From Date cannot be later than To Date.</span>

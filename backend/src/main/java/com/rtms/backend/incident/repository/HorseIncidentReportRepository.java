@@ -1,7 +1,7 @@
 package com.rtms.backend.incident.repository;
 
 import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -55,16 +55,16 @@ public interface HorseIncidentReportRepository extends JpaRepository<HorseIncide
 
     @Query("""
             SELECT r FROM HorseIncidentReport r
-            WHERE r.status IN :statuses AND r.severity IN :severities
+            WHERE r.status IN :statuses AND r.incidentType IN :severities
             ORDER BY r.reportedAt DESC
             """)
     List<HorseIncidentReport> findUrgentIncidents(
             @Param("statuses") Collection<IncidentStatus> statuses,
-            @Param("severities") Collection<IncidentSeverity> severities);
+            @Param("severities") Collection<IncidentType> severities);
 
-    long countByStatusInAndSeverityIn(
+    long countByStatusInAndIncidentTypeIn(
             Collection<IncidentStatus> statuses,
-            Collection<IncidentSeverity> severities);
+            Collection<IncidentType> severities);
 
     long countByStatusIn(Collection<IncidentStatus> statuses);
 }

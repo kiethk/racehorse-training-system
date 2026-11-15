@@ -11,7 +11,6 @@ import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.service.TrainingDecisionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
-/** Người báo sự cố thấy tên vet được giao (handledById) trên mỗi báo cáo. */
+/** Mỗi báo cáo mang tên người gửi và tên vet được giao (handledById). */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class HorseIncidentReportHandlerNameTest {
@@ -40,7 +39,6 @@ class HorseIncidentReportHandlerNameTest {
     @Mock FileStorageService files;
     @Mock CareScheduleRepository schedules;
     @Mock CareScheduleService careScheduleService;
-    @Mock TrainingDecisionService trainingDecisions;
     @Mock UserRepository users;
     @Mock com.rtms.backend.stable.repository.StableStallRepository stalls;
 
@@ -50,7 +48,7 @@ class HorseIncidentReportHandlerNameTest {
     @BeforeEach
     void setUp() {
         service = new HorseIncidentReportService(reports, horses, files, schedules, careScheduleService,
-                trainingDecisions, users, stalls);
+                users, stalls);
         when(users.findAllById(anyCollection())).thenAnswer(call -> {
             Collection<Long> ids = call.getArgument(0);
             return ids.stream().map(id -> user(id, id == 6L ? "James Carter" : "Hannah Reed")).toList();
@@ -127,6 +125,22 @@ class HorseIncidentReportHandlerNameTest {
         HorseIncidentReport handled = service.handleReport(4L, request, new AuthenticatedUser(3L, "vet3@rtms.com", "VETERINARIAN"));
 
         assertEquals("Hannah Reed", handled.getHandlerName());
+    }
+
+    @Test
+    void everyReportCarriesTheReporterNameInTheSameLookupAsTheVet() {
+        HorseIncidentReport byGroom = report(1L, IncidentStatus.IN_REVIEW, 6L);
+        byGroom.setReportedById(10L);
+        HorseIncidentReport byTrainer = report(2L, IncidentStatus.REPORTED, null);
+        byTrainer.setReportedById(6L);
+        when(reports.findByReportedById(10L)).thenReturn(List.of(byGroom, byTrainer));
+
+        service.getReports(null, null, groom);
+
+        assertEquals("Hannah Reed", byGroom.getReportedByName());
+        assertEquals("James Carter", byTrainer.getReportedByName());
+        assertEquals("James Carter", byGroom.getHandlerName());
+        verify(users, times(1)).findAllById(any());
     }
 
     private static HorseIncidentReport report(long id, IncidentStatus status, Long vetId) {

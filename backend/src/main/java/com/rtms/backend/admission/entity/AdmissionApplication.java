@@ -25,6 +25,15 @@ public class AdmissionApplication {
     @Column(name = "quarantine_stall_id")
     private Long quarantineStallId;
 
+    @Column(name = "assigned_groom_id")
+    private Long assignedGroomId;
+
+    @Column(name = "groom_assigned_at")
+    private LocalDateTime groomAssignedAt;
+
+    @Column(name = "groom_review_due_at")
+    private LocalDateTime groomReviewDueAt;
+
     @Column(name = "groom_id")
     private Long groomId;
 
@@ -147,6 +156,13 @@ public class AdmissionApplication {
     public void setQuarantineStallId(Long quarantineStallId) {
         this.quarantineStallId = quarantineStallId;
     }
+
+    public Long getAssignedGroomId() { return assignedGroomId; }
+    public void setAssignedGroomId(Long assignedGroomId) { this.assignedGroomId = assignedGroomId; }
+    public LocalDateTime getGroomAssignedAt() { return groomAssignedAt; }
+    public void setGroomAssignedAt(LocalDateTime groomAssignedAt) { this.groomAssignedAt = groomAssignedAt; }
+    public LocalDateTime getGroomReviewDueAt() { return groomReviewDueAt; }
+    public void setGroomReviewDueAt(LocalDateTime groomReviewDueAt) { this.groomReviewDueAt = groomReviewDueAt; }
 
     public Long getGroomId() {
         return groomId;

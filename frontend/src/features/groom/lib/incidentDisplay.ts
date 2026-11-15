@@ -1,5 +1,5 @@
 import type { Horse } from '@/features/stable/types';
-import type { IncidentReport, IncidentSeverity, IncidentStatus } from '../types';
+import type { IncidentReport, IncidentType, IncidentStatus } from '../types';
 import { formatDateTime } from '@/lib/display';
 
 export const INCIDENT_STATUS_MAP: Record<
@@ -12,15 +12,23 @@ export const INCIDENT_STATUS_MAP: Record<
   DISMISSED: { tone: 'neutral', label: 'Closed' },
 };
 
-export const INCIDENT_SEVERITY_MAP: Record<
-  IncidentSeverity,
-  { tone: 'neutral' | 'info' | 'warning' | 'danger'; label: string }
+export const INCIDENT_TYPE_MAP: Record<
+  IncidentType,
+  { tone: 'info' | 'danger'; label: string }
 > = {
-  LOW: { tone: 'neutral', label: 'Low' },
-  MEDIUM: { tone: 'info', label: 'Medium' },
-  HIGH: { tone: 'warning', label: 'High' },
-  CRITICAL: { tone: 'danger', label: 'Critical' },
+  PROBLEM: { tone: 'info', label: 'Problem' },
+  TRAUMA: { tone: 'danger', label: 'Trauma' },
 };
+
+/**
+ * Who took the case: the vet's name, "Awaiting assignment" while a reported case has no vet yet,
+ * or null when there is nothing useful to say (e.g. dismissed before any vet was assigned).
+ */
+export function incidentVetText(report: Pick<IncidentReport, 'status' | 'handlerName'>): string | null {
+  if (report.status === 'DISMISSED') return null;
+  if (report.handlerName) return report.handlerName;
+  return report.status === 'REPORTED' ? 'Awaiting assignment' : null;
+}
 
 /**
  * Horse name for an incident. A Groom only sees the horses they currently look after, so an older

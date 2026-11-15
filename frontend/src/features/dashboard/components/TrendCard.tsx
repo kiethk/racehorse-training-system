@@ -5,7 +5,7 @@ import { EmptyState, Panel, PeriodBarChart, SectionTitle, Skeleton, type PeriodB
 import { displayError, formatDate } from '@/lib/display';
 import type { Trend } from '../types';
 
-const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit' };
 
 type ChartSettings<TItem> = Omit<PeriodBarChartProps<TItem>, 'fromDate' | 'toDate' | 'items'>;
 

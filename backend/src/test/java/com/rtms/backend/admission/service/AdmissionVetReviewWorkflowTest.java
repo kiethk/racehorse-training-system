@@ -18,6 +18,10 @@ import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.medical.entity.InjuryRecord;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
@@ -40,7 +44,7 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -100,7 +104,7 @@ class AdmissionVetReviewWorkflowTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     @Mock
     private CandidateHorseProfileRepository candidateProfileRepository;
     @Mock
@@ -133,10 +137,10 @@ class AdmissionVetReviewWorkflowTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper()
+                mock(PreventiveVaccinationService.class),
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
 
         admissionQueryService = new AdmissionQueryService(
@@ -290,6 +294,59 @@ class AdmissionVetReviewWorkflowTest {
     }
 
     @Test
+    @DisplayName("Ca ROUTINE trên ngựa đã APPROVED: gửi kèm admissionId cũ không bị lỗi 409 ADMISSION_MISMATCH")
+    void completeCareSchedule_routineWithApprovedAdmission_success() {
+        Long scheduleId = 101L;
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setStatus(AdmissionStatus.APPROVED);
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(admissionRepository.findById(admissionId)).thenReturn(Optional.of(admission));
+        when(admissionRepository.findByIdForUpdate(admissionId)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        when(healthRecordRepository.save(any(HealthRecord.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings("Routine check clear");
+        req.setDiagnosis("Good condition");
+        req.setTrainingDecision(TrainingDecision.ALLOWED);
+        req.setMetrics(List.of(fullMetric()));
+
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setDescription("Next check");
+        next.setScheduledDate(LocalDate.now().plusDays(14).toString());
+        next.setAdmissionId(admissionId);
+        req.setNextSchedule(next);
+
+        CareScheduleResponse res = careScheduleService.completeCareSchedule(scheduleId, req, vetId);
+
+        assertNotNull(res);
+        assertEquals(CareScheduleStatus.COMPLETED, schedule.getStatus());
+    }
+
+    @Test
     @DisplayName("Vet Queue is filtered server-side by assigned veterinarian")
     void getVetQueue_filteredByAssignedVet() {
         Long vetId = 15L;
@@ -362,8 +419,10 @@ class AdmissionVetReviewWorkflowTest {
         when(careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(1L);
-        when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
+        when(careScheduleRepository.countApprovedVetQueueItems(eq(vetId), anyCollection()))
                 .thenReturn(2L);
+        when(careScheduleRepository.countReviewedVetQueueItems(vetId))
+                .thenReturn(1L);
 
         var summary = admissionQueryService.getVetQueueSummary(vetId);
 
@@ -372,6 +431,7 @@ class AdmissionVetReviewWorkflowTest {
         assertEquals(2L, summary.awaiting());
         assertEquals(1L, summary.inProgress());
         assertEquals(2L, summary.approved());
+        assertEquals(1L, summary.reviewed());
     }
 
     @Test
@@ -452,7 +512,6 @@ class AdmissionVetReviewWorkflowTest {
                 admission, "Desert Star", "Veterinary Clinical Review", "Chronic lameness not suitable for racing");
         verify(admissionNotificationService).notifyManagersOfAdmissionRejection(
                 admission, "Desert Star", "Veterinary Clinical Review", "Chronic lameness not suitable for racing");
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
         verify(healthRecordRepository, never()).save(any());
     }
 
@@ -651,7 +710,7 @@ class AdmissionVetReviewWorkflowTest {
         req.setTrainingDecision(TrainingDecision.ALLOWED);
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
-        next.setScheduledDate(java.time.LocalDate.now().plusDays(3).toString());
+        next.setScheduledDate(LocalDate.now().plusDays(3).toString());
         next.setDescription("Recheck urgent case");
         req.setNextSchedule(next);
         HorseHealthMetricRequest m = new HorseHealthMetricRequest();
@@ -738,9 +797,9 @@ class AdmissionVetReviewWorkflowTest {
         admission.setHorseId(horseId);
         admission.setStatus(AdmissionStatus.VET_REVIEW);
 
-        com.rtms.backend.medical.repository.InjuryRecordRepository injuryRepo =
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class);
-        when(injuryRepo.save(any(com.rtms.backend.medical.entity.InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
+        InjuryRecordRepository injuryRepo =
+                mock(InjuryRecordRepository.class);
+        when(injuryRepo.save(any(InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
 
         CareScheduleService serviceWithInjuryRepo = new CareScheduleService(
                 careScheduleRepository,
@@ -757,10 +816,10 @@ class AdmissionVetReviewWorkflowTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
+                mock(PreventiveVaccinationService.class),
                 injuryRepo,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper()
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
 
         when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
@@ -775,6 +834,13 @@ class AdmissionVetReviewWorkflowTest {
         });
         when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
         when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+
+        com.rtms.backend.medical.entity.HorseBodyRegion bodyRegion = new com.rtms.backend.medical.entity.HorseBodyRegion();
+        bodyRegion.setId(1L);
+        bodyRegion.setCode("foreleg_right");
+        bodyRegion.setDisplayName("Right forelimb");
+        when(entityManager.find(com.rtms.backend.medical.entity.HorseBodyRegion.class, 1L))
+                .thenReturn(bodyRegion);
 
         CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
         req.setFindings("Findings");
@@ -793,7 +859,7 @@ class AdmissionVetReviewWorkflowTest {
 
         verify(injuryRepo).save(argThat(ir ->
                 ir.getHorseId().equals(horseId)
-                        && "Tendon strain".equals(ir.getInjuryType())
+                        && "Right forelimb".equals(ir.getInjuryType())
                         && "MODERATE".equals(ir.getSeverity())));
     }
 
@@ -810,9 +876,7 @@ class AdmissionVetReviewWorkflowTest {
 
     private InjuryMarkerRequest injuryMarker() {
         InjuryMarkerRequest marker = new InjuryMarkerRequest();
-        marker.setInjuryType("Tendon strain");
         marker.setBodyRegionId(1L);
-        marker.setSeverity("MODERATE");
         marker.setDescription("Superficial digital flexor tendon, right fore");
         marker.setDiagnosedAt(LocalDateTime.now());
         return marker;

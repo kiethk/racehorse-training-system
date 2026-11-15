@@ -13,9 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Lịch sử Group Plan và Attendance của một chiến mã. (The Group Plan history and Attendance of one horse.) */
+/** Lịch sử Course Run và Attendance của một chiến mã. (The Course Run history and Attendance of one horse.) */
 @RestController
-@RequestMapping("/api/horses/{horseId}/group-plan-history")
+@RequestMapping("/api/horses/{horseId}/course-run-history")
 public class HorseAttendanceController {
 
     private final HorseAttendanceService attendanceService;

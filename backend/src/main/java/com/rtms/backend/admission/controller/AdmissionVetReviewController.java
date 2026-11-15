@@ -6,6 +6,7 @@ import com.rtms.backend.admission.dto.VetQueueSummaryResponse;
 import com.rtms.backend.admission.dto.VetReviewRequest;
 import com.rtms.backend.admission.dto.VetReviewResponse;
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 
 import com.rtms.backend.admission.enums.AdmissionStatus;
@@ -19,6 +20,9 @@ import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.admission.service.OwnerAdmissionService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -56,6 +60,10 @@ public class AdmissionVetReviewController {
             @RequestParam(required = false) String priority,
             Pageable pageable,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        if (pill != null && !Set.of("ALL", "ACTIVE", "AWAITING", "IN_PROGRESS", "APPROVED", "REVIEWED")
+                .contains(pill.trim().toUpperCase(Locale.ROOT))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PILL", "Invalid vet queue pill");
+        }
         return ApiResponse.success(admissionQueryService.getVetQueue(
                 currentUser.getUserId(), search, pill, admissionStatus, scheduleStatus, careType, priority, pageable));
     }

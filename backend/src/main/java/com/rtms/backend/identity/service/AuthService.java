@@ -17,6 +17,7 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
 import com.rtms.backend.notification.service.EmailService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -31,6 +33,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Service
@@ -45,7 +48,8 @@ public class AuthService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final GroomProfileRepository groomProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final com.rtms.backend.notification.service.EmailService emailService;
+    private final EmailService emailService;
+    private final TurnstileVerifier turnstileVerifier;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{10,15}$");
@@ -67,7 +71,21 @@ public class AuthService {
             RefreshTokenRepository refreshTokenRepository) {
         this(userRepository, roleRepository, passwordEncoder, jwtUtil,
                 veterinarianProfileRepository, trainerProfileRepository, groomProfileRepository, refreshTokenRepository,
-                null);
+                null, disabledTurnstileVerifier());
+    }
+
+    public AuthService(UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            JwtUtil jwtUtil,
+            VeterinarianProfileRepository veterinarianProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            GroomProfileRepository groomProfileRepository,
+            RefreshTokenRepository refreshTokenRepository,
+            EmailService emailService) {
+        this(userRepository, roleRepository, passwordEncoder, jwtUtil, veterinarianProfileRepository,
+                trainerProfileRepository, groomProfileRepository, refreshTokenRepository, emailService,
+                disabledTurnstileVerifier());
     }
 
     @Autowired
@@ -79,7 +97,8 @@ public class AuthService {
             TrainerProfileRepository trainerProfileRepository,
             GroomProfileRepository groomProfileRepository,
             RefreshTokenRepository refreshTokenRepository,
-            @Autowired(required = false) EmailService emailService) {
+            @Autowired(required = false) EmailService emailService,
+            TurnstileVerifier turnstileVerifier) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -89,6 +108,12 @@ public class AuthService {
         this.groomProfileRepository = groomProfileRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.emailService = emailService;
+        this.turnstileVerifier = turnstileVerifier;
+    }
+
+    private static TurnstileVerifier disabledTurnstileVerifier() {
+        return new TurnstileVerifier(new ObjectMapper(), false, "", "",
+                HttpClient.newHttpClient());
     }
 
     @Transactional
@@ -219,7 +244,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(Long userId, ChangePasswordRequest request) {
+    public LoginResult changePassword(Long userId, ChangePasswordRequest request) {
         if (request == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request body is required");
         }
@@ -242,13 +267,37 @@ public class AuthService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
+        user = userRepository.saveAndFlush(user);
 
-        // Revoke all active tokens so user must log in again with new password
+        // Revoke all prior active tokens so stale sessions on other devices are terminated
         refreshTokenRepository.revokeAllActiveTokensByUser(user, LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS + 1));
+
+        // Issue fresh access & refresh tokens to keep the current session seamless
+        String accessToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
+        String rawRefreshToken = generateOpaqueToken();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(hashToken(rawRefreshToken));
+        refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(refreshExpirationMs / 1000));
+        refreshTokenRepository.save(refreshToken);
+
+        LoginResponse loginResponse = LoginResponse.fromUser(user, null);
+        loginResponse.setAccessToken(accessToken);
+
+        return new LoginResult(accessToken, rawRefreshToken, loginResponse);
     }
 
     public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {
+        return registerOwner(request, null);
+    }
+
+    public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request, String clientIp) {
+        turnstileVerifier.verify(request == null ? null : request.getCaptchaToken(), clientIp);
+        return registerOwnerAfterVerification(request);
+    }
+
+    private OwnerRegistrationResponse registerOwnerAfterVerification(OwnerRegistrationRequest request) {
         if (request == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Registration details are required");
         }
@@ -263,7 +312,7 @@ public class AuthService {
         if (rawEmail.isEmpty() || rawEmail.length() > 255 || !EMAIL_PATTERN.matcher(rawEmail).matches()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_EMAIL", "A valid email address is required");
         }
-        String email = rawEmail.toLowerCase(java.util.Locale.ROOT);
+        String email = rawEmail.toLowerCase(Locale.ROOT);
 
         String password = request.getPassword() == null ? "" : request.getPassword();
         byte[] passwordBytes = password.getBytes(StandardCharsets.UTF_8);

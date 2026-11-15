@@ -11,7 +11,7 @@ interface ReviewDecisionDialogProps {
   /** Null keeps the dialog closed; a decision opens it for that decision. */
   decision: ReviewDecisionValue | null;
   title: string;
-  description: string;
+  description?: string;
   loading?: boolean;
   /** Request error shown inside the dialog, so the typed feedback is not lost. */
   error?: string | null;
@@ -56,7 +56,7 @@ export function ReviewDecisionDialog({ decision, title, description, loading = f
       }}
       description={(
         <div className="space-y-4">
-          <p>{description}</p>
+          {description && <p>{description}</p>}
           {error && <Notice tone="error">{error}</Notice>}
           <FormField
             label={rejecting ? 'Reason for rejection' : 'Feedback (optional)'}

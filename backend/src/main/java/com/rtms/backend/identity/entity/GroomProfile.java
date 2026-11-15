@@ -1,5 +1,7 @@
 package com.rtms.backend.identity.entity;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -23,9 +25,15 @@ public class GroomProfile {
 
     /** Lần gần nhất Groom nhận một ngựa mới vào chuồng của mình; NULL = chưa từng nhận (V202610261300). */
     @Column(name = "last_horse_assigned_at")
-    private java.time.LocalDateTime lastHorseAssignedAt;
+    private LocalDateTime lastHorseAssignedAt;
 
     // ĐÃ XOÁ (V46): field shift kiểu GroomShift — enum chết, xem V46 để biết lý do
+
+    @Column(name = "last_arrival_confirmed_at")
+    private LocalDateTime lastArrivalConfirmedAt;
+
+    public LocalDateTime getLastArrivalConfirmedAt() { return lastArrivalConfirmedAt; }
+    public void setLastArrivalConfirmedAt(LocalDateTime at) { this.lastArrivalConfirmedAt = at; }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
@@ -33,6 +41,6 @@ public class GroomProfile {
     public Long getTrainerId() { return trainerId; }
     public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 
-    public java.time.LocalDateTime getLastHorseAssignedAt() { return lastHorseAssignedAt; }
-    public void setLastHorseAssignedAt(java.time.LocalDateTime lastHorseAssignedAt) { this.lastHorseAssignedAt = lastHorseAssignedAt; }
+    public LocalDateTime getLastHorseAssignedAt() { return lastHorseAssignedAt; }
+    public void setLastHorseAssignedAt(LocalDateTime lastHorseAssignedAt) { this.lastHorseAssignedAt = lastHorseAssignedAt; }
 }

@@ -1,10 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { newestFirst, planOrder } from '../lib/listOrder.ts';
-import type { PlanStatus } from '../types';
+import { newestFirst, courseRunOrder } from '../lib/listOrder.ts';
+import type { CourseRunStatus } from '../types';
 
-function plan(planId: number, status: PlanStatus) {
-  return { planId, status };
+function courseRun(courseRunId: number, status: CourseRunStatus) {
+  return { courseRunId, status };
 }
 
 describe('newestFirst', () => {
@@ -13,14 +13,14 @@ describe('newestFirst', () => {
   });
 });
 
-describe('planOrder', () => {
-  it('lists active plans first, then upcoming, then completed, and cancelled last', () => {
-    const sorted = [plan(1, 'CANCELLED'), plan(2, 'COMPLETED'), plan(3, 'UPCOMING'), plan(4, 'ACTIVE')].sort(planOrder);
+describe('courseRunOrder', () => {
+  it('lists active course runs first, then upcoming, then completed, and cancelled last', () => {
+    const sorted = [courseRun(1, 'CANCELLED'), courseRun(2, 'COMPLETED'), courseRun(3, 'UPCOMING'), courseRun(4, 'ACTIVE')].sort(courseRunOrder);
     assert.deepEqual(sorted.map((row) => row.status), ['ACTIVE', 'UPCOMING', 'COMPLETED', 'CANCELLED']);
   });
 
-  it('puts the newest plan first within the same status', () => {
-    const sorted = [plan(3, 'ACTIVE'), plan(8, 'ACTIVE'), plan(5, 'CANCELLED'), plan(9, 'CANCELLED')].sort(planOrder);
-    assert.deepEqual(sorted.map((row) => row.planId), [8, 3, 9, 5]);
+  it('puts the newest course run first within the same status', () => {
+    const sorted = [courseRun(3, 'ACTIVE'), courseRun(8, 'ACTIVE'), courseRun(5, 'CANCELLED'), courseRun(9, 'CANCELLED')].sort(courseRunOrder);
+    assert.deepEqual(sorted.map((row) => row.courseRunId), [8, 3, 9, 5]);
   });
 });

@@ -6,7 +6,7 @@ import java.time.LocalDate;
 public class HorseFitnessTrendItemResponse {
     private Long workoutId;
     private LocalDate date;
-    private String subjectName;
+    private String exerciseName;
     private BigDecimal distanceMeters;
     private BigDecimal actualDurationMinutes;
     private BigDecimal averageSpeedKmh;
@@ -23,14 +23,14 @@ public class HorseFitnessTrendItemResponse {
      * Constructor cho truy vấn JPQL (SELECT new ...).
      * (Constructor for the JPQL projection.)
      */
-    public HorseFitnessTrendItemResponse(Long workoutId, LocalDate date, String subjectName,
+    public HorseFitnessTrendItemResponse(Long workoutId, LocalDate date, String exerciseName,
                                          BigDecimal distanceMeters, BigDecimal actualDurationMinutes,
                                          BigDecimal averageSpeedKmh, BigDecimal topSpeedKmh,
                                          Integer averageHeartRate, Integer maxHeartRate,
                                          Integer recoveryHeartRate, Integer performanceRating) {
         this.workoutId = workoutId;
         this.date = date;
-        this.subjectName = subjectName;
+        this.exerciseName = exerciseName;
         this.distanceMeters = distanceMeters;
         this.actualDurationMinutes = actualDurationMinutes;
         this.averageSpeedKmh = averageSpeedKmh;
@@ -57,12 +57,12 @@ public class HorseFitnessTrendItemResponse {
         this.date = date;
     }
 
-    public String getSubjectName() {
-        return subjectName;
+    public String getExerciseName() {
+        return exerciseName;
     }
 
-    public void setSubjectName(String subjectName) {
-        this.subjectName = subjectName;
+    public void setExerciseName(String exerciseName) {
+        this.exerciseName = exerciseName;
     }
 
     public BigDecimal getDistanceMeters() {

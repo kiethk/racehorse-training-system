@@ -7,7 +7,7 @@ import { Modal } from './Modal';
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  description: ReactNode;
+  description?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: 'primary' | 'danger';
@@ -53,7 +53,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <div className="text-sm leading-relaxed text-[var(--color-text-secondary)]">{description}</div>
+      {description && <div className="text-sm leading-relaxed text-[var(--color-text-secondary)]">{description}</div>}
     </Modal>
   );
 }

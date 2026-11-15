@@ -1,9 +1,9 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.enums.CourseRunStatus;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.stereotype.Service;
@@ -26,16 +26,16 @@ public class SessionSettlementServiceImpl implements SessionSettlementService {
 
     private final TrainingSessionRepository sessionRepository;
     private final TrainingWorkoutRepository workoutRepository;
-    private final GroupPlanRepository planRepository;
+    private final CourseRunRepository courseRunRepository;
     private final Clock clock;
 
     public SessionSettlementServiceImpl(TrainingSessionRepository sessionRepository,
                                         TrainingWorkoutRepository workoutRepository,
-                                        GroupPlanRepository planRepository,
+                                        CourseRunRepository courseRunRepository,
                                         Clock clock) {
         this.sessionRepository = sessionRepository;
         this.workoutRepository = workoutRepository;
-        this.planRepository = planRepository;
+        this.courseRunRepository = courseRunRepository;
         this.clock = clock;
     }
 
@@ -53,18 +53,18 @@ public class SessionSettlementServiceImpl implements SessionSettlementService {
             workoutRepository.markWorkoutsOfHeldSessionsAsHeld();
         }
 
-        // 2. Kế hoạch tới ngày bắt đầu thành ACTIVE. (Plans that reached their start date become ACTIVE.)
-        List<GroupPlan> started = planRepository.findByStatusAndStartDateLessThanEqual(TrainingPlanStatus.UPCOMING, today);
-        started.forEach(plan -> plan.setStatus(TrainingPlanStatus.ACTIVE));
-        planRepository.saveAll(started);
+        // 2. Kế hoạch tới ngày bắt đầu thành ACTIVE. (Course runs that reached their start date become ACTIVE.)
+        List<CourseRun> started = courseRunRepository.findByStatusAndStartDateLessThanEqual(CourseRunStatus.UPCOMING, today);
+        started.forEach(courseRun -> courseRun.setStatus(CourseRunStatus.ACTIVE));
+        courseRunRepository.saveAll(started);
 
-        // 3. Kế hoạch không còn buổi nào chờ chạy thì đóng. (Plans with no Session left to run close.)
-        List<GroupPlan> finished = planRepository.findWithoutScheduledSessions(
-                List.of(TrainingPlanStatus.UPCOMING, TrainingPlanStatus.ACTIVE), SessionStatus.SCHEDULED);
-        for (GroupPlan plan : finished) {
-            boolean anyHeld = sessionRepository.countByGroupPlanIdAndStatus(plan.getId(), SessionStatus.HELD) > 0;
-            plan.setStatus(anyHeld ? TrainingPlanStatus.COMPLETED : TrainingPlanStatus.CANCELLED);
+        // 3. Kế hoạch không còn buổi nào chờ chạy thì đóng. (Course runs with no Session left to run close.)
+        List<CourseRun> finished = courseRunRepository.findWithoutScheduledSessions(
+                CourseRunStatus.UNFINISHED, SessionStatus.SCHEDULED);
+        for (CourseRun courseRun : finished) {
+            boolean anyHeld = sessionRepository.countByCourseRunIdAndStatus(courseRun.getId(), SessionStatus.HELD) > 0;
+            courseRun.setStatus(anyHeld ? CourseRunStatus.COMPLETED : CourseRunStatus.CANCELLED);
         }
-        planRepository.saveAll(finished);
+        courseRunRepository.saveAll(finished);
     }
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button, FormField, Input, Modal, Notice } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
@@ -13,7 +12,6 @@ interface Props {
 }
 
 export function ChangePasswordModal({ open, onClose }: Props) {
-  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,11 +46,14 @@ export function ChangePasswordModal({ open, onClose }: Props) {
       if (!res.success) {
         throw new Error(res.message || 'Failed to change password.');
       }
-      toast.success('Password changed successfully. Please sign in again.');
+      toast.success('Password updated successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrors({});
+      setError(null);
+      setLoading(false);
       onClose();
-      setTimeout(() => {
-        router.push('/login');
-      }, 1000);
     } catch (cause) {
       setError(displayError(cause, 'Unable to change password.'));
       setLoading(false);

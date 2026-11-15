@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { DataTable, type DataTableColumn, type DataTablePagination } from '@/components/ui/DataTable';
 import { LinkButton } from '@/components/ui/Button';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { EntityLink } from '@/components/ui/EntityLink';
 import { formatDate } from '@/lib/display';
 import { AdmissionStatusBadge } from './AdmissionStatusBadge';
 
@@ -67,7 +68,7 @@ export function AdmissionTable<Row extends AdmissionRow>({
             <HorseAvatar name={admission.candidateName} image={admission.imageUrl} size={32} rounded="md" />
           )}
           <div className="min-w-0">
-            <span className="block truncate font-semibold">{admission.candidateName}</span>
+            <EntityLink href={detailHref(admission.admissionId)} className="block truncate font-semibold">{admission.candidateName}</EntityLink>
             <span className="block truncate text-xs text-[var(--color-text-muted)]">{admission.breed || 'Breed not provided'}</span>
           </div>
         </div>

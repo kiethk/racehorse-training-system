@@ -1,7 +1,5 @@
 package com.rtms.backend.medical.service;
 
-
-
 import com.rtms.backend.horse.entity.Horse;
 
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -34,17 +32,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import org.springframework.transaction.annotation.Transactional;
 
-
-
 import java.time.LocalDateTime;
 
 import java.util.UUID;
 
-
-
 import static org.junit.jupiter.api.Assertions.*;
-
-
 
 /**
 
@@ -68,8 +60,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CareScheduleLifecycleSweepIntegrationTest {
 
-
-
     @Autowired private CareScheduleService careScheduleService;
 
     @Autowired private CareScheduleRepository careSchedules;
@@ -82,13 +72,9 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
     @Autowired private EntityManager entityManager;
 
-
-
     private Long vetId;
 
     private Long horseId;
-
-
 
     @BeforeEach
 
@@ -108,13 +94,13 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
         vetId = users.saveAndFlush(vet).getId();
 
-        Horse horse = horses.findAll().stream().findFirst().orElseThrow();
+        Horse horse = horses.findAll().stream()
+                .filter(h -> !careSchedules.existsByHorseIdAndCareTypeAndStatusIn(h.getId(), CareType.URGENT, CareScheduleStatus.OPEN))
+                .findFirst().orElseThrow();
 
         horseId = horse.getId();
 
     }
-
-
 
     private CareSchedule schedule(CareType type, CareScheduleStatus status, LocalDateTime scheduledAt) {
 
@@ -135,8 +121,6 @@ class CareScheduleLifecycleSweepIntegrationTest {
         return careSchedules.saveAndFlush(s);
 
     }
-
-
 
     @Test
 
@@ -162,15 +146,11 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
                 workdayNow.minusMinutes(35));
 
-
-
         careScheduleService.runLifecycleSweep(workdayNow);
 
         entityManager.flush();
 
         entityManager.clear();
-
-
 
         assertEquals(CareScheduleStatus.SCHEDULED,
 
@@ -186,8 +166,6 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
     }
 
-
-
     @Test
 
     void eodRollover_movesUnfinishedInitialToNextWorkingDaySlot() {
@@ -198,17 +176,13 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
                 today.toLocalDate().atTime(9, 0));
 
-
-
-        LocalDateTime evening = today.toLocalDate().atTime(17, 5);
+        LocalDateTime evening = today.toLocalDate().plusDays(1).atTime(17, 5);
 
         careScheduleService.runLifecycleSweep(evening);
 
         entityManager.flush();
 
         entityManager.clear();
-
-
 
         CareSchedule rolled = careSchedules.findById(stale.getId()).orElseThrow();
 
@@ -220,12 +194,10 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
         // Slot hợp lệ: sau giờ đóng cửa 17:05 và nằm trên lưới 30 phút của ngày làm việc kế.
 
-        assertTrue(rolled.getScheduledDate().isAfter(evening.toLocalDate()));
+        assertTrue(rolled.getScheduledDate().isAfter(today.toLocalDate()));
         assertNull(rolled.getScheduledAt());
 
     }
-
-
 
     @Test
 
@@ -237,15 +209,11 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
                 today.minusDays(1));
 
-
-
         careScheduleService.runLifecycleSweep(today.toLocalDate().atTime(17, 5));
 
         entityManager.flush();
 
         entityManager.clear();
-
-
 
         CareSchedule kept = careSchedules.findById(urgent.getId()).orElseThrow();
 

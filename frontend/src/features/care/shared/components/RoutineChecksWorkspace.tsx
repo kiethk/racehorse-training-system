@@ -19,6 +19,7 @@ import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
 import { getScheduleExamAction } from '@/features/care/lib/scheduleStatusDisplay';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
+import { useSynchronizedClock } from '@/lib/clockSync';
 
 export function RoutineChecksWorkspace() {
   const router = useRouter();
@@ -36,6 +37,9 @@ export function RoutineChecksWorkspace() {
   const PAGE_SIZE = 8;
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // Synchronized clock: bypasses Chrome V8 60s cache and syncs with OS time on focus/2s ticker
+  const currentClock = useSynchronizedClock();
 
   const loadData = useCallback(async () => {
     try {
@@ -263,13 +267,34 @@ export function RoutineChecksWorkspace() {
               : 'Unscheduled';
             const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
             const isClosed = cs.status === 'COMPLETED';
+            const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+            const _d = currentClock;
+            const todayIso = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+            const isFuture = Boolean(!isClosed && rawDate && rawDate > todayIso);
+            // Window: ALL ROUTINE SCHEDULED exams (except PREVENTIVE) blocked outside 13:30–15:30, regardless of date
+            const _minNow = _d.getHours() * 60 + _d.getMinutes();
+            const isOutsideRoutineWindow =
+              cs.careType === 'ROUTINE' &&
+              cs.purpose !== 'PREVENTIVE' &&
+              cs.status === 'SCHEDULED' &&
+              (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+
+            const canExamine = cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
 
             return (
               <Panel
                 key={cs.id}
                 padded
-                onClick={() => handleOpenSchedule(cs)}
-                className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                onClick={() => {
+                  if (isClosed || canExamine) {
+                    handleOpenSchedule(cs);
+                  }
+                }}
+                className={`border border-[var(--color-border)] transition-all duration-200 ease-out ${
+                  isClosed || canExamine
+                    ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]'
+                    : 'cursor-not-allowed opacity-80'
+                }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   {/* Left: Avatar + Details */}
@@ -286,6 +311,11 @@ export function RoutineChecksWorkspace() {
                         {cs.status === 'COMPLETED' && (
                           <Pill tone="success" size="sm">
                             Completed
+                          </Pill>
+                        )}
+                        {cs.status === 'IN_PROGRESS' && (
+                          <Pill tone="info" size="sm" icon="activity">
+                            In Progress
                           </Pill>
                         )}
                         {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
@@ -314,19 +344,27 @@ export function RoutineChecksWorkspace() {
                   </div>
 
                   {/* Right: Action Button */}
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col items-end gap-1">
                     <Button
-                      variant={isClosed ? 'secondary' : 'primary'}
+                      variant={isClosed || cs.status === 'IN_PROGRESS' ? 'secondary' : 'primary'}
                       size="sm"
                       icon={isClosed ? 'file-text' : getScheduleExamAction(cs.status).icon}
+                      disabled={!isClosed && !canExamine}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleOpenSchedule(cs);
+                        if (isClosed || canExamine) {
+                          handleOpenSchedule(cs);
+                        }
                       }}
                       className="transition-all active:scale-[0.97]"
                     >
                       {isClosed ? 'View Record' : getScheduleExamAction(cs.status).label}
                     </Button>
+                    {!isClosed && !canExamine && cs.status !== 'IN_PROGRESS' && (
+                      <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                        {isFuture ? 'Scheduled for a later date' : 'Opens 13:30 – 15:30'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Panel>

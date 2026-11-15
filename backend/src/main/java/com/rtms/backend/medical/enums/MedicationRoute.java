@@ -12,4 +12,8 @@ public enum MedicationRoute {
     public boolean requiresVeterinarian() {
         return this == INJECTION_IV || this == INJECTION_IM;
     }
+
+    public boolean isInjection() {
+        return this == INJECTION_IV || this == INJECTION_IM;
+    }
 }

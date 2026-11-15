@@ -13,7 +13,7 @@ public class TrainingWorkout {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Buổi của nhóm mà chiến mã này tham gia; ngày, giờ và bài tập đều lấy từ buổi. (The group Session this horse takes part in; the date, time and Subject all come from it.) */
+    /** Buổi của nhóm mà chiến mã này tham gia; ngày, giờ và bài tập đều lấy từ buổi. (The group Session this horse takes part in; the date, time and Exercise all come from it.) */
     @Column(name = "session_id", nullable = false)
     private Long sessionId;
 

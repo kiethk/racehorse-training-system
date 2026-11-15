@@ -167,8 +167,8 @@ class HorseResponseJsonTest {
                 mock(com.rtms.backend.horse.repository.HorseRepository.class);
         com.rtms.backend.stable.repository.StableStallRepository stallRepo =
                 mock(com.rtms.backend.stable.repository.StableStallRepository.class);
-        com.rtms.backend.training.service.GroupWorkoutSyncService workoutSvc =
-                mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class);
+        com.rtms.backend.training.service.TrainingGroupService workoutSvc =
+                mock(com.rtms.backend.training.service.TrainingGroupService.class);
         com.rtms.backend.stable.repository.AreaRepository areaRepo =
                 mock(com.rtms.backend.stable.repository.AreaRepository.class);
 
@@ -186,7 +186,7 @@ class HorseResponseJsonTest {
                 () -> horseService.getHorseById(10L, owner));
 
         // If the controller correctly checks HorseService first, storage is never reached.
-        verify(storage, never()).load(any());
+        verify(storage, never()).load(any(), any());
         verify(storage, never()).mediaType(any());
     }
 
@@ -198,10 +198,10 @@ class HorseResponseJsonTest {
         when(admissionRepo.findByHorseIdIn(List.of(55L))).thenReturn(List.of());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> photoService.resolvePhoto(55L));
+                () -> photoService.resolvePhoto(55L, null));
 
         assertEquals(404, ex.getStatusCode().value());
-        verify(storage, never()).load(any());
+        verify(storage, never()).load(any(), any());
     }
 
     // ── Batch: single admissionRepo query for multiple horses ────────────────

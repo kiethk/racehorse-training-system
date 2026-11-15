@@ -13,6 +13,7 @@ public record CareScheduleResponse(
         Long id,
         Long horseId,
         Long veterinarianId,
+        String veterinarianName,
         Long admissionId,
         Long sourceIncidentId,
         CareType careType,
@@ -29,18 +30,14 @@ public record CareScheduleResponse(
         LocalDateTime requestedAt,
         RescheduleReason rescheduleReason,
         String rescheduleNote,
-        int rolloverCount,
-        /** D1 cờ dẫn xuất: IN_PROGRESS quá 30 phút so với scheduled_at (không phải trạng thái DB). */
-        boolean overdue,
-        /** D2 thời điểm ca khám bị tạm dừng do ưu tiên ca cấp cứu khác (legacy null). */
-        LocalDateTime pausedFrom
+        int rolloverCount
 ) {
     public static CareScheduleResponse from(CareSchedule cs) {
+        return from(cs, null);
+    }
+
+    public static CareScheduleResponse from(CareSchedule cs, String vetName) {
         if (cs == null) return null;
-        // AD-022: OVERDUE is a real status; the flag mirrors it for clients that only read the boolean.
-        boolean overdue = CareScheduleStatus.ACTIVE_EXAM.contains(cs.getStatus())
-                && cs.getScheduledAt() != null
-                && java.time.LocalDateTime.now().isAfter(cs.getScheduledAt().plusMinutes(30));
         LocalDate date = cs.getScheduledDate();
         if (date == null && cs.getScheduledAt() != null) {
             date = cs.getScheduledAt().toLocalDate();
@@ -51,6 +48,7 @@ public record CareScheduleResponse(
                 cs.getId(),
                 cs.getHorseId(),
                 cs.getVeterinarianId(),
+                vetName,
                 cs.getAdmissionId(),
                 cs.getSourceIncidentId(),
                 cs.getCareType(),
@@ -67,9 +65,7 @@ public record CareScheduleResponse(
                 cs.getRequestedAt(),
                 cs.getRescheduleReason(),
                 cs.getRescheduleNote(),
-                cs.getRolloverCount(),
-                overdue,
-                null
+                cs.getRolloverCount()
         );
     }
 }

@@ -1,6 +1,8 @@
 package com.rtms.backend.stable.service;
 import com.rtms.backend.identity.entity.Role;
+import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.enums.CareType;
 
 
 import com.rtms.backend.stable.dto.CreateGroomDailyTaskRequest;
@@ -10,8 +12,8 @@ import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.stable.entity.StableStall;
-import com.rtms.backend.training.entity.Subject;
-import com.rtms.backend.training.dto.GroomWorkoutRow;
+import com.rtms.backend.training.entity.Exercise;
+import com.rtms.backend.training.repository.projection.GroomWorkoutRow;
 import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.enums.SopSlot;
 import com.rtms.backend.stable.enums.TaskSource;
@@ -21,9 +23,11 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
+import java.time.LocalTime;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -249,8 +253,8 @@ public class GroomDailyTaskService {
         return completion.getPhotoKeys().get(index);
     }
 
-    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser) {
-        return fileStorage.load(completionPhotoKey(completionId, index, currentUser));
+    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser, FileVariant size) {
+        return fileStorage.load(completionPhotoKey(completionId, index, currentUser), size);
     }
 
     public MediaType completionPhotoMediaType(Long completionId, int index, AuthenticatedUser currentUser) {
@@ -330,11 +334,12 @@ public class GroomDailyTaskService {
                 .findByGroomIdAndScheduledTimeBetween(targetGroomId, dayStart, dayEnd);
 
         // Nguồn 2 — Buổi tập, đã JOIN sẵn giờ session, tên ngựa và tên bài tập trong MỘT câu query
-        // (Source 2 — Workouts, with session times, horse name and subject name already joined in ONE query)
+        // (Source 2 — Workouts, with session times, horse name and exercise name already joined in ONE query)
         List<GroomWorkoutRow> workouts = workoutRepository.findGroomWorkoutRows(targetGroomId, targetDate);
 
         // Nguồn 3 — Lịch thú y của ngựa trong chuồng mình
-        List<Long> stallIds = stableStallRepository.findByGroomId(targetGroomId).stream()
+        List<StableStall> groomStalls = stableStallRepository.findByGroomId(targetGroomId);
+        List<Long> stallIds = groomStalls.stream()
                 .map(StableStall::getId)
                 .toList();
 
@@ -344,9 +349,9 @@ public class GroomDailyTaskService {
         List<CareSchedule> schedules = myHorses.isEmpty() ? List.of()
                 : careScheduleRepository.findByHorseIdInAndScheduledAtBetweenAndStatusIn(
                         myHorses.stream().map(Horse::getId).toList(), dayStart, dayEnd,
-                        List.of(com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED,
-                                com.rtms.backend.medical.enums.CareScheduleStatus.IN_PROGRESS,
-                                com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED));
+                        List.of(CareScheduleStatus.SCHEDULED,
+                                CareScheduleStatus.IN_PROGRESS,
+                                CareScheduleStatus.COMPLETED));
 
         // =============================================================
         // B2 — GOM ID RỒI NẠP MỘT LẦN
@@ -358,6 +363,10 @@ public class GroomDailyTaskService {
         // Ngựa trong chuồng mình đã có sẵn tên từ B1 -> không cần query lại
         Map<Long, String> horseNameById = new HashMap<>();
         myHorses.forEach(h -> horseNameById.put(h.getId(), h.getName()));
+        Map<Long, String> stallCodeById = new HashMap<>();
+        groomStalls.forEach(stall -> stallCodeById.put(stall.getId(), stall.getStallCode()));
+        Map<Long, String> horseStallCodeById = new HashMap<>();
+        myHorses.forEach(h -> horseStallCodeById.put(h.getId(), stallCodeById.get(h.getCurrentStallId())));
 
         // Chỉ những con CHƯA có tên mới phải tra thêm (ví dụ Trainer nhờ Groom
         // này dắt hộ một con không thuộc chuồng của họ). Thường là rỗng. Buổi tập đã mang sẵn tên ngựa.
@@ -397,6 +406,7 @@ public class GroomDailyTaskService {
                     task.getNotes(),
                     Boolean.TRUE.equals(task.getIsCompleted()) ? "COMPLETED" : "PENDING",
                     true)                         // chỉ SOP mới tick được
+                    .withStallCode(horseStallCodeById.get(task.getHorseId()))
                     .withCompletion(task.getCompletionId(),
                             completion == null ? null : completion.getNote(),
                             completion == null ? List.of() : completionPhotoUrls(completion)));
@@ -410,24 +420,32 @@ public class GroomDailyTaskService {
                     w.endTime(),
                     w.horseId(),
                     w.horseName(),
-                    "Training session · " + w.subjectName(),
-                    "Lead the horse to the track, assist the trainer, and bring the horse back after the session",
+                    "Training session · " + w.exerciseName(),
+                    null,
                     w.status().name(),
-                    false));                      // Trainer mới là người đóng buổi tập
+                    false).withStallCode(horseStallCodeById.get(w.horseId())));                      // Trainer mới là người đóng buổi tập
         }
 
         for (CareSchedule s : schedules) {
+            // Day-level visits (ROUTINE/INITIAL/preventive) carry a scheduledDate but no time;
+            // urgent ones carry scheduledAt. Fall back to the vet window instead of NPE-ing.
+            LocalTime startTime = s.getScheduledAt() != null
+                    ? s.getScheduledAt().toLocalTime()
+                    : (s.getCareType() == CareType.ROUTINE
+                            ? FarmSchedulePolicy.VET_WINDOW_START
+                            : LocalTime.of(8, 0));
+            int duration = s.getDurationMinutes() > 0 ? s.getDurationMinutes() : 30;
             items.add(new TodayTaskItemResponse(
                     TaskSource.PREVENTIVE_CARE,
                     s.getId(),
-                    s.getScheduledAt().toLocalTime(),
-                    s.getScheduledAt().plusMinutes(s.getDurationMinutes()).toLocalTime(),
+                    startTime,
+                    startTime.plusMinutes(duration),
                     s.getHorseId(),
                     nameOf(horseNameById, s.getHorseId()),
                     "Veterinary · " + s.getCareType(),
                     s.getDescription(),
                     s.getStatus().name(),
-                    false));              // Vet mới là người đóng
+                    false).withStallCode(horseStallCodeById.get(s.getHorseId())));              // Vet mới là người đóng
         }
 
         // =============================================================

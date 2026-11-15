@@ -13,6 +13,29 @@ import java.util.Optional;
 @Repository
 public interface StableStallRepository extends JpaRepository<StableStall, Long> {
 
+    @Query(value = """
+            SELECT ss.groom_id, COUNT(h.id) FROM horses h
+            JOIN stable_stalls ss ON ss.id = h.current_stall_id
+            WHERE ss.groom_id IN :ids GROUP BY ss.groom_id
+            """, nativeQuery = true)
+    List<Object[]> countHorsesByGroomIds(@Param("ids") List<Long> ids);
+
+    @Query(value = """
+            SELECT DISTINCT ss.groom_id FROM stable_stalls ss JOIN areas a ON a.id = ss.area_id
+            WHERE ss.deleted_at IS NULL AND a.deleted_at IS NULL AND a.type = 'QUARANTINE'
+              AND ss.status = 'AVAILABLE' AND ss.groom_id IN :ids
+            """, nativeQuery = true)
+    List<Long> findGroomIdsWithFreeQuarantineStall(@Param("ids") List<Long> ids);
+
+    @Query(value = """
+            SELECT ss.* FROM stable_stalls ss JOIN areas a ON a.id = ss.area_id
+            WHERE ss.deleted_at IS NULL AND a.deleted_at IS NULL AND a.type = 'QUARANTINE'
+              AND ss.status = 'AVAILABLE' AND ss.groom_id = :groomId
+            ORDER BY a.code, ss.stall_number, ss.id
+            LIMIT 1 FOR UPDATE OF ss
+            """, nativeQuery = true)
+    Optional<StableStall> findAvailableQuarantineStallOfGroomForUpdate(@Param("groomId") Long groomId);
+
     @Query(value = "SELECT * FROM stable_stalls WHERE deleted_at IS NULL ORDER BY id FOR UPDATE", nativeQuery = true)
     List<StableStall> findAllForAssignmentUpdate();
 

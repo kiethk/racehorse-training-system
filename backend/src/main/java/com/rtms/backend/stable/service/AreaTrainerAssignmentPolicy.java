@@ -23,7 +23,7 @@ public class AreaTrainerAssignmentPolicy {
                     WHERE s.area_id=a.id) AS has_horses,
             EXISTS (SELECT 1 FROM stable_stalls s WHERE s.area_id=a.id
                     AND s.status IN ('OCCUPIED','RESERVED')) AS has_occupied_stalls,
-            (EXISTS (SELECT 1 FROM group_plans p WHERE p.trainer_id=a.trainer_id
+            (EXISTS (SELECT 1 FROM course_runs p WHERE p.trainer_id=a.trainer_id
                      AND p.status IN ('UPCOMING','ACTIVE'))
              OR EXISTS (SELECT 1 FROM training_sessions ts WHERE ts.trainer_id=a.trainer_id
                         AND ts.status='SCHEDULED')

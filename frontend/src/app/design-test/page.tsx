@@ -10,6 +10,7 @@ import {
   BackLink,
   ConfirmDialog,
   EmptyState,
+  EntityLink,
   FieldLabel,
   FilterChips,
   FormField,
@@ -27,6 +28,7 @@ import {
   Pill,
   ProgressBar,
   ScoreScale,
+  SearchCombobox,
   SearchInput,
   SectionTitle,
   SegmentedControl,
@@ -40,6 +42,7 @@ import {
   Textarea,
   Th,
   THead,
+  TurnstileWidget,
   Tooltip,
   Tr,
 } from '@/components/ui';
@@ -74,6 +77,7 @@ export default function DesignTestPage() {
   const [score, setScore] = useState<number | null>(7);
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'DONE'>('ALL');
   const [search, setSearch] = useState('');
+  const [pickedHorse, setPickedHorse] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -118,6 +122,7 @@ export default function DesignTestPage() {
           <IconButton icon="refresh" label="Refresh" />
           <IconButton icon="x" label="Close" size="sm" />
           <BackLink href="/design-test">Back to list</BackLink>
+          <EntityLink href="/manager/horses/1">Example horse</EntityLink>
         </div>
       </Section>
 
@@ -138,6 +143,19 @@ export default function DesignTestPage() {
           </FormField>
           <FormField label="Search">
             <SearchInput value={search} onChange={setSearch} placeholder="Search horses" />
+          </FormField>
+          <FormField label="Pick a horse">
+            <SearchCombobox
+              label="Horse"
+              placeholder="Search horse name"
+              options={[
+                { value: '1', label: 'Northern Star', hint: 'Thoroughbred' },
+                { value: '2', label: 'Desert Wind', hint: 'Arabian' },
+                { value: '3', label: 'Night Runner', hint: 'Thoroughbred' },
+              ]}
+              value={pickedHorse}
+              onChange={setPickedHorse}
+            />
           </FormField>
           <FormField label="Notes" className="sm:col-span-2">
             <Textarea placeholder="Anything the vet should know" />
@@ -228,6 +246,17 @@ export default function DesignTestPage() {
         </Panel>
       </Section>
 
+      <Section title="Turnstile widget">
+        <Panel padded>
+          <TurnstileWidget
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA'}
+            onVerify={() => undefined}
+            onExpire={() => undefined}
+            onError={() => undefined}
+          />
+        </Panel>
+      </Section>
+
       <Section title="Period bar chart">
         <Panel padded>
           <PeriodBarChart
@@ -275,7 +304,7 @@ export default function DesignTestPage() {
         <div className="space-y-2">
           <Notice tone="success">Admission approved.</Notice>
           <Notice tone="error" title="Could not save">The server rejected the request.</Notice>
-          <Notice tone="warning">This plan overlaps another course.</Notice>
+          <Notice tone="warning">This course run overlaps another course.</Notice>
           <Notice tone="info" onDismiss={() => undefined}>Dismissible notice.</Notice>
           <div className="flex flex-wrap gap-2 pt-1">
             <Button onClick={() => toast.success('Status updated')}>Success toast</Button>

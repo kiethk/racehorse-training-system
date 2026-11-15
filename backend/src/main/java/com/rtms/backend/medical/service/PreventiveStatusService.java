@@ -61,11 +61,6 @@ public class PreventiveStatusService {
 
     @Autowired
     public PreventiveStatusService(PreventiveProtocolRepository protocols, PrescriptionRepository prescriptions,
-            CareScheduleRepository schedules, HorseRepository horses, AdmissionApplicationRepository admissions) {
-        this(protocols, prescriptions, schedules, horses, admissions, Clock.systemDefaultZone());
-    }
-
-    PreventiveStatusService(PreventiveProtocolRepository protocols, PrescriptionRepository prescriptions,
             CareScheduleRepository schedules, HorseRepository horses, AdmissionApplicationRepository admissions,
             Clock clock) {
         this.protocols = protocols;

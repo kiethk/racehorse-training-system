@@ -48,7 +48,7 @@ export function EditAdmissionModal({ detail, onClose, onSaved }: {
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
-  const slots: HorseDocumentSlot[] = detail.documents.map((doc) => ({
+  const slots: HorseDocumentSlot[] = detail.documents.filter(doc => doc.documentType !== 'ARRIVAL_PHOTO').map((doc) => ({
     documentType: doc.documentType as HorseDocumentType,
     source: 'ADMISSION',
     documentId: doc.id,

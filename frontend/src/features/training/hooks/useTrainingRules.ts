@@ -5,7 +5,7 @@ import { trainingService } from '../services/trainingService';
 import type { TrainingRules } from '../types';
 
 /**
- * Loads the training rules the backend enforces (golden hours, heart-rate limits, limits for a subject).
+ * Loads the training rules the backend enforces (golden hours, heart-rate limits, limits for an exercise).
  * Returns null until they arrive or when they cannot be loaded; screens then simply leave out the hints
  * that depend on them. The backend still validates every request.
  */
