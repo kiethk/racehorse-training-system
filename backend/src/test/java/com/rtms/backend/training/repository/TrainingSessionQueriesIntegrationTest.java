@@ -65,6 +65,7 @@ class TrainingSessionQueriesIntegrationTest {
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private StableStallRepository stalls;
+    @Autowired private com.rtms.backend.horse.repository.HorseRepository horses;
     @Autowired private JdbcTemplate jdbc;
 
     private final LocalDate today = LocalDate.now();
@@ -240,6 +241,19 @@ class TrainingSessionQueriesIntegrationTest {
     void horsesInTrainingCountEachHorseOnce() {
         long before = courseRuns.countHorsesInTraining();
         assertTrue(before >= 2);
+
+        // A blocked horse should no longer be counted as in training
+        thunder.setTrainingDecision(com.rtms.backend.training.enums.TrainingDecision.BLOCKED);
+        horses.saveAndFlush(thunder);
+        long afterBlocked = courseRuns.countHorsesInTraining();
+        assertEquals(before - 1, afterBlocked);
+
+        // An inactive horse should not be counted either
+        thunder.setTrainingDecision(com.rtms.backend.training.enums.TrainingDecision.ALLOWED);
+        thunder.setCurrentStatus(com.rtms.backend.horse.enums.HorseStatus.INACTIVE);
+        horses.saveAndFlush(thunder);
+        long afterInactive = courseRuns.countHorsesInTraining();
+        assertEquals(before - 1, afterInactive);
     }
 
     @Test

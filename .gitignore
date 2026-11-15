@@ -63,3 +63,9 @@ docs
 .playwright-mcp
 
 .worktrees/
+
+# Graphify
+graphify-out/
+.graphify/
+.graphify_labels.json*
+
