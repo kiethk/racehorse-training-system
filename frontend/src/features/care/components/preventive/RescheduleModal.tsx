@@ -41,7 +41,7 @@ function RescheduleForm({
   onClose,
   onRescheduled,
 }: RescheduleModalProps & { schedule: CareScheduleResponse }) {
-  const current = schedule.scheduledAt ?? schedule.requestedAt;
+  const current = schedule.scheduledAt ?? schedule.scheduledDate ?? schedule.requestedAt;
   const [newDate, setNewDate] = useState(addDaysIso(todayIso(), 7));
   const [reason, setReason] = useState<RescheduleReason>('UNDER_TREATMENT');
   const [note, setNote] = useState('');

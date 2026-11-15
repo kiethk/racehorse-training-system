@@ -61,10 +61,6 @@ import {
   type InjuryMarker,
 } from './InjuryMarkerPanel';
 import {
-  resolveInjuryWorldPosition,
-  resolveInjuryNormal,
-} from '@/features/vet/lib/injuryZones';
-import {
   admissionAsideClassName,
   admissionDetailGridClassName,
 } from '../../shared/components/AdmissionDetailLayout';
@@ -103,6 +99,7 @@ export interface ClinicalExamFormProps {
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   /** The visit was opened by an incident report, so Follow-up rules do not apply. */
   fromIncident?: boolean;
+  incidentType?: 'PROBLEM' | 'TRAUMA';
   /** Set when another exam decides this horse's block, so this visit cannot lift it. */
   blockHeldUntil?: string | null;
   /** The horse's waiting Follow-up: a new date merges into it. */
@@ -132,6 +129,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       scheduledDate,
       schedulePurpose,
       fromIncident,
+      incidentType,
       blockHeldUntil,
       waitingFollowUpAt,
       asideTop,
@@ -312,36 +310,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         .then((injuries) => {
           if (!active) return;
           setActiveInjuries(injuries);
-          if (config.markersEnabled && injuries.length > 0) {
-            setMarkers((prev) =>
-              prev.length > 0
-                ? prev
-                : injuries.map((inj) => {
-                    const worldPos = resolveInjuryWorldPosition(inj);
-                    const normal =
-                      inj.normalX != null && inj.normalY != null && inj.normalZ != null
-                        ? resolveInjuryNormal(
-                            [Number(inj.normalX), Number(inj.normalY), Number(inj.normalZ)],
-                            worldPos,
-                          )
-                        : resolveInjuryNormal(undefined, worldPos);
-                    return {
-                      id: String(inj.id),
-                      position: worldPos,
-                      normal,
-                      zoneId: inj.zoneId ?? undefined,
-                      bodyRegionId: inj.bodyRegionId ?? null,
-                      description: inj.description || inj.injuryType || '',
-                    };
-                  }),
-            );
-          }
         })
         .catch(() => {});
       return () => {
         active = false;
       };
-    }, [horseId, config.markersEnabled]);
+    }, [horseId]);
 
     useEffect(() => {
       if (!show3DTab && anatomyTab === 'anatomy3d') {
@@ -671,6 +645,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         careType,
         schedulePurpose,
         fromIncident,
+        incidentType,
         showTier1,
         verdict,
         rejectReason,
