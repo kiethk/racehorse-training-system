@@ -64,7 +64,12 @@ export function LocalFilePreviewModal({ file, previewUrl, onClose }: LocalFilePr
             <Icon name="download" />
             Download
           </a>
-          <Button type="button" icon="external-link" onClick={() => openBlobInTab(previewUrl, file.name)}>
+          <Button
+            type="button"
+            variant="secondary"
+            icon="external-link"
+            onClick={() => openBlobInTab(previewUrl, file.name)}
+          >
             Open in new tab
           </Button>
           {!isPdf && (

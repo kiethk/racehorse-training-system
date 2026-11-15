@@ -13,7 +13,6 @@ import java.time.LocalDate;
 
 
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -76,9 +75,9 @@ class CareScheduleLifecycleTest {
     }
 
     @Test
-    @DisplayName("startCareSchedule rejects non-SCHEDULED status with 409 CONFLICT")
+    @DisplayName("startCareSchedule rejects a COMPLETED schedule with 409 CONFLICT")
     void testStart_invalidStatus_throwsConflict() {
-        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setStatus(CareScheduleStatus.COMPLETED);
         when(userRepository.findById(assignedVet.getId())).thenReturn(Optional.of(assignedVet));
         when(careScheduleRepository.findById(schedule.getId())).thenReturn(Optional.of(schedule));
         when(horseRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(new Horse()));

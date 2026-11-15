@@ -7,7 +7,7 @@ export type SimulateMode = 'resting-inline' | 'hot-profiles';
 export type SubmitAdapterMode = 'admission-aware' | 'care-schedule';
 export type ErrorMappingMode = 'formatted' | 'raw';
 
-export interface ExamVariantConfig {
+export interface ExamConfig {
   section2Mode: Section2Mode;
   /** Show a dedicated "Physical examination findings" textarea in freeText mode. */
   showFindingsTextarea: boolean;
@@ -43,100 +43,37 @@ export interface ExamVariantConfig {
   decisionPanelTitle?: string;
 }
 
-export type ExamVariant = 'STANDARD' | 'URGENT_LEGACY' | 'URGENT';
-
-export const EXAM_VARIANT_CONFIG: Record<ExamVariant, ExamVariantConfig> = {
-  STANDARD: {
-    section2Mode: 'structured',
-    showFindingsTextarea: false,
-    sampleFindings: false,
-    markersAppendToFindings: false,
-    markersEnabled: true,
-    decisionUi: 'shared-section',
-    defaultDecision: 'ALLOWED',
-    layout: 'split-sticky-decision-panel',
-    draft: true,
-    confirmDialog: true,
-    dirtyGuard: true,
-    vaccination: true,
-    prescription: false,
-    simulateMode: 'resting-inline',
-    submitAdapter: 'admission-aware',
-    errorMapping: 'formatted',
-    submitLabel: 'Complete Examination',
-    confirmDialogTitle: 'Submit Veterinary Examination?',
-    confirmDialogConfirmLabel: 'Confirm & Submit',
-    confirmDialogCancelLabel: 'Back to Review',
-    restrictionLabel: 'Assessment note',
-    restrictionPlaceholder:
-      'e.g. Tendon strain: box rest with hand-walking twice daily, recheck before trotting…',
-    restrictionZodMessage: 'An assessment note is required when training is blocked.',
-    followUpDateRequiredMessage: 'Follow-up date is required when scheduling follow-up care.',
-    followUpDateMinMessage: 'Follow-up date must be at least one day in the future.',
-    findingsRequiredMessage: 'Clinical examination findings are required.',
-    diagnosisRequiredMessage: 'Clinical diagnosis is required.',
-    abnormalFindingsRequiredMessage: 'Describe the abnormal examination findings.',
-    decisionPanelTitle: 'Veterinary Decision Panel',
-  },
-  URGENT_LEGACY: {
-    section2Mode: 'freeText',
-    showFindingsTextarea: false,
-    sampleFindings: false,
-    markersAppendToFindings: false,
-    markersEnabled: false,
-    decisionUi: 'shared-section',
-    defaultDecision: 'ALLOWED',
-    layout: 'split-sticky-decision-panel',
-    draft: true,
-    confirmDialog: true,
-    dirtyGuard: true,
-    vaccination: true,
-    prescription: false,
-    simulateMode: 'resting-inline',
-    submitAdapter: 'admission-aware',
-    errorMapping: 'formatted',
-    submitLabel: 'Complete Examination',
-    confirmDialogTitle: 'Submit Veterinary Examination?',
-    confirmDialogConfirmLabel: 'Confirm & Submit',
-    confirmDialogCancelLabel: 'Back to Review',
-    restrictionLabel: 'Assessment note',
-    restrictionPlaceholder:
-      'e.g. Tendon strain: box rest with hand-walking twice daily, recheck before trotting…',
-    restrictionZodMessage: 'An assessment note is required when training is blocked.',
-    followUpDateRequiredMessage: 'Follow-up date is required when scheduling follow-up care.',
-    followUpDateMinMessage: 'Follow-up date must be at least one day in the future.',
-    findingsRequiredMessage: 'Clinical examination findings are required.',
-    diagnosisRequiredMessage: 'Clinical diagnosis is required.',
-    decisionPanelTitle: 'Veterinary Decision Panel',
-  },
-  URGENT: {
-    section2Mode: 'freeText',
-    showFindingsTextarea: true,
-    sampleFindings: true,
-    markersAppendToFindings: true,
-    markersEnabled: true,
-    decisionUi: 'inline-cards',
-    defaultDecision: 'BLOCKED',
-    layout: 'stacked',
-    draft: false,
-    confirmDialog: false,
-    dirtyGuard: false,
-    vaccination: false,
-    prescription: true,
-    simulateMode: 'hot-profiles',
-    submitAdapter: 'care-schedule',
-    errorMapping: 'raw',
-    submitLabel: 'Complete Urgent Examination',
-    confirmDialogTitle: 'Submit Urgent Examination?',
-    confirmDialogConfirmLabel: 'Confirm & Submit',
-    confirmDialogCancelLabel: 'Back to Review',
-    restrictionLabel: 'Training restriction & rest details',
-    restrictionPlaceholder:
-      'e.g. Strict box rest for 3 days, followed by 15-minute hand walking twice daily…',
-    restrictionZodMessage: 'Restriction details are required when training is blocked.',
-    findingsRequiredMessage: 'Examination findings are required.',
-    diagnosisRequiredMessage: 'A clinical diagnosis is required.',
-  },
+export const EXAM_CONFIG: ExamConfig = {
+  section2Mode: 'structured',
+  showFindingsTextarea: false,
+  sampleFindings: false,
+  markersAppendToFindings: false,
+  markersEnabled: true,
+  decisionUi: 'shared-section',
+  defaultDecision: 'ALLOWED',
+  layout: 'split-sticky-decision-panel',
+  draft: true,
+  confirmDialog: true,
+  dirtyGuard: true,
+  vaccination: true,
+  prescription: true,
+  simulateMode: 'resting-inline',
+  submitAdapter: 'admission-aware',
+  errorMapping: 'formatted',
+  submitLabel: 'Complete Examination',
+  confirmDialogTitle: 'Submit Veterinary Examination?',
+  confirmDialogConfirmLabel: 'Confirm & Submit',
+  confirmDialogCancelLabel: 'Back to Review',
+  restrictionLabel: 'Assessment note',
+  restrictionPlaceholder:
+    'e.g. Tendon strain: box rest with hand-walking twice daily, recheck before trotting…',
+  restrictionZodMessage: 'An assessment note is required when training is blocked.',
+  followUpDateRequiredMessage: 'Follow-up date is required when scheduling follow-up care.',
+  followUpDateMinMessage: 'Follow-up date must be at least one day in the future.',
+  findingsRequiredMessage: 'Clinical examination findings are required.',
+  diagnosisRequiredMessage: 'Clinical diagnosis is required.',
+  abnormalFindingsRequiredMessage: 'Describe the abnormal examination findings.',
+  decisionPanelTitle: 'Veterinary Decision Panel',
 };
 
 export const SIX_VITAL_FIELDS: Array<
@@ -157,12 +94,10 @@ export const SIX_VITAL_FIELDS: Array<
  * A visit opened by an incident report is not a Follow-up, so it is exempt.
  */
 export function sixVitalsRequired(
-  variant: ExamVariant,
   careType: CareType,
   purpose?: 'FOLLOW_UP' | 'PREVENTIVE',
   fromIncident = false,
 ): boolean {
-  if (variant !== 'STANDARD') return false;
   if (careType === 'INITIAL') return true;
   if (careType === 'ROUTINE' && purpose === 'FOLLOW_UP') return !fromIncident;
   return false;
@@ -205,6 +140,6 @@ export function validateSixVitals(metrics: Record<string, string>): Record<strin
 }
 
 /** Whether the Tier-1 ACCEPT/REJECT verdict is shown for this exam context. */
-export function tier1VerdictEnabled(variant: ExamVariant, careType: CareType): boolean {
-  return variant === 'STANDARD' && careType === 'INITIAL';
+export function tier1VerdictEnabled(careType: CareType): boolean {
+  return careType === 'INITIAL';
 }

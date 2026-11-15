@@ -128,7 +128,9 @@ class HorseStatusChangeTest {
 
         // Assert Care schedules transitioned to CANCELLED
         verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
-                eq(horseId), eq(List.of(CareScheduleStatus.SCHEDULED)), anyString(), any(LocalDateTime.class));
+                eq(horseId),
+                eq(List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)),
+                anyString(), any(LocalDateTime.class));
         verify(careScheduleRepository, never()).saveAll(any());
 
         // Assert Groom tasks deleted

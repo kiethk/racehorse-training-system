@@ -18,7 +18,7 @@ import type { IncidentReport, IncidentType } from '../types';
 
 const INCIDENT_TYPE_OPTIONS: { value: IncidentType; label: string; hint: string; tone: string }[] = [
   { value: 'PROBLEM', label: 'Problem', hint: 'Vet checks at the next routine slot. The horse keeps training.', tone: 'text-[var(--color-info)]' },
-  { value: 'TRAUMA', label: 'Trauma', hint: 'Vet called now, even from another exam. The horse stops training and leaves its group.', tone: 'text-[var(--color-danger)] font-semibold' },
+  { value: 'TRAUMA', label: 'Trauma', hint: 'Vet called now. Training is decided after the examination.', tone: 'text-[var(--color-danger)] font-semibold' },
 ];
 
 export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {}) {
@@ -250,7 +250,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                     Emergency Urgent Care Alert:
                   </div>
                   <p className="mt-1 font-medium leading-relaxed">
-                    The system immediately pauses training clearance (BLOCKED) and triggers a real-time urgent alert directly to the on-duty veterinarian.
+                    The veterinarian is alerted now.
                   </p>
                 </div>
               )}

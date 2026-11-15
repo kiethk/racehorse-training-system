@@ -275,7 +275,7 @@ class CareScheduleLifecycleSweepTest {
 
                 eq(NotificationTypes.REFERENCE_CARE_SCHEDULE), eq(100L), eq(10L),
 
-                eq(NotificationTypes.CARE_SCHEDULE_EOD_ROLLED), anyString(), anyString());
+                eq(NotificationTypes.CARE_SCHEDULE_EOD_ROLLED), anyString(), anyString(), anyString());
 
     }
 

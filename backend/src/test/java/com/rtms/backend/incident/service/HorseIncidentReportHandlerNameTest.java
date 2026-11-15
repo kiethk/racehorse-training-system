@@ -11,7 +11,6 @@ import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.service.TrainingDecisionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,7 +39,6 @@ class HorseIncidentReportHandlerNameTest {
     @Mock FileStorageService files;
     @Mock CareScheduleRepository schedules;
     @Mock CareScheduleService careScheduleService;
-    @Mock TrainingDecisionService trainingDecisions;
     @Mock UserRepository users;
     @Mock com.rtms.backend.stable.repository.StableStallRepository stalls;
 
@@ -50,7 +48,7 @@ class HorseIncidentReportHandlerNameTest {
     @BeforeEach
     void setUp() {
         service = new HorseIncidentReportService(reports, horses, files, schedules, careScheduleService,
-                trainingDecisions, users, stalls);
+                users, stalls);
         when(users.findAllById(anyCollection())).thenAnswer(call -> {
             Collection<Long> ids = call.getArgument(0);
             return ids.stream().map(id -> user(id, id == 6L ? "James Carter" : "Hannah Reed")).toList();

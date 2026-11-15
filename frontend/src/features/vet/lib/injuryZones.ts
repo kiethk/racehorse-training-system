@@ -367,9 +367,9 @@ export function zoneById(id: string): BodyZone | undefined {
   return BODY_ZONES.find((z) => z.id === id);
 }
 
-// Canonical 8 body-region keys mirror the horse_body_regions catalog
-// (modelNodeKey values seeded in V16). Markers store one of these keys in their
-// zoneId; legacy records may still carry the 6-zone ids of BODY_ZONES above.
+// Canonical body-region keys mirror the horse_body_regions catalog (modelNodeKey values seeded in
+// V16 + V202611141700). Markers store one of these keys in their zoneId; legacy records may still
+// carry the 6-zone ids of BODY_ZONES above.
 export const BODY_REGION_KEYS = [
   'head',
   'neck',
@@ -379,6 +379,8 @@ export const BODY_REGION_KEYS = [
   'foreleg_right',
   'hindleg_left',
   'hindleg_right',
+  'eye',
+  'tail',
 ] as const;
 
 export type BodyRegionKey = (typeof BODY_REGION_KEYS)[number];
@@ -392,6 +394,8 @@ const REGION_LABELS: Record<BodyRegionKey, string> = {
   foreleg_right: 'Foreleg (Right)',
   hindleg_left: 'Hindleg (Left)',
   hindleg_right: 'Hindleg (Right)',
+  eye: 'Eye',
+  tail: 'Tail',
 };
 
 export function isBodyRegionKey(value: string | null | undefined): value is BodyRegionKey {
@@ -418,7 +422,8 @@ export function zoneForRegionKey(key: string | null | undefined): string | undef
   if (isBodyRegionKey(key)) {
     if (key.startsWith('foreleg')) return 'foreleg';
     if (key.startsWith('hindleg')) return 'hindleg';
-    if (key === 'back' || key === 'abdomen') return 'trunk';
+    if (key === 'back' || key === 'abdomen' || key === 'tail') return 'trunk';
+    if (key === 'eye') return 'head';
     return key;
   }
   return zoneById(key)?.id;

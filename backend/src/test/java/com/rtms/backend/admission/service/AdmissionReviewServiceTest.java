@@ -163,6 +163,7 @@ class AdmissionReviewServiceTest {
         request.setNextSchedule(next);
         var vaccinations = java.util.List.of(new com.rtms.backend.medical.dto.VaccinationRequest());
         request.setVaccinations(vaccinations);
+        request.setGeneralCareInstructions("Cold hose BID and monitor temperature");
 
         var response = service.reviewByVet(1L, request, 5L);
 
@@ -178,6 +179,7 @@ class AdmissionReviewServiceTest {
         assertEquals("No track work for 30 days", completion.getValue().getRestrictionDetails());
         assertSame(next, completion.getValue().getNextSchedule());
         assertSame(vaccinations, completion.getValue().getVaccinations());
+        assertEquals("Cold hose BID and monitor temperature", completion.getValue().getGeneralCareInstructions());
     }
 
     @Test

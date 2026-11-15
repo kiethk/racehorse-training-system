@@ -56,6 +56,7 @@ export function AdmissionDocumentPreview({ document, label, onClose }: {
           {file && <a href={file.url} download={filename} className={buttonClassName()}><Icon name="download" />Download</a>}
           <Button
             type="button"
+            variant="secondary"
             icon="external-link"
             onClick={() => {
               if (document?.fileUrl) {

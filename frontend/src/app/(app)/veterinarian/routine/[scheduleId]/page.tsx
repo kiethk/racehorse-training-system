@@ -97,6 +97,14 @@ export default function RoutineDetailPage() {
   }, [router, scheduleId]);
 
   const isCompleted = detail?.schedule?.status === 'COMPLETED';
+  const isUrgent = detail?.schedule?.careType === 'URGENT';
+
+  // An urgent visit has its own screen; this route only serves ROUTINE/PREVENTIVE work.
+  useEffect(() => {
+    if (isUrgent && !Number.isNaN(scheduleId)) {
+      router.replace(`/veterinarian/urgent/${scheduleId}`);
+    }
+  }, [isUrgent, scheduleId, router]);
 
   // Completed schedules share the unified View Record screen (Routine/Health/Schedule).
   useEffect(() => {

@@ -12,7 +12,6 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   ReferenceArea,
-  Dot,
 } from 'recharts';
 import { Panel, Button, Pill, Spinner, Notice, Icon } from '@/components/ui';
 import { medicalEdaService } from '../services/medicalEdaService';
@@ -69,6 +68,7 @@ export const BioSpcControlChart: React.FC<BioSpcControlChartProps> = ({ horseId,
   }, [horseId, metric]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load; the fetch owns its loading flag
     void fetchSpcData();
   }, [fetchSpcData]);
 

@@ -19,7 +19,6 @@ import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.TrainingDecisionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,7 +63,6 @@ class HorseIncidentReportRoutingTest {
     @Mock FileStorageService files;
     @Mock CareScheduleRepository schedules;
     @Mock CareScheduleService careScheduleService;
-    @Mock TrainingDecisionService trainingDecisions;
     @Mock UserRepository users;
     @Mock StableStallRepository stalls;
 
@@ -79,7 +77,7 @@ class HorseIncidentReportRoutingTest {
     @BeforeEach
     void setUp() {
         service = new HorseIncidentReportService(reports, horses, files, schedules, careScheduleService,
-                trainingDecisions, users, stalls);
+                users, stalls);
 
         horse = new Horse();
         horse.setId(HORSE_ID);
@@ -112,7 +110,7 @@ class HorseIncidentReportRoutingTest {
 
         assertEquals(created.getId(), report.getCareScheduleId());
         assertEquals(IncidentStatus.REPORTED, report.getStatus());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test
@@ -124,7 +122,7 @@ class HorseIncidentReportRoutingTest {
 
         assertEquals(IncidentStatus.IN_REVIEW, report.getStatus());
         assertEquals(VET_ID, report.getHandledById());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test
@@ -135,7 +133,8 @@ class HorseIncidentReportRoutingTest {
 
         service.createReport(request(IncidentType.TRAUMA), groom);
 
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        assertNull(horse.getTrainingDecisionReason());
     }
 
     @Test
@@ -152,8 +151,8 @@ class HorseIncidentReportRoutingTest {
     }
 
     @Test
-    @DisplayName("HIGH khi ca ROUTINE chưa khám: hủy ca đó, báo cáo cũ sang ca URGENT mới")
-    void seriousReportReplacesAnUnexaminedRoutineCase() {
+    @DisplayName("HIGH khi ca ROUTINE chưa khám: tạm dừng ca đó (giữ Vet), báo cáo cũ sang ca URGENT mới")
+    void seriousReportPausesTheRoutineCase() {
         CareSchedule routine = schedule(100L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED, VET_ID);
         when(careScheduleService.findOpenIncidentCase(HORSE_ID)).thenReturn(Optional.of(routine));
         HorseIncidentReport earlier = storedReport(routine, IncidentStatus.IN_REVIEW, VET_ID);
@@ -161,25 +160,28 @@ class HorseIncidentReportRoutingTest {
 
         HorseIncidentReport report = service.createReport(request(IncidentType.TRAUMA), groom);
 
-        verify(careScheduleService).cancelSupersededCase(routine);
+        verify(careScheduleService).interruptForUrgent(routine);
+        verify(careScheduleService).createSchedule(eq(HORSE_ID), eq(CareType.URGENT), any(), isNull(), anyLong());
         assertEquals(200L, report.getCareScheduleId());
         assertEquals(200L, earlier.getCareScheduleId());
         assertEquals(21L, earlier.getHandledById());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test
-    @DisplayName("HIGH khi Vet đang khám ca ROUTINE: gắn vào ca đó và không tự ý chặn tập")
-    void seriousReportJoinsARoutineExamInProgress() {
+    @DisplayName("HIGH khi Vet đang khám ca ROUTINE: vẫn tách ca URGENT, ca Routine giữ nguyên để khám tiếp")
+    void seriousReportPausesARoutineExamInProgress() {
         CareSchedule routine = schedule(100L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS, VET_ID);
         when(careScheduleService.findOpenIncidentCase(HORSE_ID)).thenReturn(Optional.of(routine));
+        HorseIncidentReport earlier = storedReport(routine, IncidentStatus.IN_REVIEW, VET_ID);
+        stubCreatedCase(CareType.URGENT, 200L, 21L);
 
         HorseIncidentReport report = service.createReport(request(IncidentType.TRAUMA), groom);
 
-        assertEquals(100L, report.getCareScheduleId());
-        verify(careScheduleService, never()).cancelSupersededCase(any());
-        verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong());
-        verify(trainingDecisions, never()).block(any(), anyString());
+        verify(careScheduleService).interruptForUrgent(routine);
+        assertEquals(200L, report.getCareScheduleId());
+        assertEquals(200L, earlier.getCareScheduleId());
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
     }
 
     @Test

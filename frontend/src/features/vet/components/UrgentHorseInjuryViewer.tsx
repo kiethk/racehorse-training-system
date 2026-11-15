@@ -15,7 +15,9 @@ import {
   resolveInjuryWorldPosition,
   resolveInjuryNormal,
   isNormalizedPoint,
+  MODEL_BOUNDS,
 } from '@/features/vet/lib/injuryZones';
+import { regionKeyForFaceIndex } from '@/features/vet/lib/injuryRegionMap';
 import { Button } from '@/components/ui/Button';
 import { Icon, IconButton, Textarea } from '@/components/ui';
 import { formatDate } from '@/lib/display';
@@ -49,9 +51,11 @@ interface UrgentHorseInjuryViewerProps {
   }) => void;
   onDeleteInjury?: (id: string) => void;
   onUpdateInjury?: (id: string, updates: Partial<InjuryMarkerData>) => void;
+  /** Called once the GLB has loaded, so callers can hide their loading overlay. */
+  onModelReady?: () => void;
 }
 
-const MODEL_URL = '/models/urgent-horse.glb';
+const MODEL_URL = '/models/urgent-horse-v2.glb';
 
 function HorseModel({
   isAddMode,
@@ -65,7 +69,51 @@ function HorseModel({
 }) {
   const localRef = useRef<THREE.Group>(null);
   const targetRef = groupRef || localRef;
-  const { scene } = useGLTF(MODEL_URL);
+  const { scene, parser } = useGLTF(MODEL_URL);
+
+  // injuryZones.ts hardcodes the GLB POSITION accessor bounds of the body mesh.
+  // If the model is ever re-exported or optimised, every zone/marker mapping would be
+  // silently wrong. Warn only when no mesh still matches those constants.
+  useEffect(() => {
+    const json = (parser as unknown as {
+      json?: {
+        extensionsRequired?: string[];
+        accessors?: Array<{ min?: number[]; max?: number[] }>;
+        meshes?: Array<{ primitives?: Array<{ attributes?: Record<string, number> }> }>;
+      };
+    })?.json;
+    // KHR_mesh_quantization stores POSITION in normalized integer units, so accessor
+    // min/max are no longer comparable to MODEL_BOUNDS.
+    if (json?.extensionsRequired?.includes('KHR_mesh_quantization')) return;
+    const boxes = (json?.meshes ?? [])
+      .flatMap((mesh) => mesh.primitives ?? [])
+      .map((primitive) => primitive.attributes?.POSITION)
+      .filter((index): index is number => typeof index === 'number')
+      .map((index) => json?.accessors?.[index])
+      .filter((accessor): accessor is { min: number[]; max: number[] } =>
+        Boolean(accessor?.min && accessor?.max && accessor.min.length === 3 && accessor.max.length === 3));
+
+    if (boxes.length === 0) return;
+
+    const height = Math.max(MODEL_BOUNDS.max.y - MODEL_BOUNDS.min.y, 1);
+    const distance = (box: { min: number[]; max: number[] }) => Math.max(
+      Math.abs(box.min[0] - MODEL_BOUNDS.min.x), Math.abs(box.min[1] - MODEL_BOUNDS.min.y),
+      Math.abs(box.min[2] - MODEL_BOUNDS.min.z), Math.abs(box.max[0] - MODEL_BOUNDS.max.x),
+      Math.abs(box.max[1] - MODEL_BOUNDS.max.y), Math.abs(box.max[2] - MODEL_BOUNDS.max.z),
+    ) / height;
+
+    const closest = boxes.reduce((best, box) => (distance(box) < distance(best) ? box : best), boxes[0]);
+    if (distance(closest) > 0.01) {
+      console.error(
+        '[injuryZones] MODEL_BOUNDS no longer matches any mesh in ' + MODEL_URL
+        + '. Body-part zones and marker positions are wrong until injuryZones.ts is updated. '
+        + 'Closest bounds: ' + JSON.stringify({
+          min: { x: closest.min[0], y: closest.min[1], z: closest.min[2] },
+          max: { x: closest.max[0], y: closest.max[1], z: closest.max[2] },
+        }),
+      );
+    }
+  }, [parser]);
 
   // Signal once the model is committed, so markers mount a tick later and the
   // drei <Html> portal does not race the Suspense swap (it flushed empty).
@@ -140,8 +188,15 @@ function HorseModel({
     };
     // Canonical 8-region key (head/neck/back/abdomen/foreleg/hindleg L-R) so the
     // click result matches the Body region catalog and Select options 1:1.
-    // The raw face normal refines spine vs chest/belly on trunk hits.
-    const zoneId = regionKeyForNormalized(
+    // The body mesh carries a per-triangle region map (mesh POSITION accessor bounds), so a hit
+    // resolves by triangle index and no longer depends on the runtime scene box or camera.
+    // Other meshes (mane, saddle, eyes) fall back to the point heuristic.
+    const geometry = (event.object as THREE.Mesh | undefined)?.geometry;
+    const triangleCount = geometry
+      ? (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3
+      : undefined;
+    const regionFromMap = regionKeyForFaceIndex(event.faceIndex, triangleCount);
+    const zoneId = regionFromMap ?? regionKeyForNormalized(
       normalizeScenePoint(local, runtimeBounds),
       faceNormal,
     );
@@ -544,12 +599,16 @@ export default function UrgentHorseInjuryViewer({
   onPointerHit,
   onDeleteInjury,
   onUpdateInjury,
+  onModelReady,
 }: UrgentHorseInjuryViewerProps) {
   const horseGroupRef = useRef<THREE.Group>(null);
   // Markers mount only after the model committed (see HorseModel effect) — a marker
   // <Html> portal racing the Suspense swap renders an empty overlay.
   const [markersReady, setMarkersReady] = useState(false);
-  const handleModelReady = useCallback(() => setMarkersReady(true), []);
+  const handleModelReady = useCallback(() => {
+    setMarkersReady(true);
+    onModelReady?.();
+  }, [onModelReady]);
 
   return (
     <ViewerErrorBoundary fallback={<Fallback2D injuries={injuries} />}>

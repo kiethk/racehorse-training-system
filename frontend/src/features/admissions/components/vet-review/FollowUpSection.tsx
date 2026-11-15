@@ -42,7 +42,7 @@ export function FollowUpMergeNotice({ chosenDate, waitingAt }: { chosenDate: str
 export function FollowUpSection(props: FollowUpSectionProps) {
   const {
     isFormDisabled, careType, schedulePurpose, fromIncident, waitingFollowUpAt, followUpRequired, followUpActive,
-    scheduleFollowUp, setScheduleFollowUp, followUpDate, setFollowUpDate,
+    setScheduleFollowUp, followUpDate, setFollowUpDate,
     fieldErrors, setFieldErrors,
     businessDateFromToday, tomorrowBusinessDate, suggestedRecheckDate,
   } = props;

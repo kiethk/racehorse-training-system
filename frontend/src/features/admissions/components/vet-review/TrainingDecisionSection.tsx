@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { ChoiceInput, Textarea } from '@/components/ui/Input';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Notice } from '@/components/ui/Notice';
@@ -26,7 +27,7 @@ export interface TrainingDecisionSectionProps {
 
 export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
   const {
-    isFormDisabled, trainingDecision, setTrainingDecision,
+    trainingDecision, setTrainingDecision,
     restrictionDetails, setRestrictionDetails, fieldErrors, setFieldErrors,
     followUpDate, setFollowUpDate, businessDateFromToday,
     allowLocked = false, markerNotice = null, onLockedAllowAttempt,
@@ -106,19 +107,21 @@ export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
               { label: 'Medical Isolation', text: 'Quarantine isolation with daily temperature and health monitoring.' },
               { label: 'Paddock Turnout', text: 'Individual paddock turnout permitted; avoid strenuous work.' },
             ].map((preset) => (
-              <button
+              <Button
                 key={preset.label}
                 type="button"
+                variant="secondary"
+                size="sm"
+                className="hover:border-[var(--color-warning)]"
                 onClick={() => {
                   setRestrictionDetails(preset.text);
                   if (fieldErrors.restrictionDetails) {
                     setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
                   }
                 }}
-                className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-primary)] shadow-sm hover:border-[var(--color-warning)] hover:bg-[var(--color-surface-hover)] active:scale-[0.97] transition-all"
               >
                 + {preset.label}
-              </button>
+              </Button>
             ))}
           </div>
           <Textarea

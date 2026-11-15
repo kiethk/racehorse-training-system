@@ -115,6 +115,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     // Check if horse is in already loaded rows
     const match = rows.find((r) => r.horseId === hId);
     if (match) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the deep-linked horse's completion modal
       setCompleting(match);
       return;
     }

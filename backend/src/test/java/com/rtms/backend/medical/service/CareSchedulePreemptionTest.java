@@ -13,7 +13,6 @@ import com.rtms.backend.incident.entity.HorseIncidentReport;
 import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
@@ -39,9 +38,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import org.junit.jupiter.api.Disabled;
-
-@Disabled("Preemption and pause feature abolished per 4-state lifecycle simplification")
 class CareSchedulePreemptionTest {
 
     private CareScheduleRepository schedules;
@@ -93,7 +89,7 @@ class CareSchedulePreemptionTest {
     }
 
     @Test
-    @DisplayName("WF-02 §3.2: When all vets are busy, preempt least-loaded vet with ROUTINE exam to PAUSED and assign URGENT")
+    @DisplayName("WF-02 §3.2: When all vets are busy, the least-loaded vet takes the URGENT case and keeps the routine exam IN_PROGRESS")
     void preemptsLeastLoadedVetWithRoutineExam() {
         User vet1 = eligibleVet(1L); // Load: 30 mins
         User vet2 = eligibleVet(2L); // Load: 60 mins
@@ -357,15 +353,18 @@ class CareSchedulePreemptionTest {
     }
 
     @Test
-    @DisplayName("Ca ROUTINE bị thay bằng ca khẩn cấp: xóa ca cũ (AD-022) và báo Vet cũ")
-    void theVetOfASupersededVisitIsTold() {
-        CareSchedule routine = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+    @DisplayName("Ca ROUTINE bị ca khẩn cấp chen ngang: trả về SCHEDULED, giữ Vet và báo Vet khám tiếp")
+    void theVetOfAPausedVisitIsToldToResume() {
+        CareSchedule routine = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
 
-        service.cancelSupersededCase(routine);
+        service.interruptForUrgent(routine);
 
-        verify(schedules).delete(routine);
+        assertEquals(CareScheduleStatus.SCHEDULED, routine.getStatus());
+        assertEquals(1L, routine.getVeterinarianId());
+        assertNull(routine.getScheduledAt());
+        verify(schedules, never()).delete(any());
         verify(notifications).sendAssignmentNotification(eq(1L), any(), eq(10L), eq(101L),
-                eq(NotificationTypes.CARE_SCHEDULE_CANCELLED), any(), any());
+                eq(NotificationTypes.CARE_SCHEDULE_PAUSED), any(), any());
     }
 
     private User busyVet() {
