@@ -342,9 +342,6 @@ public class AiToolExecutionService {
             item.put("breed", h.getBreed() != null ? h.getBreed() : "N/A");
             item.put("sex", h.getSex() != null ? h.getSex().name() : "N/A");
             item.put("dateOfBirth", h.getDateOfBirth() != null ? h.getDateOfBirth().toString() : "N/A");
-            item.put("breed", h.getBreed() != null ? h.getBreed() : "N/A");
-            item.put("sex", h.getSex() != null ? h.getSex().name() : "N/A");
-            item.put("dateOfBirth", h.getDateOfBirth() != null ? h.getDateOfBirth().toString() : "N/A");
             item.put("status", h.getCurrentStatus());
             item.put("trainingDecision", h.getTrainingDecision());
             item.put("trainingDecisionReason", h.getTrainingDecisionReason() != null ? h.getTrainingDecisionReason() : "Bình thường");
@@ -364,6 +361,9 @@ public class AiToolExecutionService {
         response.put("totalOwnedHorses", result.size());
         response.put("allowedTrainingHorses", duocTapLuyen);
         response.put("restrictedHorses", camTapLuyen);
+        if (result.isEmpty()) {
+            response.put("message", "You currently have no horses registered under your ownership in the club.");
+        }
         response.put("horseList", result);
         response.put("actionUrl", "/owner/horses");
         return response;

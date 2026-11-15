@@ -26,7 +26,7 @@ export function HorseProfilePhoto({ name, image }: { name: string; image?: strin
           className="group relative h-32 w-32 shrink-0 cursor-pointer overflow-hidden rounded-[var(--radius-md)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
           title={`Click to preview full photo of ${name}`}
         >
-          <HorseAvatar name={name} image={url} size={128} rounded="md" />
+          <HorseAvatar name={name} image={image} size={128} rounded="md" />
           <span className="absolute inset-0 flex items-center justify-center gap-1 rounded-[var(--radius-md)] bg-black/40 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 backdrop-blur-[1px]">
             <Icon name="maximize" size={16} />
             Preview
