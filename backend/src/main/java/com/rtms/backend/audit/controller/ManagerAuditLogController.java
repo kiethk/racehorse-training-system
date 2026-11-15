@@ -45,7 +45,7 @@ public class ManagerAuditLogController {
     public ApiResponse<Page<AuditLogResponse>> getAuditLogs(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String httpMethod,
-            @RequestParam(required = false) Integer statusCode,
+            @RequestParam(required = false) String statusCode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @RequestParam(required = false) String search,
@@ -53,9 +53,28 @@ public class ManagerAuditLogController {
             @RequestParam(required = false) String role,
             @PageableDefault(size = 20) Pageable pageable
     ) {
+        Integer parsedStatusCode = parseStatusCode(statusCode);
         return ApiResponse.success(
-                auditLogService.getAuditLogs(userId, httpMethod, statusCode, from, to, search, module, role, pageable)
+                auditLogService.getAuditLogs(userId, httpMethod, parsedStatusCode, from, to, search, module, role, pageable)
         );
+    }
+
+    private Integer parseStatusCode(String statusCode) {
+        if (statusCode == null || statusCode.isBlank() || "ALL".equalsIgnoreCase(statusCode.trim())) {
+            return null;
+        }
+        String trimmed = statusCode.trim().toUpperCase();
+        if ("SUCCESS".equals(trimmed)) {
+            return 200;
+        }
+        if ("FAILED".equals(trimmed) || "FAILURE".equals(trimmed)) {
+            return 400;
+        }
+        try {
+            return Integer.parseInt(trimmed);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @GetMapping("/archive-status")
