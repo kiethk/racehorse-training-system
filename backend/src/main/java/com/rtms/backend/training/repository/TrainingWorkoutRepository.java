@@ -9,7 +9,9 @@ import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
 import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -209,6 +211,14 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            WHERE w.id = :workoutId AND s.trainerId = :trainerId
            """)
     Optional<TrainingWorkout> findByIdAndTrainerId(@Param("workoutId") Long workoutId, @Param("trainerId") Long trainerId);
+
+    /**
+     * Đọc Workout và khóa dòng đến hết giao dịch, để hai yêu cầu cùng lúc (ghi kết quả, "Không chạy") nối đuôi nhau chứ không ghi đè nhau.
+     * (Reads a Workout and locks its row until the transaction ends, so two requests at the same moment (record a result, "Did not run") run one after the other instead of overwriting each other.)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM TrainingWorkout w WHERE w.id = :id")
+    Optional<TrainingWorkout> findByIdForUpdate(@Param("id") Long id);
 
     /** Workout còn SCHEDULED của các buổi đã HELD thành HELD. (SCHEDULED Workouts of HELD Sessions become HELD.) */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
