@@ -25,7 +25,6 @@ import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayou
 import { ManagerTrainerAssessmentTab } from '../shared/components/ManagerTrainerAssessmentTab';
 import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
 import { ManagerGroomReassignment } from './ManagerGroomReassignment';
-import { GroomAssignmentHistory } from './GroomAssignmentHistory';
 import { ReviewDue } from '../shared/components/ReviewDue';
 import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
 
@@ -355,7 +354,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                   trainerName={detail.trainerName}
                 />
               )}
-              {activeTab === 'history' && (<div className="space-y-5">{renderHistory()}<GroomAssignmentHistory admissionId={admissionId} /></div>)}
+              {activeTab === 'history' && renderHistory()}
             </div>
           </div>
         )}

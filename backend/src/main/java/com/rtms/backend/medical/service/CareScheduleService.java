@@ -1,4 +1,5 @@
 package com.rtms.backend.medical.service;
+import com.rtms.backend.config.ClientTimeContext;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
@@ -267,7 +268,7 @@ public class CareScheduleService {
                 .map(CareSchedule::getId)
                 .collect(Collectors.toSet());
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = ClientTimeContext.now();
         String effectiveReason = (reason != null && !reason.isBlank()) ? reason : "Horse left the club";
         List<HorseIncidentReport> closed = new ArrayList<>();
         for (HorseIncidentReport report : openReports) {
@@ -477,6 +478,11 @@ public class CareScheduleService {
                     "This horse has another examination in progress; finish it first");
         }
         validateRoutineScheduleDate(schedule);
+        // Window only applies when the exam hasn't been started yet (SCHEDULED).
+        // Once IN_PROGRESS or OVERDUE the vet may finish past 15:30.
+        if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
+            validateRoutineExamWindowForStart(schedule);
+        }
 
         validateMandatoryVitalsAndMarkers(request, schedule);
 
@@ -583,7 +589,7 @@ public class CareScheduleService {
         TrainingDecision effectiveDecision = horse.getTrainingDecision();
         String effectiveReason = horse.getTrainingDecisionReason();
 
-        LocalDateTime now = LocalDateTime.now().minusNanos(1_000_000);
+        LocalDateTime now = ClientTimeContext.now().minusNanos(1_000_000);
         HealthRecord record = new HealthRecord();
         record.setHorseId(horse.getId());
         record.setVeterinarianId(vetId);
@@ -722,17 +728,18 @@ public class CareScheduleService {
         // Ca tiêm phòng mà vet hoãn tiêm vẫn phải để lại một mốc mới cho ngựa.
         if (deferDays != null) {
             careScheduleRepository.flush();
-            preventiveVaccinationService.deferMilestone(horse.getId(), savedRecord.getId(), vetId, deferDays);
+            preventiveVaccinationService.deferMilestone(horse.getId(), savedRecord.getId(), vetId, deferDays)
+                    .ifPresent(this::assignRequestedSchedule);
         } else if (!vaccinations.isEmpty()) {
             careScheduleRepository.flush();
             preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
-                    schedule.getCareType());
+                    schedule.getCareType()).ifPresent(this::assignRequestedSchedule);
         } else if (schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE) {
             // Auto-create a preventive (vaccination) milestone after an ALLOWED exam even when
             // no vaccine was administered, so the next vaccination checkpoint is booked.
             careScheduleRepository.flush();
             preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
-                    schedule.getCareType());
+                    schedule.getCareType()).ifPresent(this::assignRequestedSchedule);
         }
 
         // Gán Trainer chạy SAU khi transaction này commit (TrainerAssignmentTriggers):
@@ -852,7 +859,7 @@ public class CareScheduleService {
      */
     private void validateRoutineScheduleDate(CareSchedule schedule) {
         if (schedule.getCareType() == CareType.ROUTINE) {
-            LocalDate today = LocalDate.now();
+            LocalDate today = ClientTimeContext.today();
             LocalDate scheduledDate = schedule.getScheduledDate();
             if (scheduledDate == null && schedule.getScheduledAt() != null) {
                 scheduledDate = schedule.getScheduledAt().toLocalDate();
@@ -872,8 +879,8 @@ public class CareScheduleService {
      * Sau 15:30, ca nào đã kịp IN_PROGRESS vẫn được phép hoàn tất (completeCareSchedule).
      */
     private void validateRoutineExamWindowForStart(CareSchedule schedule) {
-        if (schedule.getCareType() == CareType.ROUTINE) {
-            LocalTime now = LocalTime.now();
+        if (schedule.getCareType() == CareType.ROUTINE && schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE) {
+            LocalTime now = ClientTimeContext.time();
             if (now.isBefore(FarmSchedulePolicy.VET_WINDOW_START) || now.isAfter(FarmSchedulePolicy.VET_WINDOW_END)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTINE_EXAM_OUTSIDE_WINDOW",
                         "Routine examinations can only be started between " + FarmSchedulePolicy.VET_WINDOW_START
@@ -1001,8 +1008,8 @@ public class CareScheduleService {
         plan.setInstructions(instructions);
         plan.setStartDate(hasItems
                 ? prescriptions.stream().map(PrescriptionItemRequest::getStartDate)
-                        .min(LocalDate::compareTo).orElse(LocalDate.now())
-                : LocalDate.now());
+                        .min(LocalDate::compareTo).orElse(ClientTimeContext.today())
+                : ClientTimeContext.today());
         // Note-only: plan sống tới đúng buổi khám lại (mọi ca khám đều bắt buộc đặt nextSchedule ở luồng
         // có follow-up) để banner Groom tự tắt, không cần nút đóng tay. Không có lịch thì để null.
         plan.setEndDate(hasItems
@@ -1211,7 +1218,7 @@ public class CareScheduleService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "scheduledDate must use ISO format yyyy-MM-dd");
             }
         }
-        if (requestedAt == null || !requestedAt.isAfter(LocalDateTime.now())) {
+        if (requestedAt == null || !requestedAt.isAfter(ClientTimeContext.now())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "Requested schedule time must be in the future");
         }
         String operationKey = operationKeyOverride != null
@@ -1332,7 +1339,7 @@ public class CareScheduleService {
         if (horse.getTrainingDecision() != TrainingDecision.BLOCKED) return;
         if (findOpenIncidentCase(horse.getId()).isPresent() || findWaitingFollowUp(horse.getId()).isPresent()) return;
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = ClientTimeContext.now();
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setHorseId(horse.getId());
         next.setCareType(CareType.ROUTINE);
@@ -1345,7 +1352,7 @@ public class CareScheduleService {
     // D1 — careScheduleLifecycleSweep (ROADMAP v2.2 §4.5; WF-01 §3.1.3-5, WF-03 §3.2)
     // ------------------------------------------------------------------
 
-    private static final LocalTime WORKDAY_START = LocalTime.of(8, 0);
+    private static final LocalTime WORKDAY_START = LocalTime.of(7, 0);
     private static final LocalTime WORKDAY_END = LocalTime.of(17, 0);
     private static final DateTimeFormatter SWEEP_TIME_FMT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -1359,7 +1366,7 @@ public class CareScheduleService {
      */
     @Transactional
     public void careScheduleLifecycleSweep() {
-        runLifecycleSweep(LocalDateTime.now());
+        runLifecycleSweep(ClientTimeContext.now());
     }
 
     /** Tách `now` thành tham số để test dùng clock cố định. */
@@ -1367,9 +1374,6 @@ public class CareScheduleService {
         LocalTime tod = now.toLocalTime();
         if (!tod.isBefore(WORKDAY_START) && tod.isBefore(WORKDAY_END)) {
             return;
-        }
-        if (tod.isBefore(WORKDAY_END)) {
-            return; // trước 17:00: không rollover/escalate
         }
 
         List<CareScheduleStatus> openStatuses = CareScheduleStatus.ASSIGNED_OR_BOOKED;
@@ -1502,7 +1506,16 @@ public class CareScheduleService {
         // Ca đang khám vẫn chiếm lịch của ngựa, nên rollover phải né nó.
         List<CareSchedule> horseScheduled = careScheduleRepository.findByHorseIdAndStatusIn(
                 cs.getHorseId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
-        LocalDate day = now.toLocalDate().plusDays(1);
+        LocalDate earliestDay = !now.toLocalTime().isBefore(WORKDAY_END)
+                ? now.toLocalDate().plusDays(1)
+                : now.toLocalDate();
+        LocalDate startDay = cs.getScheduledDate() != null
+                ? cs.getScheduledDate().plusDays(1)
+                : earliestDay;
+        if (startDay.isBefore(earliestDay)) {
+            startDay = earliestDay;
+        }
+        LocalDate day = startDay;
         for (int d = 0; d < 7; d++, day = day.plusDays(1)) {
             LocalDate currentDay = day;
             List<CareSchedule> assignedInDay = careScheduleRepository.findAssignedInDay(
@@ -1573,7 +1586,7 @@ public class CareScheduleService {
 
     @Transactional
     public void assignRequestedSchedules() {
-        LocalDateTime horizon = LocalDateTime.now().plusDays(ASSIGNMENT_HORIZON_DAYS);
+        LocalDateTime horizon = ClientTimeContext.now().plusDays(ASSIGNMENT_HORIZON_DAYS);
         for (CareSchedule schedule : careScheduleRepository.lockNextRequestedBatch(ASSIGNMENT_BATCH_SIZE, horizon)) {
             assignRequestedSchedule(schedule);
         }
@@ -1607,7 +1620,7 @@ public class CareScheduleService {
     void assignRequestedSchedule(CareSchedule schedule, Long creatorVetId, boolean ignoreHorizon) {
         if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) return;
         if (schedule.getVeterinarianId() != null && (schedule.getScheduledDate() != null || schedule.getScheduledAt() != null)) return;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = ClientTimeContext.now();
         LocalDateTime horizon = now.plusDays(ASSIGNMENT_HORIZON_DAYS);
         if (!ignoreHorizon && isBeyondAssignmentHorizon(schedule, horizon)) return;
 
@@ -1718,7 +1731,7 @@ public class CareScheduleService {
             );
 
             if (urgent || schedule.getSourceIncidentId() != null) {
-                LocalDateTime assignedAt = LocalDateTime.now();
+                LocalDateTime assignedAt = ClientTimeContext.now();
                 HorseIncidentReport incident = markCaseReportsInReview(schedule, lockedVet.getId(), assignedAt);
                 if (urgent) {
                     eventPublisher.publishEvent(new UrgentAssignmentCommittedEvent(
@@ -1737,7 +1750,7 @@ public class CareScheduleService {
      * để quay lại hoàn tất ca cũ sau.
      */
     private SlotAssignment attemptPreemptionForUrgent(CareSchedule urgentSchedule, List<User> candidateVets) {
-        LocalDateTime slot = LocalDateTime.now();
+        LocalDateTime slot = ClientTimeContext.now();
         LocalDate today = slot.toLocalDate();
 
         List<User> preemptible = candidateVets.stream()
@@ -1851,7 +1864,7 @@ public class CareScheduleService {
             VetScheduleCache vetCache,
             Map<Long, Integer> overdueAppointmentsByVet, Map<Long, Integer> scheduledMinutesByVet) {
         if (schedule.getCareType() == CareType.URGENT) {
-            LocalDateTime urgentSlot = LocalDateTime.now();
+            LocalDateTime urgentSlot = ClientTimeContext.now();
             List<User> ranked = rankVeterinarians(schedule, urgentSlot, vetCache, overdueAppointmentsByVet, scheduledMinutesByVet, null);
             return ranked.isEmpty() ? null : new SlotAssignment(urgentSlot, ranked);
         }
@@ -1867,8 +1880,8 @@ public class CareScheduleService {
                 schedule.getHorseId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
 
         LocalDateTime requested = schedule.getRequestedAt();
-        LocalDate startDate = (requested != null && requested.isAfter(LocalDateTime.now())
-                ? requested : LocalDateTime.now()).toLocalDate();
+        LocalDate startDate = (requested != null && requested.isAfter(ClientTimeContext.now())
+                ? requested : ClientTimeContext.now()).toLocalDate();
         for (int dayOffset = 0; dayOffset < 14; dayOffset++) {
             LocalDate day = startDate.plusDays(dayOffset);
             List<CareSchedule> assignedInDay = null;
@@ -1905,7 +1918,7 @@ public class CareScheduleService {
             for (LocalTime time : times) {
                 LocalDateTime slot = day.atTime(time);
                 if (requested != null && slot.isBefore(requested)) continue;
-                if (slot.isBefore(LocalDateTime.now())) continue;
+                if (slot.isBefore(ClientTimeContext.now())) continue;
                 if (horseHasConflict(schedule, day, slot, scheduledForHorse)) continue;
 
                 if (assignedInDay == null) {
@@ -1984,7 +1997,7 @@ public class CareScheduleService {
                         if (count >= ADMISSION_DAILY_QUOTA) return false;
                     }
                     boolean activeExamBlocks = schedule.getCareType() != CareType.URGENT
-                            && slot.toLocalDate().isEqual(LocalDate.now())
+                            && slot.toLocalDate().isEqual(ClientTimeContext.today())
                             && vetCache.hasInProgressByVet.computeIfAbsent(v.getId(),
                                     id -> careScheduleRepository.existsByVeterinarianIdAndStatus(id, CareScheduleStatus.IN_PROGRESS));
                     return !activeExamBlocks;
@@ -2035,16 +2048,16 @@ public class CareScheduleService {
             if (startedAt == null) return true;
             int duration = inProgress.getDurationMinutes() > 0
                     ? inProgress.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
-            return startedAt.plusMinutes(duration).isAfter(LocalDateTime.now());
+            return startedAt.plusMinutes(duration).isAfter(ClientTimeContext.now());
         }
         LocalDateTime scheduledAt = inProgress.getScheduledAt();
-        if (scheduledAt == null) return slot.toLocalDate().isEqual(LocalDate.now());
+        if (scheduledAt == null) return slot.toLocalDate().isEqual(ClientTimeContext.today());
         int duration = inProgress.getDurationMinutes() > 0
                 ? inProgress.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
         // An overdue in-progress visit remains active; retain the Vet assignment but
         // do not book a conflicting appointment until that visit is completed.
-        if (!scheduledAt.plusMinutes(duration).isAfter(LocalDateTime.now())) {
-            return slot.toLocalDate().isEqual(LocalDate.now());
+        if (!scheduledAt.plusMinutes(duration).isAfter(ClientTimeContext.now())) {
+            return slot.toLocalDate().isEqual(ClientTimeContext.today());
         }
         return overlaps(schedule, slot, inProgress);
     }
@@ -2217,7 +2230,7 @@ public class CareScheduleService {
         StableStall stall = horse.getCurrentStallId() == null ? null
                 : stallRepository.findById(horse.getCurrentStallId()).orElse(null);
         long eventId = schedule.getId();
-        LocalDateTime cutoff = schedule.getCreatedAt() != null ? schedule.getCreatedAt() : LocalDateTime.now();
+        LocalDateTime cutoff = schedule.getCreatedAt() != null ? schedule.getCreatedAt() : ClientTimeContext.now();
         HealthRecord previousTraining = previousTrainingRecord(horse.getId(), cutoff).orElse(null);
         return new UrgentAssignmentAlert(
                 eventId,

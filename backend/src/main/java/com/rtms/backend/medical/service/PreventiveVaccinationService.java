@@ -2,6 +2,7 @@ package com.rtms.backend.medical.service;
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.dto.VaccinationRequest;
+import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.Prescription;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
 import com.rtms.backend.medical.entity.TreatmentPlan;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -43,11 +45,6 @@ public class PreventiveVaccinationService {
 
     @Autowired
     public PreventiveVaccinationService(PreventiveProtocolRepository protocols, TreatmentPlanRepository treatmentPlans,
-            PrescriptionRepository prescriptions, PreventiveStatusService preventiveStatus) {
-        this(protocols, treatmentPlans, prescriptions, preventiveStatus, Clock.systemDefaultZone());
-    }
-
-    PreventiveVaccinationService(PreventiveProtocolRepository protocols, TreatmentPlanRepository treatmentPlans,
             PrescriptionRepository prescriptions, PreventiveStatusService preventiveStatus, Clock clock) {
         this.protocols = protocols;
         this.treatmentPlans = treatmentPlans;
@@ -146,15 +143,15 @@ public class PreventiveVaccinationService {
      * (Manager duyệt admission mới đặt hạn cho chúng); các ca khác coi chúng là quá hạn.
      */
     @Transactional
-    public void refreshMilestone(Long horseId, Long healthRecordId, Long actorId, CareType careType) {
+    public Optional<CareSchedule> refreshMilestone(Long horseId, Long healthRecordId, Long actorId, CareType careType) {
         LocalDate missingDueOn = careType == CareType.INITIAL ? null : LocalDate.now(clock);
-        preventiveStatus.upsertMilestone(horseId, "preventive:" + healthRecordId, actorId, missingDueOn);
+        return preventiveStatus.upsertMilestone(horseId, "preventive:" + healthRecordId, actorId, missingDueOn);
     }
 
     /** Hoãn tiêm: mốc PREVENTIVE mới đặt sau {@code days} ngày, lý do UNDER_TREATMENT. */
     @Transactional
-    public void deferMilestone(Long horseId, Long healthRecordId, Long actorId, int days) {
-        preventiveStatus.deferMilestone(horseId, "preventive:" + healthRecordId, actorId,
+    public Optional<CareSchedule> deferMilestone(Long horseId, Long healthRecordId, Long actorId, int days) {
+        return preventiveStatus.deferMilestone(horseId, "preventive:" + healthRecordId, actorId,
                 LocalDate.now(clock).plusDays(days));
     }
 

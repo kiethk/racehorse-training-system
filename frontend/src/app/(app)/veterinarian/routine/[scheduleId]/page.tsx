@@ -59,7 +59,9 @@ export default function RoutineDetailPage() {
   // Auto-start routine exam to transition SCHEDULED -> IN_PROGRESS when vet opens the page
   useEffect(() => {
     if (!detail?.schedule || autoStartedRef.current) return;
-    const isFuture = detail.schedule.scheduledDate && detail.schedule.scheduledDate > new Date().toISOString().slice(0, 10);
+    const _now = new Date();
+    const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    const isFuture = Boolean(detail.schedule.scheduledDate && detail.schedule.scheduledDate > todayIso);
     if (detail.schedule.status === 'SCHEDULED' && !isFuture) {
       autoStartedRef.current = true;
       admissionsApi.startCareSchedule(scheduleId)

@@ -21,8 +21,8 @@ describe('scheduleStatusDisplay', () => {
     assert.equal(getScheduleStatusDisplay(undefined).label, 'Unknown');
   });
 
-  it('unifies open exam actions as Examine and completed ones as View Record', () => {
-    assert.equal(getScheduleExamAction('IN_PROGRESS').label, 'Examine');
+  it('unifies open exam actions as Examine or Continue and completed ones as View Record', () => {
+    assert.equal(getScheduleExamAction('IN_PROGRESS').label, 'Continue');
     assert.equal(getScheduleExamAction('SCHEDULED').label, 'Examine');
     assert.equal(getScheduleExamAction('COMPLETED').label, 'View Record');
   });
