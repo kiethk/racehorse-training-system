@@ -26,8 +26,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 @RestController
@@ -46,16 +49,18 @@ public class ManagerAuditLogController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String httpMethod,
             @RequestParam(required = false) String statusCode,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String module,
             @RequestParam(required = false) String role,
             @PageableDefault(size = 20) Pageable pageable
     ) {
         Integer parsedStatusCode = parseStatusCode(statusCode);
+        LocalDateTime fromDateTime = parseFromDate(from);
+        LocalDateTime toDateTime = parseToDate(to);
         return ApiResponse.success(
-                auditLogService.getAuditLogs(userId, httpMethod, parsedStatusCode, from, to, search, module, role, pageable)
+                auditLogService.getAuditLogs(userId, httpMethod, parsedStatusCode, fromDateTime, toDateTime, search, module, role, pageable)
         );
     }
 
@@ -77,6 +82,56 @@ public class ManagerAuditLogController {
         }
     }
 
+    private LocalDateTime parseFromDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) {
+            return null;
+        }
+        String trimmed = dateStr.trim();
+        if (trimmed.endsWith("Z") || trimmed.endsWith("z")) {
+            try {
+                return Instant.parse(trimmed).atZone(ZoneId.systemDefault()).toLocalDateTime();
+            } catch (Exception ignored) {
+                trimmed = trimmed.substring(0, trimmed.length() - 1);
+            }
+        }
+        if (trimmed.contains("T")) {
+            try {
+                return LocalDateTime.parse(trimmed);
+            } catch (Exception ignored) {}
+        }
+        try {
+            LocalDate localDate = LocalDate.parse(trimmed.length() >= 10 ? trimmed.substring(0, 10) : trimmed);
+            return localDate.atStartOfDay();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private LocalDateTime parseToDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) {
+            return null;
+        }
+        String trimmed = dateStr.trim();
+        if (trimmed.endsWith("Z") || trimmed.endsWith("z")) {
+            try {
+                return Instant.parse(trimmed).atZone(ZoneId.systemDefault()).toLocalDateTime();
+            } catch (Exception ignored) {
+                trimmed = trimmed.substring(0, trimmed.length() - 1);
+            }
+        }
+        if (trimmed.contains("T")) {
+            try {
+                return LocalDateTime.parse(trimmed);
+            } catch (Exception ignored) {}
+        }
+        try {
+            LocalDate localDate = LocalDate.parse(trimmed.length() >= 10 ? trimmed.substring(0, 10) : trimmed);
+            return localDate.atTime(LocalTime.MAX);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @GetMapping("/archive-status")
     @PreAuthorize("hasAuthority('AUDIT_LOG_VIEW')")
     public ApiResponse<AuditArchiveStatusResponse> getArchiveStatus() {
@@ -86,22 +141,25 @@ public class ManagerAuditLogController {
     @GetMapping("/export-archive")
     @PreAuthorize("hasAuthority('AUDIT_LOG_VIEW') or hasAuthority('AUDIT_LOG_MANAGE')")
     public ResponseEntity<byte[]> exportArchive(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime before
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String before
     ) {
-        String csvContent = auditLogService.exportArchiveCsv(from, to, before);
+        LocalDateTime fromDateTime = parseFromDate(from);
+        LocalDateTime toDateTime = parseToDate(to);
+        LocalDateTime beforeDateTime = parseToDate(before);
+        String csvContent = auditLogService.exportArchiveCsv(fromDateTime, toDateTime, beforeDateTime);
         byte[] csvBytes = csvContent.getBytes(StandardCharsets.UTF_8);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-        LocalDateTime effectiveEnd = to != null ? to : before;
+        LocalDateTime effectiveEnd = toDateTime != null ? toDateTime : beforeDateTime;
         String filename;
-        if (from != null && effectiveEnd != null) {
-            filename = "audit_logs_from_" + from.format(formatter) + "_to_" + effectiveEnd.format(formatter) + ".csv";
+        if (fromDateTime != null && effectiveEnd != null) {
+            filename = "audit_logs_from_" + fromDateTime.format(formatter) + "_to_" + effectiveEnd.format(formatter) + ".csv";
         } else if (effectiveEnd != null) {
             filename = "audit_archive_before_" + effectiveEnd.format(formatter) + ".csv";
-        } else if (from != null) {
-            filename = "audit_logs_from_" + from.format(formatter) + ".csv";
+        } else if (fromDateTime != null) {
+            filename = "audit_logs_from_" + fromDateTime.format(formatter) + ".csv";
         } else {
             filename = "audit_logs_all_" + LocalDate.now().format(formatter) + ".csv";
         }
