@@ -437,7 +437,7 @@ class GroomDailyTaskServiceTest {
         when(completionRepository.findById(9L)).thenReturn(Optional.of(completion));
 
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> taskService.loadCompletionPhoto(9L, 0, new AuthenticatedUser(9L, "other@example.com", "GROOM")));
+                () -> taskService.loadCompletionPhoto(9L, 0, new AuthenticatedUser(9L, "other@example.com", "GROOM"), null));
         verify(fileStorage, never()).load(any());
     }
 

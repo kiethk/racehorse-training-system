@@ -970,7 +970,7 @@ export function VetAdmissionQueue() {
                   {activeTab === 'documents' && (
                     <div className="grid gap-5 xl:grid-cols-2">
                       <div>
-                        <AdmissionDocumentsSection documents={documents} assetUrl={admissionsApi.assetUrl} />
+                        <AdmissionDocumentsSection documents={documents} />
                       </div>
 
                       <div className="space-y-4">

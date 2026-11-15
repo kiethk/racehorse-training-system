@@ -152,9 +152,12 @@ export function ReportIncidentDialog({
             onChange={(e) => {
               const selected = e.target.files?.[0] ?? null;
               if (selected && selected.size > 10 * 1024 * 1024) {
+                e.target.value = '';
+                setFile(null);
                 setError('Image file must not exceed 10 MB.');
                 return;
               }
+              setError(null);
               setFile(selected);
             }}
           />

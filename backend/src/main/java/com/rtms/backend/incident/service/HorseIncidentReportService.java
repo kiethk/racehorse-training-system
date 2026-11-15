@@ -1,6 +1,7 @@
 package com.rtms.backend.incident.service;
 
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.training.enums.TrainingDecision;
@@ -108,7 +109,7 @@ public class HorseIncidentReportService {
         incidentReportRepository.save(saved);
 
         syncReportsWithCase(target);
-        return saved;
+        return withHorseNames(withPeopleNames(List.of(saved))).get(0);
     }
 
     private CareSchedule createCase(Horse horse, HorseIncidentReport report, boolean serious) {
@@ -186,7 +187,7 @@ public class HorseIncidentReportService {
         if (status != null) {
             base = base.stream().filter(r -> r.getStatus() == status).toList();
         }
-        return withHorseNames(withHandlerNames(base));
+        return withHorseNames(withPeopleNames(base));
     }
 
     @Transactional
@@ -221,7 +222,7 @@ public class HorseIncidentReportService {
         }
 
         HorseIncidentReport saved = incidentReportRepository.save(report);
-        withHandlerNames(List.of(saved));
+        withPeopleNames(List.of(saved));
         return saved;
     }
 
@@ -235,7 +236,7 @@ public class HorseIncidentReportService {
         if (isTrainer(currentUser) && !ownReport && !isTrainerOf(report.getHorseId(), currentUser)) {
             throw new AccessDeniedException("You can only view incident reports for horses in your areas");
         }
-        withHorseNames(withHandlerNames(List.of(report)));
+        withHorseNames(withPeopleNames(List.of(report)));
         return report;
     }
 
@@ -273,12 +274,12 @@ public class HorseIncidentReportService {
         }
     }
 
-    public Resource loadImage(Long reportId, AuthenticatedUser currentUser) {
+    public Resource loadImage(Long reportId, AuthenticatedUser currentUser, FileVariant size) {
         HorseIncidentReport report = getReportById(reportId, currentUser);
         if (report.getImageUrl() == null) {
             throw new RuntimeException("Incident report #" + reportId + " has no image attached");
         }
-        return fileStorage.load(report.getImageUrl());
+        return fileStorage.load(report.getImageUrl(), size);
     }
 
     public MediaType imageMediaType(Long reportId, AuthenticatedUser currentUser) {
@@ -294,12 +295,13 @@ public class HorseIncidentReportService {
     }
 
     /**
-     * Gắn tên vet được giao để người báo biết ai đang nhận ca. Ưu tiên vet đã xử lý báo cáo
-     * (handledById); nếu chưa có thì lấy vet của ca urgent mà báo cáo được gắn vào
-     * (báo cáo thứ hai trên cùng ngựa dùng chung ca urgent đang mở, nên không có handledById).
-     * Mỗi loại dữ liệu chỉ truy vấn một lần cho cả danh sách.
+     * Gắn tên người gửi và tên vet được giao để ai xem cũng biết ai báo, ai đang nhận ca
+     * (attach the reporter's name and the assigned vet's name).
+     * Vet: ưu tiên vet đã xử lý báo cáo (handledById); nếu chưa có thì lấy vet của ca mà báo cáo được gắn vào
+     * (báo cáo thứ hai trên cùng ngựa dùng chung ca đang mở, nên không có handledById).
+     * Mỗi loại dữ liệu chỉ truy vấn một lần cho cả danh sách (one query per kind of data for the whole list).
      */
-    private List<HorseIncidentReport> withHandlerNames(List<HorseIncidentReport> reports) {
+    private List<HorseIncidentReport> withPeopleNames(List<HorseIncidentReport> reports) {
         List<Long> scheduleIds = reports.stream()
                 .filter(report -> report.getHandledById() == null)
                 .map(HorseIncidentReport::getCareScheduleId)
@@ -318,13 +320,20 @@ public class HorseIncidentReportService {
                     : null;
             if (vetId != null) vetByReport.put(report, vetId);
         }
-        if (vetByReport.isEmpty()) return reports;
 
-        Map<Long, String> names = userRepository.findAllById(vetByReport.values().stream().distinct().toList()).stream()
+        List<Long> userIds = java.util.stream.Stream.concat(
+                        vetByReport.values().stream(),
+                        reports.stream().map(HorseIncidentReport::getReportedById).filter(Objects::nonNull))
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) return reports;
+
+        Map<Long, String> names = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getFullName, (a, b) -> a));
         reports.forEach(report -> {
             Long vetId = vetByReport.get(report);
             report.setHandlerName(vetId == null ? null : names.get(vetId));
+            report.setReportedByName(report.getReportedById() == null ? null : names.get(report.getReportedById()));
         });
         return reports;
     }

@@ -28,6 +28,7 @@ import {
   Pill,
   ProgressBar,
   ScoreScale,
+  SearchCombobox,
   SearchInput,
   SectionTitle,
   SegmentedControl,
@@ -76,6 +77,7 @@ export default function DesignTestPage() {
   const [score, setScore] = useState<number | null>(7);
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'DONE'>('ALL');
   const [search, setSearch] = useState('');
+  const [pickedHorse, setPickedHorse] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -141,6 +143,19 @@ export default function DesignTestPage() {
           </FormField>
           <FormField label="Search">
             <SearchInput value={search} onChange={setSearch} placeholder="Search horses" />
+          </FormField>
+          <FormField label="Pick a horse">
+            <SearchCombobox
+              label="Horse"
+              placeholder="Search horse name"
+              options={[
+                { value: '1', label: 'Northern Star', hint: 'Thoroughbred' },
+                { value: '2', label: 'Desert Wind', hint: 'Arabian' },
+                { value: '3', label: 'Night Runner', hint: 'Thoroughbred' },
+              ]}
+              value={pickedHorse}
+              onChange={setPickedHorse}
+            />
           </FormField>
           <FormField label="Notes" className="sm:col-span-2">
             <Textarea placeholder="Anything the vet should know" />

@@ -24,6 +24,7 @@ import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -249,8 +250,8 @@ public class GroomDailyTaskService {
         return completion.getPhotoKeys().get(index);
     }
 
-    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser) {
-        return fileStorage.load(completionPhotoKey(completionId, index, currentUser));
+    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser, FileVariant size) {
+        return fileStorage.load(completionPhotoKey(completionId, index, currentUser), size);
     }
 
     public MediaType completionPhotoMediaType(Long completionId, int index, AuthenticatedUser currentUser) {

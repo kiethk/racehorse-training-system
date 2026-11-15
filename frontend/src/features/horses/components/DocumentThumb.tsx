@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Icon, ImageThumbnail, Skeleton } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import { fileVariantUrl } from '@/lib/fileVariant';
 import { useProtectedFileUrl } from '@/lib/protectedFile';
 import { renderPdfFirstPage, usePdfFirstPage } from '@/lib/pdfThumbnail';
 import { isImageDocument, isPdfDocument } from '@/features/admissions/shared/lib/documentKind';
@@ -38,7 +39,8 @@ export function StoredDocumentThumb({ fileUrl, documentType, fileName, onOpen }:
   const doc = { documentType, fileUrl, originalFileName: fileName };
   const image = isImageDocument(doc);
   const pdf = !image && isPdfDocument(doc);
-  const imageState = useProtectedFileUrl(image ? fileUrl : null);
+  // The 176 px frame shows the large copy; the document preview it opens loads the original.
+  const imageState = useProtectedFileUrl(image ? fileVariantUrl(fileUrl, 'PREVIEW') : null);
   const pdfState = usePdfFirstPage(pdf ? fileUrl : null, PDF_WIDTH);
   const state = image ? imageState : pdf ? pdfState : { url: null, failed: true };
   return <Frame {...state} alt={fileName ?? documentType} onOpen={onOpen} pdf={!image} />;

@@ -102,11 +102,11 @@ class MyProfileServiceTest {
         assertEquals(403,ex.getStatusCode().value());verify(users,never()).saveAndFlush(any());
     }
     @Test void missingAvatarReturns404() {
-        assertEquals(404,assertThrows(ResponseStatusException.class,()->service.avatar(7L)).getStatusCode().value());
+        assertEquals(404,assertThrows(ResponseStatusException.class,()->service.avatar(7L, null)).getStatusCode().value());
     }
     @Test void avatarReadUsesTheAuthenticatedUserOnly() throws Exception {
         user.setAvatarUrl(storage.store(png(),"avatar"));
-        assertEquals("image/png",service.avatar(7L).mediaType().toString());verify(users).findById(7L);
+        assertEquals("image/png",service.avatar(7L, null).mediaType().toString());verify(users).findById(7L);
     }
 
     private void reject(MockMultipartFile file) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClassName } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { PdfViewer } from '@/components/ui/PdfViewer';
 import { openBlobInTab } from '@/lib/protectedFile';
@@ -32,9 +32,6 @@ export function LocalFilePreviewModal({ file, previewUrl, onClose }: LocalFilePr
     };
   }, []);
 
-  const actionClass =
-    'inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
-
   return (
     <dialog
       ref={dialogRef}
@@ -63,18 +60,13 @@ export function LocalFilePreviewModal({ file, previewUrl, onClose }: LocalFilePr
         </header>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-2 sm:px-5">
-          <a href={previewUrl} download={file.name} className={actionClass}>
+          <a href={previewUrl} download={file.name} className={buttonClassName()}>
             <Icon name="download" />
             Download
           </a>
-          <button
-            type="button"
-            onClick={() => openBlobInTab(previewUrl, file.name, isPdf)}
-            className={actionClass}
-          >
-            <Icon name="external-link" />
+          <Button type="button" icon="external-link" onClick={() => openBlobInTab(previewUrl, file.name)}>
             Open in new tab
-          </button>
+          </Button>
           {!isPdf && (
             <div className="ml-auto flex items-center gap-1">
               <Button

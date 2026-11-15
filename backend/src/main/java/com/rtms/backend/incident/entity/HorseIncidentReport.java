@@ -57,6 +57,18 @@ public class HorseIncidentReport {
     @Transient
     private String handlerName;
 
+    /** Tên người gửi báo cáo (reportedById). Chỉ để trả ra API, không lưu DB. (Reporter's name, API only.) */
+    @Transient
+    private String reportedByName;
+
+    public String getReportedByName() {
+        return reportedByName;
+    }
+
+    public void setReportedByName(String reportedByName) {
+        this.reportedByName = reportedByName;
+    }
+
     /** Tên ngựa, vì Groom không còn thấy ngựa đã rời chuồng của mình. Chỉ để trả ra API, không lưu DB. */
     @Transient
     private String horseName;

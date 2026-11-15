@@ -10,7 +10,7 @@ import { BackLink } from '@/components/ui/BackLink';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
-import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { ImageLightbox, ImageThumbnail } from '@/components/ui/ImageLightbox';
 import { incidentApi } from '../services/incidentService';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { Horse, StableStall } from '@/features/stable/types';
@@ -298,20 +298,13 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                 </p>
 
                 {previewUrl && (
-                  <div className="relative mt-2 inline-block max-w-xs">
-                    <button
-                      type="button"
+                  <div className="relative mt-2 w-full max-w-xs">
+                    <ImageThumbnail
+                      src={previewUrl}
+                      alt="incident image in full size"
                       onClick={() => setViewingPreview(true)}
-                      aria-label="Preview full size image"
-                      className="group block cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={previewUrl}
-                        alt="Image preview"
-                        className="max-h-48 object-cover transition-transform group-hover:scale-105"
-                      />
-                    </button>
+                      className="h-48"
+                    />
                     <IconButton
                       icon="x"
                       size="sm"

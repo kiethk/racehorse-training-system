@@ -243,7 +243,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   );
 
   const renderDocuments = () => (
-    <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />
+    <AdmissionDocumentsSection documents={detail.documents} />
   );
 
   const renderMedical = () => {

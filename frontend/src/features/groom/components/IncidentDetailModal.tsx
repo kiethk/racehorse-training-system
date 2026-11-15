@@ -7,11 +7,11 @@ import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { formatDateTime } from '@/lib/display';
 import { incidentApi } from '../services/incidentService';
-import { assignedVetLabel } from '../lib/assignedVet';
 import {
   INCIDENT_TYPE_MAP,
   INCIDENT_STATUS_MAP,
   formatIncidentReportedAt,
+  incidentVetText,
 } from '../lib/incidentDisplay';
 import type { IncidentReport } from '../types';
 
@@ -28,7 +28,7 @@ export function IncidentDetailModal({ report, horseName, onClose }: IncidentDeta
   const statusCfg = INCIDENT_STATUS_MAP[report.status] || { tone: 'neutral', label: report.status };
   const severityCfg = INCIDENT_TYPE_MAP[report.incidentType] || { tone: 'neutral', label: report.incidentType };
   const imgSrc = incidentApi.imageSrc(report);
-  const vetLabel = assignedVetLabel(report);
+  const vetText = incidentVetText(report);
 
   return (
     <Modal
@@ -56,10 +56,10 @@ export function IncidentDetailModal({ report, horseName, onClose }: IncidentDeta
               <dd className="mt-0.5 text-[var(--color-text-primary)]">{report.reportedByName}</dd>
             </div>
           )}
-          {vetLabel && (
+          {vetText && (
             <div>
               <dt className="text-[var(--color-text-muted)]">Veterinarian</dt>
-              <dd className="mt-0.5 text-[var(--color-text-primary)]">{vetLabel.replace(/^Vet: /, '')}</dd>
+              <dd className="mt-0.5 text-[var(--color-text-primary)]">{vetText}</dd>
             </div>
           )}
         </dl>

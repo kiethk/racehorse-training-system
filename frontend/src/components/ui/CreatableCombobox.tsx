@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { cn } from '@/lib/cn';
 import { controlClassName, useFieldContext } from './FormField';
 import { Icon } from './Icon';
@@ -53,9 +53,13 @@ export function CreatableCombobox({
     ? options.filter((opt) => opt.label.toLowerCase().includes(value.toLowerCase()))
     : options;
 
-  useEffect(() => {
-    if (!open) setHighlight(-1);
-  }, [open]);
+  const listId = useId();
+
+  // Closing the list also clears the highlight, so the next open starts from the top.
+  const closeList = () => {
+    setOpen(false);
+    setHighlight(-1);
+  };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
@@ -68,9 +72,9 @@ export function CreatableCombobox({
     } else if (e.key === 'Enter' && open && highlight >= 0 && highlight < filtered.length) {
       e.preventDefault();
       onChange(filtered[highlight].value);
-      setOpen(false);
+      closeList();
     } else if (e.key === 'Escape') {
-      setOpen(false);
+      closeList();
     }
   };
 
@@ -84,6 +88,7 @@ export function CreatableCombobox({
         aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedBy}
         aria-expanded={open}
+        aria-controls={listId}
         aria-autocomplete="list"
         role="combobox"
         value={value}
@@ -92,7 +97,7 @@ export function CreatableCombobox({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={() => setTimeout(closeList, 150)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
@@ -106,6 +111,7 @@ export function CreatableCombobox({
       {open && filtered.length > 0 && (
         <ul
           ref={listRef}
+          id={listId}
           role="listbox"
           className="absolute z-[var(--z-dropdown)] mt-1 max-h-60 w-full overflow-auto rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-[var(--shadow-popover)]"
         >
@@ -117,7 +123,7 @@ export function CreatableCombobox({
               onMouseDown={(e) => {
                 e.preventDefault();
                 onChange(opt.value);
-                setOpen(false);
+                closeList();
               }}
               className={cn(
                 'cursor-pointer px-3 py-1.5 text-sm text-[var(--color-text-primary)]',
