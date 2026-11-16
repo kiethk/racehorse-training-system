@@ -2,8 +2,14 @@
 
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea } from '@/components/ui/Input';
-import { diagnosisOptions } from './constants';
+import { CLINICAL_DIAGNOSIS_MAP } from './constants';
 import type { Dispatch, SetStateAction } from 'react';
+
+const ABNORMAL_DIAGNOSIS_OPTIONS = [
+  CLINICAL_DIAGNOSIS_MAP.MINOR_CONDITION,
+  CLINICAL_DIAGNOSIS_MAP.TREATMENT_REQUIRED,
+  CLINICAL_DIAGNOSIS_MAP.MUSCULOSKELETAL_SUSPECTED,
+] as const;
 
 export interface DiagnosisSectionProps {
   isUrgent: boolean;
@@ -125,11 +131,9 @@ export function DiagnosisSection(props: DiagnosisSectionProps) {
                   value={structuredDiagnosis}
                   onChange={(e) => setStructuredDiagnosis(e.target.value)}
                 >
-                  {diagnosisOptions
-                    .filter((d) => d !== 'Clinically healthy')
-                    .map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
+                  {ABNORMAL_DIAGNOSIS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
                 </Select>
               </div>
             </>
