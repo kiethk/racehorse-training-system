@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"/>
+<title>ERD Interactive - Racehorse Training System</title>
+<style>
+:root{--bg:#fafafa;--ink:#111;--dim:#bbb;--hl:#d62828;--hl2:#1d4ed8;}
+*{box-sizing:border-box}
+body{margin:0;font-family:Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid #ddd;background:#fff;flex-wrap:wrap}
+header h1{font-size:15px;margin:0;font-weight:700}
+button{font:inherit;padding:4px 10px;border:1px solid #333;background:#fff;cursor:pointer;border-radius:4px}
+button:hover{background:#eee}
+input[type=search]{font:inherit;padding:4px 10px;border:1px solid #333;border-radius:4px;width:220px}
+.wrap{flex:1;display:flex;min-height:0}
+#stage{flex:1;position:relative;overflow:hidden;background:#fff}
+#svg{width:100%;height:100%;display:block;cursor:grab}
+#svg.dragging{cursor:grabbing}
+#side{width:330px;border-left:1px solid #ddd;background:#fff;overflow:auto;padding:12px}
+#side h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;color:#555}
+.node rect{fill:#fff;stroke:#111;stroke-width:1.2}
+.node text{font-size:16px;font-weight:700;text-anchor:middle;dominant-baseline:central;fill:#111;pointer-events:none;user-select:none}
+.node{cursor:pointer}
+.edge polyline{fill:none;stroke:#111;stroke-width:1.3}
+.edge .hit{stroke:transparent;stroke-width:12;fill:none;cursor:pointer}
+.edge .crow,.edge .one{stroke:#111;stroke-width:1.3;fill:none}
+.dim{opacity:.07}
+.hl-edge polyline{stroke:var(--hl);stroke-width:2.4}
+.hl-edge .crow,.hl-edge .one{stroke:var(--hl)}
+.hl-node rect{stroke:var(--hl);stroke-width:2.6;fill:#fff4f4}
+.related rect{stroke:var(--hl2);stroke-width:2}
+.sel-node rect{fill:#eef4ff;stroke:var(--hl2);stroke-width:3}
+.rel-list{list-style:none;margin:0;padding:0;font-size:13px}
+.rel-list li{padding:5px 0;border-bottom:1px solid #eee;display:flex;gap:6px;align-items:baseline}
+.rel-list .arrow{color:#888;font-weight:700}
+.rel-list .name{font-weight:600}
+.hint{font-size:12px;color:#666;line-height:1.5}
+#legend{font-size:12px;color:#444;margin-top:14px;border-top:1px solid #ddd;padding-top:10px}
+#legend .row{display:flex;align-items:center;gap:8px;margin:4px 0}
+#legend svg{flex:0 0 auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>ERD — Racehorse Training System</h1>
+  <input id="search" type="search" placeholder="Tìm bảng..." />
+  <button id="fit">Fit</button>
+  <button id="reset">Reset</button>
+  <button id="toggleDim">Dim: on</button>
+  <button id="exportPng">PNG</button>
+  <span class="hint">Hover bảng/đường để xem liên kết · Click để ghim · Lăn chuột để zoom · Kéo để di chuyển</span>
+</header>
+<div class="wrap">
+  <div id="stage"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <aside id="side">
+    <h2>Chi tiết</h2>
+    <div id="detail" class="hint">Chưa chọn bảng. Hover hoặc click vào một bảng để xem các quan hệ.</div>
+    <div id="legend">
+      <div class="row">
+        <svg width="34" height="14"><path d="M0,7 L10,0 M0,7 L10,7 M0,7 L10,14" stroke="#111" fill="none"/></svg>
+        <span>ERmany (nhiều) — phía bảng con (FK)</span>
+      </div>
+      <div class="row">
+        <svg width="34" height="14"><path d="M4,0 L4,14" stroke="#111" fill="none"/></svg>
+        <span>ERone (một) — phía bảng cha (PK)</span>
+      </div>
+      <div class="row"><span style="color:#888">Tổng: 46 bảng, 76 quan hệ</span></div>
+    </div>
+  </aside>
+</div>
+<script>
+const DATA = {"canvas": {"w": 4081, "h": 2296}, "box": {"w": 230, "h": 56}, "nodes": [{"id": "admission_applications", "x": 1926, "y": 604}, {"id": "admission_documents", "x": 1926, "y": 710}, {"id": "ai_chat_messages", "x": 2110, "y": 2032}, {"id": "ai_conversations", "x": 2390, "y": 1926}, {"id": "areas", "x": 2670, "y": 1212}, {"id": "audit_logs", "x": 2390, "y": 1820}, {"id": "candidate_horse_profiles", "x": 2206, "y": 604}, {"id": "care_schedule", "x": 1462, "y": 1424}, {"id": "course_exercises", "x": 1182, "y": 710}, {"id": "course_runs", "x": 1462, "y": 710}, {"id": "courses", "x": 1182, "y": 604}, {"id": "exercises", "x": 1462, "y": 604}, {"id": "groom_daily_tasks", "x": 2206, "y": 1212}, {"id": "groom_profiles", "x": 1926, "y": 1212}, {"id": "groom_task_completion_photos", "x": 2206, "y": 1318}, {"id": "groom_task_completions", "x": 1926, "y": 1318}, {"id": "health_conditions", "x": 1462, "y": 1212}, {"id": "health_records", "x": 1182, "y": 1212}, {"id": "horse_body_regions", "x": 2206, "y": 208}, {"id": "horse_edit_request_documents", "x": 2206, "y": 314}, {"id": "horse_edit_requests", "x": 1926, "y": 314}, {"id": "horse_health_metrics", "x": 1926, "y": 208}, {"id": "horse_incident_reports", "x": 1926, "y": 1424}, {"id": "horse_pedigrees", "x": 2206, "y": 102}, {"id": "horses", "x": 1926, "y": 102}, {"id": "medical_symptom_mappings", "x": 1182, "y": 1530}, {"id": "notifications", "x": 2110, "y": 1820}, {"id": "pending_agent_actions", "x": 2110, "y": 1926}, {"id": "permissions", "x": 1182, "y": 208}, {"id": "prescriptions", "x": 1462, "y": 1318}, {"id": "preventive_protocols", "x": 1182, "y": 1424}, {"id": "racing_readiness_assessments", "x": 1182, "y": 1820}, {"id": "rag_knowledge_documents", "x": 2390, "y": 2032}, {"id": "rag_knowledge_embeddings", "x": 2110, "y": 2138}, {"id": "refresh_tokens", "x": 1182, "y": 314}, {"id": "role_permissions", "x": 1462, "y": 208}, {"id": "roles", "x": 1462, "y": 102}, {"id": "stable_stalls", "x": 2670, "y": 1318}, {"id": "trainer_profiles", "x": 1646, "y": 1926}, {"id": "training_group_members", "x": 1462, "y": 816}, {"id": "training_groups", "x": 1182, "y": 816}, {"id": "training_sessions", "x": 1182, "y": 922}, {"id": "training_workouts", "x": 1462, "y": 922}, {"id": "treatment_plans", "x": 1182, "y": 1318}, {"id": "users", "x": 1182, "y": 102}, {"id": "veterinarian_profiles", "x": 1646, "y": 1820}], "edges": [{"source": "course_exercises", "target": "courses", "points": [[1297.0, 708.0], [1297.0, 662.0]]}, {"source": "horse_health_metrics", "target": "horses", "points": [[2041.0, 206.0], [2041.0, 160.0]]}, {"source": "role_permissions", "target": "permissions", "points": [[1460.0, 236.0], [1414.0, 236.0]]}, {"source": "role_permissions", "target": "roles", "points": [[1577.0, 206.0], [1577.0, 160.0]]}, {"source": "training_workouts", "target": "training_sessions", "points": [[1460.0, 958.7], [1414.0, 958.7]]}, {"source": "treatment_plans", "target": "health_records", "points": [[1297.0, 1316.0], [1297.0, 1270.0]]}, {"source": "candidate_horse_profiles", "target": "admission_applications", "points": [[2204.0, 632.0], [2204.0, 685.0], [2158.0, 685.0], [2158.0, 640.7]]}, {"source": "training_group_members", "target": "training_groups", "points": [[1460.0, 844.0], [1460.0, 897.0], [1414.0, 897.0], [1414.0, 852.7]]}, {"source": "horse_pedigrees", "target": "horses", "points": [[2204.0, 130.0], [2204.0, 183.0], [2158.0, 183.0], [2158.0, 138.7]]}, {"source": "horse_edit_request_documents", "target": "horse_edit_requests", "points": [[2204.0, 333.3], [2204.0, 289.0], [2158.0, 289.0], [2158.0, 342.0]]}, {"source": "groom_task_completion_photos", "target": "groom_task_completions", "points": [[2204.0, 1346.0], [2204.0, 1399.0], [2158.0, 1399.0], [2158.0, 1354.7]]}, {"source": "health_conditions", "target": "health_records", "points": [[1460.0, 1240.0], [1460.0, 1293.0], [1414.0, 1293.0], [1414.0, 1231.3]]}, {"source": "prescriptions", "target": "treatment_plans", "points": [[1460.0, 1354.7], [1460.0, 1399.0], [1414.0, 1399.0], [1414.0, 1346.0]]}, {"source": "users", "target": "roles", "points": [[1414.0, 148.6], [1414.0, 289.0], [1460.0, 289.0], [1460.0, 130.0]]}, {"source": "stable_stalls", "target": "areas", "points": [[2822.7, 1316.0], [2727.5, 1316.0], [2727.5, 1270.0], [2785.0, 1270.0]]}, {"source": "admission_documents", "target": "admission_applications", "points": [[2041.0, 708.0], [1984.5, 708.0], [1984.5, 662.0]]}, {"source": "course_runs", "target": "courses", "points": [[1460.0, 725.0], [1414.0, 725.0], [1414.0, 632.0]]}, {"source": "groom_daily_tasks", "target": "groom_task_completions", "points": [[2204.0, 1240.0], [2158.0, 1240.0], [2158.0, 1337.3]]}, {"source": "course_exercises", "target": "exercises", "points": [[1414.0, 729.3], [1460.0, 729.3], [1460.0, 632.0]]}, {"source": "course_runs", "target": "training_groups", "points": [[1460.0, 738.0], [1414.0, 738.0], [1414.0, 835.3]]}, {"source": "ai_chat_messages", "target": "ai_conversations", "points": [[2342.0, 2060.0], [2388.0, 2060.0], [2388.0, 1954.0]]}, {"source": "rag_knowledge_embeddings", "target": "rag_knowledge_documents", "points": [[2342.0, 2166.0], [2388.0, 2166.0], [2388.0, 2060.0]]}, {"source": "prescriptions", "target": "preventive_protocols", "points": [[1460.0, 1337.3], [1414.0, 1337.3], [1414.0, 1452.0]]}, {"source": "horse_edit_requests", "target": "horses", "points": [[2041.0, 312.0], [1901.0, 312.0], [1901.0, 160.0], [2024.9, 160.0]]}, {"source": "refresh_tokens", "target": "users", "points": [[1297.0, 312.0], [1437.0, 312.0], [1437.0, 160.0], [1338.1, 160.0]]}, {"source": "training_sessions", "target": "course_exercises", "points": [[1229.2, 920.0], [1437.0, 920.0], [1437.0, 768.0], [1297.0, 768.0]]}, {"source": "horse_incident_reports", "target": "care_schedule", "points": [[1924.0, 1452.0], [1694.0, 1452.0]]}, {"source": "training_sessions", "target": "course_runs", "points": [[1414.0, 941.3], [1460.0, 941.3], [1460.0, 751.0]]}, {"source": "training_workouts", "target": "course_exercises", "points": [[1460.0, 941.3], [1460.0, 746.7], [1414.0, 746.7]]}, {"source": "health_records", "target": "care_schedule", "points": [[1414.0, 1248.7], [1460.0, 1248.7], [1460.0, 1452.0]]}, {"source": "health_records", "target": "training_sessions", "points": [[1259.3, 1210.0], [1259.3, 1036.5], [1297.0, 1036.5], [1297.0, 980.0]]}, {"source": "horse_edit_request_documents", "target": "horses", "points": [[2204.0, 350.7], [2158.0, 350.7], [2158.0, 121.3]]}, {"source": "training_workouts", "target": "exercises", "points": [[1520.5, 920.0], [1437.0, 920.0], [1437.0, 662.0], [1614.7, 662.0]]}, {"source": "courses", "target": "users", "points": [[1297.0, 602.0], [1437.0, 602.0], [1437.0, 160.0], [1235.4, 160.0]]}, {"source": "health_records", "target": "training_workouts", "points": [[1297.0, 1210.0], [1577.0, 1210.0], [1577.0, 980.0]]}, {"source": "horses", "target": "users", "points": [[1924.0, 130.0], [1924.0, 183.0], [1414.0, 183.0], [1414.0, 133.7]]}, {"source": "training_sessions", "target": "exercises", "points": [[1274.4, 920.0], [1738.0, 920.0], [1738.0, 662.0], [1539.3, 662.0]]}, {"source": "admission_applications", "target": "horses", "points": [[2041.0, 602.0], [1901.0, 602.0], [1901.0, 160.0], [1944.1, 160.0]]}, {"source": "horse_edit_requests", "target": "users", "points": [[1924.0, 342.0], [1414.0, 342.0], [1414.0, 126.3]]}, {"source": "training_groups", "target": "users", "points": [[1297.0, 814.0], [1437.0, 814.0], [1437.0, 160.0], [1368.9, 160.0]]}, {"source": "exercises", "target": "users", "points": [[1577.0, 602.0], [1577.0, 342.0], [1437.0, 342.0], [1437.0, 160.0], [1245.6, 160.0]]}, {"source": "training_sessions", "target": "users", "points": [[1364.8, 920.0], [1437.0, 920.0], [1437.0, 160.0], [1379.2, 160.0]]}, {"source": "course_runs", "target": "users", "points": [[1577.0, 708.0], [1437.0, 708.0], [1437.0, 160.0], [1225.1, 160.0]]}, {"source": "training_group_members", "target": "users", "points": [[1614.7, 814.0], [1738.0, 814.0], [1738.0, 160.0], [1358.6, 160.0]]}, {"source": "training_workouts", "target": "users", "points": [[1633.5, 920.0], [1738.0, 920.0], [1738.0, 160.0], [1389.5, 160.0]]}, {"source": "admission_applications", "target": "users", "points": [[1924.0, 632.0], [1924.0, 289.0], [1414.0, 289.0], [1414.0, 111.4]]}, {"source": "health_records", "target": "users", "points": [[1334.7, 1210.0], [1437.0, 1210.0], [1437.0, 160.0], [1286.7, 160.0]]}, {"source": "training_group_members", "target": "horses", "points": [[1539.3, 814.0], [1784.0, 814.0], [1784.0, 160.0], [2105.6, 160.0]]}, {"source": "admission_applications", "target": "stable_stalls", "points": [[2158.0, 623.3], [2158.0, 685.0], [2668.0, 685.0], [2668.0, 1337.3]]}, {"source": "care_schedule", "target": "admission_applications", "points": [[1520.5, 1422.0], [1738.0, 1422.0], [1738.0, 662.0], [2041.0, 662.0]]}, {"source": "horse_incident_reports", "target": "horses", "points": [[2003.3, 1422.0], [1901.0, 1422.0], [1901.0, 160.0], [2057.1, 160.0]]}, {"source": "training_workouts", "target": "horses", "points": [[1577.0, 920.0], [1784.0, 920.0], [1784.0, 160.0], [2137.9, 160.0]]}, {"source": "groom_daily_tasks", "target": "horses", "points": [[2283.3, 1210.0], [2181.0, 1210.0], [2181.0, 160.0], [1976.4, 160.0]]}, {"source": "health_conditions", "target": "horses", "points": [[1614.7, 1210.0], [1738.0, 1210.0], [1738.0, 160.0], [1992.6, 160.0]]}, {"source": "training_sessions", "target": "horses", "points": [[1319.6, 920.0], [1830.0, 920.0], [1830.0, 160.0], [2121.7, 160.0]]}, {"source": "horse_health_metrics", "target": "health_records", "points": [[2041.0, 266.0], [1437.0, 266.0], [1437.0, 1210.0], [1372.3, 1210.0]]}, {"source": "care_schedule", "target": "horses", "points": [[1577.0, 1422.0], [1738.0, 1422.0], [1738.0, 160.0], [1960.3, 160.0]]}, {"source": "care_schedule", "target": "users", "points": [[1633.5, 1422.0], [1437.0, 1422.0], [1437.0, 160.0], [1214.8, 160.0]]}, {"source": "racing_readiness_assessments", "target": "users", "points": [[1353.5, 1818.0], [1437.0, 1818.0], [1437.0, 160.0], [1327.8, 160.0]]}, {"source": "health_conditions", "target": "horse_body_regions", "points": [[1539.3, 1210.0], [1738.0, 1210.0], [1738.0, 266.0], [2321.0, 266.0]]}, {"source": "groom_profiles", "target": "users", "points": [[2041.0, 1210.0], [1784.0, 1210.0], [1784.0, 160.0], [1266.2, 160.0]]}, {"source": "horses", "target": "stable_stalls", "points": [[2073.3, 160.0], [2181.0, 160.0], [2181.0, 1316.0], [2747.3, 1316.0]]}, {"source": "health_records", "target": "horses", "points": [[1221.7, 1210.0], [1830.0, 1210.0], [1830.0, 160.0], [2008.7, 160.0]]}, {"source": "groom_task_completions", "target": "users", "points": [[2041.0, 1316.0], [1437.0, 1316.0], [1437.0, 160.0], [1276.5, 160.0]]}, {"source": "racing_readiness_assessments", "target": "admission_applications", "points": [[1240.5, 1818.0], [1437.0, 1818.0], [1437.0, 662.0], [2097.5, 662.0]]}, {"source": "veterinarian_profiles", "target": "users", "points": [[1761.0, 1818.0], [1761.0, 160.0], [1399.7, 160.0]]}, {"source": "horse_incident_reports", "target": "users", "points": [[2078.7, 1422.0], [1784.0, 1422.0], [1784.0, 160.0], [1297.0, 160.0]]}, {"source": "groom_daily_tasks", "target": "users", "points": [[2358.7, 1210.0], [1901.0, 1210.0], [1901.0, 160.0], [1255.9, 160.0]]}, {"source": "trainer_profiles", "target": "users", "points": [[1761.0, 1924.0], [1437.0, 1924.0], [1437.0, 160.0], [1348.4, 160.0]]}, {"source": "areas", "target": "users", "points": [[2668.0, 1240.0], [2668.0, 428.5], [1414.0, 428.5], [1414.0, 118.9]]}, {"source": "racing_readiness_assessments", "target": "horses", "points": [[1297.0, 1818.0], [1738.0, 1818.0], [1738.0, 160.0], [2089.4, 160.0]]}, {"source": "stable_stalls", "target": "users", "points": [[2668.0, 1354.7], [2668.0, 183.0], [1414.0, 183.0], [1414.0, 141.1]]}, {"source": "notifications", "target": "users", "points": [[2225.0, 1818.0], [1784.0, 1818.0], [1784.0, 160.0], [1307.3, 160.0]]}, {"source": "pending_agent_actions", "target": "users", "points": [[2225.0, 1924.0], [1901.0, 1924.0], [1901.0, 160.0], [1317.5, 160.0]]}, {"source": "audit_logs", "target": "users", "points": [[2505.0, 1818.0], [2505.0, 160.0], [1204.5, 160.0]]}, {"source": "ai_conversations", "target": "users", "points": [[2505.0, 1924.0], [2645.0, 1924.0], [2645.0, 160.0], [1194.3, 160.0]]}]};
+const svg = document.getElementById('svg');
+const NS = 'http://www.w3.org/2000/svg';
+let vb = {x:0,y:0,w:DATA.canvas.w,h:DATA.canvas.h};
+let dim = true;
+let selected = null;
+let hovered = null;
+
+const nodes = new Map(DATA.nodes.map(n=>[n.id,n]));
+const incident = new Map();
+const outAdj = new Map();
+const inAdj = new Map();
+DATA.nodes.forEach(n=>{incident.set(n.id,new Set());outAdj.set(n.id,[]);inAdj.set(n.id,[]);});
+DATA.edges.forEach((e,idx)=>{incident.get(e.source).add(idx);incident.get(e.target).add(idx);outAdj.get(e.source).push({idx,other:e.target});inAdj.get(e.target).push({idx,other:e.source});});
+
+function el(tag,attrs){const x=document.createElementNS(NS,tag);for(const k in attrs)x.setAttribute(k,attrs[k]);return x;}
+function applyVB(){svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);}
+applyVB();
+
+const gEdges = el('g',{id:'edges'});
+const gNodes = el('g',{id:'nodes'});
+svg.appendChild(gEdges); svg.appendChild(gNodes);
+
+function crowAt(p, prev, len=13){
+  // prongs open along the segment direction (away from line), apex at p
+  const dx=p.x-prev.x, dy=p.y-prev.y, L=Math.hypot(dx,dy)||1;
+  const ux=dx/L, uy=dy/L; const ang=Math.atan2(uy,ux);
+  const spread=Math.PI/6;
+  const pts=[0,-spread,spread].map(a=>{
+    const x=p.x+Math.cos(ang+a)*len, y=p.y+Math.sin(ang+a)*len;
+    return `${p.x},${p.y} ${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return pts;
+}
+function oneTick(p, prev, len=13){
+  const dx=p.x-prev.x, dy=p.y-prev.y, L=Math.hypot(dx,dy)||1;
+  const px=-dy/L*len/2, py=dx/L*len/2;
+  return {x1:p.x-px,y1:p.y-py,x2:p.x+px,y2:p.y+py};
+}
+
+const edgeEls=[];
+DATA.edges.forEach((e,idx)=>{
+  const g=el('g',{class:'edge','data-idx':idx});
+  const pts=e.points;
+  const poly=el('polyline',{points:pts.map(p=>p.join(',')).join(' ')});
+  g.appendChild(poly);
+  // crow at start
+  if(pts.length>=2){
+    const prongs=crowAt({x:pts[0][0],y:pts[0][1]},{x:pts[1][0],y:pts[1][1]});
+    prongs.forEach(pr=>{g.appendChild(el('polyline',{points:pr,class:'crow'}));});
+  }
+  // one at end
+  if(pts.length>=2){
+    const t=oneTick({x:pts[pts.length-1][0],y:pts[pts.length-1][1]},{x:pts[pts.length-2][0],y:pts[pts.length-2][1]});
+    g.appendChild(el('line',{x1:t.x1,y1:t.y1,x2:t.x2,y2:t.y2,class:'one'}));
+  }
+  const hit=el('polyline',{points:pts.map(p=>p.join(',')).join(' '),class:'hit'});
+  g.appendChild(hit);
+  g.addEventListener('mouseenter',()=>onHoverEdge(idx));
+  g.addEventListener('mouseleave',()=>onHoverEdge(null));
+  gEdges.appendChild(g);
+  edgeEls.push(g);
+});
+
+const nodeEls=new Map();
+DATA.nodes.forEach(n=>{
+  const g=el('g',{class:'node','data-name':n.id});
+  g.appendChild(el('rect',{x:n.x,y:n.y,width:DATA.box.w,height:DATA.box.h,rx:3}));
+  const t=el('text',{x:n.x+DATA.box.w/2,y:n.y+DATA.box.h/2});
+  t.textContent=n.id;
+  g.appendChild(t);
+  g.addEventListener('mouseenter',()=>onHoverNode(n.id));
+  g.addEventListener('mouseleave',()=>onHoverNode(null));
+  g.addEventListener('click',(ev)=>{ev.stopPropagation(); selectNode(n.id);});
+  gNodes.appendChild(g);
+  nodeEls.set(n.id,g);
+});
+
+svg.addEventListener('click',()=>selectNode(null));
+
+function clearClasses(){
+  nodeEls.forEach(g=>g.classList.remove('dim','hl-node','related','sel-node'));
+  edgeEls.forEach(g=>g.classList.remove('dim','hl-edge'));
+}
+function onHoverNode(name){
+  hovered=name;
+  if(selected) return;
+  renderHighlight(name,null);
+}
+function onHoverEdge(idx){
+  if(selected) return;
+  renderHighlight(null,idx);
+}
+function renderHighlight(nodeName, edgeIdx){
+  clearClasses();
+  if(!nodeName && edgeIdx==null){
+    return;
+  }
+  const keepNodes=new Set();
+  const keepEdges=new Set();
+  if(nodeName){
+    keepNodes.add(nodeName);
+    incident.get(nodeName).forEach(i=>{keepEdges.add(i);keepNodes.add(DATA.edges[i].source);keepNodes.add(DATA.edges[i].target);});
+    nodeEls.get(nodeName).classList.add('hl-node');
+  }
+  if(edgeIdx!=null){
+    keepEdges.add(edgeIdx);
+    keepNodes.add(DATA.edges[edgeIdx].source);keepNodes.add(DATA.edges[edgeIdx].target);
+  }
+  if(dim){
+    nodeEls.forEach((g,n)=>{if(!keepNodes.has(n))g.classList.add('dim');});
+    edgeEls.forEach((g,i)=>{if(!keepEdges.has(i))g.classList.add('dim');});
+  }
+  keepEdges.forEach(i=>edgeEls[i].classList.add('hl-edge'));
+  keepNodes.forEach(n=>{if(n!==nodeName)nodeEls.get(n).classList.add('related');});
+}
+function selectNode(name){
+  selected=name;
+  clearClasses();
+  const detail=document.getElementById('detail');
+  if(!name){detail.innerHTML='<span class="hint">Chưa chọn bảng. Hover hoặc click vào một bảng để xem các quan hệ.</span>';renderHighlight(hovered,null);return;}
+  nodeEls.get(name).classList.add('sel-node');
+  const out=outAdj.get(name), inc=inAdj.get(name);
+  const keepNodes=new Set([name]); const keepEdges=new Set();
+  out.forEach(o=>{keepNodes.add(o.other);keepEdges.add(o.idx);});
+  inc.forEach(o=>{keepNodes.add(o.other);keepEdges.add(o.idx);});
+  if(dim){
+    nodeEls.forEach((g,n)=>{if(!keepNodes.has(n))g.classList.add('dim');});
+    edgeEls.forEach((g,i)=>{if(!keepEdges.has(i))g.classList.add('dim');});
+  }
+  keepEdges.forEach(i=>edgeEls[i].classList.add('hl-edge'));
+  keepNodes.forEach(n=>{if(n!==name)nodeEls.get(n).classList.add('related');});
+  let html=`<h2>${name}</h2>`;
+  html+=`<div class="hint">${out.length} quan hệ đi ra · ${inc.length} quan hệ đi vào</div>`;
+  html+='<ul class="rel-list">';
+  out.forEach(o=>{html+=`<li><span class="arrow">→</span><span class="name">${o.other}</span><span class="hint">(ERmany → ERone)</span></li>`;});
+  inc.forEach(o=>{html+=`<li><span class="arrow">←</span><span class="name">${o.other}</span><span class="hint">(ERmany → ERone)</span></li>`;});
+  html+='</ul>';
+  detail.innerHTML=html;
+}
+
+// zoom/pan
+let drag=null;
+svg.addEventListener('wheel',(e)=>{
+  e.preventDefault();
+  const rect=svg.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const sx=vb.x+mx/rect.width*vb.w, sy=vb.y+my/rect.height*vb.h;
+  const factor=e.deltaY<0?0.85:1.18;
+  const nw=Math.max(200,Math.min(DATA.canvas.w*3,vb.w*factor));
+  const nh=nw*vb.h/vb.w;
+  vb.x=sx-(mx/rect.width)*nw; vb.y=sy-(my/rect.height)*nh; vb.w=nw; vb.h=nh;
+  applyVB();
+},{passive:false});
+svg.addEventListener('mousedown',(e)=>{drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};svg.classList.add('dragging');});
+window.addEventListener('mousemove',(e)=>{
+  if(!drag) return;
+  const rect=svg.getBoundingClientRect();
+  vb.x=drag.vx-(e.clientX-drag.x)/rect.width*vb.w;
+  vb.y=drag.vy-(e.clientY-drag.y)/rect.height*vb.h;
+  applyVB();
+});
+window.addEventListener('mouseup',()=>{drag=null;svg.classList.remove('dragging');});
+
+function fit(){
+  const pad=30;
+  vb={x:-pad,y:-pad,w:DATA.canvas.w+pad*2,h:DATA.canvas.h+pad*2};
+  applyVB();
+}
+document.getElementById('fit').onclick=fit;
+document.getElementById('reset').onclick=()=>{fit();selectNode(null);};
+document.getElementById('toggleDim').onclick=(e)=>{dim=!dim;e.target.textContent='Dim: '+(dim?'on':'off');if(selected)selectNode(selected);else renderHighlight(hovered,null);};
+document.getElementById('search').addEventListener('input',(e)=>{
+  const q=e.target.value.trim().toLowerCase();
+  clearClasses();
+  if(!q) return;
+  let found=null;
+  nodeEls.forEach((g,n)=>{if(n.toLowerCase().includes(q)){g.classList.add('hl-node');found=found||n;}else{g.classList.add('dim');}});
+  if(found){ /* keep first match highlighted */ }
+});
+document.getElementById('exportPng').onclick=()=>{
+  const s=new XMLSerializer().serializeToString(svg);
+  const blob=new Blob([s],{type:'image/svg+xml'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas');c.width=DATA.canvas.w;c.height=DATA.canvas.h;
+    const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0);
+    const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download='erd-interactive.png';a.click();
+    URL.revokeObjectURL(url);
+  };
+  img.src=url;
+};
+fit();
+</script>
+</body>
+</html>

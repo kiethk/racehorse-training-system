@@ -3,6 +3,7 @@ package com.rtms.backend.admission.service;
 import com.rtms.backend.admission.dto.ManagerReviewRequest;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.horse.entity.Horse;
@@ -19,6 +20,8 @@ import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.identity.repository.GroomProfileRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,6 +35,8 @@ import java.util.Map;
 
 @Service
 public class AdmissionManagerReviewService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdmissionManagerReviewService.class);
 
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final StableStallRepository stableStallRepository;
@@ -132,6 +137,28 @@ public class AdmissionManagerReviewService {
         // 1. Lock REGULAR stall. Every allocation first takes the same stall-row locks, so two
         //    approvals cannot both read the same groom loads and pick the same "least loaded" groom.
         stableStallRepository.lockAdmissionCapacityStallsForUpdate();
+
+        // 1a. Every horse in quarantine must be able to move into a regular stall. This admission's
+        //     horse is already in quarantine (OCCUPIED/RESERVED is counted below), so the reserve
+        //     only needs to cover the horses currently there. If it is missing a quarantine stall,
+        //     it is an extra horse that also needs a regular stall.
+        long availableRegular = stableStallRepository.countAvailableRegularStalls();
+        long occupiedQuarantine = stableStallRepository.countOccupiedQuarantineStalls();
+        boolean horseAlreadyInQuarantine = admission.getQuarantineStallId() != null;
+        if (AdmissionCapacityPolicy.approvalBlockingReason(availableRegular, occupiedQuarantine,
+                horseAlreadyInQuarantine) != null) {
+            long requiredRegular = AdmissionCapacityPolicy.requiredRegularReserveForApproval(
+                    occupiedQuarantine, horseAlreadyInQuarantine);
+            log.warn("Admission approval blocked by regular-stall reserve: admissionId={}, gate=EXIT, "
+                            + "availableRegular={}, occupiedQuarantine={}, requiredRegular={}",
+                    admission.getId(), availableRegular, occupiedQuarantine, requiredRegular);
+            throw new ApiException(HttpStatus.CONFLICT,
+                    AdmissionCapacityPolicy.REGULAR_RESERVE_INSUFFICIENT,
+                    "Not enough regular stalls to move every horse out of quarantine: need "
+                            + requiredRegular + ", available " + availableRegular
+                            + ". Free up a regular stall first.");
+        }
+
         StableStall regularStall;
 
         if (request.getStallId() != null) {

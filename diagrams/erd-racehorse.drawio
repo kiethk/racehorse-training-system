@@ -1,0 +1,56 @@
+<mxfile host="app.diagrams.net" modified="2026-11-14T00:00:00.000Z" agent="OpenCode" version="32.6.10">
+  <diagram name="ERD - Racehorse Training" id="erd1">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Trainer entity -->
+        <mxCell id="trainer" value="Trainer&#10;─────────────&#10;id (PK)&#10;name&#10;license_no" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="150" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- Horse entity -->
+        <mxCell id="horse" value="Horse&#10;─────────────&#10;id (PK)&#10;name&#10;breed&#10;birth_date&#10;trainer_id (FK)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="320" y="60" width="160" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- TrainingSession entity -->
+        <mxCell id="session" value="TrainingSession&#10;─────────────&#10;id (PK)&#10;horse_id (FK)&#10;date&#10;duration_min&#10;notes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="560" y="60" width="170" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- Race entity -->
+        <mxCell id="race" value="Race&#10;─────────────&#10;id (PK)&#10;name&#10;date&#10;location" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="80" y="320" width="150" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- RaceEntry entity -->
+        <mxCell id="entry" value="RaceEntry&#10;─────────────&#10;id (PK)&#10;race_id (FK)&#10;horse_id (FK)&#10;position" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="320" y="300" width="160" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- Trainer 1..* Horse -->
+        <mxCell id="rel1" value="1..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERoneToMany;endFill=0;strokeColor=#6c8ebf;" edge="1" parent="1" source="trainer" target="horse">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Horse 1..* TrainingSession -->
+        <mxCell id="rel2" value="1..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERoneToMany;endFill=0;strokeColor=#82b366;" edge="1" parent="1" source="horse" target="session">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Race 1..* RaceEntry -->
+        <mxCell id="rel3" value="1..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERoneToMany;endFill=0;strokeColor=#b85450;" edge="1" parent="1" source="race" target="entry">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Horse 1..* RaceEntry -->
+        <mxCell id="rel4" value="1..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERoneToMany;endFill=0;strokeColor=#9673a6;" edge="1" parent="1" source="horse" target="entry">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

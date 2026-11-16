@@ -303,12 +303,17 @@ public class AdmissionQueryService {
         long availableQuarantine = stableStallRepository.countAvailableQuarantineStalls();
         long availableRegular = stableStallRepository.countAvailableRegularStalls();
         long occupiedQuarantine = stableStallRepository.countOccupiedQuarantineStalls();
+        boolean horseAlreadyInQuarantine = admission.getQuarantineStallId() != null;
         response.setCapacity(new AdmissionCapacitySummary(
                 availableQuarantine, availableRegular, occupiedQuarantine,
                 AdmissionCapacityPolicy.isAvailable(availableQuarantine, availableRegular,
                         occupiedQuarantine),
                 AdmissionCapacityPolicy.blockingReason(availableQuarantine, availableRegular,
-                        occupiedQuarantine)));
+                        occupiedQuarantine),
+                AdmissionCapacityPolicy.requiredRegularReserveForApproval(occupiedQuarantine,
+                        horseAlreadyInQuarantine),
+                AdmissionCapacityPolicy.isApprovalAvailable(availableRegular, occupiedQuarantine,
+                        horseAlreadyInQuarantine)));
 
         // Initial vet exam schedule and results for this admission application
         if (careScheduleRepository != null) {

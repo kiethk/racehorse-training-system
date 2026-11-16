@@ -1,0 +1,1249 @@
+<mxfile host="app.diagrams.net" modified="2026-11-15T00:00:00.000Z" agent="OpenCode" version="32.6.10">
+  <diagram name="ERD - Racehorse Training System" id="erdclust">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2152" pageHeight="1211" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="2152" height="1211" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_admission_applications" value="admission_applications" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="320" y="480" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_admission_documents" value="admission_documents" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="320" y="547" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_admission_groom_assignments" value="admission_groom_assignments" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="533" y="547" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_ai_chat_messages" value="ai_chat_messages" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#888888;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1338" y="1008" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_ai_conversations" value="ai_conversations" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#888888;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1550" y="941" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_areas" value="areas" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d0e0e3;strokeColor=#4a90a4;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="320" y="874" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_audit_logs" value="audit_logs" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#888888;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1550" y="874" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_candidate_horse_profiles" value="candidate_horse_profiles" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="533" y="480" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_care_schedule" value="care_schedule" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1084" y="614" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_course_runs" value="course_runs" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1423" y="152" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_courses" value="courses" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1423" y="85" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_exercises" value="exercises" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1635" y="85" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_groom_daily_tasks" value="groom_daily_tasks" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1635" y="480" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_groom_profiles" value="groom_profiles" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1423" y="480" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_groom_task_completion_photos" value="groom_task_completion_photos" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1635" y="547" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_groom_task_completions" value="groom_task_completions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1423" y="547" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_health_conditions" value="health_conditions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1084" y="480" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_health_records" value="health_records" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="872" y="480" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_horse_body_regions" value="horse_body_regions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1084" y="152" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_horse_edit_request_documents" value="horse_edit_request_documents" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1084" y="219" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_horse_edit_requests" value="horse_edit_requests" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="872" y="219" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_horse_health_metrics" value="horse_health_metrics" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="872" y="152" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_horse_incident_reports" value="horse_incident_reports" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1423" y="614" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_horse_pedigrees" value="horse_pedigrees" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1084" y="85" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_horses" value="horses" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="872" y="85" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_medical_symptom_mappings" value="medical_symptom_mappings" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="872" y="680" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_notifications" value="notifications" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#888888;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1338" y="874" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_pending_agent_actions" value="pending_agent_actions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#888888;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1338" y="941" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_permissions" value="permissions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="320" y="152" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_prescriptions" value="prescriptions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1084" y="547" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_preventive_protocols" value="preventive_protocols" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="872" y="614" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_racing_readiness_assessments" value="racing_readiness_assessments" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="660" y="874" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_rag_knowledge_documents" value="rag_knowledge_documents" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#888888;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1550" y="1008" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_rag_knowledge_embeddings" value="rag_knowledge_embeddings" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#888888;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1338" y="1075" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_refresh_tokens" value="refresh_tokens" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="320" y="219" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_role_permissions" value="role_permissions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="533" y="152" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_roles" value="roles" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="533" y="85" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_stable_stalls" value="stable_stalls" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#d0e0e3;strokeColor=#4a90a4;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="320" y="941" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_trainer_profiles" value="trainer_profiles" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#999999;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="999" y="941" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_training_group_members" value="training_group_members" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1423" y="219" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_training_groups" value="training_groups" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1635" y="152" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_training_sessions" value="training_sessions" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1635" y="219" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_training_workouts" value="training_workouts" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1423" y="286" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_treatment_plans" value="treatment_plans" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="872" y="547" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_users" value="users" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="320" y="85" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="t_veterinarian_profiles" value="veterinarian_profiles" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#999999;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="999" y="874" width="196" height="51" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0306;exitY=0.2745;exitDx=0;exitDy=0;entryX=-0.0102;entryY=0.3333;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_admission_applications" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="522.0" y="362.0" />
+            <mxPoint x="810.0" y="362.0" />
+            <mxPoint x="810.0" y="126.0" />
+            <mxPoint x="870.0" y="126.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.2347;exitY=1.1373;exitDx=0;exitDy=0;entryX=0.1939;entryY=-0.0588;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_admission_applications" target="t_stable_stalls">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="366.0" y="542.0" />
+            <mxPoint x="318.0" y="542.0" />
+            <mxPoint x="318.0" y="934.0" />
+            <mxPoint x="358.0" y="934.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0392;exitDx=0;exitDy=0;entryX=0.1122;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_admission_applications" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="418.0" y="302.0" />
+            <mxPoint x="322.0" y="302.0" />
+            <mxPoint x="322.0" y="298.0" />
+            <mxPoint x="318.0" y="298.0" />
+            <mxPoint x="318.0" y="150.0" />
+            <mxPoint x="322.0" y="150.0" />
+            <mxPoint x="322.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0980;exitDx=0;exitDy=0;entryX=0.5000;entryY=1.1373;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_admission_documents" target="t_admission_applications">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0153;exitY=0.4510;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.4314;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_admission_groom_assignments" target="t_admission_applications">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="530.0" y="518.0" />
+            <mxPoint x="522.0" y="518.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.4949;exitY=-0.0980;exitDx=0;exitDy=0;entryX=0.2347;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_admission_groom_assignments" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="630.0" y="538.0" />
+            <mxPoint x="318.0" y="538.0" />
+            <mxPoint x="318.0" y="306.0" />
+            <mxPoint x="314.0" y="306.0" />
+            <mxPoint x="314.0" y="298.0" />
+            <mxPoint x="310.0" y="298.0" />
+            <mxPoint x="310.0" y="150.0" />
+            <mxPoint x="366.0" y="150.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0408;exitY=0.4314;exitDx=0;exitDy=0;entryX=-0.0204;entryY=0.3333;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_ai_chat_messages" target="t_ai_conversations">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1542.0" y="1014.0" />
+            <mxPoint x="1546.0" y="1014.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0204;exitY=0.6471;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.0980;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_ai_conversations" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1542.0" y="974.0" />
+            <mxPoint x="1542.0" y="998.0" />
+            <mxPoint x="1218.0" y="998.0" />
+            <mxPoint x="1218.0" y="982.0" />
+            <mxPoint x="1202.0" y="982.0" />
+            <mxPoint x="1202.0" y="778.0" />
+            <mxPoint x="786.0" y="778.0" />
+            <mxPoint x="786.0" y="106.0" />
+            <mxPoint x="754.0" y="106.0" />
+            <mxPoint x="754.0" y="70.0" />
+            <mxPoint x="530.0" y="70.0" />
+            <mxPoint x="530.0" y="90.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0784;exitDx=0;exitDy=0;entryX=0.3367;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_areas" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="418.0" y="614.0" />
+            <mxPoint x="730.0" y="614.0" />
+            <mxPoint x="730.0" y="606.0" />
+            <mxPoint x="738.0" y="606.0" />
+            <mxPoint x="738.0" y="418.0" />
+            <mxPoint x="434.0" y="418.0" />
+            <mxPoint x="434.0" y="286.0" />
+            <mxPoint x="326.0" y="286.0" />
+            <mxPoint x="326.0" y="282.0" />
+            <mxPoint x="322.0" y="282.0" />
+            <mxPoint x="322.0" y="278.0" />
+            <mxPoint x="310.0" y="278.0" />
+            <mxPoint x="310.0" y="142.0" />
+            <mxPoint x="362.0" y="142.0" />
+            <mxPoint x="362.0" y="150.0" />
+            <mxPoint x="386.0" y="150.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0204;exitY=0.4706;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.0980;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_audit_logs" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1546.0" y="870.0" />
+            <mxPoint x="1550.0" y="870.0" />
+            <mxPoint x="1550.0" y="746.0" />
+            <mxPoint x="810.0" y="746.0" />
+            <mxPoint x="810.0" y="370.0" />
+            <mxPoint x="794.0" y="370.0" />
+            <mxPoint x="794.0" y="238.0" />
+            <mxPoint x="762.0" y="238.0" />
+            <mxPoint x="762.0" y="126.0" />
+            <mxPoint x="746.0" y="126.0" />
+            <mxPoint x="746.0" y="106.0" />
+            <mxPoint x="738.0" y="106.0" />
+            <mxPoint x="738.0" y="82.0" />
+            <mxPoint x="546.0" y="82.0" />
+            <mxPoint x="546.0" y="78.0" />
+            <mxPoint x="534.0" y="78.0" />
+            <mxPoint x="534.0" y="82.0" />
+            <mxPoint x="530.0" y="82.0" />
+            <mxPoint x="530.0" y="86.0" />
+            <mxPoint x="526.0" y="86.0" />
+            <mxPoint x="526.0" y="90.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0153;exitY=0.4314;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.6667;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_candidate_horse_profiles" target="t_admission_applications">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="530.0" y="514.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.2353;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.8235;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_care_schedule" target="t_admission_applications">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="646.0" />
+            <mxPoint x="1074.0" y="646.0" />
+            <mxPoint x="1074.0" y="722.0" />
+            <mxPoint x="1394.0" y="722.0" />
+            <mxPoint x="1394.0" y="870.0" />
+            <mxPoint x="1542.0" y="870.0" />
+            <mxPoint x="1542.0" y="938.0" />
+            <mxPoint x="1334.0" y="938.0" />
+            <mxPoint x="1334.0" y="974.0" />
+            <mxPoint x="1210.0" y="974.0" />
+            <mxPoint x="1210.0" y="998.0" />
+            <mxPoint x="886.0" y="998.0" />
+            <mxPoint x="886.0" y="818.0" />
+            <mxPoint x="530.0" y="818.0" />
+            <mxPoint x="530.0" y="574.0" />
+            <mxPoint x="526.0" y="574.0" />
+            <mxPoint x="526.0" y="530.0" />
+            <mxPoint x="522.0" y="530.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0784;exitDx=0;exitDy=0;entryX=0.1327;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_care_schedule" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1182.0" y="606.0" />
+            <mxPoint x="1082.0" y="606.0" />
+            <mxPoint x="1082.0" y="602.0" />
+            <mxPoint x="1074.0" y="602.0" />
+            <mxPoint x="1074.0" y="606.0" />
+            <mxPoint x="862.0" y="606.0" />
+            <mxPoint x="862.0" y="510.0" />
+            <mxPoint x="870.0" y="510.0" />
+            <mxPoint x="870.0" y="486.0" />
+            <mxPoint x="850.0" y="486.0" />
+            <mxPoint x="850.0" y="222.0" />
+            <mxPoint x="854.0" y="222.0" />
+            <mxPoint x="854.0" y="146.0" />
+            <mxPoint x="898.0" y="146.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e14" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.4706;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.1765;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_care_schedule" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1078.0" y="638.0" />
+            <mxPoint x="1078.0" y="686.0" />
+            <mxPoint x="1770.0" y="686.0" />
+            <mxPoint x="1770.0" y="1126.0" />
+            <mxPoint x="1542.0" y="1126.0" />
+            <mxPoint x="1542.0" y="1150.0" />
+            <mxPoint x="310.0" y="1150.0" />
+            <mxPoint x="310.0" y="306.0" />
+            <mxPoint x="306.0" y="306.0" />
+            <mxPoint x="306.0" y="74.0" />
+            <mxPoint x="302.0" y="74.0" />
+            <mxPoint x="302.0" y="66.0" />
+            <mxPoint x="518.0" y="66.0" />
+            <mxPoint x="518.0" y="82.0" />
+            <mxPoint x="522.0" y="82.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e15" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.4847;exitY=-0.0392;exitDx=0;exitDy=0;entryX=0.5051;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_course_runs" target="t_courses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1518.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e16" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0357;exitY=0.2745;exitDx=0;exitDy=0;entryX=-0.0255;entryY=0.1961;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_course_runs" target="t_training_groups">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="162.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e17" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4314;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.2549;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_course_runs" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1318.0" y="174.0" />
+            <mxPoint x="1318.0" y="294.0" />
+            <mxPoint x="770.0" y="294.0" />
+            <mxPoint x="770.0" y="246.0" />
+            <mxPoint x="754.0" y="246.0" />
+            <mxPoint x="754.0" y="142.0" />
+            <mxPoint x="734.0" y="142.0" />
+            <mxPoint x="734.0" y="146.0" />
+            <mxPoint x="626.0" y="146.0" />
+            <mxPoint x="626.0" y="142.0" />
+            <mxPoint x="526.0" y="142.0" />
+            <mxPoint x="526.0" y="106.0" />
+            <mxPoint x="530.0" y="106.0" />
+            <mxPoint x="530.0" y="98.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e18" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4902;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.2549;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_courses" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1326.0" y="110.0" />
+            <mxPoint x="1326.0" y="90.0" />
+            <mxPoint x="1294.0" y="90.0" />
+            <mxPoint x="1294.0" y="82.0" />
+            <mxPoint x="1290.0" y="82.0" />
+            <mxPoint x="1290.0" y="78.0" />
+            <mxPoint x="786.0" y="78.0" />
+            <mxPoint x="786.0" y="82.0" />
+            <mxPoint x="762.0" y="82.0" />
+            <mxPoint x="762.0" y="86.0" />
+            <mxPoint x="746.0" y="86.0" />
+            <mxPoint x="746.0" y="82.0" />
+            <mxPoint x="538.0" y="82.0" />
+            <mxPoint x="538.0" y="78.0" />
+            <mxPoint x="526.0" y="78.0" />
+            <mxPoint x="526.0" y="94.0" />
+            <mxPoint x="522.0" y="94.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e19" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.3333;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.3333;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_exercises" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="102.0" />
+            <mxPoint x="1626.0" y="82.0" />
+            <mxPoint x="1342.0" y="82.0" />
+            <mxPoint x="1342.0" y="74.0" />
+            <mxPoint x="1298.0" y="74.0" />
+            <mxPoint x="1298.0" y="70.0" />
+            <mxPoint x="778.0" y="70.0" />
+            <mxPoint x="778.0" y="74.0" />
+            <mxPoint x="762.0" y="74.0" />
+            <mxPoint x="762.0" y="78.0" />
+            <mxPoint x="542.0" y="78.0" />
+            <mxPoint x="542.0" y="82.0" />
+            <mxPoint x="530.0" y="82.0" />
+            <mxPoint x="530.0" y="94.0" />
+            <mxPoint x="526.0" y="94.0" />
+            <mxPoint x="526.0" y="102.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e20" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.1961;exitDx=0;exitDy=0;entryX=1.0357;entryY=0.2941;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_groom_daily_tasks" target="t_groom_task_completions">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1630.0" y="562.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e21" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4314;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.1765;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_groom_daily_tasks" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="502.0" />
+            <mxPoint x="1626.0" y="326.0" />
+            <mxPoint x="1854.0" y="326.0" />
+            <mxPoint x="1854.0" y="82.0" />
+            <mxPoint x="1630.0" y="82.0" />
+            <mxPoint x="1630.0" y="110.0" />
+            <mxPoint x="1626.0" y="110.0" />
+            <mxPoint x="1626.0" y="142.0" />
+            <mxPoint x="1530.0" y="142.0" />
+            <mxPoint x="1530.0" y="150.0" />
+            <mxPoint x="1418.0" y="150.0" />
+            <mxPoint x="1418.0" y="90.0" />
+            <mxPoint x="1334.0" y="90.0" />
+            <mxPoint x="1334.0" y="82.0" />
+            <mxPoint x="1298.0" y="82.0" />
+            <mxPoint x="1298.0" y="78.0" />
+            <mxPoint x="1294.0" y="78.0" />
+            <mxPoint x="1294.0" y="74.0" />
+            <mxPoint x="1074.0" y="74.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e22" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.7451;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.4118;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_groom_daily_tasks" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="518.0" />
+            <mxPoint x="1626.0" y="538.0" />
+            <mxPoint x="1418.0" y="538.0" />
+            <mxPoint x="1418.0" y="606.0" />
+            <mxPoint x="1778.0" y="606.0" />
+            <mxPoint x="1778.0" y="1006.0" />
+            <mxPoint x="878.0" y="1006.0" />
+            <mxPoint x="878.0" y="826.0" />
+            <mxPoint x="738.0" y="826.0" />
+            <mxPoint x="738.0" y="610.0" />
+            <mxPoint x="742.0" y="610.0" />
+            <mxPoint x="742.0" y="478.0" />
+            <mxPoint x="426.0" y="478.0" />
+            <mxPoint x="426.0" y="294.0" />
+            <mxPoint x="326.0" y="294.0" />
+            <mxPoint x="326.0" y="290.0" />
+            <mxPoint x="314.0" y="290.0" />
+            <mxPoint x="314.0" y="70.0" />
+            <mxPoint x="526.0" y="70.0" />
+            <mxPoint x="526.0" y="106.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e23" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4314;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.4118;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_groom_profiles" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1402.0" y="502.0" />
+            <mxPoint x="1402.0" y="730.0" />
+            <mxPoint x="1754.0" y="730.0" />
+            <mxPoint x="1754.0" y="934.0" />
+            <mxPoint x="1334.0" y="934.0" />
+            <mxPoint x="1334.0" y="906.0" />
+            <mxPoint x="1218.0" y="906.0" />
+            <mxPoint x="1218.0" y="762.0" />
+            <mxPoint x="794.0" y="762.0" />
+            <mxPoint x="794.0" y="386.0" />
+            <mxPoint x="538.0" y="386.0" />
+            <mxPoint x="538.0" y="354.0" />
+            <mxPoint x="522.0" y="354.0" />
+            <mxPoint x="522.0" y="214.0" />
+            <mxPoint x="426.0" y="214.0" />
+            <mxPoint x="426.0" y="210.0" />
+            <mxPoint x="318.0" y="210.0" />
+            <mxPoint x="318.0" y="78.0" />
+            <mxPoint x="522.0" y="78.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e24" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4510;exitDx=0;exitDy=0;entryX=1.0357;entryY=0.6078;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_groom_task_completion_photos" target="t_groom_task_completions">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1630.0" y="578.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e25" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4510;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.4902;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_groom_task_completions" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1414.0" y="570.0" />
+            <mxPoint x="1414.0" y="610.0" />
+            <mxPoint x="1418.0" y="610.0" />
+            <mxPoint x="1418.0" y="634.0" />
+            <mxPoint x="1294.0" y="634.0" />
+            <mxPoint x="1294.0" y="678.0" />
+            <mxPoint x="834.0" y="678.0" />
+            <mxPoint x="834.0" y="314.0" />
+            <mxPoint x="586.0" y="314.0" />
+            <mxPoint x="586.0" y="210.0" />
+            <mxPoint x="530.0" y="210.0" />
+            <mxPoint x="530.0" y="202.0" />
+            <mxPoint x="526.0" y="202.0" />
+            <mxPoint x="526.0" y="134.0" />
+            <mxPoint x="530.0" y="134.0" />
+            <mxPoint x="530.0" y="122.0" />
+            <mxPoint x="522.0" y="122.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e26" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.4314;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.2745;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_conditions" target="t_health_records">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="494.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e27" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.3163;exitY=-0.0392;exitDx=0;exitDy=0;entryX=0.5000;entryY=1.1373;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_conditions" target="t_horse_body_regions">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1286.0" y="478.0" />
+            <mxPoint x="1286.0" y="210.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e28" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.6633;exitY=-0.0392;exitDx=0;exitDy=0;entryX=0.2551;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_conditions" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1214.0" y="330.0" />
+            <mxPoint x="1070.0" y="330.0" />
+            <mxPoint x="1070.0" y="278.0" />
+            <mxPoint x="1074.0" y="278.0" />
+            <mxPoint x="1074.0" y="142.0" />
+            <mxPoint x="978.0" y="142.0" />
+            <mxPoint x="978.0" y="146.0" />
+            <mxPoint x="966.0" y="146.0" />
+            <mxPoint x="966.0" y="150.0" />
+            <mxPoint x="950.0" y="150.0" />
+            <mxPoint x="950.0" y="146.0" />
+            <mxPoint x="922.0" y="146.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e29" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0306;exitY=0.4314;exitDx=0;exitDy=0;entryX=-0.0102;entryY=0.7059;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_records" target="t_care_schedule">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1074.0" y="542.0" />
+            <mxPoint x="870.0" y="542.0" />
+            <mxPoint x="870.0" y="674.0" />
+            <mxPoint x="1082.0" y="674.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e30" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.3163;exitY=-0.0392;exitDx=0;exitDy=0;entryX=0.3776;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_records" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="934.0" y="286.0" />
+            <mxPoint x="866.0" y="286.0" />
+            <mxPoint x="866.0" y="234.0" />
+            <mxPoint x="870.0" y="234.0" />
+            <mxPoint x="870.0" y="150.0" />
+            <mxPoint x="946.0" y="150.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e31" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0306;exitY=0.6667;exitDx=0;exitDy=0;entryX=-0.0255;entryY=0.1373;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_records" target="t_training_sessions">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="514.0" />
+            <mxPoint x="1082.0" y="506.0" />
+            <mxPoint x="1078.0" y="506.0" />
+            <mxPoint x="1078.0" y="498.0" />
+            <mxPoint x="1074.0" y="498.0" />
+            <mxPoint x="1074.0" y="338.0" />
+            <mxPoint x="1410.0" y="338.0" />
+            <mxPoint x="1410.0" y="214.0" />
+            <mxPoint x="1630.0" y="214.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e32" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0306;exitY=0.8235;exitDx=0;exitDy=0;entryX=-0.0255;entryY=0.2353;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_records" target="t_training_workouts">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="522.0" />
+            <mxPoint x="1082.0" y="538.0" />
+            <mxPoint x="1286.0" y="538.0" />
+            <mxPoint x="1286.0" y="486.0" />
+            <mxPoint x="1418.0" y="486.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e33" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.4314;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.4902;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_health_records" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="842.0" y="502.0" />
+            <mxPoint x="842.0" y="222.0" />
+            <mxPoint x="802.0" y="222.0" />
+            <mxPoint x="802.0" y="90.0" />
+            <mxPoint x="770.0" y="90.0" />
+            <mxPoint x="770.0" y="66.0" />
+            <mxPoint x="522.0" y="66.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e34" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.2941;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.5294;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_edit_request_documents" target="t_horse_edit_requests">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="246.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e35" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.6078;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.2549;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_edit_request_documents" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="278.0" />
+            <mxPoint x="1294.0" y="278.0" />
+            <mxPoint x="1294.0" y="154.0" />
+            <mxPoint x="1286.0" y="154.0" />
+            <mxPoint x="1286.0" y="150.0" />
+            <mxPoint x="1078.0" y="150.0" />
+            <mxPoint x="1078.0" y="142.0" />
+            <mxPoint x="1074.0" y="142.0" />
+            <mxPoint x="1074.0" y="122.0" />
+            <mxPoint x="1078.0" y="122.0" />
+            <mxPoint x="1078.0" y="106.0" />
+            <mxPoint x="1074.0" y="106.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e36" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0980;exitDx=0;exitDy=0;entryX=0.5204;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_edit_requests" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="846.0" y="214.0" />
+            <mxPoint x="846.0" y="138.0" />
+            <mxPoint x="870.0" y="138.0" />
+            <mxPoint x="870.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e37" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.4510;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.5686;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_edit_requests" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="870.0" y="278.0" />
+            <mxPoint x="1062.0" y="278.0" />
+            <mxPoint x="1062.0" y="470.0" />
+            <mxPoint x="1842.0" y="470.0" />
+            <mxPoint x="1842.0" y="594.0" />
+            <mxPoint x="1846.0" y="594.0" />
+            <mxPoint x="1846.0" y="1142.0" />
+            <mxPoint x="302.0" y="1142.0" />
+            <mxPoint x="302.0" y="82.0" />
+            <mxPoint x="526.0" y="82.0" />
+            <mxPoint x="526.0" y="86.0" />
+            <mxPoint x="530.0" y="86.0" />
+            <mxPoint x="530.0" y="114.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e38" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=1.1373;exitDx=0;exitDy=0;entryX=0.6633;entryY=-0.0392;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_health_metrics" target="t_health_records">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="862.0" y="210.0" />
+            <mxPoint x="862.0" y="230.0" />
+            <mxPoint x="858.0" y="230.0" />
+            <mxPoint x="858.0" y="478.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e39" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0392;exitDx=0;exitDy=0;entryX=0.6429;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_health_metrics" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="998.0" y="150.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e40" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.2353;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.5490;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_incident_reports" target="t_care_schedule">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1410.0" y="626.0" />
+            <mxPoint x="1410.0" y="510.0" />
+            <mxPoint x="1418.0" y="510.0" />
+            <mxPoint x="1418.0" y="494.0" />
+            <mxPoint x="1294.0" y="494.0" />
+            <mxPoint x="1294.0" y="626.0" />
+            <mxPoint x="1286.0" y="626.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e41" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4706;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.4118;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_incident_reports" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1418.0" y="674.0" />
+            <mxPoint x="1854.0" y="674.0" />
+            <mxPoint x="1854.0" y="586.0" />
+            <mxPoint x="1862.0" y="586.0" />
+            <mxPoint x="1862.0" y="146.0" />
+            <mxPoint x="1870.0" y="146.0" />
+            <mxPoint x="1870.0" y="66.0" />
+            <mxPoint x="1078.0" y="66.0" />
+            <mxPoint x="1078.0" y="102.0" />
+            <mxPoint x="1074.0" y="102.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e42" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.7059;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.6471;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_incident_reports" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1302.0" y="650.0" />
+            <mxPoint x="1302.0" y="730.0" />
+            <mxPoint x="1074.0" y="730.0" />
+            <mxPoint x="1074.0" y="738.0" />
+            <mxPoint x="818.0" y="738.0" />
+            <mxPoint x="818.0" y="330.0" />
+            <mxPoint x="562.0" y="330.0" />
+            <mxPoint x="562.0" y="234.0" />
+            <mxPoint x="558.0" y="234.0" />
+            <mxPoint x="558.0" y="230.0" />
+            <mxPoint x="546.0" y="230.0" />
+            <mxPoint x="546.0" y="226.0" />
+            <mxPoint x="542.0" y="226.0" />
+            <mxPoint x="542.0" y="214.0" />
+            <mxPoint x="534.0" y="214.0" />
+            <mxPoint x="534.0" y="210.0" />
+            <mxPoint x="530.0" y="210.0" />
+            <mxPoint x="530.0" y="194.0" />
+            <mxPoint x="522.0" y="194.0" />
+            <mxPoint x="522.0" y="170.0" />
+            <mxPoint x="526.0" y="170.0" />
+            <mxPoint x="526.0" y="118.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e43" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.4902;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.5686;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horse_pedigrees" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="114.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e44" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.7653;exitY=1.1176;exitDx=0;exitDy=0;entryX=0.3980;entryY=-0.0588;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horses" target="t_stable_stalls">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1022.0" y="150.0" />
+            <mxPoint x="1042.0" y="150.0" />
+            <mxPoint x="1042.0" y="146.0" />
+            <mxPoint x="1410.0" y="146.0" />
+            <mxPoint x="1410.0" y="74.0" />
+            <mxPoint x="1862.0" y="74.0" />
+            <mxPoint x="1862.0" y="142.0" />
+            <mxPoint x="1866.0" y="142.0" />
+            <mxPoint x="1866.0" y="150.0" />
+            <mxPoint x="1870.0" y="150.0" />
+            <mxPoint x="1870.0" y="1162.0" />
+            <mxPoint x="318.0" y="1162.0" />
+            <mxPoint x="318.0" y="938.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.6471;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.6471;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_horses" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="738.0" y="118.0" />
+            <mxPoint x="738.0" y="150.0" />
+            <mxPoint x="538.0" y="150.0" />
+            <mxPoint x="538.0" y="142.0" />
+            <mxPoint x="530.0" y="142.0" />
+            <mxPoint x="530.0" y="118.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e46" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0204;exitY=0.4706;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.7255;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_notifications" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1334.0" y="754.0" />
+            <mxPoint x="802.0" y="754.0" />
+            <mxPoint x="802.0" y="378.0" />
+            <mxPoint x="546.0" y="378.0" />
+            <mxPoint x="546.0" y="346.0" />
+            <mxPoint x="538.0" y="346.0" />
+            <mxPoint x="538.0" y="246.0" />
+            <mxPoint x="534.0" y="246.0" />
+            <mxPoint x="534.0" y="234.0" />
+            <mxPoint x="526.0" y="234.0" />
+            <mxPoint x="526.0" y="222.0" />
+            <mxPoint x="522.0" y="222.0" />
+            <mxPoint x="522.0" y="210.0" />
+            <mxPoint x="526.0" y="210.0" />
+            <mxPoint x="526.0" y="202.0" />
+            <mxPoint x="530.0" y="202.0" />
+            <mxPoint x="530.0" y="126.0" />
+            <mxPoint x="522.0" y="126.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e47" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0204;exitY=0.4902;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.7255;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_pending_agent_actions" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1210.0" y="966.0" />
+            <mxPoint x="1210.0" y="770.0" />
+            <mxPoint x="778.0" y="770.0" />
+            <mxPoint x="778.0" y="338.0" />
+            <mxPoint x="546.0" y="338.0" />
+            <mxPoint x="546.0" y="238.0" />
+            <mxPoint x="542.0" y="238.0" />
+            <mxPoint x="542.0" y="230.0" />
+            <mxPoint x="534.0" y="230.0" />
+            <mxPoint x="534.0" y="218.0" />
+            <mxPoint x="530.0" y="218.0" />
+            <mxPoint x="530.0" y="206.0" />
+            <mxPoint x="522.0" y="206.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e48" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.2941;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.5490;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_prescriptions" target="t_preventive_protocols">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1082.0" y="542.0" />
+            <mxPoint x="1286.0" y="542.0" />
+            <mxPoint x="1286.0" y="610.0" />
+            <mxPoint x="1082.0" y="610.0" />
+            <mxPoint x="1082.0" y="618.0" />
+            <mxPoint x="1074.0" y="618.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e49" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0102;exitY=0.6078;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.5294;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_prescriptions" target="t_treatment_plans">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1074.0" y="578.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e50" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.2347;exitY=-0.0784;exitDx=0;exitDy=0;entryX=0.7449;entryY=1.1373;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_racing_readiness_assessments" target="t_admission_applications">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="410.0" y="870.0" />
+            <mxPoint x="410.0" y="606.0" />
+            <mxPoint x="522.0" y="606.0" />
+            <mxPoint x="522.0" y="542.0" />
+            <mxPoint x="466.0" y="542.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e51" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0784;exitDx=0;exitDy=0;entryX=0.8878;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_racing_readiness_assessments" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="862.0" y="870.0" />
+            <mxPoint x="862.0" y="1134.0" />
+            <mxPoint x="1838.0" y="1134.0" />
+            <mxPoint x="1838.0" y="478.0" />
+            <mxPoint x="1294.0" y="478.0" />
+            <mxPoint x="1294.0" y="286.0" />
+            <mxPoint x="1078.0" y="286.0" />
+            <mxPoint x="1078.0" y="230.0" />
+            <mxPoint x="1082.0" y="230.0" />
+            <mxPoint x="1082.0" y="214.0" />
+            <mxPoint x="1078.0" y="214.0" />
+            <mxPoint x="1078.0" y="150.0" />
+            <mxPoint x="1046.0" y="150.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e52" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.7449;exitY=-0.0784;exitDx=0;exitDy=0;entryX=0.4592;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_racing_readiness_assessments" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="806.0" y="810.0" />
+            <mxPoint x="746.0" y="810.0" />
+            <mxPoint x="746.0" y="410.0" />
+            <mxPoint x="442.0" y="410.0" />
+            <mxPoint x="442.0" y="278.0" />
+            <mxPoint x="318.0" y="278.0" />
+            <mxPoint x="318.0" y="214.0" />
+            <mxPoint x="314.0" y="214.0" />
+            <mxPoint x="314.0" y="154.0" />
+            <mxPoint x="318.0" y="154.0" />
+            <mxPoint x="318.0" y="150.0" />
+            <mxPoint x="326.0" y="150.0" />
+            <mxPoint x="326.0" y="146.0" />
+            <mxPoint x="370.0" y="146.0" />
+            <mxPoint x="370.0" y="150.0" />
+            <mxPoint x="410.0" y="150.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e53" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0408;exitY=0.4510;exitDx=0;exitDy=0;entryX=-0.0204;entryY=0.4314;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_rag_knowledge_embeddings" target="t_rag_knowledge_documents">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1550.0" y="1098.0" />
+            <mxPoint x="1550.0" y="1066.0" />
+            <mxPoint x="1546.0" y="1066.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e54" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0980;exitDx=0;exitDy=0;entryX=0.5612;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_refresh_tokens" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="322.0" y="214.0" />
+            <mxPoint x="322.0" y="210.0" />
+            <mxPoint x="306.0" y="210.0" />
+            <mxPoint x="306.0" y="146.0" />
+            <mxPoint x="326.0" y="146.0" />
+            <mxPoint x="326.0" y="150.0" />
+            <mxPoint x="358.0" y="150.0" />
+            <mxPoint x="358.0" y="146.0" />
+            <mxPoint x="422.0" y="146.0" />
+            <mxPoint x="422.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e55" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0153;exitY=0.4314;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.5098;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_role_permissions" target="t_permissions">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="522.0" y="174.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e56" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.4949;exitY=-0.0392;exitDx=0;exitDy=0;entryX=0.5153;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_role_permissions" target="t_roles">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="630.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e57" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5816;exitY=-0.0588;exitDx=0;exitDy=0;entryX=0.5000;entryY=1.1765;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_stable_stalls" target="t_areas">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="418.0" y="938.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e58" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.7857;exitY=-0.0588;exitDx=0;exitDy=0;entryX=0.6837;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_stable_stalls" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="854.0" y="938.0" />
+            <mxPoint x="854.0" y="1070.0" />
+            <mxPoint x="1542.0" y="1070.0" />
+            <mxPoint x="1542.0" y="1106.0" />
+            <mxPoint x="1762.0" y="1106.0" />
+            <mxPoint x="1762.0" y="738.0" />
+            <mxPoint x="1078.0" y="738.0" />
+            <mxPoint x="1078.0" y="742.0" />
+            <mxPoint x="870.0" y="742.0" />
+            <mxPoint x="870.0" y="686.0" />
+            <mxPoint x="826.0" y="686.0" />
+            <mxPoint x="826.0" y="230.0" />
+            <mxPoint x="794.0" y="230.0" />
+            <mxPoint x="794.0" y="98.0" />
+            <mxPoint x="746.0" y="98.0" />
+            <mxPoint x="746.0" y="90.0" />
+            <mxPoint x="742.0" y="90.0" />
+            <mxPoint x="742.0" y="74.0" />
+            <mxPoint x="310.0" y="74.0" />
+            <mxPoint x="310.0" y="138.0" />
+            <mxPoint x="318.0" y="138.0" />
+            <mxPoint x="318.0" y="146.0" />
+            <mxPoint x="346.0" y="146.0" />
+            <mxPoint x="346.0" y="142.0" />
+            <mxPoint x="418.0" y="142.0" />
+            <mxPoint x="418.0" y="150.0" />
+            <mxPoint x="454.0" y="150.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e59" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.4847;exitY=-0.0588;exitDx=0;exitDy=0;entryX=0.7857;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_trainer_profiles" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="894.0" y="938.0" />
+            <mxPoint x="894.0" y="794.0" />
+            <mxPoint x="762.0" y="794.0" />
+            <mxPoint x="762.0" y="394.0" />
+            <mxPoint x="530.0" y="394.0" />
+            <mxPoint x="530.0" y="218.0" />
+            <mxPoint x="526.0" y="218.0" />
+            <mxPoint x="526.0" y="170.0" />
+            <mxPoint x="522.0" y="170.0" />
+            <mxPoint x="522.0" y="146.0" />
+            <mxPoint x="514.0" y="146.0" />
+            <mxPoint x="514.0" y="142.0" />
+            <mxPoint x="502.0" y="142.0" />
+            <mxPoint x="502.0" y="146.0" />
+            <mxPoint x="474.0" y="146.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e60" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.2941;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.6471;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_group_members" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1418.0" y="158.0" />
+            <mxPoint x="1318.0" y="158.0" />
+            <mxPoint x="1318.0" y="98.0" />
+            <mxPoint x="1286.0" y="98.0" />
+            <mxPoint x="1286.0" y="82.0" />
+            <mxPoint x="1082.0" y="82.0" />
+            <mxPoint x="1082.0" y="110.0" />
+            <mxPoint x="1074.0" y="110.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e61" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0357;exitY=0.4510;exitDx=0;exitDy=0;entryX=-0.0255;entryY=0.4314;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_group_members" target="t_training_groups">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="210.0" />
+            <mxPoint x="1630.0" y="210.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e62" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.6078;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.8039;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_group_members" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1326.0" y="250.0" />
+            <mxPoint x="1326.0" y="302.0" />
+            <mxPoint x="766.0" y="302.0" />
+            <mxPoint x="766.0" y="298.0" />
+            <mxPoint x="746.0" y="298.0" />
+            <mxPoint x="746.0" y="150.0" />
+            <mxPoint x="742.0" y="150.0" />
+            <mxPoint x="742.0" y="146.0" />
+            <mxPoint x="734.0" y="146.0" />
+            <mxPoint x="734.0" y="142.0" />
+            <mxPoint x="626.0" y="142.0" />
+            <mxPoint x="626.0" y="146.0" />
+            <mxPoint x="522.0" y="146.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e63" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.7451;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.8824;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_groups" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="190.0" />
+            <mxPoint x="1626.0" y="170.0" />
+            <mxPoint x="1630.0" y="170.0" />
+            <mxPoint x="1630.0" y="150.0" />
+            <mxPoint x="1842.0" y="150.0" />
+            <mxPoint x="1842.0" y="214.0" />
+            <mxPoint x="1838.0" y="214.0" />
+            <mxPoint x="1838.0" y="286.0" />
+            <mxPoint x="1630.0" y="286.0" />
+            <mxPoint x="1630.0" y="282.0" />
+            <mxPoint x="1418.0" y="282.0" />
+            <mxPoint x="1418.0" y="290.0" />
+            <mxPoint x="1334.0" y="290.0" />
+            <mxPoint x="1334.0" y="310.0" />
+            <mxPoint x="762.0" y="310.0" />
+            <mxPoint x="762.0" y="306.0" />
+            <mxPoint x="578.0" y="306.0" />
+            <mxPoint x="578.0" y="218.0" />
+            <mxPoint x="558.0" y="218.0" />
+            <mxPoint x="558.0" y="214.0" />
+            <mxPoint x="542.0" y="214.0" />
+            <mxPoint x="542.0" y="210.0" />
+            <mxPoint x="530.0" y="210.0" />
+            <mxPoint x="530.0" y="150.0" />
+            <mxPoint x="534.0" y="150.0" />
+            <mxPoint x="534.0" y="142.0" />
+            <mxPoint x="530.0" y="142.0" />
+            <mxPoint x="530.0" y="134.0" />
+            <mxPoint x="526.0" y="134.0" />
+            <mxPoint x="526.0" y="130.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e64" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.2941;exitDx=0;exitDy=0;entryX=1.0357;entryY=0.6667;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_sessions" target="t_course_runs">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1630.0" y="210.0" />
+            <mxPoint x="1626.0" y="210.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e65" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.4847;exitY=-0.0980;exitDx=0;exitDy=0;entryX=0.5051;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_sessions" target="t_exercises">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1730.0" y="210.0" />
+            <mxPoint x="1838.0" y="210.0" />
+            <mxPoint x="1838.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e66" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4510;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.8039;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_sessions" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1630.0" y="258.0" />
+            <mxPoint x="1626.0" y="258.0" />
+            <mxPoint x="1626.0" y="274.0" />
+            <mxPoint x="1630.0" y="274.0" />
+            <mxPoint x="1630.0" y="278.0" />
+            <mxPoint x="1418.0" y="278.0" />
+            <mxPoint x="1418.0" y="242.0" />
+            <mxPoint x="1310.0" y="242.0" />
+            <mxPoint x="1310.0" y="138.0" />
+            <mxPoint x="1286.0" y="138.0" />
+            <mxPoint x="1286.0" y="142.0" />
+            <mxPoint x="1082.0" y="142.0" />
+            <mxPoint x="1082.0" y="126.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e67" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.6078;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.8824;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_sessions" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="250.0" />
+            <mxPoint x="1626.0" y="262.0" />
+            <mxPoint x="1630.0" y="262.0" />
+            <mxPoint x="1630.0" y="278.0" />
+            <mxPoint x="1830.0" y="278.0" />
+            <mxPoint x="1830.0" y="462.0" />
+            <mxPoint x="1850.0" y="462.0" />
+            <mxPoint x="1850.0" y="594.0" />
+            <mxPoint x="1862.0" y="594.0" />
+            <mxPoint x="1862.0" y="1154.0" />
+            <mxPoint x="1334.0" y="1154.0" />
+            <mxPoint x="1334.0" y="1014.0" />
+            <mxPoint x="870.0" y="1014.0" />
+            <mxPoint x="870.0" y="802.0" />
+            <mxPoint x="754.0" y="802.0" />
+            <mxPoint x="754.0" y="402.0" />
+            <mxPoint x="514.0" y="402.0" />
+            <mxPoint x="514.0" y="278.0" />
+            <mxPoint x="526.0" y="278.0" />
+            <mxPoint x="526.0" y="242.0" />
+            <mxPoint x="538.0" y="242.0" />
+            <mxPoint x="538.0" y="214.0" />
+            <mxPoint x="522.0" y="214.0" />
+            <mxPoint x="522.0" y="198.0" />
+            <mxPoint x="530.0" y="198.0" />
+            <mxPoint x="530.0" y="138.0" />
+            <mxPoint x="522.0" y="138.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e68" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0357;exitY=0.3137;exitDx=0;exitDy=0;entryX=-0.0255;entryY=0.6471;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_workouts" target="t_exercises">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1846.0" y="302.0" />
+            <mxPoint x="1846.0" y="146.0" />
+            <mxPoint x="1730.0" y="146.0" />
+            <mxPoint x="1730.0" y="142.0" />
+            <mxPoint x="1630.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e69" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.4706;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.8824;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_workouts" target="t_horses">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1342.0" y="310.0" />
+            <mxPoint x="1342.0" y="258.0" />
+            <mxPoint x="1302.0" y="258.0" />
+            <mxPoint x="1302.0" y="214.0" />
+            <mxPoint x="1090.0" y="214.0" />
+            <mxPoint x="1090.0" y="210.0" />
+            <mxPoint x="1082.0" y="210.0" />
+            <mxPoint x="1082.0" y="142.0" />
+            <mxPoint x="1078.0" y="142.0" />
+            <mxPoint x="1078.0" y="130.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e70" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0357;exitY=0.6275;exitDx=0;exitDy=0;entryX=-0.0255;entryY=0.7647;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_workouts" target="t_training_sessions">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1626.0" y="266.0" />
+            <mxPoint x="1630.0" y="266.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e71" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=-0.0255;exitY=0.7059;exitDx=0;exitDy=0;entryX=1.0306;entryY=0.9608;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_training_workouts" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="570.0" y="322.0" />
+            <mxPoint x="570.0" y="226.0" />
+            <mxPoint x="558.0" y="226.0" />
+            <mxPoint x="558.0" y="222.0" />
+            <mxPoint x="526.0" y="222.0" />
+            <mxPoint x="526.0" y="150.0" />
+            <mxPoint x="518.0" y="150.0" />
+            <mxPoint x="518.0" y="142.0" />
+            <mxPoint x="522.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e72" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.5000;exitY=-0.0980;exitDx=0;exitDy=0;entryX=0.5000;entryY=1.1373;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_treatment_plans" target="t_health_records">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e73" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=1.0306;exitY=0.9608;exitDx=0;exitDy=0;entryX=-0.0153;entryY=0.4902;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_users" target="t_roles">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="522.0" y="110.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e74" style="edgeStyle=none;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;strokeColor=#7a7a7a;strokeWidth=1.2;exitX=0.4847;exitY=-0.0784;exitDx=0;exitDy=0;entryX=0.9082;entryY=1.1176;entryDx=0;entryDy=0;" edge="1" parent="1" source="t_veterinarian_profiles" target="t_users">
+          <mxGeometry relative="1" as="geometry">
+          <Array as="points">
+            <mxPoint x="1094.0" y="786.0" />
+            <mxPoint x="770.0" y="786.0" />
+            <mxPoint x="770.0" y="346.0" />
+            <mxPoint x="554.0" y="346.0" />
+            <mxPoint x="554.0" y="238.0" />
+            <mxPoint x="550.0" y="238.0" />
+            <mxPoint x="550.0" y="218.0" />
+            <mxPoint x="534.0" y="218.0" />
+            <mxPoint x="534.0" y="210.0" />
+            <mxPoint x="522.0" y="210.0" />
+            <mxPoint x="522.0" y="150.0" />
+            <mxPoint x="466.0" y="150.0" />
+            <mxPoint x="466.0" y="142.0" />
+          </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -97,6 +97,10 @@ A Quarantine Groom with no free quarantine stall left. A Full Groom can still re
 The number of horses in a Groom's stalls plus the Admissions assigned to that Groom that are still waiting for the Groom's decision. The lower it is, the sooner the Groom gets the next Admission. On a tie, the Groom who last confirmed a horse's arrival longest ago (or never) goes first.
 _Avoid_: Load, capacity
 
+**Regular-stall reserve**:
+The free regular stalls that must cover every horse in quarantine and any horse about to enter it. A Groom may approve a new admission only when one more regular stall is free than the horses already in quarantine; a Manager may approve a horse out of quarantine only when the free regular stalls still cover every horse there, the approved horse included.
+_Avoid_: Buffer, spare capacity
+
 **Reassignment**:
 Handing an Admission in Groom review from its Assigned Groom to the Quarantine Groom with the next lowest Groom Workload who has not had it yet, because the Assigned Groom did not decide within 72 hours of being assigned, became Full, was deactivated or no longer looks after a quarantine stall. The 72 hours are counted around the clock and restart with every Reassignment. Once every Quarantine Groom has had it, the rotation starts again from the lowest Groom Workload. The Manager can also reassign an Admission by hand to any Quarantine Groom. The new Assigned Groom, the previous one and the Manager are told every time.
 _Avoid_: Escalation, transfer
