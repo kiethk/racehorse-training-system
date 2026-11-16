@@ -54,6 +54,8 @@ describe('Horse edit validation', () => {
   it('accepts both UELN formats and flags anything else', () => {
     assert.equal(uelnFormatError('250001AB1234567'), null);
     assert.equal(uelnFormatError('FRA123456789012'), null);
+    assert.equal(uelnFormatError('704001000000001'), null);
+    assert.equal(uelnFormatError('VNM001000000001'), null);
     assert.equal(uelnFormatError(''), null);
     assert.notEqual(uelnFormatError('ABC'), null);
   });
