@@ -183,3 +183,57 @@ body {
   opacity: 1;
 }
 
+/* ==========================================================================
+   Role-based theme tokens (Council / Presentation visual cues)
+   ========================================================================== */
+:root[data-role='CLUB_MANAGER'],
+[data-role='CLUB_MANAGER'] {
+  --color-primary: #6657c7;
+  --color-primary-hover: #5748b8;
+  --color-primary-soft: #f1eeff;
+  --color-primary-subtle: #f8f6ff;
+  --color-focus: #7c6ee6;
+  --color-ring: #7c6ee6;
+}
+
+:root[data-role='HEAD_TRAINER'],
+[data-role='HEAD_TRAINER'] {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-soft: #eff6ff;
+  --color-primary-subtle: #f8faff;
+  --color-focus: #3b82f6;
+  --color-ring: #3b82f6;
+}
+
+:root[data-role='VETERINARIAN'],
+[data-role='VETERINARIAN'] {
+  --color-primary: #0d9488;
+  --color-primary-hover: #0f766e;
+  --color-primary-soft: #f0fdfa;
+  --color-primary-subtle: #f7fefe;
+  --color-focus: #14b8a6;
+  --color-ring: #14b8a6;
+}
+
+:root[data-role='GROOM'],
+[data-role='GROOM'] {
+  --color-primary: #475569;
+  --color-primary-hover: #334155;
+  --color-primary-soft: #f1f5f9;
+  --color-primary-subtle: #f8fafc;
+  --color-focus: #64748b;
+  --color-ring: #64748b;
+}
+
+:root[data-role='HORSE_OWNER'],
+[data-role='HORSE_OWNER'] {
+  --color-primary: #78350f;
+  --color-primary-hover: #5f2a0c;
+  --color-primary-soft: #fef3c7;
+  --color-primary-subtle: #fffbeb;
+  --color-focus: #92400e;
+  --color-ring: #92400e;
+}
+
+
