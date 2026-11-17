@@ -74,4 +74,32 @@ class PreventiveCareServiceTest {
                 && r.getDescription().startsWith("ROUTINE_EXAM:")), eq(7L));
         verify(schedules, never()).save(any());
     }
+
+    @Test
+    void movingAnUnassignedMilestoneRefusesADayTheHorseIsBusy() {
+        CareSchedule milestone = new CareSchedule();
+        milestone.setId(5L);
+        milestone.setHorseId(2L);
+        milestone.setCareType(CareType.ROUTINE);
+        milestone.setPurpose(com.rtms.backend.medical.enums.CareSchedulePurpose.PREVENTIVE);
+        milestone.setStatus(CareScheduleStatus.SCHEDULED);
+        when(schedules.findFirstByHorseIdAndPurposeAndStatusIn(eq(2L),
+                eq(com.rtms.backend.medical.enums.CareSchedulePurpose.PREVENTIVE), anyList()))
+                .thenReturn(Optional.of(milestone));
+        when(horses.findById(2L)).thenReturn(Optional.of(new com.rtms.backend.horse.entity.Horse()));
+        doThrow(new ApiException(HttpStatus.CONFLICT, "HORSE_BUSY_THAT_DAY", "busy"))
+                .when(care).assertHorseFreeOnDay(eq(2L), any(), eq(5L));
+
+        CreatePreventiveCareScheduleRequest request = new CreatePreventiveCareScheduleRequest();
+        request.setHorseId(2L);
+        request.setCareType("VACCINATION");
+        request.setScheduledDate(java.time.LocalDate.now().plusDays(3));
+
+        ApiException error = assertThrows(ApiException.class, () ->
+                new PreventiveCareService(schedules, horses, care, admissions, users).createSchedule(request, vet));
+
+        assertEquals("HORSE_BUSY_THAT_DAY", error.getErrorCode());
+        verify(schedules, never()).save(any());
+        verify(care, never()).assignRequestedScheduleOnChosenDay(any(), any());
+    }
 }

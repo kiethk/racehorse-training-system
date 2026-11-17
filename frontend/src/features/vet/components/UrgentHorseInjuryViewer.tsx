@@ -32,6 +32,8 @@ export interface InjuryMarkerData {
   status?: string;
   diagnosedAt?: string;
   description?: string;
+  resolved?: boolean;
+  canResolve?: boolean;
   /**
    * Callers that pre-resolve a legacy/seeded marker (normalized DB coords)
    * into world coordinates set this so the Marker still surface-snaps;
@@ -51,6 +53,7 @@ interface UrgentHorseInjuryViewerProps {
   }) => void;
   onDeleteInjury?: (id: string) => void;
   onUpdateInjury?: (id: string, updates: Partial<InjuryMarkerData>) => void;
+  onToggleResolve?: (id: string) => void;
   /** Called once the GLB has loaded, so callers can hide their loading overlay. */
   onModelReady?: () => void;
 }
@@ -292,17 +295,17 @@ function snapToHorseSurface(
 function Marker({
   injury,
   horseGroupRef,
-  isAddMode,
   readOnly,
   onDelete,
   onUpdate,
+  onToggleResolve,
 }: {
   injury: InjuryMarkerData;
   horseGroupRef: React.RefObject<THREE.Group | null>;
-  isAddMode?: boolean;
   readOnly?: boolean;
   onDelete?: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<InjuryMarkerData>) => void;
+  onToggleResolve?: (id: string) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const tagWrapperRef = useRef<HTMLDivElement>(null);
@@ -382,18 +385,22 @@ function Marker({
     injury.label ||
     regionKeyLabel(injury.zoneId) ||
     'INJURY';
+  const isResolved = Boolean(injury.resolved);
+  const pinColor = isResolved ? 'var(--color-success)' : 'var(--color-danger)';
   const hasDetail = Boolean(
     injury.severity ||
       injury.status ||
       injury.diagnosedAt ||
       injury.description ||
-      (!readOnly && onUpdate),
+      (!injury.canResolve && !readOnly && onUpdate) ||
+      (!readOnly && injury.canResolve && onToggleResolve),
   );
 
   return (
     <group position={initialWorldPos} ref={groupRef}>
       <Html
         position={[0, 0, 0]}
+        zIndexRange={[10, 0]}
         style={{
           pointerEvents: 'none',
         }}
@@ -403,7 +410,7 @@ function Marker({
           className="pointer-events-auto relative select-none"
           style={{ willChange: 'opacity, transform', transition: 'opacity 0.2s ease-out' }}
         >
-          {/* Medical SVG target pin: glowing red dot with outer ring and diagonal leader line */}
+          {/* Medical SVG target pin: glowing dot with outer ring and diagonal leader line */}
           <svg
             className="absolute left-0 top-0 overflow-visible pointer-events-none"
             width="1"
@@ -416,7 +423,7 @@ function Marker({
               cy="0"
               r="11"
               fill="none"
-              stroke="var(--color-danger)"
+              stroke={pinColor}
               strokeWidth="0.75"
               opacity="0.35"
             />
@@ -426,14 +433,14 @@ function Marker({
               cy="0"
               r="7"
               fill="none"
-              stroke="var(--color-danger)"
+              stroke={pinColor}
               strokeWidth="1.5"
               opacity="0.85"
             />
-            {/* Inner solid red dot */}
-            <circle cx="0" cy="0" r="3.5" fill="var(--color-danger)" />
+            {/* Inner solid dot */}
+            <circle cx="0" cy="0" r="3.5" fill={pinColor} />
             {/* Diagonal leader line out to the tag button */}
-            <line x1="0" y1="0" x2="34" y2="-28" stroke="var(--color-danger)" strokeWidth="1.5" />
+            <line x1="0" y1="0" x2="34" y2="-28" stroke={pinColor} strokeWidth="1.5" />
           </svg>
 
           {/* Clickable hotspot over the target pin dot so user can click the dot itself to open details */}
@@ -446,7 +453,6 @@ function Marker({
             className="absolute -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full cursor-pointer bg-transparent p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
             style={{ left: 0, top: 0 }}
             onClick={(e) => {
-              if (isAddMode) return;
               e.stopPropagation();
               setOpen((o) => !o);
             }}
@@ -464,13 +470,17 @@ function Marker({
                 size="sm"
                 aria-expanded={open}
                 onClick={(e) => {
-                  if (isAddMode) return;
                   e.stopPropagation();
                   setOpen((o) => !o);
                 }}
                 className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-danger)]" aria-hidden />
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isResolved ? 'bg-[var(--color-success)]' : 'bg-[var(--color-danger)]'
+                  }`}
+                  aria-hidden
+                />
                 {label}
                 <Icon
                   name={open ? 'chevron-down' : 'chevron-right'}
@@ -478,12 +488,12 @@ function Marker({
                   className="text-[var(--color-text-muted)]"
                 />
               </Button>
-              {!readOnly && onDelete && (
+              {!readOnly && onDelete && !injury.canResolve && (
                 <IconButton
                   label="Delete this marker"
                   icon="x"
                   size="sm"
-                  className="mr-1 h-5 w-5 rounded text-[var(--color-text-muted)] hover:bg-[var(--color-danger-subtle)] hover:text-[var(--color-danger)]"
+                  className="mr-1 h-5 w-5 rounded text-[var(--color-text-muted)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDelete(injury.id);
@@ -492,10 +502,10 @@ function Marker({
               )}
             </div>
             {open && hasDetail && (
-              <div className="min-w-44 max-w-56 space-y-1.5 border-t border-[var(--color-border)] px-2 py-1.5 text-[10px] text-[var(--color-text-secondary)]">
-                {!readOnly && onUpdate ? (
+              <div className="min-w-48 max-w-60 space-y-1.5 border-t border-[var(--color-border)] px-2.5 py-2 text-xs text-[var(--color-text-secondary)]">
+                {!injury.canResolve && !readOnly && onUpdate ? (
                   <div className="space-y-1">
-                    <label className="block text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    <label className="block text-xs font-semibold text-[var(--color-text-muted)]">
                       Clinical note:
                     </label>
                     <Textarea
@@ -503,25 +513,50 @@ function Marker({
                       placeholder="Enter clinical observation..."
                       value={injury.description || ''}
                       onChange={(e) => onUpdate(injury.id, { description: e.target.value })}
-                      className="w-full resize-none rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-[10px] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)]"
+                      className="w-full resize-none rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)]"
                     />
                   </div>
                 ) : (
                   injury.description && (
                     <div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-muted)] block">
+                      <span className="block text-xs font-semibold text-[var(--color-text-muted)]">
                         Note:
                       </span>
                       <p className="leading-snug">{injury.description}</p>
                     </div>
                   )
                 )}
-                {injury.status && (
+                {injury.severity && (
                   <div>
-                    Status: <strong>{injury.status}</strong>
+                    Severity: <strong>{injury.severity}</strong>
+                  </div>
+                )}
+                {(injury.status || injury.canResolve) && (
+                  <div>
+                    Status: <strong>{isResolved ? 'RESOLVED' : (injury.status || 'ACTIVE')}</strong>
                   </div>
                 )}
                 {injury.diagnosedAt && <div>Diagnosed: {formatDate(injury.diagnosedAt)}</div>}
+                {!readOnly && injury.canResolve && onToggleResolve && (
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isResolved ? 'secondary' : 'primary'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleResolve(injury.id);
+                      }}
+                      className={
+                        isResolved
+                          ? 'w-full border-[var(--color-success)] bg-[var(--color-success-soft)] text-[var(--color-success)] hover:bg-[var(--color-success-soft)]'
+                          : 'w-full'
+                      }
+                    >
+                      {isResolved ? 'Resolved' : 'Mark Resolved'}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -578,7 +613,13 @@ function Fallback2D({ injuries }: { injuries: InjuryMarkerData[] }) {
         />
         {pts.map(({ inj, px, py }, i) => (
           <g key={inj.id}>
-            <circle cx={px} cy={py} r={6} fill="#ef4444" opacity={0.85} />
+            <circle
+              cx={px}
+              cy={py}
+              r={6}
+              fill={inj.resolved ? 'var(--color-success)' : 'var(--color-danger)'}
+              opacity={0.85}
+            />
             <text x={px + 8} y={py + 3} fontSize="10" fill="currentColor" className="text-[var(--color-text-primary)]">
               {inj.label || `M${i + 1}`}
             </text>
@@ -599,6 +640,7 @@ export default function UrgentHorseInjuryViewer({
   onPointerHit,
   onDeleteInjury,
   onUpdateInjury,
+  onToggleResolve,
   onModelReady,
 }: UrgentHorseInjuryViewerProps) {
   const horseGroupRef = useRef<THREE.Group>(null);
@@ -612,7 +654,7 @@ export default function UrgentHorseInjuryViewer({
 
   return (
     <ViewerErrorBoundary fallback={<Fallback2D injuries={injuries} />}>
-      <div className="relative h-[420px] w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]">
+      <div className="relative isolate z-0 h-[420px] w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]">
         <Canvas
           camera={{ position: [3.2, 1.6, 3.2], fov: 45 }}
           frameloop="demand"
@@ -637,10 +679,10 @@ export default function UrgentHorseInjuryViewer({
                 key={injury.id}
                 injury={injury}
                 horseGroupRef={horseGroupRef}
-                isAddMode={isAddMode}
                 readOnly={readOnly}
                 onDelete={onDeleteInjury}
                 onUpdate={onUpdateInjury}
+                onToggleResolve={onToggleResolve}
               />
             ))}
             <gridHelper args={[14, 28, '#0d9488', '#1e293b']} position={[0, -1.3, 0]} />

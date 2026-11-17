@@ -120,9 +120,11 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       setUrgentCase((current) => (current ? { ...current, status: schedule.status } : current));
     } catch (cause) {
       setError(
-        cause instanceof ApiError
-          ? displayError(cause, 'Unable to start the examination.')
-          : 'Unable to start the examination.',
+        cause instanceof ApiError && cause.errorCode === 'HORSE_EXAM_IN_PROGRESS'
+          ? 'This horse already has an examination in progress. Finish that examination first, then start this urgent case.'
+          : cause instanceof ApiError
+            ? displayError(cause, 'Unable to start the examination.')
+            : 'Unable to start the examination.',
       );
     } finally {
       setStarting(false);
@@ -380,6 +382,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       {/* Main Workspace Area */}
       {urgentCase.status === 'SCHEDULED' && (
         <Panel padded className="border-l-4 border-l-[var(--color-warning)] bg-[var(--color-warning-soft)]/20">
+          {error && <Notice tone="error">{error}</Notice>}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
@@ -412,6 +415,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           careScheduleId={urgentCase.scheduleId}
           careType="URGENT"
           scheduleStatus={urgentCase.status}
+          incidentType={urgentCase.incidentType}
           asideTop={urgentAsideTop}
           onSuccess={handleSuccess}
           waitingFollowUpAt={waitingFollowUp?.at}
