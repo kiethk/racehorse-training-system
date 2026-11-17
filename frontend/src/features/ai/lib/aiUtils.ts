@@ -68,3 +68,62 @@ export function getQuickPromptsByRole(role?: Role | string | null): string[] {
   }
   return PROMPTS_BY_ROLE.HORSE_OWNER;
 }
+
+export interface Coordinates {
+  x: number;
+  y: number;
+}
+
+/**
+ * Clamps floating dialog position within viewport boundaries with safety margin.
+ */
+export function clampDialogPosition(
+  pos: Coordinates,
+  width: number,
+  height: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  minMargin = 8
+): Coordinates {
+  const effectiveWidth = Math.min(width, Math.max(0, viewportWidth - minMargin * 2));
+  const effectiveHeight = Math.min(height, Math.max(0, viewportHeight - minMargin * 2));
+
+  const maxX = Math.max(minMargin, viewportWidth - effectiveWidth - minMargin);
+  const maxY = Math.max(minMargin, viewportHeight - effectiveHeight - minMargin);
+
+  return {
+    x: Math.min(Math.max(minMargin, Math.round(pos.x)), Math.round(maxX)),
+    y: Math.min(Math.max(minMargin, Math.round(pos.y)), Math.round(maxY)),
+  };
+}
+
+/**
+ * Calculates popup position relative to the floating action button (FAB).
+ */
+export function getPopupPositionFromFab(
+  fab: Coordinates,
+  isExpanded: boolean,
+  viewportWidth: number,
+  viewportHeight: number
+): Coordinates {
+  const width = isExpanded ? 800 : 380;
+  const height = isExpanded ? 720 : 560;
+  const fabSize = 56;
+  const gap = 12;
+
+  let y = fab.y - height - gap;
+  if (y < gap) {
+    y = fab.y + fabSize + gap;
+  }
+
+  let x: number;
+  if (fab.x + fabSize / 2 > viewportWidth / 2) {
+    x = fab.x + fabSize - width;
+  } else {
+    x = fab.x;
+  }
+
+  return clampDialogPosition({ x, y }, width, height, viewportWidth, viewportHeight, gap);
+}
+
+

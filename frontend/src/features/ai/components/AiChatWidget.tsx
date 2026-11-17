@@ -20,10 +20,11 @@ import {
   Trash2,
   Loader2,
   Pencil,
+  GripVertical,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useAiChat } from '../context/AiChatContext';
-import { getQuickPromptsByRole, getRoleDisplayName } from '../lib/aiUtils';
+import { getQuickPromptsByRole, getRoleDisplayName, clampDialogPosition, getPopupPositionFromFab } from '../lib/aiUtils';
 import { MarkdownMessage } from './MarkdownMessage';
 import { formatClockLabel, formatDateTime } from '@/lib/display';
 
@@ -283,6 +284,186 @@ export function AiChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const fabRef = useRef<HTMLDivElement>(null);
+
+  // Vị trí neo đồng nhất duy nhất giữa nút tròn FAB và Popup
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingDialog, setIsDraggingDialog] = useState(false);
+  const [isDraggingFab, setIsDraggingFab] = useState(false);
+
+  const isDraggingAny = isDraggingDialog || isDraggingFab;
+
+  const dialogDragStartRef = useRef<{
+    pointerX: number;
+    pointerY: number;
+    startAnchorX: number;
+    startAnchorY: number;
+  } | null>(null);
+
+  const fabDragStartRef = useRef<{
+    pointerX: number;
+    pointerY: number;
+    startAnchorX: number;
+    startAnchorY: number;
+    moved: boolean;
+  } | null>(null);
+
+  // Lấy tọa độ neo ban đầu nếu chưa kéo
+  const getInitialAnchor = useCallback(() => {
+    if (anchor) return anchor;
+    if (typeof window === 'undefined') return { x: 0, y: 0 };
+    const el = fabRef.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top };
+    }
+    return {
+      x: window.innerWidth - 24 - 56,
+      y: window.innerHeight - 24 - 56,
+    };
+  }, [anchor]);
+
+  // Xử lý kéo thả từ thanh Header của Popup
+  const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('button, input, textarea, a')) return;
+
+    const start = getInitialAnchor();
+    dialogDragStartRef.current = {
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      startAnchorX: start.x,
+      startAnchorY: start.y,
+    };
+    setIsDraggingDialog(true);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingDialog || !dialogDragStartRef.current) return;
+    const { pointerX, pointerY, startAnchorX, startAnchorY } = dialogDragStartRef.current;
+    const deltaX = e.clientX - pointerX;
+    const deltaY = e.clientY - pointerY;
+
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2 || anchor !== null) {
+      const clamped = clampDialogPosition(
+        { x: startAnchorX + deltaX, y: startAnchorY + deltaY },
+        56,
+        56,
+        window.innerWidth,
+        window.innerHeight,
+        12
+      );
+      setAnchor(clamped);
+    }
+  };
+
+  const handleHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDraggingDialog) {
+      setIsDraggingDialog(false);
+      dialogDragStartRef.current = null;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+    }
+  };
+
+  // Xử lý kéo thả từ nút tròn FAB
+  const handleFabPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const start = getInitialAnchor();
+    fabDragStartRef.current = {
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      startAnchorX: start.x,
+      startAnchorY: start.y,
+      moved: false,
+    };
+    setIsDraggingFab(true);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleFabPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isDraggingFab || !fabDragStartRef.current) return;
+    const { pointerX, pointerY, startAnchorX, startAnchorY } = fabDragStartRef.current;
+    const deltaX = e.clientX - pointerX;
+    const deltaY = e.clientY - pointerY;
+
+    if (!fabDragStartRef.current.moved && Math.hypot(deltaX, deltaY) > 4) {
+      fabDragStartRef.current.moved = true;
+    }
+
+    if (fabDragStartRef.current.moved) {
+      const clamped = clampDialogPosition(
+        { x: startAnchorX + deltaX, y: startAnchorY + deltaY },
+        56,
+        56,
+        window.innerWidth,
+        window.innerHeight,
+        12
+      );
+      setAnchor(clamped);
+    }
+  };
+
+  const handleFabPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (isDraggingFab) {
+      setIsDraggingFab(false);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+    }
+  };
+
+  const handleFabPointerCancel = () => {
+    setIsDraggingFab(false);
+    if (fabDragStartRef.current) {
+      fabDragStartRef.current.moved = false;
+    }
+  };
+
+  const handleFabClick = () => {
+    if (fabDragStartRef.current?.moved) {
+      fabDragStartRef.current = null;
+      return;
+    }
+    fabDragStartRef.current = null;
+    toggleOpen();
+  };
+
+  const handleResetPosition = (e?: React.MouseEvent) => {
+    if (e && (e.target as HTMLElement).closest('button, input, textarea, a')) return;
+    setAnchor(null);
+  };
+
+  // Giữ vị trí trong màn hình khi thay đổi kích thước cửa sổ
+  useEffect(() => {
+    if (!anchor) return;
+    const handleResize = () => {
+      setAnchor((prev) => {
+        if (!prev) return null;
+        return clampDialogPosition(prev, 56, 56, window.innerWidth, window.innerHeight, 12);
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [anchor]);
+
+  // Vị trí hiển thị của popup luôn đồng nhất tuyệt đối với nút tròn FAB
+  const dialogPosition = useMemo(() => {
+    if (!anchor || typeof window === 'undefined') return null;
+    return getPopupPositionFromFab(
+      anchor,
+      isExpanded,
+      window.innerWidth,
+      window.innerHeight
+    );
+  }, [anchor, isExpanded]);
 
   // Cuộn xuống dưới cùng khi có tin mới hoặc đang load
   const scrollToBottom = useCallback((smooth = true) => {
@@ -317,7 +498,8 @@ export function AiChatWidget() {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    const computedHeight = Math.max(el.scrollHeight, 48);
+    el.style.height = `${Math.min(computedHeight, 160)}px`;
   }, [input]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -377,22 +559,46 @@ export function AiChatWidget() {
 
   return (
     <>
-      {/* Floating Action Button (FAB) góc dưới phải */}
+      {/* Floating Action Button (FAB) */}
       <div
-        className={`fixed bottom-6 right-6 z-50 flex items-center ${
+        ref={fabRef}
+        style={
+          anchor
+            ? {
+                left: `${anchor.x}px`,
+                top: `${anchor.y}px`,
+                bottom: 'auto',
+                right: 'auto',
+              }
+            : undefined
+        }
+        className={`fixed z-50 flex items-center ${
+          !anchor ? 'bottom-6 right-6' : ''
+        } ${
           isOpen && isExpanded ? 'hidden pointer-events-none' : ''
         }`}
       >
         <button
           type="button"
-          onClick={toggleOpen}
+          onClick={handleFabClick}
+          onDoubleClick={handleResetPosition}
+          onPointerDown={handleFabPointerDown}
+          onPointerMove={handleFabPointerMove}
+          onPointerUp={handleFabPointerUp}
+          onPointerCancel={handleFabPointerCancel}
+          onLostPointerCapture={handleFabPointerCancel}
           aria-label={isOpen ? 'Close RTMS Copilot' : 'Open RTMS Copilot'}
-          className="group relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[var(--color-primary)] text-white shadow-xl shadow-[var(--color-primary)]/25 transition-all duration-300 hover:scale-105 hover:bg-[var(--color-primary-hover)] active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] outline-none"
+          title="Nhấp để mở • Kéo để di chuyển • Nhấp đúp để đặt lại góc"
+          className={`group relative flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)] text-white shadow-xl shadow-[var(--color-primary)]/25 outline-none select-none touch-none ${
+            isDraggingAny
+              ? 'cursor-grabbing scale-105 transition-none shadow-2xl'
+              : 'cursor-grab transition-all duration-300 hover:scale-105 hover:bg-[var(--color-primary-hover)] active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]'
+          }`}
         >
           {isOpen ? (
-            <X className="size-6 transition-transform group-hover:rotate-90" />
+            <X className="size-6 transition-transform group-hover:rotate-90 pointer-events-none" />
           ) : (
-            <Sparkles className="size-6 animate-pulse" />
+            <Sparkles className="size-6 animate-pulse pointer-events-none" />
           )}
         </button>
       </div>
@@ -400,17 +606,53 @@ export function AiChatWidget() {
       {/* Cửa sổ Chat nổi */}
       {isOpen && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-label="RTMS Copilot Dialog"
-          className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl shadow-neutral-900/15 backdrop-blur-md transition-all duration-300 ease-in-out animate-in fade-in slide-in-from-bottom-4 ${
+          style={
+            dialogPosition
+              ? {
+                  left: `${dialogPosition.x}px`,
+                  top: `${dialogPosition.y}px`,
+                  bottom: 'auto',
+                  right: 'auto',
+                }
+              : undefined
+          }
+          className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl shadow-neutral-900/15 backdrop-blur-md ${
+            isDraggingAny
+              ? 'select-none transition-none'
+              : 'transition-all duration-300 ease-in-out'
+          } ${
+            !dialogPosition
+              ? isExpanded
+                ? 'bottom-6 right-6'
+                : 'bottom-22 right-6'
+              : ''
+          } ${
             isExpanded
-              ? 'bottom-6 right-6 h-[720px] w-[800px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-48px)]'
-              : 'bottom-22 right-6 h-[560px] w-[380px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-110px)]'
-          }`}
+              ? 'h-[720px] w-[800px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-48px)]'
+              : 'h-[560px] w-[380px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-110px)]'
+          } animate-in fade-in slide-in-from-bottom-4`}
         >
           {/* Header */}
-          <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3.5">
-            <div className="flex items-center gap-2.5">
+          <div
+            onPointerDown={handleHeaderPointerDown}
+            onPointerMove={handleHeaderPointerMove}
+            onPointerUp={handleHeaderPointerUp}
+            onPointerCancel={handleHeaderPointerUp}
+            onLostPointerCapture={handleHeaderPointerUp}
+            onDoubleClick={handleResetPosition}
+            className={`flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3.5 select-none touch-none ${
+              isDraggingAny ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
+            title="Kéo để di chuyển cửa sổ chat • Nhấp đúp để đặt lại góc"
+          >
+            <div className="flex items-center gap-2">
+              <GripVertical
+                className="size-3.5 text-[var(--color-text-secondary)]/50 shrink-0 cursor-grab active:cursor-grabbing"
+                aria-hidden="true"
+              />
               {/* Nút bật/tắt Lịch sử hội thoại */}
               <button
                 type="button"
@@ -610,11 +852,13 @@ export function AiChatWidget() {
               <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto px-4 py-4 space-y-6"
+                className={`flex-1 overflow-y-auto px-4 py-4 ${
+                  messages.length === 0 ? 'flex flex-col justify-end' : 'space-y-6'
+                }`}
               >
                 {/* Trạng thái rỗng: Cuộc trò chuyện mới ("Suggested Prompts") */}
                 {messages.length === 0 && (
-                  <div className="flex flex-col justify-end min-h-[300px] space-y-3 pb-2">
+                  <div className="flex flex-col justify-end w-full space-y-3 pb-2">
                     <p className="text-xs font-medium text-[var(--color-text-secondary)]">
                       Suggested Prompts
                     </p>
@@ -767,12 +1011,12 @@ export function AiChatWidget() {
                 >
                   <textarea
                     ref={textareaRef}
-                    rows={1}
+                    rows={2}
                     value={input}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     placeholder="Ask about training schedule, horse health, stabling..."
-                    className="max-h-36 min-h-[40px] flex-1 resize-none bg-transparent px-3 py-2 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] outline-hidden leading-relaxed"
+                    className="max-h-36 min-h-[48px] flex-1 resize-none bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] outline-hidden leading-normal overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   />
 
                   {isLoading ? (

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CHART_PALETTE } from '../lib/chartUtils.ts';
-import { getQuickPromptsByRole } from '../lib/aiUtils.ts';
+import { getQuickPromptsByRole, clampDialogPosition, getPopupPositionFromFab } from '../lib/aiUtils.ts';
 
 describe('AI Chat Upgraded Features & Logic Tests', () => {
   it('CHART_PALETTE is aligned with RTMS Brand Tokens (#6657c7 primary)', () => {
@@ -175,5 +175,75 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
     assert.ok(!sourceCode.includes('[overflow-wrap:anywhere]'), 'Table cells must not use [overflow-wrap:anywhere] which breaks words arbitrarily');
     // Asserts whitespace-nowrap and break-normal for discrete word boundary wrapping
     assert.ok(sourceCode.includes('whitespace-nowrap'), 'Table headers and cells must maintain clean word spacing');
+  });
+
+  describe('AI Floating Popup Dragging & Clamping Logic', () => {
+    it('clamps negative or zero coordinates to safety margin', () => {
+      const clamped = clampDialogPosition({ x: -50, y: -20 }, 380, 560, 1920, 1080, 8);
+      assert.equal(clamped.x, 8);
+      assert.equal(clamped.y, 8);
+    });
+
+    it('clamps overflow coordinates beyond right and bottom viewport bounds', () => {
+      // dialog: 380x560, viewport: 1000x800, margin: 8
+      // maxX = 1000 - 380 - 8 = 612
+      // maxY = 800 - 560 - 8 = 232
+      const clamped = clampDialogPosition({ x: 900, y: 700 }, 380, 560, 1000, 800, 8);
+      assert.equal(clamped.x, 612);
+      assert.equal(clamped.y, 232);
+    });
+
+    it('preserves valid coordinates inside bounds', () => {
+      const clamped = clampDialogPosition({ x: 250, y: 150 }, 380, 560, 1920, 1080, 8);
+      assert.equal(clamped.x, 250);
+      assert.equal(clamped.y, 150);
+    });
+
+    it('handles viewports smaller than dialog dimensions safely', () => {
+      const clamped = clampDialogPosition({ x: 100, y: 100 }, 800, 720, 500, 600, 8);
+      assert.equal(clamped.x, 8);
+      assert.equal(clamped.y, 8);
+    });
+
+    it('AiChatWidget source implements pointer capture dragging and double-click reset', () => {
+      const widgetPath = resolve(process.cwd(), 'src/features/ai/components/AiChatWidget.tsx');
+      const widgetCode = readFileSync(widgetPath, 'utf-8');
+
+      assert.ok(widgetCode.includes('onPointerDown={handleHeaderPointerDown}'), 'Must attach onPointerDown on header');
+      assert.ok(widgetCode.includes('onPointerMove={handleHeaderPointerMove}'), 'Must attach onPointerMove on header');
+      assert.ok(widgetCode.includes('onPointerUp={handleHeaderPointerUp}'), 'Must attach onPointerUp on header');
+      assert.ok(widgetCode.includes('onDoubleClick={handleResetPosition}'), 'Must support double-click to reset position');
+      assert.ok(widgetCode.includes('setPointerCapture'), 'Must use setPointerCapture for smooth dragging across boundaries');
+      assert.ok(widgetCode.includes('cursor-grab'), 'Must provide cursor-grab visual affordance');
+      assert.ok(widgetCode.includes('GripVertical'), 'Must display GripVertical handle icon');
+      assert.ok(widgetCode.includes('touch-none'), 'Must specify touch-none to prevent conflict with touch scrolling');
+    });
+
+    it('calculates popup position relative to FAB correctly when opened from left and right halves', () => {
+      // FAB at right bottom: x: 1800, y: 1000 in 1920x1080 screen
+      const rightBottomPopup = getPopupPositionFromFab({ x: 1800, y: 1000 }, false, 1920, 1080);
+      // Popup should be on the right half, positioned above the FAB (y < 1000)
+      assert.ok(rightBottomPopup.y < 1000);
+      assert.ok(rightBottomPopup.x > 1000);
+
+      // FAB at top left: x: 30, y: 50 in 1920x1080 screen
+      const topLeftPopup = getPopupPositionFromFab({ x: 30, y: 50 }, false, 1920, 1080);
+      // Popup should be below the FAB (y > 50) and aligned left
+      assert.ok(topLeftPopup.y > 50);
+      assert.equal(topLeftPopup.x, 30);
+    });
+
+    it('AiChatWidget source implements round FAB dragging with unified anchor and click-suppression', () => {
+      const widgetPath = resolve(process.cwd(), 'src/features/ai/components/AiChatWidget.tsx');
+      const widgetCode = readFileSync(widgetPath, 'utf-8');
+
+      assert.ok(widgetCode.includes('onPointerDown={handleFabPointerDown}'), 'FAB must attach handleFabPointerDown');
+      assert.ok(widgetCode.includes('onPointerMove={handleFabPointerMove}'), 'FAB must attach handleFabPointerMove');
+      assert.ok(widgetCode.includes('onPointerUp={handleFabPointerUp}'), 'FAB must attach handleFabPointerUp');
+      assert.ok(widgetCode.includes('onClick={handleFabClick}'), 'FAB must use handleFabClick with drag suppression');
+      assert.ok(widgetCode.includes('onDoubleClick={handleResetPosition}'), 'FAB must support double-click to reset corner');
+      assert.ok(widgetCode.includes('setAnchor'), 'Must use unified setAnchor to keep FAB and Popup in sync');
+      assert.ok(widgetCode.includes('dialogPosition'), 'Must derive dialogPosition directly from unified anchor');
+    });
   });
 });
