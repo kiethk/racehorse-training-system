@@ -18,7 +18,11 @@ export function TopBar({
   const toggleLabel = sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
 
   return (
-    <header className="sticky top-0 z-[var(--z-sidebar)] flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4">
+    <header className="relative sticky top-0 z-[var(--z-sidebar)] flex h-[var(--topbar-height)] shrink-0 items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-[var(--color-primary)] transition-colors duration-[var(--duration-base)]"
+      />
       {canToggleSidebar && (
         <Tooltip content={toggleLabel} side="bottom">
           <button
