@@ -1,46 +1,107 @@
 # Backend (Java/Maven)
+target/
 backend/target/
+*.class
+*.war
+*.nar
+*.ear
 backend/.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
 
 # Frontend & Node
 node_modules/
 frontend/node_modules/
-test-results/
-tests/e2e/results/
 **/.next/
+*.tsbuildinfo
+.turbo/
 pnpm-lock.yaml
 pnpm-workspace.yaml
 
-# AI Worker (Python)
-ai-worker/**/__pycache__/
-ai-worker/**/.pytest_cache/
+# Testing & QA
+test-results/
+tests/e2e/results/
+playwright-report/
+blob-report/
+coverage/
+htmlcov/
+.coverage
+
+# AI Worker & Python
+**/__pycache__/
+**/.pytest_cache/
+*.py[cod]
+*$py.class
 ai-worker/venv/
 ai-worker/.venv/
+.venv/
+venv/
+env/
+ENV/
 *.pt
+*.pth
 
-# Environment
+# Environment & Credentials
 .env
 .env.local
+.env*.local
 !.env*.example
 backend/.env.cloud
+!backend/.env.cloud.example
 backend/src/main/resources/application-local.properties
 
-# IDE
+# IDE & Editors
 .idea/
 .vscode/
 *.iml
+*.iws
+*.ipr
 .cursor/
 .gemini/
 .kiro/
+.aiassistant/
+.history/
+*.swp
+*.swo
+*~
 
-# OS
+# AI & Agent Frameworks
+.codex/
+.sdd/
+.kombai/
+.agents/
+.trail/
+.claude/
+.playwright-mcp/
+skills-lock.json
+/AGENTS.md
+/IDEA.md
+/GEMINI.md
+/gemini.md
+
+# OS Artifacts & Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.tmp
+*.bak
 
 # Project Docs & Artifacts
 artifacts/
 ui-reference/
 tutorials/
+uploads/
+backend/uploads/
 docs/
 docs/bmad/
 !backend/docs/
@@ -48,19 +109,5 @@ backend/docs/*
 !backend/docs/CLOUD_DEMO_SEED.md
 !backend/docs/HORSE_SEX.md
 !backend/docs/STABLE_AREA_LIFECYCLE.md
-.codex/
-uploads/
-.agents/
-.trail/
-.kombai/
-AGENTS.md
-IDEA.md
-GEMINI.md
-gemini.md
-.claude
-skills-lock.json
-.sdd/
-docs
-.playwright-mcp
-
 .worktrees/
+
