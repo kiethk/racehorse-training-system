@@ -1,5 +1,5 @@
 /**
- * Tiện ích toán học và xử lý dữ liệu biểu đồ AI SVG
+ * Math and data processing utilities for AI SVG charts
  */
 
 export interface ChartDataItem {
@@ -33,8 +33,8 @@ export const CHART_PALETTE = [
 ];
 
 /**
- * Trích xuất toạ độ từ toạ độ cực (Polar) sang Descartes (Cartesian)
- * Góc 0 rad tính từ 12 giờ (đỉnh trên cùng).
+ * Convert polar coordinates to Cartesian coordinates.
+ * Angle 0 rad is measured from 12 o'clock (the top).
  */
 export function polarToCartesian(
   cx: number,
@@ -49,7 +49,7 @@ export function polarToCartesian(
 }
 
 /**
- * Sinh path SVG cho cung tròn (Donut slice hoặc Pie slice)
+ * Generate an SVG path for a circular arc (Donut or Pie slice).
  */
 export function describeArc(
   cx: number,
@@ -61,7 +61,7 @@ export function describeArc(
 ): string {
   const angleDiff = endAngle - startAngle;
 
-  // Nếu là vòng tròn đầy (360 độ hoặc xấp xỉ 2PI)
+  // If this is a full circle (360 degrees or approximately 2PI)
   if (angleDiff >= 2 * Math.PI - 0.001) {
     const midAngle = startAngle + Math.PI;
     const p1 = describeArc(cx, cy, r, innerR, startAngle, midAngle);
@@ -73,12 +73,12 @@ export function describeArc(
   const endOuter = polarToCartesian(cx, cy, r, endAngle);
   const largeArcFlag = angleDiff > Math.PI ? 1 : 0;
 
-  // Pie slice (hình quạt tròn đầy)
+  // Pie slice (full circular sector)
   if (innerR <= 0) {
     return `M ${cx} ${cy} L ${startOuter.x} ${startOuter.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${endOuter.x} ${endOuter.y} Z`;
   }
 
-  // Donut slice (hình vành khăn)
+  // Donut slice (ring segment)
   const startInner = polarToCartesian(cx, cy, innerR, startAngle);
   const endInner = polarToCartesian(cx, cy, innerR, endAngle);
 
@@ -93,14 +93,14 @@ export function describeArc(
 }
 
 /**
- * Parse và chuẩn hoá cấu hình biểu đồ từ JSON raw
+ * Parse and normalize chart configuration from raw JSON.
  */
 export function parseChartConfig(rawText: string): ChartConfig | null {
   if (!rawText || !rawText.trim()) return null;
 
   try {
     let cleaned = rawText.trim();
-    // Bỏ markdown block markers nếu có
+    // Remove Markdown code fence markers if present
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.replace(/^```[a-zA-Z0-9_-]*\s*/, '').replace(/\s*```$/, '');
     }
@@ -118,7 +118,7 @@ export function parseChartConfig(rawText: string): ChartConfig | null {
       return null;
     }
 
-    // Trích xuất mảng dữ liệu (hỗ trợ nhiều tên trường data/items/series/slices/values)
+    // Extract the data array (supports data/items/series/slices/values field names)
     let rawItems: unknown[] = [];
     if (Array.isArray(obj.data)) {
       rawItems = obj.data;
@@ -146,7 +146,7 @@ export function parseChartConfig(rawText: string): ChartConfig | null {
       if (!it || typeof it !== 'object') continue;
 
       const label = String(
-        it.label ?? it.name ?? it.title ?? it.category ?? it.key ?? `Mục ${i + 1}`
+        it.label ?? it.name ?? it.title ?? it.category ?? it.key ?? `Item ${i + 1}`
       ).trim();
 
       const rawVal = it.value ?? it.count ?? it.total ?? it.amount ?? it.val ?? 0;

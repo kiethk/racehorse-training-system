@@ -98,7 +98,23 @@ export function clampDialogPosition(
 }
 
 /**
- * Calculates popup position relative to the floating action button (FAB).
+ * Checks whether two rectangular areas intersect.
+ */
+export function checkRectsOverlap(
+  r1: { x: number; y: number; width: number; height: number },
+  r2: { x: number; y: number; width: number; height: number }
+): boolean {
+  return !(
+    r1.x + r1.width <= r2.x ||
+    r1.x >= r2.x + r2.width ||
+    r1.y + r1.height <= r2.y ||
+    r1.y >= r2.y + r2.height
+  );
+}
+
+/**
+ * Calculates popup position relative to the floating action button (FAB),
+ * ensuring the popup appears beside or above without covering the button.
  */
 export function getPopupPositionFromFab(
   fab: Coordinates,
@@ -111,19 +127,59 @@ export function getPopupPositionFromFab(
   const fabSize = 56;
   const gap = 12;
 
-  let y = fab.y - height - gap;
-  if (y < gap) {
-    y = fab.y + fabSize + gap;
+  const fabRect = { x: fab.x, y: fab.y, width: fabSize, height: fabSize };
+
+  // Candidate 1: Try placing above the FAB (ideal when FAB is near bottom corner)
+  const candidateAboveX =
+    fab.x + fabSize / 2 > viewportWidth / 2
+      ? fab.x + fabSize - width
+      : fab.x;
+  const candidateAboveY = fab.y - height - gap;
+
+  const clampedAbove = clampDialogPosition(
+    { x: candidateAboveX, y: candidateAboveY },
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+    gap
+  );
+
+  // If candidateAbove fits above without overlapping the FAB, use it
+  if (!checkRectsOverlap({ ...clampedAbove, width, height }, fabRect)) {
+    return clampedAbove;
   }
 
-  let x: number;
-  if (fab.x + fabSize / 2 > viewportWidth / 2) {
-    x = fab.x + fabSize - width;
+  // Candidate 2: Place side-by-side so the popup never covers the FAB
+  const spaceLeft = fab.x - gap;
+  const spaceRight = viewportWidth - (fab.x + fabSize) - gap;
+
+  let sideX: number;
+  if (spaceLeft >= width) {
+    // Prefer left side if it has enough space
+    sideX = fab.x - width - gap;
+  } else if (spaceRight >= width) {
+    // Or right side if it fits
+    sideX = fab.x + fabSize + gap;
+  } else if (spaceLeft >= spaceRight) {
+    sideX = fab.x - width - gap;
   } else {
-    x = fab.x;
+    sideX = fab.x + fabSize + gap;
   }
 
-  return clampDialogPosition({ x, y }, width, height, viewportWidth, viewportHeight, gap);
+  // Vertically align centered with the FAB, clamped safely to viewport
+  const idealY = fab.y + fabSize / 2 - height / 2;
+  const clampedSideY = Math.min(
+    Math.max(gap, idealY),
+    Math.max(gap, viewportHeight - height - gap)
+  );
+
+  return clampDialogPosition(
+    { x: sideX, y: clampedSideY },
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+    gap
+  );
 }
-
-

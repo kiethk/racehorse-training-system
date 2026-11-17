@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check } from 'lucide-react';
+import { Button, Table, TBody, Td, THead, Th, Tr } from '@/components/ui';
 import { AiSvgChart, parseChartConfig } from './AiSvgChart';
 
 interface MarkdownMessageProps {
@@ -33,24 +34,25 @@ function CodeBlockHeader({
   return (
     <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-900/90 px-3 py-1.5 text-[10px] text-neutral-400 font-mono">
       <span className="uppercase tracking-wider font-semibold">{language || 'CODE'}</span>
-      <button
+      <Button
         type="button"
+        variant="tertiary"
+        size="sm"
         onClick={handleCopy}
-        aria-label="Sao chép đoạn mã"
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
+        className="text-[var(--color-text-inverse)]"
       >
         {copied ? (
           <>
             <Check className="size-3 text-[var(--color-primary)]" />
-            <span className="text-[var(--color-primary)]">Đã chép</span>
+            <span className="text-[var(--color-primary)]">Copied</span>
           </>
         ) : (
           <>
             <Copy className="size-3" />
-            <span>Sao chép</span>
+            <span>Copy</span>
           </>
         )}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -91,36 +93,34 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
           ),
           table: ({ children }) => (
             <div className="my-2.5 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-panel)]">
-              <div className="scroll-slim relative w-full overflow-x-auto">
-                <table className="w-max min-w-full text-left text-xs border-collapse">{children}</table>
-              </div>
+              <Table bare className="w-max min-w-full text-left text-xs border-collapse">{children}</Table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-[var(--color-surface-muted)] text-[var(--color-text-primary)] font-semibold border-b border-[var(--color-border)]">
+            <THead className="bg-[var(--color-surface-muted)] text-[var(--color-text-primary)] font-semibold border-b border-[var(--color-border)]">
               {children}
-            </thead>
+            </THead>
           ),
-          tbody: ({ children }) => <tbody className="divide-y divide-[var(--color-border)]">{children}</tbody>,
+          tbody: ({ children }) => <TBody className="divide-y divide-[var(--color-border)]">{children}</TBody>,
           tr: ({ children }) => (
-            <tr className="group/row hover:bg-[var(--color-surface-muted)]/40 transition-colors">{children}</tr>
+            <Tr className="group/row hover:bg-[var(--color-surface-muted)]/40 transition-colors">{children}</Tr>
           ),
           th: ({ children }) => (
-            <th className="px-3.5 py-2.5 font-semibold text-[var(--color-text-primary)] whitespace-nowrap">
+            <Th className="px-3.5 py-2.5 font-semibold text-[var(--color-text-primary)] whitespace-nowrap">
               {children}
-            </th>
+            </Th>
           ),
           td: ({ children }) => (
-            <td className="px-3.5 py-2 text-[var(--color-text-secondary)] whitespace-nowrap [overflow-wrap:normal] break-normal align-middle group-hover/row:text-[var(--color-text-primary)] transition-colors">
+            <Td className="px-3.5 py-2 text-[var(--color-text-secondary)] whitespace-nowrap [overflow-wrap:normal] break-normal align-middle group-hover/row:text-[var(--color-text-primary)] transition-colors">
               {children}
-            </td>
+            </Td>
           ),
           hr: () => <hr className="my-3 border-[var(--color-border)]" />,
           img: ({ src, alt, ...props }: React.ComponentPropsWithoutRef<'img'>) => (
             <span className="my-2 block overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] shadow-sm">
               <img
                 src={src}
-                alt={alt || 'Hình ảnh đính kèm'}
+                alt={alt || 'Attached image'}
                 loading="lazy"
                 className="max-h-56 w-auto max-w-full rounded-lg object-contain mx-auto transition-transform hover:scale-[1.02]"
                 {...props}
@@ -184,11 +184,11 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
                 return <AiSvgChart config={chartConfig} />;
               }
 
-              // Fallback khi JSON không hợp lệ
+              // Fallback when the JSON is invalid
               return (
                 <div className="my-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
                   <div className="mb-1.5 font-medium text-amber-700 dark:text-amber-400">
-                    Dữ liệu biểu đồ không hợp lệ
+                    Invalid chart data
                   </div>
                   <pre className="overflow-x-auto rounded-lg bg-neutral-900 p-2.5 font-mono text-[11px] text-neutral-200">
                     <code>{rawContent}</code>
