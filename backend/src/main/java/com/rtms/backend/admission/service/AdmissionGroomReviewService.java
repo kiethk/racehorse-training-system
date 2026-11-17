@@ -34,6 +34,8 @@ import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.admission.dto.GroomAdmissionReviewRequest;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.event.AdmissionEnteredGroomReviewEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,7 @@ import java.util.Objects;
 
 @Service
 public class AdmissionGroomReviewService {
+    private static final Logger log = LoggerFactory.getLogger(AdmissionGroomReviewService.class);
     private static final int ARRIVAL_WINDOW_DAYS = 14;
     public static final int MAX_FEEDBACK_LENGTH = 2000;
 
@@ -134,9 +137,30 @@ public class AdmissionGroomReviewService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported Groom decision");
         }
 
+        // Serialize with Manager approvals and with other Groom approvals: the regular-stall
+        // reserve below must be read from a stable snapshot of all quarantine + regular stalls.
+        stableStallRepository.lockAdmissionCapacityStallsForUpdate();
+
         StableStall stall = stableStallRepository.findAvailableQuarantineStallOfGroomForUpdate(groomId)
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "GROOM_FULL",
                         "All your quarantine stalls are taken. Reject the admission or wait for a stall to free up"));
+
+        // Entry gate: this horse is not in quarantine yet, so the reserve must cover the horses
+        // already there plus this one. Otherwise quarantine fills up and no horse can leave it.
+        long availableRegular = stableStallRepository.countAvailableRegularStalls();
+        long occupiedQuarantine = stableStallRepository.countOccupiedQuarantineStalls();
+        long requiredRegular = AdmissionCapacityPolicy.requiredRegularReserveForEntry(occupiedQuarantine);
+        if (availableRegular < requiredRegular) {
+            log.warn("Admission approval blocked by regular-stall reserve: admissionId={}, gate=ENTRY, "
+                            + "availableRegular={}, occupiedQuarantine={}, requiredRegular={}",
+                    admission.getId(), availableRegular, occupiedQuarantine, requiredRegular);
+            throw new ApiException(HttpStatus.CONFLICT,
+                    AdmissionCapacityPolicy.REGULAR_RESERVE_INSUFFICIENT,
+                    "Cannot approve: the quarantine pipeline would hold " + requiredRegular
+                            + " horse(s) but only " + availableRegular
+                            + " regular stall(s) are free. Free up a regular stall first.");
+        }
+
         stampGroomReview(admission, groomId, ReviewDecision.APPROVED, feedback);
         reserve(admission, stall);
         groomAssignmentService.closeAsDecided(admissionId);

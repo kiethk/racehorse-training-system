@@ -64,3 +64,6 @@ docs
 .playwright-mcp
 
 .worktrees/
+
+diagram/
+.worktrees/
