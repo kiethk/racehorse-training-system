@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Controller cung cấp các endpoint phục vụ module Exploratory Data Analysis (EDA) Analytics Widget.
+ * Controller providing endpoints for the Exploratory Data Analysis (EDA) Analytics Widget module.
  */
 @RestController
 public class HorseEdaAnalyticsController {
@@ -25,7 +25,7 @@ public class HorseEdaAnalyticsController {
     }
 
     /**
-     * Phân tích EDA tương quan và phân bố đặc trưng thống kê toàn bộ đàn ngựa.
+     * Analyzes correlations and statistical distributions for the entire horse population using EDA.
      */
     @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
     @GetMapping("/api/analytics/eda/fleet")
@@ -37,7 +37,7 @@ public class HorseEdaAnalyticsController {
     }
 
     /**
-     * Phân tích EDA tương quan và thống kê chi tiết theo từng buổi tập của một chiến mã.
+     * Analyzes correlations and provides detailed statistics for each workout of an individual horse using EDA.
      */
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping("/api/analytics/eda/horses/{id}")

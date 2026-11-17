@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Tiện ích toán học thuần túy tính toán các đặc trưng thống kê mô tả (Descriptive Statistics)
- * và phân tích tương quan tuyến tính (Bivariate Pearson Correlation & Regression) cho EDA.
+ * Pure mathematical utility for computing descriptive statistics (Descriptive Statistics)
+ * and analyzing linear correlation (Bivariate Pearson Correlation & Regression) for EDA.
  */
 public final class EdaStatisticsCalculator {
 
@@ -37,7 +37,7 @@ public final class EdaStatisticsCalculator {
     ) {}
 
     /**
-     * Tính toán thống kê mô tả: Mean, Median, Q1, Q3, IQR, Độ lệch chuẩn mẫu, và Outliers theo Tukey's Fences.
+     * Computes descriptive statistics: Mean, Median, Q1, Q3, IQR, sample standard deviation, and Outliers according to Tukey's Fences.
      */
     public static DistributionStats computeDistribution(List<Double> rawValues) {
         if (rawValues == null || rawValues.isEmpty()) {
@@ -68,7 +68,7 @@ public final class EdaStatisticsCalculator {
             return new DistributionStats(min, max, mean, mean, mean, mean, 0.0, 0.0, 1, Collections.emptyList());
         }
 
-        // Độ lệch chuẩn mẫu (sample standard deviation) với n - 1 bậc tự do
+        // Sample standard deviation with n - 1 degrees of freedom
         double sumSqDiff = 0.0;
         for (double v : values) {
             double diff = v - mean;
@@ -96,7 +96,7 @@ public final class EdaStatisticsCalculator {
     }
 
     /**
-     * Tính toán hệ số tương quan Pearson r và phương trình đường hồi quy y = slope * x + intercept.
+     * Computes the Pearson correlation coefficient r and regression equation y = slope * x + intercept.
      */
     public static CorrelationResult computeCorrelation(List<Double> xRaw, List<Double> yRaw) {
         if (xRaw == null || yRaw == null || xRaw.size() != yRaw.size() || xRaw.size() < 2) {
@@ -141,13 +141,13 @@ public final class EdaStatisticsCalculator {
             covXY += diffX * diffY;
         }
 
-        // Kiểm tra chống chia cho 0 nếu một trong hai biến có phương sai bằng 0
+        // Check for division by zero if either variable has zero variance
         if (varX <= 1e-12 || varY <= 1e-12) {
             return new CorrelationResult(0.0, "NO_VARIANCE", 0.0, meanY, n);
         }
 
         double r = covXY / Math.sqrt(varX * varY);
-        // Kẹp giá trị trong khoảng [-1.0, 1.0] để khử sai số dấu phẩy động
+        // Clamp the value to the range [-1.0, 1.0] to eliminate floating-point error
         r = Math.max(-1.0, Math.min(1.0, r));
 
         double slope = covXY / varX;
@@ -170,7 +170,7 @@ public final class EdaStatisticsCalculator {
     }
 
     /**
-     * Tính phân vị p (từ 0.0 đến 1.0) bằng phương pháp nội suy tuyến tính (Linear Interpolation).
+     * Computes percentile p (from 0.0 to 1.0) using linear interpolation (Linear Interpolation).
      */
     private static double computePercentile(List<Double> sortedValues, double p) {
         int n = sortedValues.size();

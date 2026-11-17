@@ -56,6 +56,24 @@ public class BioSpcAnalyticsService {
             String metricType,
             AuthenticatedUser currentUser
     ) {
+        return calculateBioSpcSeries(horseId, metricType, currentUser, true);
+    }
+
+    @Transactional(readOnly = true)
+    public BioSpcSeriesResponse getBioSpcSeriesForAi(
+            Long horseId,
+            String metricType,
+            AuthenticatedUser actor
+    ) {
+        return calculateBioSpcSeries(horseId, metricType, actor, false);
+    }
+
+    private BioSpcSeriesResponse calculateBioSpcSeries(
+            Long horseId,
+            String metricType,
+            AuthenticatedUser currentUser,
+            boolean dispatchNotifications
+    ) {
         if (currentUser != null) {
             accessPolicy.assertCanViewHorse(horseId, currentUser);
         }
@@ -95,7 +113,7 @@ public class BioSpcAnalyticsService {
 
         // Check if latest point triggered an anomaly to dispatch notification
         List<BioSpcPointDto> analyzedPoints = analysis.analyzedPoints();
-        if (!analyzedPoints.isEmpty()) {
+        if (dispatchNotifications && !analyzedPoints.isEmpty()) {
             BioSpcPointDto latestPoint = analyzedPoints.get(analyzedPoints.size() - 1);
             if (latestPoint.isSpecialCause()) {
                 double val = latestPoint.value();

@@ -147,6 +147,54 @@ class BioSpcAnalyticsServiceTest {
     }
 
     @Test
+    @DisplayName("AI Bio-SPC series matches the REST series without dispatching an anomaly notification")
+    void getBioSpcSeriesForAiReturnsSameSeriesWithoutDispatchingNotification() {
+        when(horseRepository.findById(100L)).thenReturn(Optional.of(mockHorse));
+
+        User vetUser = new User();
+        vetUser.setId(20L);
+        when(userRepository.findActiveVeterinarians()).thenReturn(List.of(vetUser));
+
+        List<HorseHealthMetric> metrics = new ArrayList<>();
+        LocalDateTime baseTime = LocalDateTime.now().minusDays(10);
+        for (long i = 1; i <= 5; i++) {
+            HorseHealthMetric m = new HorseHealthMetric();
+            m.setHorseId(100L);
+            m.setRecordedAt(baseTime.plusDays(i));
+            m.setTemperature(BigDecimal.valueOf(37.4));
+            metrics.add(m);
+        }
+        HorseHealthMetric spike = new HorseHealthMetric();
+        spike.setHorseId(100L);
+        spike.setRecordedAt(baseTime.plusDays(6));
+        spike.setTemperature(BigDecimal.valueOf(39.2));
+        metrics.add(spike);
+        when(metricRepository.findByHorseIdOrderByRecordedAtDesc(100L)).thenReturn(metrics);
+
+        BioSpcSeriesResponse aiResponse = service.getBioSpcSeriesForAi(100L, "TEMPERATURE", mockVet);
+
+        assertTrue(aiResponse.isBaselineActive());
+        assertEquals(6, aiResponse.sampleCount());
+        assertEquals(39.2, aiResponse.points().get(5).value());
+        assertTrue(aiResponse.points().get(5).isSpecialCause());
+        verify(accessPolicy).assertCanViewHorse(100L, mockVet);
+        verifyNoInteractions(userRepository, notificationService);
+
+        BioSpcSeriesResponse restResponse = service.getBioSpcSeries(100L, "TEMPERATURE", mockVet);
+
+        assertEquals(restResponse, aiResponse);
+        verify(notificationService).createNotification(
+                eq(20L),
+                contains("Thunder Bolt"),
+                contains("outside 3-sigma limits"),
+                eq(NotificationTypes.BIO_SPC_ANOMALY_DETECTED),
+                eq(NotificationTypes.REFERENCE_HORSE),
+                eq(100L),
+                anyString()
+        );
+    }
+
+    @Test
     @DisplayName("Horse not found throws 404 ApiException")
     void testHorseNotFound() {
         when(horseRepository.findById(999L)).thenReturn(Optional.empty());
