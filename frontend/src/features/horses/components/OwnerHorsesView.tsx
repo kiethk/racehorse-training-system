@@ -9,6 +9,7 @@ import {
   HorseAvatar,
   Icon,
   Input,
+  LinkButton,
   PageHeader,
   Panel,
   Pill,
@@ -45,6 +46,11 @@ export function OwnerHorsesView() {
       return matchesSearch && matchesStatus;
     });
   }, [horses, search, statusFilter]);
+
+  const handleClearFilters = () => {
+    setSearch('');
+    setStatusFilter('ALL');
+  };
 
   return (
     <ScreenLayout variant="detail">
@@ -118,8 +124,27 @@ export function OwnerHorsesView() {
             title={horses.length === 0 ? "You do not have any registered horses" : "No matching horses found"}
             description={
               horses.length === 0
-                ? "Once horses are accepted into the academy under your ownership, they will appear here."
+                ? "Once horses are accepted into the academy under your ownership, they will appear here. Track your pending applications or submit a new horse in Admissions."
                 : "Try adjusting your search query or status filter."
+            }
+            action={
+              horses.length === 0 ? (
+                <LinkButton
+                  href="/owner/admissions"
+                  variant="primary"
+                  icon="clipboard"
+                >
+                  View Admissions
+                </LinkButton>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleClearFilters}
+                >
+                  Clear filters
+                </Button>
+              )
             }
           />
         </Panel>
