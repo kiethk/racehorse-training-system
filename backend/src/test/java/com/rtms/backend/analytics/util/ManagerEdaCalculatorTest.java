@@ -104,15 +104,45 @@ class ManagerEdaCalculatorTest {
 
         assertThat(result.totalWorkoutsScheduled()).isEqualTo(3);
         assertThat(result.totalWorkoutsCompleted()).isEqualTo(2);
-        assertThat(result.overallAdherenceRate()).isEqualTo(66.7);
+        // Effective scheduled = 3 - 1 (cancelled) = 2. Effective adherence = 2/2 = 100.0%
+        assertThat(result.overallAdherenceRate()).isEqualTo(100.0);
+        assertThat(result.overallCancellationRate()).isEqualTo(33.3);
         assertThat(result.trainers()).hasSize(1);
 
         var tom = result.trainers().get(0);
         assertThat(tom.trainerName()).isEqualTo("Trainer Tom");
-        assertThat(tom.adherenceRate()).isEqualTo(66.7);
+        assertThat(tom.adherenceRate()).isEqualTo(100.0);
+        assertThat(tom.cancellationRate()).isEqualTo(33.3);
         assertThat(tom.averageRating()).isEqualTo(8.5);
         assertThat(tom.speedGainKmh()).isEqualTo(4.0);
         assertThat(tom.hrRecoveryImprovementBpm()).isEqualTo(8.0);
+    }
+
+    @Test
+    @DisplayName("TrainerEdaCalculator distinguishes held vs cancelled workouts in adherence calculation")
+    void testTrainerEdaWithHeldAndCancelled() {
+        Map<Long, String> names = Map.of(20L, "Trainer Lisa");
+        List<TrainerWorkoutRow> rows = List.of(
+                new TrainerWorkoutRow(20L, WorkoutStatus.RAN, 8, BigDecimal.valueOf(42.0), 75, LocalDate.now().minusDays(4), 201L),
+                new TrainerWorkoutRow(20L, WorkoutStatus.RAN, 9, BigDecimal.valueOf(44.0), 73, LocalDate.now().minusDays(3), 201L),
+                new TrainerWorkoutRow(20L, WorkoutStatus.HELD, null, null, null, LocalDate.now().minusDays(2), 201L),
+                new TrainerWorkoutRow(20L, WorkoutStatus.CANCELLED, null, null, null, LocalDate.now().minusDays(1), 201L)
+        );
+
+        var result = TrainerEdaCalculator.calculate(rows, names);
+
+        // Scheduled: 4, Cancelled: 1 => Effective: 3. Completed: 2, Held: 1.
+        // Effective Adherence = 2 / 3 = 66.7%
+        // Cancellation Rate = 1 / 4 = 25.0%
+        assertThat(result.overallAdherenceRate()).isEqualTo(66.7);
+        assertThat(result.overallCancellationRate()).isEqualTo(25.0);
+
+        var lisa = result.trainers().get(0);
+        assertThat(lisa.adherenceRate()).isEqualTo(66.7);
+        assertThat(lisa.cancellationRate()).isEqualTo(25.0);
+        assertThat(lisa.completedWorkouts()).isEqualTo(2);
+        assertThat(lisa.heldWorkouts()).isEqualTo(1);
+        assertThat(lisa.cancelledWorkouts()).isEqualTo(1);
     }
 
     @Test

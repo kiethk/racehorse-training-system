@@ -48,16 +48,23 @@ export const TrainerEvaluationEdaView: React.FC<TrainerEvaluationEdaViewProps> =
     },
     {
       id: 'workouts',
-      header: 'Workouts (Ran / Total)',
+      header: 'Workouts (Ran / Sched)',
       render: (row: TrainerPerformanceDto) => (
-        <span className="text-xs">
-          <strong className="text-[var(--color-text-primary)]">{row.completedWorkouts}</strong> / {row.scheduledWorkouts}
-        </span>
+        <div className="text-xs">
+          <div>
+            <strong className="text-[var(--color-text-primary)]">{row.completedWorkouts}</strong> / {row.scheduledWorkouts}
+          </div>
+          {row.cancelledWorkouts > 0 && (
+            <span className="text-xs text-[var(--color-text-muted)]">
+              ({row.cancelledWorkouts} cancelled)
+            </span>
+          )}
+        </div>
       ),
     },
     {
       id: 'adherence',
-      header: 'Adherence',
+      header: 'Effective Adherence',
       render: (row: TrainerPerformanceDto) => (
         <Pill
           tone={row.adherenceRate >= 80 ? 'success' : row.adherenceRate >= 60 ? 'warning' : 'danger'}
@@ -66,6 +73,21 @@ export const TrainerEvaluationEdaView: React.FC<TrainerEvaluationEdaViewProps> =
           {row.adherenceRate.toFixed(1)}%
         </Pill>
       ),
+    },
+    {
+      id: 'cancellationRate',
+      header: 'Cancellation Rate',
+      render: (row: TrainerPerformanceDto) => {
+        const rate = row.cancellationRate ?? 0;
+        return (
+          <Pill
+            tone={rate > 25 ? 'danger' : rate > 10 ? 'warning' : 'neutral'}
+            size="sm"
+          >
+            {rate.toFixed(1)}%
+          </Pill>
+        );
+      },
     },
     {
       id: 'rating',
@@ -109,11 +131,18 @@ export const TrainerEvaluationEdaView: React.FC<TrainerEvaluationEdaViewProps> =
   return (
     <div className="space-y-4">
       {/* Top Metrics Row */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         <Panel padded className="space-y-1">
-          <span className="text-xs text-[var(--color-text-muted)]">Overall Workout Adherence</span>
+          <span className="text-xs text-[var(--color-text-muted)]">Effective Adherence</span>
           <div className="text-2xl font-bold text-[var(--color-text-primary)]">
             {data.overallAdherenceRate.toFixed(1)}%
+          </div>
+        </Panel>
+
+        <Panel padded className="space-y-1">
+          <span className="text-xs text-[var(--color-text-muted)]">Overall Cancellation Rate</span>
+          <div className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {(data.overallCancellationRate ?? 0).toFixed(1)}%
           </div>
         </Panel>
 

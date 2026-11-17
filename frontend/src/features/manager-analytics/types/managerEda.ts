@@ -32,6 +32,7 @@ export interface TrainerPerformanceDto {
   heldWorkouts: number;
   cancelledWorkouts: number;
   adherenceRate: number;
+  cancellationRate: number;
   averageRating: number;
   averageSpeedKmh: number;
   averageRecoveryHeartRate: number;
@@ -41,6 +42,7 @@ export interface TrainerPerformanceDto {
 
 export interface TrainerEvaluationEdaDto {
   overallAdherenceRate: number;
+  overallCancellationRate: number;
   totalWorkoutsScheduled: number;
   totalWorkoutsCompleted: number;
   trainers: TrainerPerformanceDto[];
