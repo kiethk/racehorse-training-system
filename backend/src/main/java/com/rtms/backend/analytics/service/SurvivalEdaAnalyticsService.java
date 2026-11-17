@@ -1,16 +1,14 @@
-package com.rtms.backend.medical.analytics.service;
+package com.rtms.backend.analytics.service;
 
-import com.rtms.backend.medical.analytics.dto.SurvivalEdaResponse;
-import com.rtms.backend.medical.analytics.dto.SurvivalEdaResponse.SurvivalStratumDto;
-import com.rtms.backend.medical.analytics.util.KaplanMeierCalculator;
-import com.rtms.backend.medical.analytics.util.KaplanMeierCalculator.KmAnalysisResult;
-import com.rtms.backend.medical.analytics.util.KaplanMeierCalculator.SurvivalObservation;
+import com.rtms.backend.analytics.dto.SurvivalEdaResponse;
+import com.rtms.backend.analytics.dto.SurvivalEdaResponse.SurvivalStratumDto;
+import com.rtms.backend.analytics.util.KaplanMeierCalculator;
+import com.rtms.backend.analytics.util.KaplanMeierCalculator.KmAnalysisResult;
+import com.rtms.backend.analytics.util.KaplanMeierCalculator.SurvivalObservation;
 import com.rtms.backend.medical.entity.HorseBodyRegion;
 import com.rtms.backend.medical.entity.InjuryRecord;
-import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.repository.HorseBodyRegionRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
-import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,16 +21,13 @@ import java.util.stream.Collectors;
 public class SurvivalEdaAnalyticsService {
 
     private final InjuryRecordRepository injuryRecordRepository;
-    private final TreatmentPlanRepository treatmentPlanRepository;
     private final HorseBodyRegionRepository bodyRegionRepository;
 
     public SurvivalEdaAnalyticsService(
             InjuryRecordRepository injuryRecordRepository,
-            TreatmentPlanRepository treatmentPlanRepository,
             HorseBodyRegionRepository bodyRegionRepository
     ) {
         this.injuryRecordRepository = injuryRecordRepository;
-        this.treatmentPlanRepository = treatmentPlanRepository;
         this.bodyRegionRepository = bodyRegionRepository;
     }
 
@@ -40,7 +35,7 @@ public class SurvivalEdaAnalyticsService {
     public SurvivalEdaResponse getSurvivalAnalytics(String stratifyBy) {
         String normalizedStratify = (stratifyBy != null && stratifyBy.equalsIgnoreCase("BODY_ZONE"))
                 ? "BODY_ZONE"
-                : "TREATMENT_PLAN";
+                : "SEVERITY";
 
         List<InjuryRecord> injuries = injuryRecordRepository.findAll();
         if (injuries.isEmpty()) {
@@ -67,20 +62,32 @@ public class SurvivalEdaAnalyticsService {
                 strataMap.computeIfAbsent(stratumName, k -> new ArrayList<>()).add(obs);
             }
         } else {
-            // TREATMENT_PLAN: exclude CANCELLED plans to associate effective interventions
-            Map<Long, List<TreatmentPlan>> plansByRecord = treatmentPlanRepository.findAll().stream()
-                    .filter(tp -> !"CANCELLED".equalsIgnoreCase(tp.getStatus()))
-                    .collect(Collectors.groupingBy(TreatmentPlan::getHealthRecordId));
+            // SEVERITY: Clinical ordering (Mild -> Moderate -> Severe -> Unspecified)
+            List<String> canonicalOrder = List.of("Mild Severity", "Moderate Severity", "Severe", "Unspecified Severity");
+            for (String label : canonicalOrder) {
+                strataMap.put(label, new ArrayList<>());
+            }
 
             for (InjuryRecord inj : injuries) {
-                List<TreatmentPlan> plans = plansByRecord.get(inj.getHealthRecordId());
-                String stratumName = (plans != null && !plans.isEmpty() && plans.get(0).getTreatmentName() != null)
-                        ? plans.get(0).getTreatmentName()
-                        : "Standard Rest & Care";
+                String rawSeverity = inj.getSeverity();
+                String stratumName;
+                if (rawSeverity != null) {
+                    switch (rawSeverity.trim().toUpperCase()) {
+                        case "MILD" -> stratumName = "Mild Severity";
+                        case "MODERATE" -> stratumName = "Moderate Severity";
+                        case "SEVERE" -> stratumName = "Severe";
+                        default -> stratumName = "Unspecified Severity";
+                    }
+                } else {
+                    stratumName = "Unspecified Severity";
+                }
 
                 SurvivalObservation obs = toObservation(inj);
-                strataMap.computeIfAbsent(stratumName, k -> new ArrayList<>()).add(obs);
+                strataMap.get(stratumName).add(obs);
             }
+
+            // Remove any predefined stratum that has no cases
+            strataMap.entrySet().removeIf(e -> e.getValue().isEmpty());
         }
 
         List<SurvivalStratumDto> strata = new ArrayList<>();

@@ -1,15 +1,15 @@
-package com.rtms.backend.medical.analytics.service;
+package com.rtms.backend.analytics.service;
 
+import com.rtms.backend.analytics.dto.BioSpcSeriesResponse;
+import com.rtms.backend.analytics.dto.BioSpcSeriesResponse.BioSpcPointDto;
+import com.rtms.backend.analytics.util.BioSpcCalculator;
+import com.rtms.backend.analytics.util.BioSpcCalculator.RawPoint;
+import com.rtms.backend.analytics.util.BioSpcCalculator.SpcAnalysisResult;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
-import com.rtms.backend.medical.analytics.dto.BioSpcSeriesResponse;
-import com.rtms.backend.medical.analytics.dto.BioSpcSeriesResponse.BioSpcPointDto;
-import com.rtms.backend.medical.analytics.util.BioSpcCalculator;
-import com.rtms.backend.medical.analytics.util.BioSpcCalculator.RawPoint;
-import com.rtms.backend.medical.analytics.util.BioSpcCalculator.SpcAnalysisResult;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.entity.Notification;

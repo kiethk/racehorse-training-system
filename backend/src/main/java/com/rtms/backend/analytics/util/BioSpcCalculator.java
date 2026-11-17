@@ -1,6 +1,6 @@
-package com.rtms.backend.medical.analytics.util;
+package com.rtms.backend.analytics.util;
 
-import com.rtms.backend.medical.analytics.dto.BioSpcSeriesResponse.BioSpcPointDto;
+import com.rtms.backend.analytics.dto.BioSpcSeriesResponse.BioSpcPointDto;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

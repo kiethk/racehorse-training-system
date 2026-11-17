@@ -1,13 +1,11 @@
-package com.rtms.backend.medical.analytics.service;
+package com.rtms.backend.analytics.service;
 
-import com.rtms.backend.medical.analytics.dto.SurvivalEdaResponse;
-import com.rtms.backend.medical.analytics.dto.SurvivalEdaResponse.SurvivalStratumDto;
+import com.rtms.backend.analytics.dto.SurvivalEdaResponse;
+import com.rtms.backend.analytics.dto.SurvivalEdaResponse.SurvivalStratumDto;
 import com.rtms.backend.medical.entity.HorseBodyRegion;
 import com.rtms.backend.medical.entity.InjuryRecord;
-import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.repository.HorseBodyRegionRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
-import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,9 +26,6 @@ class SurvivalEdaAnalyticsServiceTest {
     private InjuryRecordRepository injuryRecordRepository;
 
     @Mock
-    private TreatmentPlanRepository treatmentPlanRepository;
-
-    @Mock
     private HorseBodyRegionRepository bodyRegionRepository;
 
     private SurvivalEdaAnalyticsService service;
@@ -39,71 +34,59 @@ class SurvivalEdaAnalyticsServiceTest {
     void setUp() {
         service = new SurvivalEdaAnalyticsService(
                 injuryRecordRepository,
-                treatmentPlanRepository,
                 bodyRegionRepository
         );
     }
 
     @Test
-    @DisplayName("getSurvivalAnalytics stratified by TREATMENT_PLAN")
-    void testSurvivalByTreatmentPlan() {
+    @DisplayName("getSurvivalAnalytics stratified by SEVERITY in clinical order (Mild -> Moderate -> Severe)")
+    void testSurvivalBySeverity() {
         LocalDateTime baseTime = LocalDateTime.now().minusDays(30);
 
         InjuryRecord inj1 = new InjuryRecord();
         inj1.setId(1L);
-        inj1.setHealthRecordId(101L);
+        inj1.setSeverity("MILD");
         inj1.setCreatedAt(baseTime);
-        inj1.setRecoveredAt(baseTime.plusDays(10));
+        inj1.setRecoveredAt(baseTime.plusDays(7));
         inj1.setStatus("RESOLVED");
 
         InjuryRecord inj2 = new InjuryRecord();
         inj2.setId(2L);
-        inj2.setHealthRecordId(101L);
+        inj2.setSeverity("MODERATE");
         inj2.setCreatedAt(baseTime);
         inj2.setRecoveredAt(null); // censored
         inj2.setStatus("ACTIVE");
 
         InjuryRecord inj3 = new InjuryRecord();
         inj3.setId(3L);
-        inj3.setHealthRecordId(102L);
+        inj3.setSeverity("SEVERE");
         inj3.setCreatedAt(baseTime);
-        inj3.setRecoveredAt(baseTime.plusDays(20));
+        inj3.setRecoveredAt(baseTime.plusDays(25));
         inj3.setStatus("RECOVERED");
 
         when(injuryRecordRepository.findAll()).thenReturn(List.of(inj1, inj2, inj3));
 
-        TreatmentPlan tp1 = new TreatmentPlan();
-        tp1.setId(501L);
-        tp1.setHealthRecordId(101L);
-        tp1.setTreatmentName("Hydrotherapy Protocol");
-
-        TreatmentPlan tp2 = new TreatmentPlan();
-        tp2.setId(502L);
-        tp2.setHealthRecordId(102L);
-        tp2.setTreatmentName("Laser & Cryotherapy");
-
-        when(treatmentPlanRepository.findAll()).thenReturn(List.of(tp1, tp2));
-
-        SurvivalEdaResponse res = service.getSurvivalAnalytics("TREATMENT_PLAN");
+        SurvivalEdaResponse res = service.getSurvivalAnalytics("SEVERITY");
 
         assertNotNull(res);
-        assertEquals("TREATMENT_PLAN", res.stratifyBy());
-        assertEquals(2, res.strata().size());
+        assertEquals("SEVERITY", res.stratifyBy());
+        assertEquals(3, res.strata().size());
 
-        SurvivalStratumDto stratum1 = res.strata().stream()
-                .filter(s -> s.stratumName().equals("Hydrotherapy Protocol"))
-                .findFirst().orElseThrow();
-        assertEquals(2, stratum1.totalCases());
-        assertEquals(1, stratum1.recoveredCount());
-        assertEquals(1, stratum1.censoredCount());
-        assertFalse(stratum1.steps().isEmpty());
+        // Verify clinical order
+        assertEquals("Mild Severity", res.strata().get(0).stratumName());
+        assertEquals(1, res.strata().get(0).totalCases());
+        assertEquals(1, res.strata().get(0).recoveredCount());
+        assertEquals(0, res.strata().get(0).censoredCount());
 
-        SurvivalStratumDto stratum2 = res.strata().stream()
-                .filter(s -> s.stratumName().equals("Laser & Cryotherapy"))
-                .findFirst().orElseThrow();
-        assertEquals(1, stratum2.totalCases());
-        assertEquals(1, stratum2.recoveredCount());
-        assertEquals(0, stratum2.censoredCount());
+        assertEquals("Moderate Severity", res.strata().get(1).stratumName());
+        assertEquals(1, res.strata().get(1).totalCases());
+        assertEquals(0, res.strata().get(1).recoveredCount());
+        assertEquals(1, res.strata().get(1).censoredCount());
+
+        assertEquals("Severe", res.strata().get(2).stratumName());
+        assertEquals(1, res.strata().get(2).totalCases());
+        assertEquals(1, res.strata().get(2).recoveredCount());
+        assertEquals(0, res.strata().get(2).censoredCount());
     }
 
     @Test
@@ -152,44 +135,37 @@ class SurvivalEdaAnalyticsServiceTest {
     void testEmptyInjuries() {
         when(injuryRecordRepository.findAll()).thenReturn(List.of());
 
-        SurvivalEdaResponse res = service.getSurvivalAnalytics("TREATMENT_PLAN");
+        SurvivalEdaResponse res = service.getSurvivalAnalytics("SEVERITY");
 
         assertNotNull(res);
         assertTrue(res.strata().isEmpty());
     }
 
     @Test
-    @DisplayName("Cancelled treatment plans are excluded in favor of active treatment plans")
-    void testCancelledTreatmentPlansExcluded() {
+    @DisplayName("Null or unknown severity values fall back to Unspecified Severity stratum")
+    void testNullAndUnknownSeverityFallback() {
         LocalDateTime baseTime = LocalDateTime.now().minusDays(20);
 
-        InjuryRecord inj = new InjuryRecord();
-        inj.setId(10L);
-        inj.setHealthRecordId(200L);
-        inj.setCreatedAt(baseTime);
-        inj.setStatus("ACTIVE");
+        InjuryRecord inj1 = new InjuryRecord();
+        inj1.setId(10L);
+        inj1.setSeverity(null);
+        inj1.setCreatedAt(baseTime);
+        inj1.setStatus("ACTIVE");
 
-        when(injuryRecordRepository.findAll()).thenReturn(List.of(inj));
+        InjuryRecord inj2 = new InjuryRecord();
+        inj2.setId(11L);
+        inj2.setSeverity("UNKNOWN_GRADE");
+        inj2.setCreatedAt(baseTime);
+        inj2.setStatus("ACTIVE");
 
-        TreatmentPlan tpCancelled = new TreatmentPlan();
-        tpCancelled.setId(901L);
-        tpCancelled.setHealthRecordId(200L);
-        tpCancelled.setTreatmentName("Cancelled Old Plan");
-        tpCancelled.setStatus("CANCELLED");
+        when(injuryRecordRepository.findAll()).thenReturn(List.of(inj1, inj2));
 
-        TreatmentPlan tpActive = new TreatmentPlan();
-        tpActive.setId(902L);
-        tpActive.setHealthRecordId(200L);
-        tpActive.setTreatmentName("Acupuncture & Shockwave");
-        tpActive.setStatus("ACTIVE");
-
-        when(treatmentPlanRepository.findAll()).thenReturn(List.of(tpCancelled, tpActive));
-
-        SurvivalEdaResponse res = service.getSurvivalAnalytics("TREATMENT_PLAN");
+        SurvivalEdaResponse res = service.getSurvivalAnalytics("SEVERITY");
 
         assertNotNull(res);
         assertEquals(1, res.strata().size());
-        assertEquals("Acupuncture & Shockwave", res.strata().get(0).stratumName());
+        assertEquals("Unspecified Severity", res.strata().get(0).stratumName());
+        assertEquals(2, res.strata().get(0).totalCases());
     }
 
     @Test
@@ -200,7 +176,7 @@ class SurvivalEdaAnalyticsServiceTest {
 
         InjuryRecord inj = new InjuryRecord();
         inj.setId(15L);
-        inj.setHealthRecordId(300L);
+        inj.setSeverity("MILD");
         inj.setDiagnosedAt(diagnosed);
         inj.setRecoveredAt(null); // null recoveredAt
         inj.setStatus("RESOLVED");
@@ -215,9 +191,8 @@ class SurvivalEdaAnalyticsServiceTest {
         }
 
         when(injuryRecordRepository.findAll()).thenReturn(List.of(inj));
-        when(treatmentPlanRepository.findAll()).thenReturn(List.of());
 
-        SurvivalEdaResponse res = service.getSurvivalAnalytics("TREATMENT_PLAN");
+        SurvivalEdaResponse res = service.getSurvivalAnalytics("SEVERITY");
 
         assertNotNull(res);
         assertEquals(1, res.strata().size());

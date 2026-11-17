@@ -1,8 +1,8 @@
-package com.rtms.backend.medical.analytics.util;
+package com.rtms.backend.analytics.util;
 
-import com.rtms.backend.medical.analytics.dto.BioSpcSeriesResponse.BioSpcPointDto;
-import com.rtms.backend.medical.analytics.util.BioSpcCalculator.RawPoint;
-import com.rtms.backend.medical.analytics.util.BioSpcCalculator.SpcAnalysisResult;
+import com.rtms.backend.analytics.dto.BioSpcSeriesResponse.BioSpcPointDto;
+import com.rtms.backend.analytics.util.BioSpcCalculator.RawPoint;
+import com.rtms.backend.analytics.util.BioSpcCalculator.SpcAnalysisResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

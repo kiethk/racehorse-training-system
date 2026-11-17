@@ -1,4 +1,4 @@
-package com.rtms.backend.medical.analytics.dto;
+package com.rtms.backend.analytics.dto;
 
 import java.util.List;
 

@@ -4,11 +4,11 @@ import type { SurvivalEdaResponse } from '../../types/medicalEda.ts';
 
 describe('KaplanMeierSurvivalChart Logic Tests', () => {
   const mockSurvivalData: SurvivalEdaResponse = {
-    stratifyBy: 'TREATMENT_PLAN',
+    stratifyBy: 'SEVERITY',
     strata: [
       {
         stratumId: 1,
-        stratumName: 'Hydrotherapy & Soft Rest',
+        stratumName: 'Mild Severity',
         totalCases: 10,
         recoveredCount: 7,
         censoredCount: 3,
@@ -22,7 +22,7 @@ describe('KaplanMeierSurvivalChart Logic Tests', () => {
       },
       {
         stratumId: 2,
-        stratumName: 'Corticosteroid & Cryotherapy',
+        stratumName: 'Moderate Severity',
         totalCases: 8,
         recoveredCount: 4,
         censoredCount: 4,
@@ -89,14 +89,22 @@ describe('KaplanMeierSurvivalChart Logic Tests', () => {
     assert.equal(rows[5].stratum_2, 50);
   });
 
-  it('verifies dropdown options support TREATMENT_PLAN and BODY_ZONE', () => {
+  it('verifies dropdown options support SEVERITY and BODY_ZONE', () => {
     const options = [
-      { value: 'TREATMENT_PLAN', label: 'Compare by Treatment Plan' },
+      { value: 'SEVERITY', label: 'Compare by Severity' },
       { value: 'BODY_ZONE', label: 'Compare by Body Zone' },
     ];
     assert.equal(options.length, 2);
-    assert.equal(options[0].label, 'Compare by Treatment Plan');
+    assert.equal(options[0].label, 'Compare by Severity');
     assert.equal(options[1].label, 'Compare by Body Zone');
+  });
+
+  it('correctly maps stratum table header label based on stratifyBy', () => {
+    const getHeaderLabel = (stratifyBy: 'SEVERITY' | 'BODY_ZONE') =>
+      stratifyBy === 'SEVERITY' ? 'Injury Severity' : 'Body Zone';
+
+    assert.equal(getHeaderLabel('SEVERITY'), 'Injury Severity');
+    assert.equal(getHeaderLabel('BODY_ZONE'), 'Body Zone');
   });
 
   it('extends timeline to at least 10 days domain when all events occur early', () => {

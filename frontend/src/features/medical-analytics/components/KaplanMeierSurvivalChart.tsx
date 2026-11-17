@@ -34,7 +34,7 @@ const STRATUM_COLORS = [
 ];
 
 export const KaplanMeierSurvivalChart: React.FC = () => {
-  const [stratifyBy, setStratifyBy] = useState<SurvivalStratifyBy>('TREATMENT_PLAN');
+  const [stratifyBy, setStratifyBy] = useState<SurvivalStratifyBy>('SEVERITY');
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<SurvivalEdaResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +109,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div>
           <h3 className="text-base font-bold text-[var(--color-text-primary)]">
-            Injury Recovery Timeline by Treatment
+            Injury Recovery Timeline (Kaplan-Meier)
           </h3>
           <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
             Time required for horses to recover and return to full training.
@@ -123,7 +123,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
             value={stratifyBy}
             onChange={(e) => setStratifyBy(e.target.value as SurvivalStratifyBy)}
           >
-            <option value="TREATMENT_PLAN">Compare by Treatment Plan</option>
+            <option value="SEVERITY">Compare by Severity</option>
             <option value="BODY_ZONE">Compare by Body Zone</option>
           </Select>
         </FormField>
@@ -258,7 +258,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
           <Table className="text-xs">
             <THead>
               <Tr>
-                <Th className="px-3 py-2">{stratifyBy === 'TREATMENT_PLAN' ? 'Treatment Plan' : 'Body Zone'}</Th>
+                <Th className="px-3 py-2">{stratifyBy === 'SEVERITY' ? 'Injury Severity' : 'Body Zone'}</Th>
                 <Th className="px-3 py-2 text-right">Cases Under Care</Th>
                 <Th className="px-3 py-2 text-right">Recovered</Th>
                 <Th className="px-3 py-2 text-right">Still Recovering</Th>
