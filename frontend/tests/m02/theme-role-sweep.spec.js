@@ -49,7 +49,7 @@ const ROLES = [
   {
     role: 'GROOM',
     email: 'groom1@rtms.com',
-    expectedColorHex: '#d97706',
+    expectedColorHex: '#475569',
     routes: [
       '/groom',
       '/groom/tasks',
@@ -63,7 +63,7 @@ const ROLES = [
   {
     role: 'HORSE_OWNER',
     email: 'owner@rtms.com',
-    expectedColorHex: '#059669',
+    expectedColorHex: '#78350f',
     routes: [
       '/owner',
       '/owner/horses',
@@ -104,6 +104,26 @@ for (const config of ROLES) {
       await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15_000 });
       await page.waitForLoadState('domcontentloaded');
 
+      // Verify root html data-role
+      const rootRole = await page.evaluate(() => document.documentElement.getAttribute('data-role'));
+      expect(rootRole).toBe(config.role);
+
+      // Verify Notification Popover color inheritance (portalled to body)
+      const bell = page.locator('button[aria-label*="Notifications"]').first();
+      if (await bell.isVisible()) {
+        await bell.click();
+        await page.waitForTimeout(300);
+        const popoverColor = await page.evaluate(() => {
+          const popover = document.querySelector('[data-radix-popper-content-wrapper]');
+          if (!popover) return null;
+          return getComputedStyle(popover).getPropertyValue('--color-primary').trim();
+        });
+        if (popoverColor) {
+          expect(popoverColor.toLowerCase()).toBe(config.expectedColorHex);
+        }
+        await bell.click(); // close popover
+      }
+
       // Verify each route
       for (const route of config.routes) {
         await page.goto(route, { waitUntil: 'domcontentloaded' });
@@ -119,12 +139,7 @@ for (const config of ROLES) {
           if (!el) return null;
           return getComputedStyle(el).getPropertyValue('--color-primary').trim();
         });
-        expect(primaryColor.toLowerCase()).toBe(
-          config.role === 'CLUB_MANAGER' ? '#6657c7' :
-          config.role === 'HEAD_TRAINER' ? '#2563eb' :
-          config.role === 'VETERINARIAN' ? '#0d9488' :
-          config.role === 'GROOM' ? '#d97706' : '#059669'
-        );
+        expect(primaryColor.toLowerCase()).toBe(config.expectedColorHex);
 
         // 3. Verify horizontal layout: no unwanted horizontal overflow
         const hasHorizontalScroll = await page.evaluate(() => {

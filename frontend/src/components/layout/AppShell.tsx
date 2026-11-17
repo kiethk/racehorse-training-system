@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -19,6 +19,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
   const { collapsed, canToggle, toggle } = useSidebarState();
+
+  useEffect(() => {
+    if (user?.role) {
+      document.documentElement.setAttribute('data-role', user.role);
+    }
+    return () => {
+      document.documentElement.removeAttribute('data-role');
+    };
+  }, [user?.role]);
 
   if (!user) return null;
 
