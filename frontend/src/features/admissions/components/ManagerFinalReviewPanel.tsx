@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ApiError } from '@/services/api';
 import { admissionsApi } from '../services/api';
 import type { AdmissionDetailResponse } from '../types';
-import { Button, Checkbox, ConfirmDialog, FormField, Notice, Select, Textarea } from '@/components/ui';
+import { Button, ConfirmDialog, FormField, Notice, Textarea } from '@/components/ui';
 import { toast } from '@/lib/toast';
 import { canApproveAdmission } from '../shared/lib/capacity';
 
@@ -15,15 +15,12 @@ interface Props {
 
 export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
   const [actionMode, setActionMode] = useState<'INITIAL' | 'APPROVE' | 'REJECT'>('INITIAL');
-  const [stallMode, setStallMode] = useState<'auto' | 'manual'>('auto');
-  const [stallId, setStallId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
   
   const [confirmDecision, setConfirmDecision] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const availableStalls = detailData.availableRegularStalls || [];
   const capacity = detailData.capacity;
   const approvalCapacityAvailable = canApproveAdmission(capacity);
 
@@ -31,10 +28,6 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
     setError(null);
     if (decision === 'REJECTED' && !feedback.trim()) {
       setError('Feedback is required to reject an application.');
-      return;
-    }
-    if (decision === 'APPROVED' && stallMode === 'manual' && !stallId) {
-      setError('Please select a stall or switch to automatic assignment.');
       return;
     }
     setConfirmDecision(decision);
@@ -47,12 +40,9 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
       await admissionsApi.managerReview(detailData.admissionId, {
         decision: confirmDecision!,
         feedback: feedback.trim() || undefined,
-        stallId: confirmDecision === 'APPROVED' && stallMode === 'manual' ? stallId : null,
       });
       setConfirmDecision(null);
       setFeedback('');
-      setStallId(null);
-      setStallMode('auto');
       setActionMode('INITIAL');
       toast.success(confirmDecision === 'APPROVED' ? 'Admission approved' : 'Admission rejected',
         confirmDecision === 'APPROVED'
@@ -78,8 +68,6 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
   
   const cancelAction = () => {
     setActionMode('INITIAL');
-    setStallMode('auto');
-    setStallId(null);
     setFeedback('');
     setError(null);
   };
@@ -114,39 +102,12 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
 
         {actionMode === 'APPROVE' && (
           <div className="space-y-4">
-            <fieldset className="space-y-2">
-              <legend className="text-xs font-medium text-[var(--color-text-primary)]">Stall assignment</legend>
-              <Checkbox
-                type="radio"
-                name="stallMode"
-                label="Automatic assignment"
-                checked={stallMode === 'auto'}
-                onChange={() => setStallMode('auto')}
-              />
-              <Checkbox
-                type="radio"
-                name="stallMode"
-                label="Manual selection"
-                checked={stallMode === 'manual'}
-                onChange={() => setStallMode('manual')}
-                disabled={availableStalls.length === 0}
-              />
-            </fieldset>
-
-            {stallMode === 'manual' && (
-              availableStalls.length > 0 ? (
-                <FormField label="Regular stall" required>
-                  <Select value={stallId || ''} onChange={(e) => setStallId(Number(e.target.value))}>
-                    <option value="" disabled>Select a stall...</option>
-                    {availableStalls.map(stall => (
-                      <option key={stall.id} value={stall.id}>Stall {stall.stallCode}</option>
-                    ))}
-                  </Select>
-                </FormField>
-              ) : (
-                <Notice tone="error">No regular stalls available. Cannot approve in manual mode.</Notice>
-              )
-            )}
+            <div className="p-3 rounded border border-[var(--color-border)] bg-[var(--color-surface-hover)]/40 text-xs space-y-1">
+              <div className="font-semibold text-[var(--color-text-primary)]">Stall assignment: Automatic</div>
+              <p className="text-[var(--color-text-muted)]">
+                The horse will be automatically assigned to the fairest available regular stall with an active groom.
+              </p>
+            </div>
 
             <FormField label="Feedback (optional)">
               <Textarea
@@ -161,7 +122,7 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
               <Button variant="secondary" onClick={cancelAction} disabled={submitting}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={() => handleActionClick('APPROVED')} disabled={submitting || !approvalCapacityAvailable || (stallMode === 'manual' && (!stallId || availableStalls.length === 0))}>
+              <Button variant="primary" onClick={() => handleActionClick('APPROVED')} disabled={submitting || !approvalCapacityAvailable}>
                 Confirm Approve
               </Button>
             </div>
@@ -197,7 +158,7 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
       <ConfirmDialog
         open={confirmDecision === 'APPROVED'}
         title="Approve Admission?"
-        description="The candidate will become ELIGIBLE, the quarantine stall will be released, and the regular stall will be occupied."
+        description="The candidate will become ELIGIBLE, the quarantine stall will be released, and a regular stall will be automatically assigned."
         confirmLabel="Approve"
         tone="primary"
         loading={submitting}

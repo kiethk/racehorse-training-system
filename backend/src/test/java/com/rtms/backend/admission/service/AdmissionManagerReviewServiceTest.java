@@ -128,11 +128,11 @@ class AdmissionManagerReviewServiceTest {
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        AdmissionApplication result = service.review(1L, 5L, approveRequest(20L));
+        AdmissionApplication result = service.review(1L, 5L, approveRequest(null));
 
         assertEquals(AdmissionStatus.APPROVED, result.getStatus());
         assertEquals(ReviewDecision.APPROVED, result.getManagerDecision());
@@ -431,10 +431,10 @@ class AdmissionManagerReviewServiceTest {
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.empty());
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.empty());
 
         var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> service.review(1L, 5L, approveRequest(20L)));
+                () -> service.review(1L, 5L, approveRequest(null)));
         assertEquals(409, error.getStatusCode().value());
 
         verify(admissionApplicationRepository, never()).save(any());
@@ -498,10 +498,10 @@ class AdmissionManagerReviewServiceTest {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.countAvailableRegularStalls()).thenReturn(1L);
         when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L);
-        when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.of(regularStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        AdmissionApplication result = service.review(1L, 5L, approveRequest(20L));
+        AdmissionApplication result = service.review(1L, 5L, approveRequest(null));
 
         assertEquals(AdmissionStatus.APPROVED, result.getStatus());
         // findById for Q stall must never be called
@@ -570,11 +570,11 @@ class AdmissionManagerReviewServiceTest {
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        AdmissionApplication result = service.review(1L, 5L, approveRequest(20L));
+        AdmissionApplication result = service.review(1L, 5L, approveRequest(null));
 
         assertEquals(AdmissionStatus.APPROVED, result.getStatus());
         assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());

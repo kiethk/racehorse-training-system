@@ -137,19 +137,31 @@ export function AccessControlView() {
   const handleSave = async () => {
     if (dirtyRoles.length === 0) return;
     
+    // Client-side pre-validation: check for privilege escalation or lockout before calling API
+    for (const role of dirtyRoles) {
+      const perms = dirtyMatrix[role.roleId] || [];
+      if (role.roleName === 'CLUB_MANAGER' && !perms.includes('USER_MANAGE')) {
+        setSaveError('CLUB_MANAGER must retain USER_MANAGE permission to prevent lock-out.');
+        return;
+      }
+      if (role.roleName !== 'CLUB_MANAGER' && perms.includes('USER_MANAGE')) {
+        setSaveError(`Only CLUB_MANAGER role is permitted to hold USER_MANAGE permission. Cannot assign to ${role.roleName}.`);
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setSaveError(null);
       setSaveSuccess(false);
       
-      // Save all dirty roles in parallel
-      await Promise.all(
-        dirtyRoles.map(role => 
-          accessControlService.updateRolePermissions(role.roleId, {
-            permissionCodes: dirtyMatrix[role.roleId]
-          })
-        )
-      );
+      // Save all dirty roles atomically in a single transactional request
+      const payload = dirtyRoles.map(role => ({
+        roleId: role.roleId,
+        permissionCodes: dirtyMatrix[role.roleId] || []
+      }));
+
+      await accessControlService.updateBulkRolePermissions(payload);
       
       // Refresh to get true original state
       await fetchData();

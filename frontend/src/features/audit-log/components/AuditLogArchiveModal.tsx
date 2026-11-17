@@ -21,15 +21,11 @@ type ArchivePreset = '30_days' | '60_days' | 'custom';
 type Step = 'config' | 'confirm';
 
 function parseLocalDateStart(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
-  return date.toISOString();
+  return `${dateStr}T00:00:00`;
 }
 
 function parseLocalDateEnd(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d, 23, 59, 59, 999);
-  return date.toISOString();
+  return `${dateStr}T23:59:59`;
 }
 
 export function AuditLogArchiveModal({

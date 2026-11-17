@@ -440,8 +440,19 @@ abstract class DemoSeedWorkflow {
                     at(date(p,"approvedDate"),14,0);
                     ManagerReviewRequest decision=new ManagerReviewRequest(); decision.setDecision(ReviewDecision.APPROVED);
                     decision.setFeedback("DEMO: dossier, intake examination and trainer assessment reviewed; admitted to regular stable.");
-                    decision.setStallId(stalls.findAll().stream().filter(s -> text(p,"stallCode").equals(s.getStallCode())).findFirst().orElseThrow().getId());
                     managers.review(id,1L,decision);
+                    Long targetStallId = stalls.findAll().stream().filter(s -> text(p,"stallCode").equals(s.getStallCode())).findFirst().orElseThrow().getId();
+                    Horse h = horses.findById(adm.getHorseId()).orElseThrow();
+                    if (!targetStallId.equals(h.getCurrentStallId())) {
+                        StableStall oldStall = stalls.findById(h.getCurrentStallId()).orElseThrow();
+                        oldStall.setStatus(StallStatus.AVAILABLE);
+                        stalls.save(oldStall);
+                        StableStall newStall = stalls.findById(targetStallId).orElseThrow();
+                        newStall.setStatus(StallStatus.OCCUPIED);
+                        stalls.save(newStall);
+                        h.setCurrentStallId(targetStallId);
+                        horses.save(h);
+                    }
                 }
                 return null;
             });

@@ -242,7 +242,18 @@ public class AuditLogService {
                 predicates.add(cb.equal(root.get("httpMethod"), finalMethod));
             }
             if (statusCode != null) {
-                predicates.add(cb.equal(root.get("statusCode"), statusCode));
+                if (statusCode == 200) {
+                    // Success bucket: 2xx (200..299) or null (default success for domain events)
+                    predicates.add(cb.or(
+                            cb.and(cb.greaterThanOrEqualTo(root.get("statusCode"), 200), cb.lessThan(root.get("statusCode"), 300)),
+                            cb.isNull(root.get("statusCode"))
+                    ));
+                } else if (statusCode == 400) {
+                    // Failed / Rejected bucket: 4xx client errors and 5xx server errors
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("statusCode"), 400));
+                } else {
+                    predicates.add(cb.equal(root.get("statusCode"), statusCode));
+                }
             }
             if (from != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from));

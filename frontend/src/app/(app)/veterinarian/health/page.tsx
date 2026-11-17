@@ -57,7 +57,7 @@ function HealthRecordsContent() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [page, setPage] = useState(0);
-  const pageSize = 20;
+  const pageSize = 10;
 
   const [selectedHorseId, setSelectedHorseId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);

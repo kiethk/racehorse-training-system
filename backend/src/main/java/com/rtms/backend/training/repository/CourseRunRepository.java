@@ -158,14 +158,21 @@ public interface CourseRunRepository extends JpaRepository<CourseRun, Long> {
            """)
     boolean existsHorseInTrainerArea(@Param("horseId") Long horseId, @Param("trainerId") Long trainerId);
 
-    /** Số chiến mã đang tập: có Workout còn hiệu lực trong một kế hoạch ACTIVE. (Horses in training: with an effective Workout in an ACTIVE course run.) */
+    /**
+     * Số chiến mã đang tập: chỉ đếm ngựa ELIGIBLE có training decision ALLOWED và còn Workout hiệu lực
+     * (chưa chạy xong, chưa hủy) trong một kế hoạch ACTIVE.
+     * (Horses in training: only ELIGIBLE horses with training decision ALLOWED and an active Workout not yet RAN or CANCELLED in an ACTIVE course run.)
+     */
     @Query("""
            SELECT COUNT(DISTINCT w.horseId)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN CourseRun p ON s.courseRunId = p.id
+           JOIN Horse h ON w.horseId = h.id
            WHERE p.status = com.rtms.backend.training.enums.CourseRunStatus.ACTIVE
-             AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+             AND h.currentStatus = com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE
+             AND h.trainingDecision = com.rtms.backend.training.enums.TrainingDecision.ALLOWED
+             AND w.status NOT IN (com.rtms.backend.training.enums.WorkoutStatus.RAN, com.rtms.backend.training.enums.WorkoutStatus.CANCELLED)
            """)
     long countHorsesInTraining();
 }

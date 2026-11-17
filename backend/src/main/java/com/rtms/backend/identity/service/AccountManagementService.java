@@ -202,6 +202,7 @@ public class AccountManagementService {
     public List<AccountSummaryResponse> getAllAccounts() {
         // Query grouped horse counts once to completely eliminate N+1 queries
         Map<Long, Long> horseCountsByOwner = new HashMap<>();
+        Map<Long, Long> activeHorseCountsByOwner = new HashMap<>();
         if (horseRepository != null) {
             List<Object[]> groupedCounts = horseRepository.countHorsesGroupedByOwner();
             if (groupedCounts != null) {
@@ -210,6 +211,16 @@ public class AccountManagementService {
                         Long ownerId = ((Number) row[0]).longValue();
                         Long count = ((Number) row[1]).longValue();
                         horseCountsByOwner.put(ownerId, count);
+                    }
+                }
+            }
+            List<Object[]> groupedActiveCounts = horseRepository.countActiveHorsesGroupedByOwner();
+            if (groupedActiveCounts != null) {
+                for (Object[] row : groupedActiveCounts) {
+                    if (row.length >= 2 && row[0] != null && row[1] != null) {
+                        Long ownerId = ((Number) row[0]).longValue();
+                        Long count = ((Number) row[1]).longValue();
+                        activeHorseCountsByOwner.put(ownerId, count);
                     }
                 }
             }
@@ -253,7 +264,7 @@ public class AccountManagementService {
         for (User user : allUsers) {
             if (user.getRole() == null) continue;
             AccountSummaryResponse summary = mapToAccountSummary(
-                    user, horseCountsByOwner, areaById, managedAreasByTrainer, stallsByGroom, userNameById
+                    user, horseCountsByOwner, activeHorseCountsByOwner, areaById, managedAreasByTrainer, stallsByGroom, userNameById
             );
             result.add(summary);
         }
@@ -452,11 +463,26 @@ public class AccountManagementService {
         }
 
         // Owner or Club Manager update
-        if (request.getFullName() != null && !request.getFullName().isBlank()) {
-            user.setFullName(request.getFullName().trim());
+        if (request.getFullName() != null) {
+            String trimmedName = request.getFullName().trim();
+            if (trimmedName.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Full name cannot be blank");
+            }
+            if (trimmedName.length() > 255) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Full name cannot exceed 255 characters");
+            }
+            user.setFullName(trimmedName);
         }
-        user.setPhone(clean(request.getPhone()));
-        user.setAddress(clean(request.getAddress()));
+        String cleanedPhone = clean(request.getPhone());
+        if (cleanedPhone != null && cleanedPhone.length() > 20) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone number cannot exceed 20 characters");
+        }
+        user.setPhone(cleanedPhone);
+        String cleanedAddress = clean(request.getAddress());
+        if (cleanedAddress != null && cleanedAddress.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Address cannot exceed 255 characters");
+        }
+        user.setAddress(cleanedAddress);
         userRepository.save(user);
 
         return getAccountDetail(userId);
@@ -499,9 +525,14 @@ public class AccountManagementService {
 
         // Fetch single owner count if owner
         Map<Long, Long> singleCountMap = new HashMap<>();
+        Map<Long, Long> activeCountMap = new HashMap<>();
         if (user.getRole() != null && "HORSE_OWNER".equals(user.getRole().getName())) {
-            long count = horseRepository.findByOwnerId(user.getId()).size();
-            singleCountMap.put(user.getId(), count);
+            List<Horse> horses = horseRepository.findByOwnerId(user.getId());
+            singleCountMap.put(user.getId(), (long) horses.size());
+            long activeCount = horses.stream()
+                    .filter(h -> h.getCurrentStallId() != null || h.getCurrentStatus() == HorseStatus.ELIGIBLE)
+                    .count();
+            activeCountMap.put(user.getId(), activeCount);
         }
 
         Map<Long, List<String>> managedAreasByTrainer = new HashMap<>();
@@ -512,7 +543,7 @@ public class AccountManagementService {
             }
         }
 
-        return mapToAccountSummary(user, singleCountMap, Collections.emptyMap(), managedAreasByTrainer, Collections.emptyMap(), Collections.emptyMap());
+        return mapToAccountSummary(user, singleCountMap, activeCountMap, Collections.emptyMap(), managedAreasByTrainer, Collections.emptyMap(), Collections.emptyMap());
     }
 
     private void validateDeactivationPrerequisites(User user, Long currentUserId, Long replacementTrainerId) {
@@ -709,12 +740,13 @@ public class AccountManagementService {
     }
 
     private AccountSummaryResponse mapToAccountSummary(User user, Map<Long, Long> horseCountsByOwner) {
-        return mapToAccountSummary(user, horseCountsByOwner, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+        return mapToAccountSummary(user, horseCountsByOwner, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
     }
 
     private AccountSummaryResponse mapToAccountSummary(
             User user,
             Map<Long, Long> horseCountsByOwner,
+            Map<Long, Long> activeHorseCountsByOwner,
             Map<Long, Area> areaById,
             Map<Long, List<String>> managedAreasByTrainer,
             Map<Long, List<StableStall>> stallsByGroom,
@@ -787,7 +819,9 @@ public class AccountManagementService {
                 }
                 case "HORSE_OWNER": {
                     long owned = horseCountsByOwner.getOrDefault(user.getId(), 0L);
+                    long active = activeHorseCountsByOwner.getOrDefault(user.getId(), 0L);
                     summary.setOwnedHorsesCount(owned);
+                    summary.setActiveHorsesCount(active);
                     summary.setProfileSummary(owned == 1 ? "1 horse owned" : owned + " horses owned");
                     break;
                 }

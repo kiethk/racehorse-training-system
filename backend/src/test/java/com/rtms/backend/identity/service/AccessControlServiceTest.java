@@ -215,4 +215,66 @@ class AccessControlServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
         assertTrue(ex.getMessage().contains("Only CLUB_MANAGER"));
     }
+
+    @Test
+    void testUpdateBulkRolePermissions_Success() {
+        Role mgr = new Role();
+        mgr.setId(1L);
+        mgr.setName("CLUB_MANAGER");
+
+        Role groom = new Role();
+        groom.setId(2L);
+        groom.setName("GROOM");
+
+        Permission userManage = new Permission();
+        userManage.setCode("USER_MANAGE");
+
+        Permission areaView = new Permission();
+        areaView.setCode("AREA_VIEW");
+
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mgr));
+        when(roleRepository.findById(2L)).thenReturn(Optional.of(groom));
+        when(permissionRepository.findByCodeIn(List.of("USER_MANAGE"))).thenReturn(List.of(userManage));
+        when(permissionRepository.findByCodeIn(List.of("AREA_VIEW"))).thenReturn(List.of(areaView));
+        when(roleRepository.save(any(Role.class))).thenAnswer(i -> i.getArgument(0));
+
+        var reqs = List.of(
+                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(1L, List.of("USER_MANAGE")),
+                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(2L, List.of("AREA_VIEW"))
+        );
+
+        List<AccessControlMatrixResponse.RolePermissionSummary> res = accessControlService.updateBulkRolePermissions(reqs);
+
+        assertEquals(2, res.size());
+        verify(roleRepository, times(2)).save(any(Role.class));
+    }
+
+    @Test
+    void testUpdateBulkRolePermissions_OneInvalidRollsBackEntireBatch() {
+        Role mgr = new Role();
+        mgr.setId(1L);
+        mgr.setName("CLUB_MANAGER");
+
+        Role groom = new Role();
+        groom.setId(2L);
+        groom.setName("GROOM");
+
+        Permission userManage = new Permission();
+        userManage.setCode("USER_MANAGE");
+
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(mgr));
+        when(roleRepository.findById(2L)).thenReturn(Optional.of(groom));
+        when(permissionRepository.findByCodeIn(List.of("USER_MANAGE"))).thenReturn(List.of(userManage));
+
+        // Groom illegally tries to get USER_MANAGE
+        var reqs = List.of(
+                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(1L, List.of("USER_MANAGE")),
+                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(2L, List.of("USER_MANAGE"))
+        );
+
+        ApiException ex = assertThrows(ApiException.class, () -> accessControlService.updateBulkRolePermissions(reqs));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertTrue(ex.getMessage().contains("Only CLUB_MANAGER"));
+        verify(roleRepository, never()).save(any(Role.class));
+    }
 }

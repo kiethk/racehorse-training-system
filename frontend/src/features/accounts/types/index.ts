@@ -11,6 +11,7 @@ export interface AccountSummary {
   createdAt: string;
   profileSummary?: string;
   ownedHorsesCount?: number;
+  activeHorsesCount?: number;
   assignmentStatus?: string;
   assignedAreaCode?: string | null;
   assignedAreaType?: 'REGULAR' | 'QUARANTINE' | null;

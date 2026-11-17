@@ -25,6 +25,6 @@ module.exports = defineConfig({
     timezoneId: 'Asia/Ho_Chi_Minh',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1440, height: 1000 } } },
   ],
 });

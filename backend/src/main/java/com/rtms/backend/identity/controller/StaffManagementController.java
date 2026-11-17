@@ -42,7 +42,7 @@ public class StaffManagementController {
     @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<StaffDetailResponse> updateStaff(
             @PathVariable Long id,
-            @RequestBody StaffUpdateRequest request) {
+            @Valid @RequestBody StaffUpdateRequest request) {
         return ApiResponse.success(staffManagementService.updateStaff(id, request));
     }
 

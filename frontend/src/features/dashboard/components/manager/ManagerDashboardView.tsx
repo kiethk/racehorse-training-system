@@ -104,7 +104,11 @@ export function ManagerDashboardView() {
             value={`${formatNumber(summary.stallSummary.occupancyRate, 1)}%`}
             icon="grid"
             tone={summary.stallSummary.occupancyRate >= 90 ? 'danger' : 'success'}
-            hint={`${summary.stallSummary.occupiedStalls}/${summary.stallSummary.totalStalls} stalls used (${summary.stallSummary.availableStalls} available)`}
+            hint={
+              summary.stallSummary.reservedStalls > 0
+                ? `${summary.stallSummary.occupiedStalls + summary.stallSummary.reservedStalls}/${summary.stallSummary.totalStalls} used (incl. ${summary.stallSummary.reservedStalls} reserved)`
+                : `${summary.stallSummary.occupiedStalls}/${summary.stallSummary.totalStalls} used (${summary.stallSummary.availableStalls} available)`
+            }
             className="min-h-24"
           />
 
