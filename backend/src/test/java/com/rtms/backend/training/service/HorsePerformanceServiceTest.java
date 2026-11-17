@@ -14,7 +14,6 @@ import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
-import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRunRepository;
@@ -175,13 +174,13 @@ class HorsePerformanceServiceTest {
     }
 
     @Test
-    @DisplayName("The schedule of a horse is read for the requested days, cancelled sessions included")
+    @DisplayName("The schedule of a horse is read for the requested days")
     void testGetHorseSchedule_ReturnsTheRequestedRange() {
         LocalDate from = LocalDate.of(2026, 10, 27);
         LocalDate to = LocalDate.of(2026, 11, 2);
         List<HorseScheduleItemResponse> rows = List.of(new HorseScheduleItemResponse(
                 7L, from, java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 0), "Gallop",
-                SessionStatus.SCHEDULED, WorkoutStatus.CANCELLED));
+                WorkoutStatus.SCHEDULED));
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 5L)));
         when(workoutRepository.findHorseSchedule(1L, from, to)).thenReturn(rows);
 

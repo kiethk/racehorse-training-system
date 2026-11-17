@@ -33,11 +33,11 @@ The state of a Held Workout once its results are recorded; the recorded results 
 _Avoid_: Attended, present, completed
 
 **Cancel**:
-Withdrawing a Session, one horse's Workout, or a whole Course Run before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone.
+Withdrawing a Session, one horse's Workout, or a whole Course Run before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone. A cancelled Workout is not shown anywhere: not among a Session's horses, not on the horse's own calendar, and a horse with no Workout left in a Course Run is not listed in it.
 _Avoid_: Skip, postpone
 
 **Did not run**:
-A mark set on a Held Workout whose horse did not actually take part; the Workout becomes cancelled. No reason is given: a horse unfit to train is blocked by the Vet instead.
+A mark set on a Held Workout whose horse did not actually take part; the Workout becomes cancelled. No reason is given: a horse unfit to train is blocked by the Vet instead. Once marked, the horse disappears from that Session like any other cancelled Workout, and nothing tells it apart from a Workout cancelled before the Session.
 _Avoid_: No-show, absent
 
 **Golden Window**:
@@ -49,7 +49,7 @@ How many of a Course Run's Sessions have been Held, shown against all the Sessio
 _Avoid_: Completion rate
 
 **Attendance**:
-How many of a Course Run's Sessions a horse took part in (its Workouts that Ran), shown against the same total as the Course Run progress (for example 4 of 10). Sessions from before the horse joined, and Sessions or Workouts that were cancelled, stay in the total: the horse simply goes on with its group.
+How many of a Course Run's Sessions a horse took part in (its Workouts that Ran), shown against the same total as the Course Run progress (for example 4 of 10). Sessions from before the horse joined, and Sessions or Workouts that were cancelled, stay in the total: the horse simply goes on with its group. A Course Run in which all of a horse's Workouts were cancelled is not listed for that horse.
 _Avoid_: Presence
 
 **Course**:
@@ -108,3 +108,7 @@ _Avoid_: Escalation, transfer
 **Review Due**:
 The moment, 72 hours after the latest assignment, when an Admission still waiting for its Assigned Groom's decision is reassigned. Shown to the Groom and the Manager.
 _Avoid_: Deadline, SLA
+
+**Trainer Feedback**:
+The written opinion the Trainer assigned to an Admission gives on the candidate horse after the vet's examination. It is required, it is plain text with no scores or ratings, and handing it in moves the Admission on to Manager review. The Manager and the Owner read it as it was written.
+_Avoid_: Racing readiness assessment, readiness score, evaluation

@@ -197,7 +197,6 @@ Import from `@/components/ui`.
 | Search box | `SearchInput` |
 | Search with suggestions; the value changes only when a suggestion is picked | `SearchCombobox` (`label`, `options`, `value`, `onChange`) |
 | View switch (Week / Month) | `SegmentedControl` |
-| Score picked from a bar of cells (0 to 10) | `ScoreScale` |
 | Name that opens its record when clicked (a horse in a lot) | `ChipButton` |
 | Quick filters with counts | `FilterChips` |
 | Section tabs | `Tabs` |

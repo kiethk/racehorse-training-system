@@ -9,7 +9,9 @@ import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
 import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -83,16 +85,17 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     List<TrainingWorkout> findByHorseIdAndSessionIdIsNotNull(Long horseId);
 
     /**
-     * Lịch tập của MỘT con ngựa trong khoảng ngày, kể cả buổi đã hủy, theo thứ tự ngày rồi giờ.
-     * (One horse schedule over a date range, cancelled Sessions included, in date then time order.)
+     * Lịch tập của MỘT con ngựa trong khoảng ngày, không kể Workout đã hủy, theo thứ tự ngày rồi giờ.
+     * (One horse schedule over a date range, without cancelled Workouts, in date then time order.)
      */
     @Query("""
            SELECT new com.rtms.backend.training.dto.HorseScheduleItemResponse(
-                      s.id, s.sessionDate, s.startTime, s.endTime, sub.name, s.status, w.status)
+                      s.id, s.sessionDate, s.startTime, s.endTime, sub.name, w.status)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN Exercise sub ON s.exerciseId = sub.id
            WHERE w.horseId = :horseId
+             AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
              AND s.sessionDate BETWEEN :fromDate AND :toDate
            ORDER BY s.sessionDate ASC, s.startTime ASC
            """)
@@ -208,6 +211,14 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            WHERE w.id = :workoutId AND s.trainerId = :trainerId
            """)
     Optional<TrainingWorkout> findByIdAndTrainerId(@Param("workoutId") Long workoutId, @Param("trainerId") Long trainerId);
+
+    /**
+     * Đọc Workout và khóa dòng đến hết giao dịch, để hai yêu cầu cùng lúc (ghi kết quả, "Không chạy") nối đuôi nhau chứ không ghi đè nhau.
+     * (Reads a Workout and locks its row until the transaction ends, so two requests at the same moment (record a result, "Did not run") run one after the other instead of overwriting each other.)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM TrainingWorkout w WHERE w.id = :id")
+    Optional<TrainingWorkout> findByIdForUpdate(@Param("id") Long id);
 
     /** Workout còn SCHEDULED của các buổi đã HELD thành HELD. (SCHEDULED Workouts of HELD Sessions become HELD.) */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

@@ -65,5 +65,11 @@ docs
 
 .worktrees/
 
+# Playwright (reports, traces, saved login sessions; test-results/ is ignored above)
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+.env.test
 diagram/
 .worktrees/

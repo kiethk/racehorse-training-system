@@ -12,7 +12,6 @@ import com.rtms.backend.medical.entity.HorseHealthMetric;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
-import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.admission.service.AdmissionQueryService;
 import com.rtms.backend.admission.service.AdmissionTrainerReviewService;
@@ -33,7 +32,6 @@ public class AdmissionTrainerReviewController {
     private final AdmissionTrainerReviewService trainerReviewService;
     private final AdmissionQueryService queryService;
     private final HorseRepository horseRepository;
-    private final RacingReadinessAssessmentRepository assessmentRepository;
     private final HealthRecordRepository healthRecordRepository;
     private final HorseHealthMetricRepository horseHealthMetricRepository;
     private final HeadTrainerWorkloadService workloadService;
@@ -42,14 +40,12 @@ public class AdmissionTrainerReviewController {
             AdmissionTrainerReviewService trainerReviewService,
             AdmissionQueryService queryService,
             HorseRepository horseRepository,
-            RacingReadinessAssessmentRepository assessmentRepository,
             HealthRecordRepository healthRecordRepository,
             HorseHealthMetricRepository horseHealthMetricRepository,
             HeadTrainerWorkloadService workloadService) {
         this.trainerReviewService = trainerReviewService;
         this.queryService = queryService;
         this.horseRepository = horseRepository;
-        this.assessmentRepository = assessmentRepository;
         this.healthRecordRepository = healthRecordRepository;
         this.horseHealthMetricRepository = horseHealthMetricRepository;
         this.workloadService = workloadService;
@@ -110,19 +106,17 @@ public class AdmissionTrainerReviewController {
                 detail,
                 horse,
                 healthRecords,
-                healthMetrics,
-                assessmentRepository.findByAdmissionId(id).orElse(null)));
+                healthMetrics));
     }
 
-    /** Hoàn thành đánh giá -> đơn chuyển MANAGER_REVIEW. */
+    /** Nộp nhận xét -> đơn chuyển MANAGER_REVIEW. (Hand in the feedback: the admission moves to MANAGER_REVIEW.) */
     @PostMapping("/{id}/trainer-review")
-    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_TRAINER_REVIEW') "
-                + "and hasAuthority('RACING_READINESS_ASSESSMENT_CREATE')")
+    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_TRAINER_REVIEW')")
     public ApiResponse<AdmissionApplication> trainerReview(
             @PathVariable Long id,
             @RequestBody TrainerAdmissionReviewRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(
-                trainerReviewService.completeAssessment(id, request, currentUser.getUserId()));
+                trainerReviewService.completeReview(id, request, currentUser.getUserId()));
     }
 }

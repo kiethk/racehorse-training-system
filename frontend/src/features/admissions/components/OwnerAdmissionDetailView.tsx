@@ -279,12 +279,12 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
                         {/* 3. Trainer Review */}
                         {(detail.trainerReviewedAt || detail.trainerFeedback) && (
                           <div className="space-y-3 pt-5 border-t border-[var(--color-border)]">
-                            <InfoGroupTitle>Trainer Assessment</InfoGroupTitle>
+                            <InfoGroupTitle>Trainer Feedback</InfoGroupTitle>
                             {detail.trainerReviewedAt && (
-                              <InfoRow label="Assessed At" value={formatDateTime(detail.trainerReviewedAt)} />
+                              <InfoRow label="Reviewed At" value={formatDateTime(detail.trainerReviewedAt)} />
                             )}
                             <InfoRow
-                              label="Assessment Notes"
+                              label="Feedback"
                               value={detail.trainerFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}
                             />
                           </div>

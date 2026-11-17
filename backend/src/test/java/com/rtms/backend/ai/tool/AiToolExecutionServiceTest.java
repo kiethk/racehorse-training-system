@@ -39,18 +39,15 @@ import com.rtms.backend.training.repository.projection.SessionHorseNameRow;
 import com.rtms.backend.training.repository.projection.SessionRow;
 import com.rtms.backend.training.dto.*;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.RacingReadinessAssessment;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.DistanceBand;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.RacingReadinessStatus;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
 import com.rtms.backend.training.repository.CourseRunRepository;
-import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
@@ -122,7 +119,6 @@ class AiToolExecutionServiceTest {
     private CourseRunRepository horseTrainingPlanRepository;
     private HorseSpecialtyService horseSpecialtyService;
     private HorsePerformanceService horsePerformanceService;
-    private RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
     private AreaRepository areaRepository;
     private UserRepository userRepository;
     private CourseRepository courseRepository;
@@ -160,7 +156,6 @@ class AiToolExecutionServiceTest {
         horseTrainingPlanRepository = Mockito.mock(CourseRunRepository.class);
         horseSpecialtyService = Mockito.mock(HorseSpecialtyService.class);
         horsePerformanceService = Mockito.mock(HorsePerformanceService.class);
-        racingReadinessAssessmentRepository = Mockito.mock(RacingReadinessAssessmentRepository.class);
         areaRepository = Mockito.mock(AreaRepository.class);
         userRepository = Mockito.mock(UserRepository.class);
         courseRepository = Mockito.mock(CourseRepository.class);
@@ -195,7 +190,6 @@ class AiToolExecutionServiceTest {
                 horseTrainingPlanRepository,
                 horseSpecialtyService,
                 horsePerformanceService,
-                racingReadinessAssessmentRepository,
                 areaRepository,
                 userRepository,
                 courseRepository,

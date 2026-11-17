@@ -136,7 +136,6 @@ export function ScheduleWeekCalendar({
     if (mode === 'horse') {
       for (const item of horseItems) {
         const list = map.get(item.sessionDate) ?? [];
-        const cancelled = item.sessionStatus === 'CANCELLED' || item.workoutStatus === 'CANCELLED';
 
         list.push({
           id: item.sessionId,
@@ -144,8 +143,8 @@ export function ScheduleWeekCalendar({
           startTime: item.startTime,
           endTime: item.endTime,
           exerciseName: item.exerciseName,
-          cancelled,
-          pill: WORKOUT_STATUS[cancelled ? 'CANCELLED' : item.workoutStatus],
+          cancelled: false,
+          pill: WORKOUT_STATUS[item.workoutStatus],
         });
         map.set(item.sessionDate, list);
       }
@@ -187,7 +186,6 @@ export function ScheduleWeekCalendar({
         horse.breed,
         horse.sex && formatEnumLabel(horse.sex),
         horse.dateOfBirth && `Born ${formatDate(horse.dateOfBirth)}`,
-        horse.registrationNumber && `Reg. ${horse.registrationNumber}`,
       ]
         .filter(Boolean)
         .join(' · ')

@@ -1,12 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, ConfirmDialog, IconButton, Modal, Notice, Pill, Skeleton, Tooltip } from '@/components/ui';
-import { cn } from '@/lib/cn';
 import { displayError, formatDate, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { sessionHasStarted, sessionTitle } from '../../lib/groupSchedule';
-import { SESSION_STATUS } from '../../lib/status';
+import { SESSION_STATUS, WORKOUT_STATUS } from '../../lib/status';
 import { trainingService } from '../../services/trainingService';
 import type { SessionDetail, SessionHorse } from '../../types';
 import { SessionResultDialog } from './SessionResultDialog';
@@ -31,7 +30,7 @@ const CONFIRM_TEXT = {
     title: 'Did not run',
     confirm: 'Mark as not running',
     cancel: 'Back',
-    text: 'Mark this horse as not running? It will not count towards its attendance.',
+    text: 'Mark this horse as not running? It will not count towards its attendance and will no longer be listed in this session.',
   },
 } as const;
 
@@ -118,13 +117,6 @@ export function SessionDetailContent({
     }
   }
 
-  const sortedHorses = useMemo(() => {
-    if (!detail) return [];
-    const active = detail.horses.filter((h) => h.status !== 'CANCELLED');
-    const cancelled = detail.horses.filter((h) => h.status === 'CANCELLED');
-    return [...active, ...cancelled];
-  }, [detail]);
-
   if (error) return <Notice tone="error">{error}</Notice>;
   if (!detail) return <Skeleton className="h-48 w-full" />;
 
@@ -162,28 +154,23 @@ export function SessionDetailContent({
         </div>
       </div>
 
-      <ul className="divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
-        {sortedHorses.map((horse) => {
-          const isCancelled = horse.status === 'CANCELLED';
-          return (
+      {detail.horses.length === 0 ? (
+        <p className="text-sm text-[var(--color-text-muted)]">No horses in this session.</p>
+      ) : (
+        <ul className="divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+          {detail.horses.map((horse) => (
             <li
               key={horse.workoutId}
-              className={cn(
-                'flex flex-wrap items-center justify-between gap-2 px-3 py-2 transition-colors',
-                isCancelled && 'bg-[var(--color-surface-subtle)] opacity-60',
-              )}
+              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 transition-colors"
             >
               <div className="min-w-0">
-                <p className={cn('truncate text-sm font-medium', isCancelled ? 'text-[var(--color-text-muted)] line-through' : 'text-[var(--color-text-primary)]')}>
-                  {horse.horseName}
-                </p>
+                <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{horse.horseName}</p>
                 {horse.groomName && <p className="truncate text-xs text-[var(--color-text-secondary)]">{horse.groomName}</p>}
               </div>
               <div className="flex items-center gap-2">
-                {isCancelled && <Pill tone="danger" size="sm">Cancelled</Pill>}
-                {horse.status === 'SCHEDULED' && <Pill tone="info" size="sm">Scheduled</Pill>}
-                {horse.status === 'RAN' && <Pill tone="success" size="sm">Rating {horse.performanceRating}</Pill>}
-                {horse.status === 'HELD' && <Pill tone="warning" size="sm">Needs result</Pill>}
+                <Pill tone={WORKOUT_STATUS[horse.status].tone} size="sm">
+                  {horse.status === 'RAN' ? `Rating ${horse.performanceRating}` : WORKOUT_STATUS[horse.status].label}
+                </Pill>
 
                 {canManage && horse.status === 'SCHEDULED' && canChange && (
                   <Tooltip content="Cancel workout">
@@ -209,9 +196,9 @@ export function SessionDetailContent({
                 )}
               </div>
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      )}
 
       {onClose && (
         <div className="flex justify-end pt-2 border-t border-[var(--color-border)]">

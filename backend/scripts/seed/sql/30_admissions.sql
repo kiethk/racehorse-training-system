@@ -332,14 +332,14 @@ BEGIN
             v_trainer := pg_temp.uid(a.trainer_k);
             UPDATE admission_applications SET trainer_id = v_trainer WHERE id = v_adm;
             PERFORM pg_temp.notify(v_trainer, 'ADMISSION', v_adm, 'ADMISSION_TRAINER_ASSIGNED', 'New horse assignment',
-                                   'You have been assigned to candidate horse ' || hs.name || ' for racing readiness assessment.',
+                                   'You have been assigned to candidate horse ' || hs.name || ' for review.',
                                    v_done + INTERVAL '1 minute');
         END IF;
 
-        -- 5. Trainer đánh giá; đơn sang MANAGER_REVIEW. (Trainer assessment; the admission moves to MANAGER_REVIEW.)
+        -- 5. Trainer nộp nhận xét; đơn sang MANAGER_REVIEW. (Trainer hands in the feedback; the admission moves to MANAGER_REVIEW.)
         IF a.trainer_at IS NOT NULL THEN
             v_t := pg_temp.ts(a.trainer_at);
-            v_remarks := CASE a.readiness
+            v_remarks := CASE a.feedback_tone
                 WHEN 'READY' THEN (ARRAY[
                     'Balanced, correct conformation and a calm, workable temperament. Moves straight with good reach, can start a racing preparation straight after admission.',
                     'Strong, well-muscled and light on the forehand. Settles quickly on the track, ready for race-specific work.'])
@@ -351,17 +351,12 @@ BEGIN
                     'Good temperament, stride still short and the horse tires in the last furlong. Conditioning first, then speed work.',
                     'Correct legs and a kind eye, but green at the gate and on turns. Needs gate schooling and a base fitness block.'])
                     [pg_temp.rndi('rm' || a.k, 1, 3)] END;
-            INSERT INTO racing_readiness_assessments (horse_id, readiness_status, assessment_date, remarks, created_at, trainer_id,
-                                                      admission_id, conformation_score, temperament_score, gait_quality_score,
-                                                      estimated_months_to_race)
-            VALUES (v_horse, a.readiness, v_t::DATE, v_remarks, v_t, v_trainer, v_adm, a.conformation, a.temperament, a.gait,
-                    a.months_to_race);
             UPDATE admission_applications SET trainer_feedback = v_remarks, trainer_reviewed_at = v_t, status = 'MANAGER_REVIEW',
                                               updated_at = v_t
              WHERE id = v_adm;
-            PERFORM pg_temp.audit(v_trainer, 'Trainer Fitness Assessment', 'AdmissionApplication', v_adm,
-                                  'Head Trainer assessed conformation, gait, and racing readiness for application #' || v_adm,
-                                  v_t, 'POST', '/api/admissions/' || v_adm || '/trainer-assessment');
+            PERFORM pg_temp.audit(v_trainer, 'Trainer Feedback', 'AdmissionApplication', v_adm,
+                                  'Head Trainer left feedback for application #' || v_adm,
+                                  v_t, 'POST', '/api/admissions/' || v_adm || '/trainer-review');
         END IF;
 
         -- Trong thời gian cách ly: tái khám và tiêm phòng tới lúc Manager quyết định (hoặc tới hôm nay).

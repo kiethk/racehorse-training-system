@@ -225,7 +225,7 @@ abstract class DemoSeedWorkflow {
         Map<String,List<String>> result=new LinkedHashMap<>();
         for (String table:List.of("horses","admission_applications","admission_documents","candidate_horse_profiles",
                 "areas","stable_stalls","groom_profiles","trainer_profiles","veterinarian_profiles","exercises",
-                "health_records","racing_readiness_assessments","notifications","audit_logs")) {
+                "health_records","notifications","audit_logs")) {
             String order=table.endsWith("_profiles") && !table.equals("candidate_horse_profiles") ? "user_id" : "id";
             result.put(table,jdbc.queryForList("SELECT (to_jsonb(t)-'owner_id')::text FROM "+table+" t ORDER BY "+order,String.class));
         }
@@ -433,15 +433,9 @@ abstract class DemoSeedWorkflow {
             if (!"TRAINER_REVIEW".equals(target)) tx(() -> {
                 at(date(p,"arrivedDate").plusDays(1),10,0);
                 AdmissionApplication adm=admissions.findById(id).orElseThrow();
-                TrainerAdmissionReviewRequest assess=new TrainerAdmissionReviewRequest();
-                int n=Integer.parseInt(key.substring(1));
-                assess.setReadinessStatus(RacingReadinessStatus.NEEDS_MORE_TRAINING);
-                assess.setConformationScore(BigDecimal.valueOf(7+(n%3)*0.5));
-                assess.setTemperamentScore(BigDecimal.valueOf(7+((n+1)%3)*0.5));
-                assess.setGaitQualityScore(BigDecimal.valueOf(7+((n+2)%3)*0.5));
-                assess.setEstimatedMonthsToRace(3+n%4);
-                assess.setRemarks("DEMO admission assessment: suitable to begin conditioning after intake; review readiness after a structured training period.");
-                trainers.completeAssessment(id,assess,adm.getTrainerId());
+                TrainerAdmissionReviewRequest assess=new TrainerAdmissionReviewRequest(
+                        "DEMO admission review: suitable to begin conditioning after intake; review again after a structured training period.");
+                trainers.completeReview(id,assess,adm.getTrainerId());
                 if ("APPROVED".equals(target)) {
                     at(date(p,"approvedDate"),14,0);
                     ManagerReviewRequest decision=new ManagerReviewRequest(); decision.setDecision(ReviewDecision.APPROVED);
@@ -517,13 +511,6 @@ abstract class DemoSeedWorkflow {
             FROM care_schedule cs
             WHERE hr.care_schedule_id = cs.id
         """);
-
-        jdbc.update("""
-            UPDATE racing_readiness_assessments rra
-            SET trainer_id = a.trainer_id
-            FROM admission_applications a
-            WHERE rra.admission_id = a.id AND a.trainer_id IS NOT NULL
-        """);
     }
 
     private void verifyResult() throws Exception {
@@ -538,7 +525,7 @@ abstract class DemoSeedWorkflow {
         assertEquals(6L,jdbc.queryForObject("SELECT count(*) FROM horses WHERE current_status='CANDIDATE'",Long.class));
         assertEquals(48L,jdbc.queryForObject("SELECT count(*) FROM stable_stalls WHERE status='OCCUPIED'",Long.class));
         assertEquals(2L,jdbc.queryForObject("SELECT count(*) FROM stable_stalls WHERE status='RESERVED'",Long.class));
-        assertEquals(46L,count("health_records")); assertEquals(44L,count("racing_readiness_assessments"));
+        assertEquals(46L,count("health_records"));
         assertEquals(0L,jdbc.queryForObject("SELECT count(*) FROM admission_applications WHERE arrived_at<submitted_at OR vet_reviewed_at<arrived_at OR trainer_reviewed_at<vet_reviewed_at OR manager_reviewed_at<trainer_reviewed_at",Long.class));
         for (String table:List.of("horse_training_plans","training_lots","training_workouts","groom_daily_tasks","horse_health_metrics")) assertEquals(0L,count(table));
         int checkedFiles=0;

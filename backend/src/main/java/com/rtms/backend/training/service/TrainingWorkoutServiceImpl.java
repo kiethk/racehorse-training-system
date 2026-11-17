@@ -60,7 +60,7 @@ public class TrainingWorkoutServiceImpl implements TrainingWorkoutService {
     @Transactional
     public SessionWorkoutResponse recordResult(Long workoutId, CompleteWorkoutRequest request, AuthenticatedUser currentUser) {
         settlement.settle();
-        TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
+        TrainingWorkout workout = findOwnWorkoutForUpdate(workoutId, currentUser);
         assertTookPlace(workout);
         if (workout.getStatus() == WorkoutStatus.RAN) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_ALREADY_RECORDED",
@@ -76,7 +76,7 @@ public class TrainingWorkoutServiceImpl implements TrainingWorkoutService {
     @Transactional
     public SessionWorkoutResponse updateResult(Long workoutId, CompleteWorkoutRequest request, AuthenticatedUser currentUser) {
         settlement.settle();
-        TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
+        TrainingWorkout workout = findOwnWorkoutForUpdate(workoutId, currentUser);
         assertTookPlace(workout);
         if (workout.getStatus() != WorkoutStatus.RAN) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_NOT_RECORDED",
@@ -91,7 +91,7 @@ public class TrainingWorkoutServiceImpl implements TrainingWorkoutService {
     @Transactional
     public SessionWorkoutResponse markDidNotRun(Long workoutId, AuthenticatedUser currentUser) {
         settlement.settle();
-        TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
+        TrainingWorkout workout = findOwnWorkoutForUpdate(workoutId, currentUser);
         assertTookPlace(workout);
         if (workout.getStatus() == WorkoutStatus.RAN) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_ALREADY_RECORDED",
@@ -129,8 +129,17 @@ public class TrainingWorkoutServiceImpl implements TrainingWorkoutService {
 
     /** Workout của buổi thuộc Trainer này; của người khác báo "không tìm thấy" để không lộ nó tồn tại. */
     private TrainingWorkout findOwnWorkout(Long workoutId, AuthenticatedUser currentUser) {
-        TrainingWorkout workout = workoutRepository.findById(workoutId)
-                .filter(found -> found.getSessionId() != null)
+        return ownOrNotFound(workoutRepository.findById(workoutId), currentUser);
+    }
+
+    /** Như findOwnWorkout nhưng khóa dòng, dùng cho thao tác ghi. (Like findOwnWorkout but locks the row, for writes.) */
+    private TrainingWorkout findOwnWorkoutForUpdate(Long workoutId, AuthenticatedUser currentUser) {
+        return ownOrNotFound(workoutRepository.findByIdForUpdate(workoutId), currentUser);
+    }
+
+    private TrainingWorkout ownOrNotFound(java.util.Optional<TrainingWorkout> found, AuthenticatedUser currentUser) {
+        TrainingWorkout workout = found
+                .filter(w -> w.getSessionId() != null)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WORKOUT_NOT_FOUND", "Workout not found!"));
         TrainingSession session = findSession(workout);
         if (!session.getTrainerId().equals(currentUser.getUserId())) {
