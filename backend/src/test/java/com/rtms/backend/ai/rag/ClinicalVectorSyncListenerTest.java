@@ -37,37 +37,37 @@ class ClinicalVectorSyncListenerTest {
     }
 
     @Test
-    @DisplayName("Đồng bộ bệnh án thành công vào rag_knowledge_documents và rag_knowledge_embeddings")
+    @DisplayName("Successfully sync a clinical record to rag_knowledge_documents and rag_knowledge_embeddings")
     void testOnClinicalRecordCreatedSuccess() {
         ClinicalRecordCreatedEvent event = new ClinicalRecordCreatedEvent(
                 101L,
                 42L,
                 "VN-2024-00123",
-                "cào đất, bỏ ăn",
-                "Nghi ngờ đau bụng cấp tính thể nhẹ (mild colic)",
+                "pawing at the ground, off feed",
+                "Suspected mild equine colic",
                 List.of("VETERINARIAN", "HEAD_TRAINER")
         );
 
-        when(symptomExpander.expand("cào đất, bỏ ăn"))
-                .thenReturn("cào đất, bỏ ăn [Thuật ngữ y khoa liên quan: đau bụng cấp tính ở ngựa (equine colic)]");
+        when(symptomExpander.expand("pawing at the ground, off feed"))
+                .thenReturn("pawing at the ground, off feed [Related medical terms: equine colic]");
 
         float[] mockVector = new float[]{0.1f, -0.2f, 0.5f};
         when(embeddingService.embed(anyString())).thenReturn(mockVector);
 
-        // Giả lập insert document trả về documentId = 999L
+        // Simulate inserting a document and receiving documentId = 999L.
         when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any()))
                 .thenReturn(999L);
 
-        // Thực thi listener
+        // Execute the listener.
         listener.onClinicalRecordCreated(event);
 
-        // Xác minh expander được gọi
-        verify(symptomExpander).expand("cào đất, bỏ ăn");
+        // Verify that the expander was called.
+        verify(symptomExpander).expand("pawing at the ground, off feed");
 
-        // Xác minh sinh vector
+        // Verify that an embedding was generated.
         verify(embeddingService).embed(contains("VN-2024-00123"));
 
-        // Xác minh lưu document
+        // Verify that the document was saved.
         verify(jdbcTemplate).queryForObject(
                 contains("INSERT INTO rag_knowledge_documents"),
                 eq(Long.class),
@@ -75,7 +75,7 @@ class ClinicalVectorSyncListenerTest {
                 contains("{VETERINARIAN,HEAD_TRAINER}")
         );
 
-        // Xác minh lưu embedding
+        // Verify that the embedding was saved.
         verify(jdbcTemplate).update(
                 contains("INSERT INTO rag_knowledge_embeddings"),
                 eq(999L),

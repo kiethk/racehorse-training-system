@@ -34,10 +34,10 @@ class OpenAiEmbeddingServiceTest {
     }
 
     @Test
-    @DisplayName("Embed thành công khi OpenAI trả về vector 1536 chiều hợp lệ")
+    @DisplayName("Embedding succeeds when OpenAI returns a valid 1536-dimensional vector")
     @SuppressWarnings("unchecked")
     void testEmbed_Success() throws Exception {
-        // Chuẩn bị vector mẫu 1536 chiều
+        // Prepare a sample 1536-dimensional vector.
         StringBuilder jsonBuilder = new StringBuilder("{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[");
         for (int i = 0; i < 1536; i++) {
             jsonBuilder.append(i == 0 ? "0.05" : ",0.01");
@@ -58,7 +58,7 @@ class OpenAiEmbeddingServiceTest {
                 httpClient
         );
 
-        float[] result = service.embed("Ngựa bị đau bụng Colic");
+        float[] result = service.embed("The horse has signs of colic");
 
         assertNotNull(result);
         assertEquals(1536, result.length);
@@ -68,7 +68,7 @@ class OpenAiEmbeddingServiceTest {
     }
 
     @Test
-    @DisplayName("Input rỗng hoặc null trả về vector toàn số 0 và không gọi API")
+    @DisplayName("An empty or null input returns an all-zero vector without calling the API")
     void testEmbed_BlankInput_ReturnsZeroVector() {
         OpenAiEmbeddingService service = new OpenAiEmbeddingService(
                 "https://api.openai.com/v1",
@@ -96,7 +96,7 @@ class OpenAiEmbeddingServiceTest {
     }
 
     @Test
-    @DisplayName("API Key rỗng hoặc placeholder kích hoạt fallback sang DefaultEmbeddingService")
+    @DisplayName("An empty or placeholder API key triggers fallback to DefaultEmbeddingService")
     void testEmbed_PlaceholderApiKey_Fallback() {
         float[] mockFallbackVector = new float[1536];
         mockFallbackVector[0] = 0.99f;
@@ -112,16 +112,16 @@ class OpenAiEmbeddingServiceTest {
                 httpClient
         );
 
-        float[] result = service.embed("Ngựa bị đau bụng");
+        float[] result = service.embed("The horse has abdominal pain");
 
         assertNotNull(result);
         assertEquals(0.99f, result[0]);
-        verify(fallbackService).embed("Ngựa bị đau bụng");
+        verify(fallbackService).embed("The horse has abdominal pain");
         verifyNoInteractions(httpClient);
     }
 
     @Test
-    @DisplayName("Khi OpenAI trả mã lỗi HTTP 500 tự động fallback an toàn không gây crash")
+    @DisplayName("When OpenAI returns HTTP 500, the service safely falls back without crashing")
     @SuppressWarnings("unchecked")
     void testEmbed_Http500_Fallback() throws Exception {
         float[] mockFallbackVector = new float[1536];
@@ -142,25 +142,25 @@ class OpenAiEmbeddingServiceTest {
                 httpClient
         );
 
-        float[] result = service.embed("Triệu chứng viêm khớp");
+        float[] result = service.embed("Symptoms of arthritis");
 
         assertNotNull(result);
         assertEquals(0.77f, result[0]);
-        verify(fallbackService).embed("Triệu chứng viêm khớp");
+        verify(fallbackService).embed("Symptoms of arthritis");
     }
 
     @Test
-    @DisplayName("Batch Embed thành công với danh sách nhiều văn bản")
+    @DisplayName("Batch embedding succeeds with a list of multiple texts")
     @SuppressWarnings("unchecked")
     void testEmbedBatch_Success() throws Exception {
         StringBuilder jsonBuilder = new StringBuilder("{\"object\":\"list\",\"data\":[");
-        // Item 1
+        // Item 1.
         jsonBuilder.append("{\"object\":\"embedding\",\"index\":0,\"embedding\":[");
         for (int i = 0; i < 1536; i++) {
             jsonBuilder.append(i == 0 ? "0.1" : ",0.01");
         }
         jsonBuilder.append("]},");
-        // Item 2
+        // Item 2.
         jsonBuilder.append("{\"object\":\"embedding\",\"index\":1,\"embedding\":[");
         for (int i = 0; i < 1536; i++) {
             jsonBuilder.append(i == 0 ? "0.2" : ",0.02");
@@ -181,7 +181,7 @@ class OpenAiEmbeddingServiceTest {
                 httpClient
         );
 
-        List<float[]> results = service.embedBatch(List.of("Triệu chứng 1", "Triệu chứng 2"));
+        List<float[]> results = service.embedBatch(List.of("Symptom 1", "Symptom 2"));
 
         assertNotNull(results);
         assertEquals(2, results.size());

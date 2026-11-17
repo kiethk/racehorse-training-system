@@ -6,7 +6,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 /**
- * Thực thể lưu trữ chi tiết từng tin nhắn trong hội thoại và phục vụ Audit Trail.
+ * Entity that stores each conversation message in detail and supports the audit trail.
  */
 @Entity
 @Table(name = "ai_chat_messages")

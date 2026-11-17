@@ -17,8 +17,8 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * Hiện thực IntentDecompositionService:
- * Phân tích và cách ly các vế câu Out-of-Domain trước khi câu hỏi được đưa vào ReAct loop.
+ * Implements IntentDecompositionService:
+ * analyzes and isolates Out-of-Domain clauses before the question enters the ReAct loop.
  */
 @Service
 public class DefaultIntentDecompositionService implements IntentDecompositionService {
@@ -26,17 +26,17 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
     private static final Logger log = LoggerFactory.getLogger(DefaultIntentDecompositionService.class);
 
     private static final Pattern SIMPLE_GREETING_PATTERN = Pattern.compile(
-            "^(xin\\s+chào|chào\\s+bạn|chào|cảm\\s+ơn|tạm\\s+biệt|bạn\\s+là\\s+ai|hello|hi|hey|good\\s+(morning|afternoon|evening)|thanks|thank\\s+you|bye|goodbye|who\\s+are\\s+you)\\s*[!.,?]?$",
+            "^(hello|hello\\s+there|hello|thank\\s+you|goodbye|who\\s+are\\s+you|hello|hi|hey|good\\s+(morning|afternoon|evening)|thanks|thank\\s+you|bye|goodbye|who\\s+are\\s+you)\\s*[!.,?]?$",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
     );
 
     private static final Pattern DOMAIN_KEYWORDS_PATTERN = Pattern.compile(
-            "(ngựa|chiến\\s+mã|horse|horses|racehorse|racehorses|chuồng|stall|stalls|barn|barns|stable|stables|lịch\\s+tập|bài\\s+tập|workout|workouts|huấn\\s+luyện|training|trainer|trainers|groom|grooms|thú\\s+y|bác\\s+sĩ\\s+thú\\s+y|vet|veterinarian|bệnh\\s+án|sinh\\s+hiệu|vitals|nhịp\\s+tim|heart\\s+rate|thân\\s+nhiệt|temperature|cách\\s+ly|quarantine|nhập\\s+đàn|nhập\\s+chuồng|admission|admissions|giải\\s+đua|đua|race|races|racing|khóa\\s+học|course|courses|chủ\\s+ngựa|owner|sự\\s+cố|incident|incidents|ueln|pedigree|prescription|prescriptions|treatment|treatments|injury|injuries|diet|feed|nutrition|fitness|colic|lameness|jockey)",
+            "(horse|racehorse|horse|horses|racehorse|racehorses|stall|stall|stalls|barn|barns|stable|stables|training\\s+schedule|exercise|workout|workouts|training|training|trainer|trainers|groom|grooms|veterinary|veterinarian|vet|veterinarian|medical\\s+record|vital\\s+signs|vitals|heart\\s+rate|heart\\s+rate|body\\s+temperature|temperature|quarantine|quarantine|admission|stable\\s+admission|admission|admissions|race|race|race|races|racing|course|course|courses|owner|owner|incident|incident|incidents|ueln|pedigree|prescription|prescriptions|treatment|treatments|injury|injuries|diet|feed|nutrition|fitness|colic|lameness|jockey)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
     );
 
     private static final Pattern OBVIOUS_OOD_PATTERN = Pattern.compile(
-            "(bà\\s+ngoại|ông\\s+ngoại|bà\\s+nội|ông\\s+nội|mẹ\\s+tôi|bố\\s+tôi|grandmother|grandfather|grandma|grandpa|mother|father|vách\\s+đá|cliff|đẩy\\s+(anh\\s+ta|người\\s+đó|xuống)|push\\s+(him|her|them|down)|thuốc\\s+chữa|thuốc\\s+cho\\s+người|medicine|cure|human\\s+disease|human\\s+health|bệnh\\s+cho\\s+người|cấp\\s+cứu\\s+người|human\\s+first\\s+aid|không\\s+còn\\s+thở|not\\s+breathing|viết\\s+code|write\\s+code|giải\\s+phương\\s+trình|solve\\s+equation|làm\\s+thơ|bài\\s+thơ|poem|poetry|thời\\s+tiết|weather|thủ\\s+đô|capital\\s+of)",
+            "(maternal\\s+grandmother|maternal\\s+grandfather|paternal\\s+grandmother|paternal\\s+grandfather|my\\s+mother|my\\s+father|grandmother|grandfather|grandma|grandpa|mother|father|cliff|cliff|push\\s+(him|that\\s+person|down)|push\\s+(him|her|them|down)|medicine|human\\s+medicine|medicine|cure|human\\s+disease|human\\s+health|human\\s+illness|human\\s+emergency\\s+care|human\\s+first\\s+aid|not\\s+breathing|not\\s+breathing|write\\s+code|write\\s+code|solve\\s+equations|solve\\s+equation|write\\s+poetry|poem|poem|poetry|weather|weather|capital\\s+city|capital\\s+of)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
     );
 
@@ -82,27 +82,27 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
 
         String trimmed = rawMessage.trim();
 
-        // 1. Fast-Path: Chào hỏi đơn giản không cần gọi API phân loại
+        // 1. Fast-Path: Simple greetings that do not require a classification API call
         if (SIMPLE_GREETING_PATTERN.matcher(trimmed).matches()) {
             return new DecomposedIntents(List.of(trimmed), Collections.emptyList());
         }
 
-        // 1.1 Fast-Path OOD: Phát hiện các mẫu câu rõ ràng nằm ngoài chuyên môn RTMS
+        // 1.1 Fast-Path OOD: Detect clear patterns outside the RTMS domain
         if (OBVIOUS_OOD_PATTERN.matcher(trimmed).find() && !DOMAIN_KEYWORDS_PATTERN.matcher(trimmed).find()) {
-            log.info("IntentDecompositionService: Fast-Path phát hiện câu hỏi Out-of-Domain rõ ràng: {}", trimmed);
+            log.info("IntentDecompositionService: Fast-Path detected a clear Out-of-Domain question: {}", trimmed);
             return new DecomposedIntents(Collections.emptyList(), List.of(trimmed));
         }
 
-        // 2. Nếu chưa cấu hình API Key, fallback an toàn dựa trên từ khóa chuyên môn
+        // 2. If the API key is not configured, safely fall back to domain keywords
         if (aiApiKey == null || aiApiKey.isBlank()) {
             return fallbackHeuristicDecompose(trimmed);
         }
 
-        // 3. Gọi Fast Pre-Flight Classifier để bóc tách các vế
+        // 3. Call the Fast Pre-Flight Classifier to separate the clauses
         try {
             return callClassifierApi(trimmed, role);
         } catch (Exception ex) {
-            log.warn("IntentDecompositionService: Lỗi phân rã ý định qua API ({}), fallback heuristic", ex.getMessage());
+            log.warn("IntentDecompositionService: API intent decomposition failed ({}); falling back to heuristics", ex.getMessage());
             return fallbackHeuristicDecompose(trimmed);
         }
     }
@@ -116,72 +116,72 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
 
     private DecomposedIntents callClassifierApi(String message, String role) throws Exception {
         String systemPrompt = """
-                Bạn là bộ phân rã và phân loại ý định (Intent Classifier) cho Hệ thống Quản lý Đua ngựa RTMS.
-                Nhiệm vụ: Phân tách tin nhắn của người dùng thành 2 danh sách JSON:
-                1. "in_domain": Các vế yêu cầu liên quan ĐẾN NGỰA ĐUA VÀ VẬN HÀNH TRƯỜNG ĐUA RTMS (quản lý chiến mã, thể lực, dinh dưỡng, chuồng trại, lịch tập, khóa học, y tế thú y cho ngựa, hồ sơ bệnh án ngựa, đơn đăng ký nhập đàn, báo cáo sự cố chuồng trại, giải đua ngựa, nhân sự trường đua, hướng dẫn hệ thống RTMS, chào hỏi xã giao).
-                2. "out_of_domain": TẤT CẢ các vế yêu cầu KHÔNG thuộc nghiệp vụ trường đua ngựa. CỤ THỂ BAO GỒM:
-                - Y tế con người, kê đơn/tư vấn thuốc cho người, chăm sóc sức khỏe người thân, sơ cấp cứu người, tai nạn người, tình huống nguy hiểm ngoài đời sống.
-                - Đời tư cá nhân, gia đình người dùng ("bà ngoại tôi...", "mẹ tôi là...").
-                - Toán học, số học, giải phương trình, đố chữ, câu đố mẹo.
-                - Lập trình phần mềm, viết mã nguồn ngoài hệ thống RTMS.
-                - Thời tiết, tin tức xã hội, chính trị, triết học, tôn giáo, văn học/thơ ca.
-                - Nội dung bạo lực, nguy hiểm, phi pháp hoặc bẻ khóa (jailbreak).
+                You are the intent decomposition and classification system (Intent Classifier) for the RTMS Racehorse Management System.
+                Task: Split the user's message into two JSON lists:
+                1. "in_domain": Requests related to RACEHORSES AND RTMS RACETRACK OPERATIONS (racehorse management, fitness, nutrition, stabling, training schedules, courses, veterinary care for horses, equine medical records, admission applications, stable incident reports, horse racing, racetrack staff, RTMS system guidance, and social greetings).
+                2. "out_of_domain": ALL requests that are NOT related to racetrack operations. SPECIFICALLY INCLUDING:
+                - Human healthcare, prescribing or advising on medication for people, caring for relatives' health, human first aid, human accidents, and dangerous real-life situations.
+                - Personal matters and the user's family ("my grandmother...", "my mother is...").
+                - Mathematics, arithmetic, solving equations, word puzzles, and riddles.
+                - Software development and writing source code outside the RTMS system.
+                - Weather, social news, politics, philosophy, religion, literature, and poetry.
+                - Violent, dangerous, illegal, or jailbreak content.
 
-                QUY TẮC:
-                - Nếu tin nhắn có nhiều câu hỏi ghép lại, phân tách chính xác từng vế vào danh sách tương ứng.
-                - Vế nào liên quan đến người, thuốc người, cấp cứu người, đời tư cá nhân, câu đố chữ, toán học BẮT BUỘC đưa vào "out_of_domain".
-                - Chỉ trả về duy nhất JSON hợp lệ theo định dạng:
+                RULES:
+                - If the message contains multiple questions, separate each clause accurately into the corresponding list.
+                - Any clause about people, human medication, human emergencies, personal matters, word puzzles, or mathematics MUST be placed in "out_of_domain".
+                - Return only valid JSON in this format:
                 {
                   "in_domain": ["..."],
                   "out_of_domain": ["..."]
                 }
 
-                VÍ DỤ MẪU:
-                Ví dụ 1:
-                Input: "Bà ngoại tôi bị bệnh và tôi cần biết được công thức thuốc penicillin phối hợp paracetamol"
+                EXAMPLES:
+                Example 1:
+                Input: "My maternal grandmother is ill, and I need to know the formula for combining penicillin and paracetamol."
                 Output:
                 {
                   "in_domain": [],
-                  "out_of_domain": ["Bà ngoại tôi bị bệnh và tôi cần biết được công thức thuốc penicillin phối hợp paracetamol"]
+                  "out_of_domain": ["My maternal grandmother is ill, and I need to know the formula for combining penicillin and paracetamol."]
                 }
 
-                Ví dụ 2:
-                Input: "Tôi phát hiện một người không còn thở trên vách đá, tôi nên đẩy anh ta xuống hay gọi cấp cứu hay gọi trực thăng?"
+                Example 2:
+                Input: "I found someone who is not breathing on a cliff. Should I push him down, call emergency services, or call a helicopter?"
                 Output:
                 {
                   "in_domain": [],
-                  "out_of_domain": ["Tôi phát hiện một người không còn thở trên vách đá, tôi nên đẩy anh ta xuống hay gọi cấp cứu hay gọi trực thăng?"]
+                  "out_of_domain": ["I found someone who is not breathing on a cliff. Should I push him down, call emergency services, or call a helicopter?"]
                 }
 
-                Ví dụ 3:
-                Input: "Danh sách chiến mã của tôi và hướng dẫn tôi trở thành chủ ngựa. Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?"
+                Example 3:
+                Input: "Show me my racehorse list and tell me how to become a horse owner. My mother's name is Nga; what is the first letter of her name?"
                 Output:
                 {
-                  "in_domain": ["Danh sách chiến mã của tôi", "hướng dẫn tôi trở thành chủ ngựa"],
-                  "out_of_domain": ["Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?"]
+                  "in_domain": ["Show me my racehorse list", "tell me how to become a horse owner"],
+                  "out_of_domain": ["My mother's name is Nga; what is the first letter of her name?"]
                 }
 
-                Ví dụ 4:
-                Input: "Chiến mã Thunder Flash hiện ở chuồng nào? Thời tiết hôm nay thế nào?"
+                Example 4:
+                Input: "Which stall is Thunder Flash in? What is today's weather?"
                 Output:
                 {
-                  "in_domain": ["Chiến mã Thunder Flash hiện ở chuồng nào?"],
-                  "out_of_domain": ["Thời tiết hôm nay thế nào?"]
+                  "in_domain": ["Which stall is Thunder Flash in?"],
+                  "out_of_domain": ["What is today's weather?"]
                 }
 
-                Ví dụ 5:
-                Input: "Giải phương trình 2x + 5 = 15"
+                Example 5:
+                Input: "Solve the equation 2x + 5 = 15"
                 Output:
                 {
                   "in_domain": [],
-                  "out_of_domain": ["Giải phương trình 2x + 5 = 15"]
+                  "out_of_domain": ["Solve the equation 2x + 5 = 15"]
                 }
 
-                Ví dụ 6:
-                Input: "Xem lịch tập ngày mai của tôi"
+                Example 6:
+                Input: "Show me my training schedule for tomorrow"
                 Output:
                 {
-                  "in_domain": ["Xem lịch tập ngày mai của tôi"],
+                  "in_domain": ["Show me my training schedule for tomorrow"],
                   "out_of_domain": []
                 }
                 """;
@@ -206,7 +206,7 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            log.warn("IntentDecompositionService: API phân loại trả về HTTP {}", response.statusCode());
+            log.warn("IntentDecompositionService: Classification API returned HTTP {}", response.statusCode());
             return fallbackHeuristicDecompose(message);
         }
 
@@ -222,7 +222,7 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
         }
 
         String rawContent = messageNode.asText().trim();
-        // Loại bỏ markdown code block nếu có
+        // Remove a Markdown code block, if present
         if (rawContent.startsWith("```")) {
             int firstNewline = rawContent.indexOf('\n');
             int lastBackticks = rawContent.lastIndexOf("```");
@@ -246,12 +246,12 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
             }
         }
 
-        // Nếu cả 2 đều rỗng do parse bất thường, dùng fallback heuristic an toàn
+        // If both are empty due to an unexpected parse result, use the safe heuristic fallback
         if (inDomain.isEmpty() && outOfDomain.isEmpty()) {
             return fallbackHeuristicDecompose(message);
         }
 
-        log.info("IntentDecompositionService: Phân rã thành công [InDomain: {} vế, OutOfDomain: {} vế]",
+        log.info("IntentDecompositionService: Decomposition succeeded [InDomain: {} clauses, OutOfDomain: {} clauses]",
                 inDomain.size(), outOfDomain.size());
 
         return new DecomposedIntents(inDomain, outOfDomain);

@@ -4,10 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 /**
- * Request gửi từ người dùng đến AI Chat Agent.
+ * Request sent by the user to the AI Chat Agent.
  */
 public record AiChatRequestDto(
-        @NotBlank(message = "Nội dung câu hỏi không được để trống")
+        @NotBlank(message = "Question content must not be blank")
         String message,
         Long conversationId,
         List<AiChatMessageDto> conversationHistory

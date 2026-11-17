@@ -4,8 +4,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Dịch vụ phân rã và phân loại ý định người dùng (Pre-Flight Intent Router)
- * phục vụ cơ chế Guardrail ở cấp độ điều phối ReAct.
+ * Service for decomposing and classifying user intent (Pre-Flight Intent Router),
+ * supporting the Guardrail mechanism at the ReAct orchestration level.
  */
 public interface IntentDecompositionService {
 

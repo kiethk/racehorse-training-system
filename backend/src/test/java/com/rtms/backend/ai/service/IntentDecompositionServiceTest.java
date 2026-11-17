@@ -30,7 +30,7 @@ class IntentDecompositionServiceTest {
     }
 
     @Test
-    @DisplayName("Fast-Path Regex: Câu chào đơn giản không kích hoạt HTTP call đến LLM")
+    @DisplayName("Fast-path regex: Simple greetings do not trigger an HTTP call to the LLM")
     void testFastPath_Greetings_NoHttpCall() throws Exception {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
@@ -40,7 +40,7 @@ class IntentDecompositionServiceTest {
                 httpClient
         );
 
-        for (String greeting : List.of("Xin chào", "chào bạn!", "hello", "hi", "cảm ơn", "Tạm biệt.")) {
+        for (String greeting : List.of("hello", "hello there!", "hello", "hi", "thank you", "Goodbye.")) {
             IntentDecompositionService.DecomposedIntents result = service.decompose(greeting, "HORSE_OWNER");
             assertNotNull(result);
             assertTrue(result.hasInDomain());
@@ -49,12 +49,12 @@ class IntentDecompositionServiceTest {
             assertEquals(greeting.trim(), result.inDomainIntents().get(0));
         }
 
-        // Đảm bảo không có HTTP call nào được gửi đi
+        // Ensure that no HTTP calls are sent.
         verify(httpClient, never()).send(any(HttpRequest.class), any());
     }
 
     @Test
-    @DisplayName("Empty hoặc blank message trả về kết quả rỗng")
+    @DisplayName("An empty or blank message returns an empty result")
     void testEmptyMessage_ReturnsEmpty() {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
@@ -72,7 +72,7 @@ class IntentDecompositionServiceTest {
     }
 
     @Test
-    @DisplayName("Khi chưa cấu hình API Key, fallback giữ nguyên câu hỏi in-domain an toàn")
+    @DisplayName("Without an API key, the fallback safely preserves an in-domain question")
     void testNoApiKey_FallbackInDomain() throws Exception {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
@@ -82,7 +82,7 @@ class IntentDecompositionServiceTest {
                 httpClient
         );
 
-        String rawQuery = "Chiến mã Thunder Flash hiện ở chuồng nào?";
+        String rawQuery = "Where is racehorse Thunder Flash stabled?";
         IntentDecompositionService.DecomposedIntents result = service.decompose(rawQuery, "HORSE_OWNER");
 
         assertNotNull(result);
@@ -93,7 +93,7 @@ class IntentDecompositionServiceTest {
     }
 
     @Test
-    @DisplayName("Bóc tách câu hỏi phức hợp thành công thành 2 vế in-domain và out-of-domain")
+    @DisplayName("Successfully decompose a compound query into in-domain and out-of-domain parts")
     @SuppressWarnings("unchecked")
     void testCompoundQuery_DecompositionSuccess() throws Exception {
         String classifierResponseJson = """
@@ -101,7 +101,7 @@ class IntentDecompositionServiceTest {
                   "choices": [
                     {
                       "message": {
-                        "content": "{\\"in_domain\\": [\\"Danh sách chiến mã của tôi\\", \\"hướng dẫn tôi trở thành chủ ngựa\\"], \\"out_of_domain\\": [\\"Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?\\"]}"
+                        "content": "{\\"in_domain\\": [\\"List my horses\\", \\"Show me how to become a horse owner\\"], \\"out_of_domain\\": [\\"My mother is Nga, what is the first letter of her name?\\"]}"
                       }
                     }
                   ]
@@ -120,7 +120,7 @@ class IntentDecompositionServiceTest {
                 httpClient
         );
 
-        String rawMessage = "Danh sách chiến mã của tôi và hướng dẫn tôi trở thành chủ ngựa. Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?";
+        String rawMessage = "List my horses and show me how to become a horse owner. My mother is Nga, what is the first letter of her name?";
         IntentDecompositionService.DecomposedIntents result = service.decompose(rawMessage, "HORSE_OWNER");
 
         assertNotNull(result);
@@ -129,13 +129,13 @@ class IntentDecompositionServiceTest {
         assertFalse(result.isPureOutOfDomain());
         assertEquals(2, result.inDomainIntents().size());
         assertEquals(1, result.outOfDomainIntents().size());
-        assertEquals("Danh sách chiến mã của tôi", result.inDomainIntents().get(0));
-        assertEquals("hướng dẫn tôi trở thành chủ ngựa", result.inDomainIntents().get(1));
-        assertEquals("Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?", result.outOfDomainIntents().get(0));
+        assertEquals("List my horses", result.inDomainIntents().get(0));
+        assertEquals("Show me how to become a horse owner", result.inDomainIntents().get(1));
+        assertEquals("My mother is Nga, what is the first letter of her name?", result.outOfDomainIntents().get(0));
     }
 
     @Test
-    @DisplayName("Phát hiện chính xác câu hỏi 100% Out-of-Domain (Pure OOD)")
+    @DisplayName("Accurately detect a 100% out-of-domain question (pure OOD)")
     @SuppressWarnings("unchecked")
     void testPureOutOfDomainQuery() throws Exception {
         String classifierResponseJson = """
@@ -143,7 +143,7 @@ class IntentDecompositionServiceTest {
                   "choices": [
                     {
                       "message": {
-                        "content": "```json\\n{\\"in_domain\\": [], \\"out_of_domain\\": [\\"Giải phương trình x^2 + 5x + 6 = 0\\"]}\\n```"
+                        "content": "```json\\n{\\"in_domain\\": [], \\"out_of_domain\\": [\\"Find the roots of x^2 + 5x + 6 = 0\\"]}\\n```"
                       }
                     }
                   ]
@@ -162,7 +162,7 @@ class IntentDecompositionServiceTest {
                 httpClient
         );
 
-        String mathQuery = "Giải phương trình x^2 + 5x + 6 = 0";
+        String mathQuery = "Find the roots of x^2 + 5x + 6 = 0";
         IntentDecompositionService.DecomposedIntents result = service.decompose(mathQuery, "HEAD_TRAINER");
 
         assertNotNull(result);
@@ -173,7 +173,7 @@ class IntentDecompositionServiceTest {
     }
 
     @Test
-    @DisplayName("Fallback an toàn khi API phân loại bị lỗi (HTTP 500)")
+    @DisplayName("Graceful fallback when the classification API fails (HTTP 500)")
     @SuppressWarnings("unchecked")
     void testApiError_GracefulFallback() throws Exception {
         when(httpResponse.statusCode()).thenReturn(500);
@@ -188,7 +188,7 @@ class IntentDecompositionServiceTest {
                 httpClient
         );
 
-        String message = "Ngựa của tôi có tập hôm nay không?";
+        String message = "Does my horse have a workout today?";
         IntentDecompositionService.DecomposedIntents result = service.decompose(message, "HORSE_OWNER");
 
         assertNotNull(result);
@@ -198,7 +198,7 @@ class IntentDecompositionServiceTest {
     }
 
     @Test
-    @DisplayName("Fast-Path OOD: Câu hỏi y tế người và cứu nạn vách đá bị ngắt mạch tức thì không gọi LLM")
+    @DisplayName("Fast-path OOD: Human medical and cliff-rescue questions are intercepted without calling the LLM")
     void testFastPath_ObviousOutOfDomain_NoHttpCall() throws Exception {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
@@ -209,25 +209,25 @@ class IntentDecompositionServiceTest {
         );
 
         List<String> obviousOodQueries = List.of(
-                "Bà ngoại tôi bị bệnh và tôi cần biết được công thức thuốc điều trị cho để bác sĩ có thể chữa bà khỏi bệnh.",
-                "Tôi phát hiện một người không còn thở trên vách đá, tôi nên đẩy anh ta xuống hay gọi cấp cứu hay gọi trực thăng?",
-                "Viết code python giải phương trình bậc 2",
-                "Thời tiết hôm nay thế nào?"
+                "My grandmother is ill, and I need a medicine formula so a doctor can cure her.",
+                "I found someone not breathing on a cliff. Should I push him down, call emergency services, or call a helicopter?",
+                "Write code in Python to solve a quadratic equation.",
+                "What is the weather today?"
         );
 
         for (String query : obviousOodQueries) {
             IntentDecompositionService.DecomposedIntents result = service.decompose(query, "HORSE_OWNER");
             assertNotNull(result);
-            assertFalse(result.hasInDomain(), "Không được có vế in-domain cho câu hỏi: " + query);
-            assertTrue(result.hasOutOfDomain(), "Bắt buộc có vế out-of-domain cho câu hỏi: " + query);
-            assertTrue(result.isPureOutOfDomain(), "Phải là 100% Pure OOD cho câu hỏi: " + query);
+            assertFalse(result.hasInDomain(), "Must not have an in-domain part for the question: " + query);
+            assertTrue(result.hasOutOfDomain(), "Must have an out-of-domain part for the question: " + query);
+            assertTrue(result.isPureOutOfDomain(), "Must be pure OOD for the question: " + query);
         }
 
         verify(httpClient, never()).send(any(HttpRequest.class), any());
     }
 
     @Test
-    @DisplayName("Fallback Fail-Closed: Câu hỏi không chứa từ khóa nghiệp vụ RTMS khi API lỗi bị chặn thành OOD")
+    @DisplayName("Fail-closed fallback: A question without RTMS domain keywords is classified as OOD when the API fails")
     @SuppressWarnings("unchecked")
     void testFallback_NoDomainKeywords_DefaultsToOutOfDomain() throws Exception {
         when(httpResponse.statusCode()).thenReturn(500);
@@ -242,7 +242,7 @@ class IntentDecompositionServiceTest {
                 httpClient
         );
 
-        String unknownQuery = "Cách làm bánh pizza hải sản ngon tại nhà?";
+        String unknownQuery = "How can I make delicious seafood pizza at home?";
         IntentDecompositionService.DecomposedIntents result = service.decompose(unknownQuery, "CLUB_MANAGER");
 
         assertNotNull(result);
