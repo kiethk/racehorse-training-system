@@ -236,7 +236,7 @@ function HealthRecordsContent() {
           (s) => s.status === 'SCHEDULED' || s.status === 'IN_PROGRESS',
         );
         const next = open.find((s) => s.purpose === 'FOLLOW_UP') ?? open[0];
-        setOpenFollowUp(next ? { id: next.id, scheduledAt: next.scheduledAt ?? null } : null);
+        setOpenFollowUp(next ? { id: next.id, scheduledAt: next.scheduledAt ?? next.scheduledDate ?? null } : null);
       })
       .catch(() => {
         if (!ignore) setOpenFollowUp(null);

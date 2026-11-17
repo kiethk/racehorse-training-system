@@ -433,7 +433,7 @@ export function AiChatWidget() {
                   <span className="flex h-2 w-2 rounded-full bg-[var(--color-primary)] animate-pulse" title="Ready" />
                   {isExpanded && (
                     <span className="rounded bg-[var(--color-primary)]/10 px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-primary)]">
-                      Mở rộng
+                      Expanded
                     </span>
                   )}
                 </div>

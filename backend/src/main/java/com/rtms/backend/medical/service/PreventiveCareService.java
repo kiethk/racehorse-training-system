@@ -160,13 +160,17 @@ public class PreventiveCareService {
                             "This horse already has an active preventive care visit. Reschedule that visit instead");
                 }
                 // Mốc chưa xếp vet: dời tới ngày Vet chọn rồi xếp cho chính Vet đó.
+                // Ngày này do Vet chọn nên phải chặn trùng ngày và giữ đúng ngày đã chọn (AD-037).
+                care.assertHorseFreeOnDay(request.getHorseId(), requestedAt.toLocalDate(), active.getId());
                 active.setRequestedAt(requestedAt);
                 active.setDescription(description);
                 CareSchedule moved = schedules.save(active);
-                care.assignRequestedSchedule(moved, user.getUserId());
+                care.assignRequestedScheduleOnChosenDay(moved, user.getUserId());
                 return moved;
             }
         }
+
+        care.assertHorseFreeOnDay(request.getHorseId(), requestedAt.toLocalDate(), null);
 
         CareSchedule schedule = new CareSchedule();
         schedule.setHorseId(request.getHorseId());
@@ -182,7 +186,7 @@ public class PreventiveCareService {
         schedule.setRequestedAt(requestedAt);
 
         CareSchedule saved = schedules.save(schedule);
-        care.assignRequestedSchedule(saved, user.getUserId());
+        care.assignRequestedScheduleOnChosenDay(saved, user.getUserId());
         return saved;
     }
 

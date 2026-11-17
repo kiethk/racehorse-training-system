@@ -6,6 +6,7 @@ backend/.mvn/wrapper/maven-wrapper.jar
 node_modules/
 frontend/node_modules/
 test-results/
+tests/e2e/results/
 **/.next/
 pnpm-lock.yaml
 pnpm-workspace.yaml
@@ -70,3 +71,5 @@ blob-report/
 playwright/.cache/
 playwright/.auth/
 .env.test
+diagram/
+.worktrees/

@@ -160,6 +160,8 @@ class AdmissionGroomReviewServiceTest {
         own.setGroomId(7L);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(stableStallRepository.findAvailableQuarantineStallOfGroomForUpdate(7L)).thenReturn(Optional.of(own));
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(1L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L);
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "  "));
         assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, result.getStatus());
         assertEquals(99L, result.getQuarantineStallId());
@@ -170,6 +172,47 @@ class AdmissionGroomReviewServiceTest {
         assertNotNull(result.getArrivalDeadlineAt());
         verify(assignments).closeAsDecided(1L);
         verifyNoInteractions(triggers);
+    }
+
+    @Test
+    @DisplayName("Groom approve bị chặn khi chuồng thường không đủ cho các ngựa đang cách ly + ngựa mới")
+    void approvalBlockedWhenRegularReserveCannotCoverQuarantinePlusNewHorse() {
+        AdmissionApplication admission = admission();
+        StableStall own = stall(99L);
+        own.setGroomId(7L);
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.findAvailableQuarantineStallOfGroomForUpdate(7L)).thenReturn(Optional.of(own));
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(2L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(2L);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.review(1L, 7L, request(ReviewDecision.APPROVED, null)));
+
+        assertEquals(409, error.getStatus().value());
+        assertEquals(AdmissionCapacityPolicy.REGULAR_RESERVE_INSUFFICIENT, error.getErrorCode());
+        assertEquals(AdmissionStatus.GROOM_REVIEW, admission.getStatus());
+        assertNull(admission.getQuarantineStallId());
+        assertEquals(StallStatus.AVAILABLE, own.getStatus());
+        verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
+        verify(assignments, never()).closeAsDecided(anyLong());
+    }
+
+    @Test
+    @DisplayName("Groom approve thành công khi còn đúng một chuồng thường cho ngựa mới")
+    void approvalSucceedsWhenReserveCoversQuarantinePlusNewHorse() {
+        AdmissionApplication admission = admission();
+        StableStall own = stall(99L);
+        own.setGroomId(7L);
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.findAvailableQuarantineStallOfGroomForUpdate(7L)).thenReturn(Optional.of(own));
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(3L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(2L);
+
+        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, null));
+
+        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, result.getStatus());
+        assertEquals(StallStatus.RESERVED, own.getStatus());
+        verify(assignments).closeAsDecided(1L);
     }
 
     @Test
@@ -232,6 +275,8 @@ class AdmissionGroomReviewServiceTest {
         StableStall own = stall(99L); own.setGroomId(7L);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(stableStallRepository.findAvailableQuarantineStallOfGroomForUpdate(7L)).thenReturn(Optional.of(own));
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(1L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L);
         when(workload.isFull(7L)).thenReturn(true);
         service.review(1L, 7L, request(ReviewDecision.APPROVED, "Ready"));
         verify(triggers).reassignFullAfterCommit(7L);

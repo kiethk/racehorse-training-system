@@ -106,11 +106,14 @@ public class CareRescheduleService {
         }
         authorize(schedule, actor);
 
-        LocalDate oldDate = schedule.getRequestedAt() != null ? schedule.getRequestedAt().toLocalDate() : null;
+        LocalDate oldDate = schedule.getScheduledDate() != null ? schedule.getScheduledDate()
+                : (schedule.getScheduledAt() != null ? schedule.getScheduledAt().toLocalDate()
+                : (schedule.getRequestedAt() != null ? schedule.getRequestedAt().toLocalDate() : null));
         CareScheduleStatus oldStatus = schedule.getStatus();
 
         if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
             schedule.setVeterinarianId(null);
+            schedule.setScheduledDate(null);
             schedule.setScheduledAt(null);
             schedule.setStatus(CareScheduleStatus.SCHEDULED);
         }
@@ -119,7 +122,9 @@ public class CareRescheduleService {
         schedule.setRescheduleNote(request.getNote() == null || request.getNote().isBlank() ? null : request.getNote().trim());
         CareSchedule saved = schedules.save(schedule);
         if (careScheduleService != null) {
-            careScheduleService.assignRequestedSchedule(saved);
+            // Ngày mới do Vet chọn: chặn trùng ngày của ngựa và giữ đúng ngày đó (AD-037).
+            careScheduleService.assertHorseFreeOnDay(saved.getHorseId(), request.getNewDate(), saved.getId());
+            careScheduleService.assignRequestedScheduleOnChosenDay(saved, saved.getRequestedById());
         }
 
         if (auditLogService != null) {

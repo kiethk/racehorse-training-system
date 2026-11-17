@@ -62,6 +62,7 @@ class CareRescheduleServiceTest {
         schedule.setCareType(CareType.ROUTINE);
         schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setVeterinarianId(20L);
+        schedule.setScheduledDate(TODAY.plusDays(2));
         schedule.setScheduledAt(TODAY.plusDays(2).atTime(9, 0));
         when(schedules.findByIdForUpdate(100L)).thenReturn(Optional.of(schedule));
         when(schedules.save(any())).thenAnswer(call -> call.getArgument(0));
@@ -76,6 +77,7 @@ class CareRescheduleServiceTest {
 
         assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
         assertNull(schedule.getVeterinarianId());
+        assertNull(schedule.getScheduledDate());
         assertNull(schedule.getScheduledAt());
         assertEquals(TODAY.plusDays(9).atTime(14, 0), schedule.getRequestedAt());
         assertEquals(RescheduleReason.UNDER_TREATMENT, schedule.getRescheduleReason());

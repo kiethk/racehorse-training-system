@@ -10,6 +10,7 @@ export interface ExamValidationInput {
   careType: CareType;
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   fromIncident?: boolean;
+  incidentType?: 'PROBLEM' | 'TRAUMA';
   showTier1: boolean;
   verdict: VetReviewDecision;
   rejectReason: string;
@@ -41,6 +42,7 @@ export function validateExam(input: ExamValidationInput): ExamValidationResult {
     careType,
     schedulePurpose,
     fromIncident,
+    incidentType,
     showTier1,
     verdict,
     rejectReason,
@@ -163,6 +165,10 @@ export function validateExam(input: ExamValidationInput): ExamValidationResult {
   if (careType === 'INITIAL' && trainingDecision === 'BLOCKED' && markerCount === 0) {
     errors.injuryMarkers =
       'An injury or condition record is required when blocking a newly admitted horse.';
+  }
+  if (incidentType === 'TRAUMA' && markerCount === 0) {
+    errors.injuryMarkers =
+      'A trauma case must record at least one injury marker before it can be completed.';
   }
 
   let vaccinationErrors: Record<string, string> | null = null;

@@ -6,6 +6,7 @@ import { admissionsApi } from '../services/api';
 import type { AdmissionDetailResponse } from '../types';
 import { Button, Checkbox, ConfirmDialog, FormField, Notice, Select, Textarea } from '@/components/ui';
 import { toast } from '@/lib/toast';
+import { canApproveAdmission } from '../shared/lib/capacity';
 
 interface Props {
   detailData: AdmissionDetailResponse;
@@ -23,6 +24,8 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const availableStalls = detailData.availableRegularStalls || [];
+  const capacity = detailData.capacity;
+  const approvalCapacityAvailable = canApproveAdmission(capacity);
 
   const handleActionClick = (decision: 'APPROVED' | 'REJECTED') => {
     setError(null);
@@ -65,6 +68,9 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
       setError(msg);
       toast.error('Review not saved', msg);
       setConfirmDecision(null);
+      if (err instanceof ApiError && err.errorCode === 'REGULAR_RESERVE_INSUFFICIENT') {
+        onSuccess();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -86,6 +92,14 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
     <>
       <div className="space-y-4">
         {error && <Notice tone="error">{error}</Notice>}
+
+        {!approvalCapacityAvailable && capacity && (
+          <Notice tone="warning">
+            Cannot approve yet: {capacity.occupiedQuarantineStalls} horse(s) are in quarantine and need{' '}
+            {capacity.requiredRegularStallsForApproval} free regular stall(s), but only{' '}
+            {capacity.availableRegularStalls} are available. Free up a regular stall first.
+          </Notice>
+        )}
 
         {actionMode === 'INITIAL' && (
           <div className="grid grid-cols-2 gap-2">
@@ -147,7 +161,7 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
               <Button variant="secondary" onClick={cancelAction} disabled={submitting}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={() => handleActionClick('APPROVED')} disabled={submitting || (stallMode === 'manual' && (!stallId || availableStalls.length === 0))}>
+              <Button variant="primary" onClick={() => handleActionClick('APPROVED')} disabled={submitting || !approvalCapacityAvailable || (stallMode === 'manual' && (!stallId || availableStalls.length === 0))}>
                 Confirm Approve
               </Button>
             </div>

@@ -1,8 +1,7 @@
 'use client';
 
 import { FormField } from '@/components/ui/FormField';
-import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import { useMemo } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { Input, Select } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import type { MetricField } from './constants';
@@ -18,39 +17,6 @@ export interface VitalsSectionProps {
 }
 
 export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled, onRandomize }: VitalsSectionProps) {
-  // Derived dehydration grade from the vitals actually typed in (screening aid, not a diagnosis).
-  const hydrationHint = useMemo(
-    () => assessHydrationFromVitals({ heartRate: metrics.heartRate, temperature: metrics.temperature, respiratoryRate: metrics.respiratoryRate }),
-    [metrics.heartRate, metrics.temperature, metrics.respiratoryRate],
-  );
-  const hintTone = !hydrationHint
-    ? ''
-    : hydrationHint.status === 'NORMAL'
-      ? 'text-[var(--color-success)]'
-      : hydrationHint.status === 'MILD_DEHYDRATION'
-        ? 'text-[var(--color-warning)]'
-        : 'text-[var(--color-danger)]';
-  let hintNode: ReactNode = null;
-  if (hydrationHint) {
-    hintNode = (
-      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-        <span className={`font-medium ${hintTone}`}>
-          {`Assessment from vitals: ${HYDRATION_STATUS_LABELS[hydrationHint.status]} — ${hydrationHint.reason}`}
-        </span>
-        {hydrationHint.status !== metrics.hydrationStatus && (
-          <Button
-            type="button"
-            size="sm"
-            variant="tertiary"
-            disabled={isFormDisabled}
-            onClick={() => setMetrics((curr) => ({ ...curr, hydrationStatus: hydrationHint.status }))}
-          >
-            Apply
-          </Button>
-        )}
-      </p>
-    );
-  }
   return (
     <fieldset disabled={isFormDisabled} className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4">
       <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
@@ -74,36 +40,15 @@ export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-5">
         {metricConfigs.map((cfg) => {
           const valStr = metrics[cfg.key];
-          // metric tone computed in parent? recompute here minimal
           let borderClass = 'border-[var(--color-border)] focus:border-[var(--color-primary)]';
-          let statusLabel: string | null = null;
-          let tone: 'warning' | 'danger' | 'success' | null = null;
           if (valStr.trim()) {
             const num = Number(valStr);
-            if (Number.isNaN(num)) {
+            if (Number.isNaN(num) || num < cfg.criticalMin || num > cfg.criticalMax) {
               borderClass = 'border-[var(--color-danger)] focus:border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]';
-              statusLabel = 'Invalid';
-              tone = 'danger';
-            } else if (num < cfg.criticalMin) {
-              borderClass = 'border-[var(--color-danger)] focus:border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]';
-              statusLabel = 'Critical Low';
-              tone = 'danger';
-            } else if (num > cfg.criticalMax) {
-              borderClass = 'border-[var(--color-danger)] focus:border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]';
-              statusLabel = 'Critical High';
-              tone = 'danger';
-            } else if (num < cfg.normalMin) {
+            } else if (num < cfg.normalMin || num > cfg.normalMax) {
               borderClass = 'border-[var(--color-warning)] focus:border-[var(--color-warning)] ring-1 ring-[var(--color-warning)]';
-              statusLabel = 'Low';
-              tone = 'warning';
-            } else if (num > cfg.normalMax) {
-              borderClass = 'border-[var(--color-warning)] focus:border-[var(--color-warning)] ring-1 ring-[var(--color-warning)]';
-              statusLabel = 'Elevated';
-              tone = 'warning';
             } else {
               borderClass = 'border-[var(--color-success)] focus:border-[var(--color-success)]';
-              statusLabel = 'Normal';
-              tone = 'success';
             }
           }
           return (
@@ -112,19 +57,6 @@ export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled
                 <label htmlFor={`metric-${cfg.key}`} className="font-medium text-[var(--color-text-primary)]">
                   {cfg.label}
                 </label>
-                {statusLabel && (
-                  <span
-                    className={`text-xs font-bold ${
-                      tone === 'danger'
-                        ? 'text-[var(--color-danger)]'
-                        : tone === 'warning'
-                          ? 'text-[var(--color-warning)]'
-                          : 'text-[var(--color-success)]'
-                    }`}
-                  >
-                    {statusLabel}
-                  </span>
-                )}
               </div>
               <div className="relative">
                 <Input
@@ -134,7 +66,25 @@ export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled
                   step={cfg.step}
                   placeholder={cfg.placeholder}
                   value={metrics[cfg.key]}
-                  onChange={(e) => setMetrics((curr) => ({ ...curr, [cfg.key]: e.target.value }))}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    setMetrics((curr) => {
+                      const next = { ...curr, [cfg.key]: nextValue };
+                      if (
+                        cfg.key === 'temperature' ||
+                        cfg.key === 'heartRate' ||
+                        cfg.key === 'respiratoryRate'
+                      ) {
+                        const assessed = assessHydrationFromVitals({
+                          heartRate: next.heartRate,
+                          temperature: next.temperature,
+                          respiratoryRate: next.respiratoryRate,
+                        });
+                        next.hydrationStatus = assessed ? assessed.status : '';
+                      }
+                      return next;
+                    });
+                  }}
                   className={`w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-3 pr-10 font-metric text-sm font-semibold text-[var(--color-text-primary)] outline-none transition-all ${borderClass}`}
                 />
                 <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-muted)]">
@@ -167,7 +117,6 @@ export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled
               ))}
             </Select>
           </FormField>
-          {hintNode}
         </div>
         <div>
           <FormField label="Telemetry &amp; Observation Context" htmlFor="metric-notes">
