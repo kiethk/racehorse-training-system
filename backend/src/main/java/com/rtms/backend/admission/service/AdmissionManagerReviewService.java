@@ -159,19 +159,11 @@ public class AdmissionManagerReviewService {
                             + ". Free up a regular stall first.");
         }
 
-        StableStall regularStall;
-
-        if (request.getStallId() != null) {
-            regularStall = stableStallRepository
-                    .findAvailableRegularStallByIdForUpdate(request.getStallId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
-                            "Selected regular stall is no longer available or has no assigned groom"));
-        } else {
-            regularStall = stableStallRepository
-                    .findFairAvailableStallForUpdate("REGULAR")
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
-                            "No available regular stall with an assigned groom"));
-        }
+        // 1b. Always automatically assign to the fairest available regular stall with an assigned groom
+        StableStall regularStall = stableStallRepository
+                .findFairAvailableStallForUpdate("REGULAR")
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                        "No available regular stall with an assigned groom"));
 
         // 2. Update existing Horse
         // Thành ELIGIBLE là đủ để ngựa tập được nếu Thú y đã cho phép. Kết luận
