@@ -54,6 +54,7 @@ class CourseRunHorsesIntegrationTest {
     @Autowired private CourseRunService courseRunService;
     @Autowired private TrainingSessionService sessionService;
     @Autowired private TrainingWorkoutService workoutService;
+    @Autowired private HorseAttendanceService attendanceService;
     @Autowired private SessionSettlementService settlement;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
@@ -126,17 +127,50 @@ class CourseRunHorsesIntegrationTest {
     }
 
     @Test
-    void sessionHorsesShowOutcomeToRunRanCancelledAndDidNotRun() {
+    void sessionHorsesNeverShowACancelledWorkout() {
         clock.set(monday.atTime(12, 0));
         settlement.settle();
         fixtures.recordHeldResults(blaze);
         workoutService.markDidNotRun(sessionHorse(courseRun.sessions().get(0).id(), "Thunder").workoutId(), trainer);
         groupService.removeHorse(group.id(), blaze.getId(), trainer);
 
-        assertEquals("CANCELLED", sessionHorse(courseRun.sessions().get(0).id(), "Thunder").status());
+        assertEquals(List.of("Blaze"), horsesOfSession(0));
         assertEquals("RAN", sessionHorse(courseRun.sessions().get(0).id(), "Blaze").status());
+        assertEquals(List.of("Thunder"), horsesOfSession(1));
         assertEquals("SCHEDULED", sessionHorse(courseRun.sessions().get(1).id(), "Thunder").status());
-        assertEquals("CANCELLED", sessionHorse(courseRun.sessions().get(1).id(), "Blaze").status());
+    }
+
+    @Test
+    void aCancelledSessionListsNoHorses() {
+        Long first = courseRun.sessions().get(0).id();
+
+        sessionService.cancel(first, trainer);
+
+        assertTrue(sessionHorses(first).isEmpty());
+        assertEquals(List.of("Blaze", "Thunder"), horsesOfSession(1));
+    }
+
+    @Test
+    void aHorseLeavingBeforeTheFirstSessionLeavesNoTraceInTheCourseRun() {
+        groupService.removeHorse(group.id(), blaze.getId(), trainer);
+
+        assertEquals(List.of("Thunder"), List.copyOf(courseRunHorses().keySet()));
+        assertTrue(attendanceService.getHistory(blaze.getId(), trainer).isEmpty());
+        assertEquals(1, attendanceService.getHistory(thunder.getId(), trainer).size());
+    }
+
+    @Test
+    void aHorseThatDidNotRunAnySessionIsNoLongerListed() {
+        clock.set(monday.plusDays(4).atTime(12, 0));   // whole course is over
+        settlement.settle();
+        fixtures.recordHeldResults(blaze);
+        List<Long> thunderWorkouts = courseRun.sessions().stream()
+                .map(session -> sessionHorse(session.id(), "Thunder").workoutId()).toList();
+        thunderWorkouts.forEach(workoutId -> workoutService.markDidNotRun(workoutId, trainer));
+
+        assertEquals(List.of("Blaze"), List.copyOf(courseRunHorses().keySet()));
+        assertTrue(attendanceService.getHistory(thunder.getId(), trainer).isEmpty());
+        assertEquals(3, attendanceService.getHistory(blaze.getId(), trainer).get(0).attended());
     }
 
     @Test

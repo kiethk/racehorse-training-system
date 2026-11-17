@@ -18,11 +18,11 @@ import { displayError, formatDate } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { useTrainingRules } from '../../hooks/useTrainingRules';
 import { shiftIsoDate, toIsoDate, DAY_HEADING_FORMAT } from '../../lib/dateRange';
-import { groupByDate, mondayOf, sessionTitle, totalNeedingResult } from '../../lib/groupSchedule';
+import { mondayOf, sessionTitle, totalNeedingResult } from '../../lib/groupSchedule';
 import { trainingService } from '../../services/trainingService';
 import type { SessionSummary, TrainingGroup } from '../../types';
 import { ScheduleWeekCalendar } from './ScheduleWeekCalendar';
-import { SessionCard } from './SessionCard';
+import { NeedsResultGrid } from './NeedsResultGrid';
 import { SessionDialog, SessionDetailContent } from './SessionDialog';
 import { TimelineStrip } from './TimelineStrip';
 
@@ -159,8 +159,6 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
     }
   }
 
-  const byDate = useMemo(() => groupByDate(sessions), [sessions]);
-
   return (
     <ScreenLayout variant="list">
       <PageHeader title="Schedule" />
@@ -243,7 +241,7 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
           />
         </Panel>
       ) : view === 'needs-result' ? (
-        <DayList byDate={byDate} onOpen={setOpenId} emptyTitle="Nothing is waiting for a result" />
+        <NeedsResultGrid sessions={sessions} rules={rules} onOpen={setOpenId} />
       ) : view === 'today' ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
@@ -346,31 +344,3 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
   );
 }
 
-function DayList({
-  byDate,
-  onOpen,
-  emptyTitle,
-}: {
-  byDate: Record<string, SessionSummary[]>;
-  onOpen: (id: number) => void;
-  emptyTitle: string;
-}) {
-  const dates = Object.keys(byDate).sort();
-  if (dates.length === 0) {
-    return <Panel padded><EmptyState icon="calendar" title={emptyTitle} /></Panel>;
-  }
-  return (
-    <div className="space-y-4">
-      {dates.map((day) => (
-        <section key={day} className="space-y-2">
-          <h2 className="text-sm font-semibold text-[var(--color-text-secondary)]">{formatDate(day, DAY_HEADING_FORMAT)}</h2>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {byDate[day].map((session) => (
-              <SessionCard key={session.id} session={session} onOpen={onOpen} />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}

@@ -150,6 +150,8 @@ export interface AdmissionDetailResponse {
     occupiedQuarantineStalls: number;
     admissionCapacityAvailable: boolean;
     blockingReason: 'NO_QUARANTINE_STALL' | 'REGULAR_RESERVE_INSUFFICIENT' | null;
+    requiredRegularStallsForApproval: number;
+    approvalCapacityAvailable: boolean;
   };
 }
 

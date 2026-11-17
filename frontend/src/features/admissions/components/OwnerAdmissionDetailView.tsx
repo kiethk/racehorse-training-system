@@ -8,6 +8,7 @@ import { Notice } from '@/components/ui/Notice';
 import { Pill } from '@/components/ui/StatusBadge';
 import { formatDateTime } from '@/lib/display';
 import { ownerAdmissionApi, type OwnerAdmissionDetail } from '../services/ownerApi';
+import type { AdmissionDocumentType } from '../types/owner';
 import { admissionsApi } from '../services/api';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
@@ -15,7 +16,7 @@ import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionInfoSection, AdmissionSideCard, InfoGroupTitle, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { EditAdmissionModal } from './EditAdmissionModal';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
-import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { AdmissionDocumentsSection, documentNames } from '../shared/components/AdmissionDocumentsSection';
 import { ArrivalPhotosBlock } from '../shared/components/ArrivalPhotosBlock';
 
 const reviewFeedback = [
@@ -75,10 +76,38 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
     detail.vetTrainingDecision ||
     detail.managerDecision
   );
+
+  const canEditAdmission =
+    detail.status === 'GROOM_REVIEW' &&
+    !detail.groomReviewedAt &&
+    !detail.groomDecision;
+
+  const REQUIRED_DOCS: readonly AdmissionDocumentType[] = [
+    'HORSE_PHOTO',
+    'REGISTRATION_DOCUMENT',
+    'PEDIGREE_CERTIFICATE',
+    'VACCINATION_RECORD',
+  ];
+  const uploadedDocTypes = new Set(detail.documents.map((d) => d.documentType));
+  const missingRequired = REQUIRED_DOCS.filter((t) => !uploadedDocTypes.has(t));
+
   return (
     <div className="space-y-5">
       {created && <Notice tone="success">Admission and supporting documents submitted for Groom review.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
+      {missingRequired.length > 0 && canEditAdmission && (
+        <Notice tone="warning" title="Action required: Missing documents">
+          Your admission request is awaiting groom review, but is missing required document(s):{' '}
+          <span className="font-semibold">
+            {missingRequired.map((t) => documentNames[t] || t).join(', ')}
+          </span>.
+          <div className="mt-2.5">
+            <Button size="sm" variant="primary" icon="upload" onClick={() => setEditing(true)}>
+              Upload missing documents
+            </Button>
+          </div>
+        </Notice>
+      )}
       {detail.status === 'REJECTED' && (
         <Notice tone="error" title="Application rejected">
           {feedback.length > 0 ? (
@@ -98,7 +127,7 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
         returnTo="/owner/admissions"
         header={<AdmissionDetailHeader detail={{ ...detail, ownerId: user?.userId, ownerName: user?.fullName }} horsePhotoUrl={photo ? admissionsApi.assetUrl(photo.fileUrl) : undefined} />}
         pipeline={<AdmissionPipeline detail={detail} />}
-        sidebar={detail.status === 'GROOM_REVIEW' ? (
+        sidebar={canEditAdmission ? (
           <AdmissionSideCard title="Waiting for groom review">
             <p className="text-[var(--color-text-secondary)]">
               You can still change the horse details and replace or add documents until a groom reviews this application.
@@ -137,7 +166,45 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
                 id: 'documents',
                 label: 'Documents',
                 count: detail.documents.length,
-                content: <AdmissionDocumentsSection documents={detail.documents} />,
+                content: (
+                  <div className="space-y-4">
+                    {missingRequired.length > 0 && canEditAdmission && (
+                      <Notice tone="warning" title="Missing required documents">
+                        Please upload the missing required document(s) before the groom reviews your application:{' '}
+                        <span className="font-semibold">
+                          {missingRequired.map((t) => documentNames[t] || t).join(', ')}
+                        </span>.
+                        <div className="mt-2.5">
+                          <Button size="sm" variant="primary" icon="upload" onClick={() => setEditing(true)}>
+                            Upload missing documents
+                          </Button>
+                        </div>
+                      </Notice>
+                    )}
+                    {canEditAdmission && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                            Upload or replace supporting documents
+                          </p>
+                          <p className="text-xs text-[var(--color-text-secondary)]">
+                            You can upload additional documents (e.g. Deworming Record, Health Certificate, Medical Records) or replace files until the groom reviews your application.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          icon="upload"
+                          onClick={() => setEditing(true)}
+                        >
+                          Upload documents
+                        </Button>
+                      </div>
+                    )}
+                    <AdmissionDocumentsSection documents={detail.documents} />
+                  </div>
+                ),
               },
               {
                 id: 'history',
@@ -212,12 +279,12 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
                         {/* 3. Trainer Review */}
                         {(detail.trainerReviewedAt || detail.trainerFeedback) && (
                           <div className="space-y-3 pt-5 border-t border-[var(--color-border)]">
-                            <InfoGroupTitle>Trainer Assessment</InfoGroupTitle>
+                            <InfoGroupTitle>Trainer Feedback</InfoGroupTitle>
                             {detail.trainerReviewedAt && (
-                              <InfoRow label="Assessed At" value={formatDateTime(detail.trainerReviewedAt)} />
+                              <InfoRow label="Reviewed At" value={formatDateTime(detail.trainerReviewedAt)} />
                             )}
                             <InfoRow
-                              label="Assessment Notes"
+                              label="Feedback"
                               value={detail.trainerFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}
                             />
                           </div>

@@ -12,6 +12,7 @@ import com.rtms.backend.identity.entity.VeterinarianProfile;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -33,6 +34,8 @@ import com.rtms.backend.training.service.TrainingDecisionService;
 
 
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.config.ClientTimeContext;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -103,6 +106,103 @@ class CareScheduleHardeningTests {
         when(schedules.existsByVeterinarianIdAndStatus(anyLong(), eq(CareScheduleStatus.IN_PROGRESS))).thenReturn(false);
         when(schedules.existsByHorseIdAndStatus(anyLong(), eq(CareScheduleStatus.IN_PROGRESS))).thenReturn(false);
         when(schedules.existsByVeterinarianIdAndHorseIdAndStatusIn(anyLong(), anyLong(), any())).thenReturn(false);
+    }
+
+    @Test
+    @DisplayName("AD-037: ngày Vet chọn đã hết slot thì 409 NO_SLOT_THAT_DAY, không tự dời sang ngày khác")
+    void chosenDayWithoutSlot_isRejectedInsteadOfMovingToAnotherDay() {
+        mockHorse(10L, "Thunder");
+        User vet = mockVet(5L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+
+        LocalDate chosenDay = ClientTimeContext.today().plusDays(2);
+        CareSchedule routine = new CareSchedule();
+        routine.setId(102L);
+        routine.setHorseId(10L);
+        routine.setCareType(CareType.ROUTINE);
+        routine.setPurpose(CareSchedulePurpose.FOLLOW_UP);
+        routine.setStatus(CareScheduleStatus.SCHEDULED);
+        routine.setDurationMinutes(30);
+        routine.setRequestedAt(chosenDay.atTime(14, 0));
+
+        // Vet duy nhất đã đủ quota 3 ca ROUTINE trong ngày Vet chọn.
+        when(schedules.findAssignedInDay(any(), any(), any())).thenReturn(List.of(
+                filledRoutine(201L, 5L, chosenDay),
+                filledRoutine(202L, 5L, chosenDay),
+                filledRoutine(203L, 5L, chosenDay)));
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.assignRequestedScheduleOnChosenDay(routine, 5L));
+
+        assertEquals("NO_SLOT_THAT_DAY", error.getErrorCode());
+        assertNull(routine.getScheduledDate());
+        assertNull(routine.getVeterinarianId());
+    }
+
+    @Test
+    @DisplayName("AD-037: ngày Vet chọn xa hơn 14 ngày (horizon) và hết slot vẫn bị 409 NO_SLOT_THAT_DAY")
+    void chosenDayBeyondHorizon_stillChecksSlotAndRejectsWhenFull() {
+        mockHorse(10L, "Thunder");
+        User vet = mockVet(5L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+
+        LocalDate chosenDay = ClientTimeContext.today().plusDays(20);
+        CareSchedule routine = new CareSchedule();
+        routine.setId(103L);
+        routine.setHorseId(10L);
+        routine.setCareType(CareType.ROUTINE);
+        routine.setPurpose(CareSchedulePurpose.FOLLOW_UP);
+        routine.setStatus(CareScheduleStatus.SCHEDULED);
+        routine.setDurationMinutes(30);
+        routine.setRequestedAt(chosenDay.atTime(14, 0));
+
+        when(schedules.findAssignedInDay(any(), any(), any())).thenReturn(List.of(
+                filledRoutine(201L, 5L, chosenDay),
+                filledRoutine(202L, 5L, chosenDay),
+                filledRoutine(203L, 5L, chosenDay)));
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.assignRequestedScheduleOnChosenDay(routine, 5L));
+
+        assertEquals("NO_SLOT_THAT_DAY", error.getErrorCode());
+        assertNull(routine.getScheduledDate());
+        assertNull(routine.getVeterinarianId());
+    }
+
+    @Test
+    @DisplayName("AD-037: ngày Vet chọn xa hơn 14 ngày (horizon) còn slot thì gán ngay Vet và ngày đã chọn")
+    void chosenDayBeyondHorizon_assignsVetOnChosenDayWhenSlotAvailable() {
+        mockHorse(10L, "Thunder");
+        User vet = mockVet(5L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+
+        LocalDate chosenDay = ClientTimeContext.today().plusDays(20);
+        CareSchedule routine = new CareSchedule();
+        routine.setId(104L);
+        routine.setHorseId(10L);
+        routine.setCareType(CareType.ROUTINE);
+        routine.setPurpose(CareSchedulePurpose.FOLLOW_UP);
+        routine.setStatus(CareScheduleStatus.SCHEDULED);
+        routine.setDurationMinutes(30);
+        routine.setRequestedAt(chosenDay.atTime(14, 0));
+
+        service.assignRequestedScheduleOnChosenDay(routine, 5L);
+
+        assertEquals(5L, routine.getVeterinarianId());
+        assertEquals(chosenDay, routine.getScheduledDate());
+    }
+
+    private CareSchedule filledRoutine(Long id, Long vetId, LocalDate day) {
+        CareSchedule filled = new CareSchedule();
+        filled.setId(id);
+        filled.setHorseId(900L + id);
+        filled.setVeterinarianId(vetId);
+        filled.setCareType(CareType.ROUTINE);
+        filled.setPurpose(CareSchedulePurpose.FOLLOW_UP);
+        filled.setStatus(CareScheduleStatus.SCHEDULED);
+        filled.setDurationMinutes(30);
+        filled.setScheduledDate(day);
+        return filled;
     }
 
     private Horse mockHorse(Long id, String name) {

@@ -83,7 +83,13 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
         raw.includes('active preventive care visit')
       ) {
         msg = 'This horse already has an active preventive care visit. Please complete or reschedule that visit instead.';
-      } else if (code === 'IDEMPOTENCY_CONFLICT' || raw.includes('IDEMPOTENCY_CONFLICT') || status === 409 || raw.includes('already exists')) {
+      } else if (code === 'HORSE_BUSY_THAT_DAY' || raw.includes('HORSE_BUSY_THAT_DAY')) {
+        msg = 'This horse already has a care visit on the selected date. Please choose another day.';
+      } else if (code === 'NO_SLOT_THAT_DAY' || raw.includes('NO_SLOT_THAT_DAY')) {
+        msg = 'No veterinarian has a free slot on the selected date. Please choose another day.';
+      } else if (code === 'HORSE_EXAM_IN_PROGRESS' || raw.includes('HORSE_EXAM_IN_PROGRESS')) {
+        msg = 'This horse already has an examination in progress. Finish it before booking another visit.';
+      } else if (code === 'IDEMPOTENCY_CONFLICT' || raw.includes('IDEMPOTENCY_CONFLICT') || raw.includes('already exists')) {
         msg = 'A care schedule of this type already exists for this horse on the selected date.';
       } else if (
         code === 'INVALID_DATE' ||

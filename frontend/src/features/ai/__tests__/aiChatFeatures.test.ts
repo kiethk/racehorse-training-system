@@ -99,16 +99,16 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
 
   it('filters nextPrompts to never suggest questions user already asked in current conversation', () => {
     const rolePrompts = [
-      'Lịch tập các ca hôm nay',
-      'Tiến độ các kế hoạch huấn luyện',
-      'Cảnh báo nguy cơ chấn thương & nhịp tim',
-      'Phân tích sở trường của ngựa',
-      'Danh sách Groom làm việc cùng',
+      "Today's workout session schedule",
+      'Training plan progress & milestones',
+      'Injury risk & recovery heart rate alerts',
+      'Horse distance & track preferences',
+      'Assigned grooms on duty',
     ];
 
     const messages = [
-      { id: 'u1', role: 'user', content: 'Lịch tập các ca hôm nay' },
-      { id: 'a1', role: 'assistant', content: 'Hôm nay có 3 ca tập.' },
+      { id: 'u1', role: 'user', content: "Today's workout session schedule" },
+      { id: 'a1', role: 'assistant', content: 'There are 3 sessions scheduled today.' },
     ];
 
     const asked = new Set(
@@ -120,9 +120,9 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
     const nextPrompts = unasked.slice(0, 2);
 
     assert.equal(nextPrompts.length, 2);
-    assert.equal(nextPrompts[0], 'Tiến độ các kế hoạch huấn luyện');
-    assert.equal(nextPrompts[1], 'Cảnh báo nguy cơ chấn thương & nhịp tim');
-    assert.ok(!nextPrompts.includes('Lịch tập các ca hôm nay'));
+    assert.equal(nextPrompts[0], 'Training plan progress & milestones');
+    assert.equal(nextPrompts[1], 'Injury risk & recovery heart rate alerts');
+    assert.ok(!nextPrompts.includes("Today's workout session schedule"));
   });
 
   it('extracts tool execution details with error prioritization over arguments', () => {

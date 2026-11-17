@@ -98,3 +98,5 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
    Chỉ để thử: chạy thật thì để seed lấy giờ hiện tại.
 
 `10_data.sql` được sinh một lần từ `seed-preview.json` của bộ hồ sơ. Từ giờ sửa thẳng trên file SQL.
+
+Nguồn dữ liệu: tên, số UELN và phả hệ của ngựa lấy từ trang ANICA công khai; link của từng con nằm trong comment `/* ANICA: ... */` cạnh cột `pedigree_notes` (để NULL, không hiện lên giao diện). Ảnh ngựa, giấy tờ, bệnh án và các đơn nhập học đều là mô phỏng cho demo.

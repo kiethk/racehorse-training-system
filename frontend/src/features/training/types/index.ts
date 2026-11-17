@@ -1,6 +1,9 @@
 export type CourseRunStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 /** HELD: the Session took place but the Workout is not yet confirmed; RAN: results recorded, so the horse took part. */
 export type WorkoutStatus = 'SCHEDULED' | 'HELD' | 'RAN' | 'CANCELLED';
+
+/** A Workout the API lists: a cancelled Workout is never listed, so these are the only statuses a screen shows. */
+export type ListedWorkoutStatus = Exclude<WorkoutStatus, 'CANCELLED'>;
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
 export type IntensityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -95,15 +98,14 @@ export interface WorkoutResultPreviewResponse {
   recoveryHeartRate: number;
 }
 
-/** One session of a horse in its schedule. The session and the horse's own workout can each be cancelled. */
+/** One session of a horse in its schedule; Sessions where the horse's own Workout was cancelled are not listed. */
 export interface HorseScheduleItem {
   sessionId: number;
   sessionDate: string; // YYYY-MM-DD
   startTime: string; // "06:00:00"
   endTime: string;
   exerciseName: string;
-  sessionStatus: SessionStatus;
-  workoutStatus: WorkoutStatus;
+  workoutStatus: ListedWorkoutStatus;
 }
 
 export interface HorseFitnessTrendItem {
@@ -244,8 +246,6 @@ export interface CourseRunSummary {
   sessionsTotal: number;
 }
 
-export type SessionHorseOutcome = 'TO_RUN' | 'NEEDS_RESULT' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
-
 /** A horse of a course run with its Attendance (attended of total Sessions). */
 export interface CourseRunHorse {
   horseId: number;
@@ -292,7 +292,7 @@ export interface SessionHorse {
   horseId: number;
   horseName: string;
   groomName: string | null;
-  status: WorkoutStatus;
+  status: ListedWorkoutStatus;
   performanceRating: number | null;
   /** The stored result, null until one is recorded; the edit form is pre-filled from it. */
   result: SessionWorkoutResult | null;

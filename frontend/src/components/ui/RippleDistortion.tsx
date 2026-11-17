@@ -207,8 +207,9 @@ export const RippleDistortion: React.FC<RippleDistortionProps> = ({
   configRef.current = { brushSize, spread, fade, spacing, clickStrength, trigger, enabled };
 
   useEffect(() => {
+    const setup = (): (() => void) | undefined => {
     const mount = mountRef.current;
-    if (!mount) return;
+    if (!mount) return undefined;
 
     const reduceMotion =
       typeof window !== 'undefined' &&
@@ -221,12 +222,21 @@ export const RippleDistortion: React.FC<RippleDistortionProps> = ({
       dpr: Math.min(window.devicePixelRatio || 1, 2)
     });
     const gl = renderer.gl;
+    if (!gl) throw new Error('WebGL context unavailable');
     gl.clearColor(0, 0, 0, 1);
     const canvas = gl.canvas;
     canvas.style.width = '100%';
     canvas.style.height = '100%';
     canvas.style.display = 'block';
     mount.appendChild(canvas);
+
+    // The canvas stays transparent (see globals.css) until the first frame with the image is drawn,
+    // so the static image under it is never covered by the black clear colour.
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      canvas.dataset.ready = 'false';
+    };
+    canvas.addEventListener('webglcontextlost', onContextLost);
 
     const imageTexture = new Texture(gl, {
       generateMipmaps: false,
@@ -263,6 +273,9 @@ export const RippleDistortion: React.FC<RippleDistortionProps> = ({
     };
 
     let disposed = false;
+    let imageReady = false;
+    let retried = false;
+    let retryTimer = 0;
     const image = new window.Image();
     image.crossOrigin = 'anonymous';
     image.decoding = 'async';
@@ -270,11 +283,21 @@ export const RippleDistortion: React.FC<RippleDistortionProps> = ({
       if (disposed) return;
       imageTexture.image = image;
       compositeUniforms.uTextureSize.value = [image.naturalWidth || 1, image.naturalHeight || 1];
+      imageReady = true;
+    };
+    image.onerror = () => {
+      // One retry covers a request lost while the server restarts or the network blips.
+      if (disposed || retried) return;
+      retried = true;
+      retryTimer = window.setTimeout(() => {
+        if (!disposed) image.src = `${src}${src.includes('?') ? '&' : '?'}retry=1`;
+      }, 800);
     };
     image.src = src;
     if (image.complete && image.naturalWidth > 0) {
       imageTexture.image = image;
       compositeUniforms.uTextureSize.value = [image.naturalWidth, image.naturalHeight];
+      imageReady = true;
     }
 
     const offsets = new Float32Array(MAX_WAVES * 2);
@@ -395,6 +418,7 @@ export const RippleDistortion: React.FC<RippleDistortionProps> = ({
 
     let raf = 0;
     let previousTime = 0;
+    let shown = false;
 
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
@@ -435,11 +459,18 @@ export const RippleDistortion: React.FC<RippleDistortionProps> = ({
 
       renderer.render({ scene: waveMesh, target: displacementTarget, clear: true });
       renderer.render({ scene: compositeMesh });
+
+      if (imageReady && !shown) {
+        shown = true;
+        canvas.dataset.ready = 'true';
+      }
     };
     raf = requestAnimationFrame(loop);
 
     return () => {
       disposed = true;
+      window.clearTimeout(retryTimer);
+      canvas.removeEventListener('webglcontextlost', onContextLost);
       cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener('pointermove', onMove);
@@ -449,6 +480,16 @@ export const RippleDistortion: React.FC<RippleDistortionProps> = ({
       const ext = gl.getExtension('WEBGL_lose_context');
       if (ext) ext.loseContext();
     };
+    };
+
+    try {
+      return setup();
+    } catch (error) {
+      // WebGL is unavailable or failed to start: drop the half-built canvas; the static image below stays visible.
+      console.warn('RippleDistortion: WebGL failed to start, showing the static image.', error);
+      mountRef.current?.replaceChildren();
+      return undefined;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src, quality]);
 

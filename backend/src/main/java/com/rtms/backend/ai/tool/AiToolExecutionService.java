@@ -45,7 +45,6 @@ import com.rtms.backend.training.repository.projection.PastWorkoutRow;
 import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
 import com.rtms.backend.training.repository.projection.SessionRow;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.RacingReadinessAssessment;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDecision;
@@ -54,7 +53,6 @@ import com.rtms.backend.training.repository.CourseRepository;
 import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.enums.CourseRunStatus;
-import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
@@ -142,7 +140,6 @@ public class AiToolExecutionService {
     private final CourseRunRepository courseRunRepository;
     private final HorseSpecialtyService horseSpecialtyService;
     private final HorsePerformanceService horsePerformanceService;
-    private final RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
     private final AreaRepository areaRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
@@ -177,7 +174,6 @@ public class AiToolExecutionService {
                                   CourseRunRepository courseRunRepository,
                                   HorseSpecialtyService horseSpecialtyService,
                                   HorsePerformanceService horsePerformanceService,
-                                  RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
                                   AreaRepository areaRepository,
                                   @Autowired(required = false) UserRepository userRepository,
                                   @Autowired(required = false) CourseRepository courseRepository,
@@ -210,7 +206,6 @@ public class AiToolExecutionService {
         this.courseRunRepository = courseRunRepository;
         this.horseSpecialtyService = horseSpecialtyService;
         this.horsePerformanceService = horsePerformanceService;
-        this.racingReadinessAssessmentRepository = racingReadinessAssessmentRepository;
         this.areaRepository = areaRepository;
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
@@ -272,7 +267,6 @@ public class AiToolExecutionService {
             case "getTrainerPlansSummary" -> handleGetTrainerPlansSummary(args, currentUser);
             case "getHorseSpecialtyAnalysis" -> handleGetHorseSpecialtyAnalysis(args, currentUser);
             case "getTrainerRiskAlerts" -> handleGetTrainerRiskAlerts(args, currentUser);
-            case "getRacingReadinessAssessment" -> handleGetRacingReadinessAssessment(args);
             case "getTrainerAssignedGrooms" -> handleGetTrainerAssignedGrooms(currentUser);
             case "getAssignedAdmissionReviews" -> handleGetAssignedAdmissionReviews(currentUser);
             case "getCourseCurriculumOverview" -> handleGetCourseCurriculumOverview();
@@ -342,9 +336,6 @@ public class AiToolExecutionService {
             item.put("breed", h.getBreed() != null ? h.getBreed() : "N/A");
             item.put("sex", h.getSex() != null ? h.getSex().name() : "N/A");
             item.put("dateOfBirth", h.getDateOfBirth() != null ? h.getDateOfBirth().toString() : "N/A");
-            item.put("breed", h.getBreed() != null ? h.getBreed() : "N/A");
-            item.put("sex", h.getSex() != null ? h.getSex().name() : "N/A");
-            item.put("dateOfBirth", h.getDateOfBirth() != null ? h.getDateOfBirth().toString() : "N/A");
             item.put("status", h.getCurrentStatus());
             item.put("trainingDecision", h.getTrainingDecision());
             item.put("trainingDecisionReason", h.getTrainingDecisionReason() != null ? h.getTrainingDecisionReason() : "Bình thường");
@@ -364,6 +355,9 @@ public class AiToolExecutionService {
         response.put("totalOwnedHorses", result.size());
         response.put("allowedTrainingHorses", duocTapLuyen);
         response.put("restrictedHorses", camTapLuyen);
+        if (result.isEmpty()) {
+            response.put("message", "You currently have no horses registered under your ownership in the club.");
+        }
         response.put("horseList", result);
         response.put("actionUrl", "/owner/horses");
         return response;
@@ -1350,40 +1344,6 @@ public class AiToolExecutionService {
 
         return Map.of("trainerName", resolveUserName(currentUser, "Huấn luyện viên"), "horsesAtRiskCount", aggregated.size(), "alertDetails", aggregated
         );
-    }
-
-    private Object handleGetRacingReadinessAssessment(Map<String, Object> args) {
-        Horse horse = resolveHorse(args);
-        if (horse == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
-        }
-        Long horseId = horse.getId();
-
-        Optional<RacingReadinessAssessment> opt = racingReadinessAssessmentRepository.findTopByHorseIdOrderByCreatedAtDesc(horseId);
-        if (opt.isEmpty()) {
-            return Map.of("horseName", horse.getName(), "message", "Chưa có bản đánh giá sẵn sàng thi đấu nào cho chiến mã này."
-            );
-        }
-
-        RacingReadinessAssessment r = opt.get();
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("horseId", horse.getId());
-        result.put("horseName", horse.getName());
-        result.put("readinessStatus", r.getReadinessStatus());
-        result.put("conformationScore", r.getConformationScore());
-        result.put("temperamentScore", r.getTemperamentScore());
-        result.put("racingFormScore", r.getGaitQualityScore());
-        result.put("estimatedMonthsToRace", r.getEstimatedMonthsToRace());
-        result.put("assessmentDate", r.getAssessmentDate());
-        result.put("expertReview", r.getRemarks());
-        result.put("trainerId", r.getTrainerId());
-        String readinessTrainer = "Chưa xác định";
-        if (r.getTrainerId() != null && userRepository != null) {
-            readinessTrainer = userRepository.findById(r.getTrainerId()).map(User::getFullName).orElse("HLV #" + r.getTrainerId());
-        }
-        result.put("trainerName", readinessTrainer);
-        result.put("admissionId", r.getAdmissionId());
-        return result;
     }
 
     private Object handleGetTrainerAssignedGrooms(AuthenticatedUser currentUser) {

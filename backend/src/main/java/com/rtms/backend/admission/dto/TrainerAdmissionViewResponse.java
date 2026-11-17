@@ -3,7 +3,6 @@ import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
 
 import com.rtms.backend.horse.entity.Horse;
-import com.rtms.backend.training.entity.RacingReadinessAssessment;
 
 import java.util.List;
 
@@ -20,22 +19,16 @@ public class TrainerAdmissionViewResponse {
     /** Danh sách chỉ số sinh hiệu (HorseHealthMetric). */
     private List<?> healthMetrics;
 
-    /** Đã đánh giá rồi thì trả về để FE hiển thị lại; chưa thì null. */
-    private RacingReadinessAssessment existingAssessment;
-
     public TrainerAdmissionViewResponse(AdmissionDetailResponse admission, Horse horse,
-                                        List<?> healthRecords, List<?> healthMetrics,
-                                        RacingReadinessAssessment existingAssessment) {
+                                        List<?> healthRecords, List<?> healthMetrics) {
         this.admission = admission;
         this.horse = horse;
         this.healthRecords = healthRecords;
         this.healthMetrics = healthMetrics;
-        this.existingAssessment = existingAssessment;
     }
 
     public AdmissionDetailResponse getAdmission() { return admission; }
     public Horse getHorse() { return horse; }
     public List<?> getHealthRecords() { return healthRecords; }
     public List<?> getHealthMetrics() { return healthMetrics; }
-    public RacingReadinessAssessment getExistingAssessment() { return existingAssessment; }
 }

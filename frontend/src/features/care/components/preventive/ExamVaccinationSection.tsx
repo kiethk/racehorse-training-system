@@ -144,7 +144,7 @@ export function ExamVaccinationSection({
       ) : isAdmission ? (
         <div className="space-y-2">
           {onViewDocument && (
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
+            <div className="flex flex-wrap gap-2">
               {([
                 ['VACCINATION_RECORD', 'View vaccination record'],
                 ['DEWORMING_RECORD', 'View deworming record'],
@@ -153,7 +153,15 @@ export function ExamVaccinationSection({
               ] as const).map(([type, label]) => {
                 const document = documents.find((item) => item.documentType === type);
                 return document ? (
-                  <Button key={type} type="button" variant="link" onClick={() => onViewDocument(document.id)}>{label}</Button>
+                  <Button
+                    key={type}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onViewDocument(document.id)}
+                  >
+                    {label}
+                  </Button>
                 ) : null;
               })}
             </div>

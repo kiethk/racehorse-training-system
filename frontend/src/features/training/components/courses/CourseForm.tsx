@@ -57,7 +57,10 @@ function CourseFormContent({
   const [totalSessions, setTotalSessions] = useState(DEFAULT_SESSIONS);
   const [rotation, setRotation] = useState<number[]>([]);
   const [search, setSearch] = useState('');
-  const [validation, setValidation] = useState<string | null>(null);
+  // A validation message belongs to the inputs it was raised for: once any input changes it is no longer shown.
+  const [validation, setValidation] = useState<{ text: string; inputs: string } | null>(null);
+  const inputsKey = JSON.stringify([name, totalSessions, rotation]);
+  const shownValidation = validation?.inputs === inputsKey ? validation.text : null;
 
   const exerciseById = useMemo(
     () => new Map(exercises.map((exercise) => [exercise.id, exercise])),
@@ -96,20 +99,21 @@ function CourseFormContent({
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    const reject = (text: string) => setValidation({ text, inputs: inputsKey });
     if (!name.trim() || sessionsError) {
-      setValidation('Enter a course name and a valid number of sessions.');
+      reject('Enter a course name and a valid number of sessions.');
       return;
     }
     if (rules && rotation.length > rules.maxCourseExercises) {
-      setValidation(`A course can have at most ${rules.maxCourseExercises} exercises.`);
+      reject(`A course can have at most ${rules.maxCourseExercises} exercises.`);
       return;
     }
     if (rotation.length === 0) {
-      setValidation('Select at least one exercise for the course rotation.');
+      reject('Select at least one exercise for the course rotation.');
       return;
     }
     if (tooManyExercises) {
-      setValidation(tooManyExercises);
+      reject(tooManyExercises);
       return;
     }
     setValidation(null);
@@ -121,7 +125,7 @@ function CourseFormContent({
     });
   }
 
-  const message = validation ?? error;
+  const message = shownValidation ?? error;
 
   const filteredCount = useMemo(() => {
     return exercises.filter((s) => s.name.toLowerCase().includes(search.trim().toLowerCase()))

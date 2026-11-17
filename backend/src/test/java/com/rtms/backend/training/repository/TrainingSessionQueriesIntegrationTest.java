@@ -168,13 +168,13 @@ class TrainingSessionQueriesIntegrationTest {
     // ---------------------------------------------------------------- schedules
 
     @Test
-    void aHorseScheduleIncludesCancelledSessionsInOrder() {
+    void aHorseScheduleSkipsCancelledWorkoutsAndKeepsTheOrder() {
         List<HorseScheduleItemResponse> schedule = workouts.findHorseSchedule(thunder.getId(), today.minusDays(10), today.plusDays(10));
 
-        assertEquals(4, schedule.size());
+        assertEquals(3, schedule.size());
         assertEquals(today.minusDays(3), schedule.get(0).sessionDate());
-        assertEquals(SessionStatus.CANCELLED, schedule.get(3).sessionStatus());
-        assertEquals(WorkoutStatus.CANCELLED, schedule.get(3).workoutStatus());
+        assertEquals(today.plusDays(2), schedule.get(2).sessionDate());
+        assertTrue(schedule.stream().noneMatch(item -> item.workoutStatus() == WorkoutStatus.CANCELLED));
     }
 
     @Test

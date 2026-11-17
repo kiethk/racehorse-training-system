@@ -2,6 +2,7 @@ package com.rtms.backend.admission.service;
 
 import com.rtms.backend.admission.dto.ManagerReviewRequest;
 import com.rtms.backend.admission.entity.AdmissionApplication;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.medical.entity.CareSchedule;
@@ -495,6 +496,8 @@ class AdmissionManagerReviewServiceTest {
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(1L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L);
         when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.of(regularStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -503,6 +506,55 @@ class AdmissionManagerReviewServiceTest {
         assertEquals(AdmissionStatus.APPROVED, result.getStatus());
         // findById for Q stall must never be called
         verify(stableStallRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("APPROVE bị chặn khi chuồng thường không đủ cho tất cả ngựa đang ở khu cách ly")
+    void approve_blockedWhenRegularReserveInsufficient() {
+        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
+        Horse horse = buildHorse(HorseStatus.CANDIDATE);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(2L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(3L);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.review(1L, 5L, approveRequest(null)));
+
+        assertEquals(409, error.getStatus().value());
+        assertEquals(AdmissionCapacityPolicy.REGULAR_RESERVE_INSUFFICIENT, error.getErrorCode());
+        assertEquals(AdmissionStatus.MANAGER_REVIEW, admission.getStatus());
+        assertEquals(HorseStatus.CANDIDATE, horse.getCurrentStatus());
+        verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
+        verify(stableStallRepository, never()).findFairAvailableStallForUpdate(any());
+        verify(stableStallRepository, never()).findAvailableRegularStallByIdForUpdate(any());
+        verify(horseRepository, never()).save(any());
+        verify(admissionApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("APPROVE thành công khi reserve vừa đủ cho số ngựa đang ở khu cách ly (gồm chính nó)")
+    void approve_succeedsWhenReserveEqualsQuarantineOccupancy() {
+        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
+        Horse horse = buildHorse(HorseStatus.CANDIDATE);
+        StableStall regularStall = buildStall(21L, StallStatus.AVAILABLE);
+        StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(3L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(3L);
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        AdmissionApplication result = service.review(1L, 5L, approveRequest(null));
+
+        assertEquals(AdmissionStatus.APPROVED, result.getStatus());
+        assertEquals(21L, horse.getCurrentStallId());
+        assertEquals(StallStatus.OCCUPIED, regularStall.getStatus());
+        assertEquals(StallStatus.AVAILABLE, qStall.getStatus());
     }
 
     @Test

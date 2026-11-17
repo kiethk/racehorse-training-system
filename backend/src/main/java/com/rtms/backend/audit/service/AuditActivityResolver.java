@@ -180,10 +180,10 @@ public class AuditActivityResolver {
         if ((m = ADMISSION_TRAINER_REVIEW.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
             return new ResolvedActivity(
-                    "Trainer Fitness Assessment",
+                    "Trainer Feedback",
                     "AdmissionApplication",
                     id,
-                    "Head Trainer assessed conformation, gait, and racing readiness for application #" + id + statusSuffix
+                    "Head Trainer left feedback for application #" + id + statusSuffix
             );
         }
         if ((m = ADMISSION_MANAGER_REVIEW.matcher(normalizedPath)).matches()) {

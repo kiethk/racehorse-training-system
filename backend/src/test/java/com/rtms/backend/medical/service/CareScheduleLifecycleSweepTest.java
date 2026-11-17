@@ -220,6 +220,18 @@ class CareScheduleLifecycleSweepTest {
 
     @Test
 
+    @DisplayName("06:00 bắt đầu ngày mới: không sweep, không rollover")
+
+    void atWorkdayStart0600_doesNothing() {
+
+        service.runLifecycleSweep(LocalDateTime.of(2026, 11, 1, 6, 0));
+
+        verify(careScheduleRepository, never()).findRollableEodCandidates(any(), any());
+
+    }
+
+    @Test
+
     @DisplayName("07:00 ngoài giờ làm: không sweep, không rollover")
 
     void beforeWorkday_doesNothing() {
@@ -430,6 +442,53 @@ class CareScheduleLifecycleSweepTest {
 
         assertEquals(RescheduleReason.TIME_EXCEEDED, saved.getValue().getRescheduleReason());
 
+    }
+
+    @Test
+    @DisplayName("Rollover: Vet có ca URGENT vào NGÀY GỐC của ca bỏ dở → URGENT_PREEMPTION và gỡ Vet để gán lại")
+    void rollover_checksUrgentOnOriginalDay() {
+        CareSchedule routine = schedule(105L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED, null);
+        routine.setScheduledDate(LocalDate.of(2026, 11, 1));
+        when(careScheduleRepository.findRollableEodCandidates(any(), any())).thenReturn(List.of(routine));
+        when(careScheduleRepository.existsByVeterinarianIdAndCareTypeAndStatusInAndScheduledDate(
+                eq(20L), eq(CareType.URGENT), any(), eq(LocalDate.of(2026, 11, 1)))).thenReturn(true);
+
+        service.runLifecycleSweep(LocalDateTime.of(2026, 11, 2, 1, 0));
+
+        assertEquals(LocalDate.of(2026, 11, 2), routine.getScheduledDate());
+        assertEquals(RescheduleReason.URGENT_PREEMPTION, routine.getRescheduleReason());
+        assertNull(routine.getVeterinarianId());
+    }
+
+    @Test
+    @DisplayName("Cascade: ca bị đẩy khỏi ngày đầy không rơi vào ngày ngựa của nó đã có ca khác (AD-034)")
+    void cascade_skipsDaysTheCascadedHorseIsBusy() {
+        CareSchedule rolled = schedule(106L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED, null);
+        rolled.setScheduledDate(LocalDate.of(2026, 11, 1));
+        rolled.setRolloverCount(1);
+        LocalDate t1 = LocalDate.of(2026, 11, 2);
+        List<CareSchedule> full = new java.util.ArrayList<>();
+        for (long i = 0; i < 3; i++) {
+            CareSchedule booked = schedule(200L + i, CareType.ROUTINE, CareScheduleStatus.SCHEDULED, null);
+            booked.setHorseId(11L + i);
+            booked.setScheduledDate(t1);
+            booked.setCreatedAt(LocalDateTime.of(2026, 10, 1, 0, 0).plusDays(i));
+            full.add(booked);
+        }
+        CareSchedule newest = full.get(2); // rolloverCount 0 + mới nhất → bị cascade
+        CareSchedule horseBusyOnT2 = schedule(300L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED, null);
+        horseBusyOnT2.setHorseId(newest.getHorseId());
+        horseBusyOnT2.setScheduledDate(t1.plusDays(1));
+        when(careScheduleRepository.findRollableEodCandidates(any(), any())).thenReturn(List.of(rolled));
+        when(careScheduleRepository.findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                eq(20L), eq(t1), eq(CareType.ROUTINE), any())).thenReturn(full);
+        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(newest.getHorseId()), any()))
+                .thenReturn(List.of(newest, horseBusyOnT2));
+
+        service.runLifecycleSweep(LocalDateTime.of(2026, 11, 2, 1, 0));
+
+        assertEquals(t1, rolled.getScheduledDate());
+        assertEquals(t1.plusDays(2), newest.getScheduledDate());
     }
 
 }

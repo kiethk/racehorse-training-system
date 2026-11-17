@@ -20,6 +20,7 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
 import com.rtms.backend.incident.enums.IncidentStatus;
+import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
@@ -397,6 +398,51 @@ class UrgentCareCompletionTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         assertEquals("FOLLOW_UP_REQUIRED", ex.getErrorCode());
         verifyNoInteractions(healthRecordRepository, workoutService);
+    }
+
+    @Test
+    @DisplayName("Ca TRAUMA không có injury marker -> 400 INJURY_RECORD_REQUIRED (WF-02 §3.3.1)")
+    void testCompleteUrgentSchedule_traumaWithoutMarkers_rejected() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        incident.setIncidentType(IncidentType.TRAUMA);
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(horseRepository.findByIdForUpdate(horse.getId())).thenReturn(Optional.of(horse));
+        when(careScheduleRepository.findByIdForUpdate(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        ApiException ex = assertThrows(ApiException.class, () -> careScheduleService.completeCareSchedule(
+                urgentSchedule.getId(), completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("INJURY_RECORD_REQUIRED", ex.getErrorCode());
+        verifyNoInteractions(healthRecordRepository);
+    }
+
+    @Test
+    @DisplayName("Ca PROBLEM từ báo cáo sự cố không bị đòi injury marker")
+    void testCompleteUrgentSchedule_problemIncidentWithoutMarkers_allowed() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        incident.setIncidentType(IncidentType.PROBLEM);
+        stubCompletion();
+        when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        assertDoesNotThrow(() -> careScheduleService.completeCareSchedule(
+                urgentSchedule.getId(), completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId()));
+    }
+
+    @Test
+    @DisplayName("AD-036: hoàn tất ca khám là nhặt ca đang chờ ngay, không đợi tick 60s")
+    void testComplete_assignsWaitingSchedulesImmediately() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        incident.setIncidentType(IncidentType.PROBLEM);
+        stubCompletion();
+        when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+        when(careScheduleRepository.lockNextRequestedBatch(anyInt(), any())).thenReturn(List.of());
+
+        careScheduleService.completeCareSchedule(
+                urgentSchedule.getId(), completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
+
+        verify(careScheduleRepository).lockNextRequestedBatch(anyInt(), any());
     }
 
     @Test
