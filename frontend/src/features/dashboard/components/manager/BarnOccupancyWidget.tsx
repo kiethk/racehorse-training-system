@@ -16,7 +16,7 @@ export function BarnOccupancyWidget({ summary, barns }: BarnOccupancyWidgetProps
         <div>
           <SectionTitle>Barn & Quarantine Capacity</SectionTitle>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Total {summary.totalStalls} stalls · {summary.occupiedStalls} occupied · {summary.availableStalls} available
+            Total {summary.totalStalls} stalls · {summary.occupiedStalls} occupied{summary.reservedStalls > 0 ? ` · ${summary.reservedStalls} reserved` : ''} · {summary.availableStalls} available
           </p>
         </div>
 

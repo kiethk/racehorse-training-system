@@ -12,10 +12,10 @@ describe('FleetDistribution & Specialty Calculations', () => {
       inactive: 0,
     };
 
-    const readyHorses = Math.max(0, summary.activeEligible - summary.inTraining - summary.medicalBlocked);
+    const readyHorses = summary.totalHorses - summary.inTraining - summary.medicalBlocked;
     assert.equal(readyHorses, 8);
 
-    const segmentSum = summary.inTraining + readyHorses + summary.medicalBlocked + summary.inactive;
+    const segmentSum = summary.inTraining + readyHorses + summary.medicalBlocked;
     assert.equal(segmentSum, summary.totalHorses);
   });
 

@@ -1,7 +1,7 @@
 package com.rtms.backend.ai.dto;
 
 /**
- * Tin nhắn trong lịch sử hội thoại AI.
+ * Message in the AI conversation history.
  */
 public record AiChatMessageDto(
         String role,

@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import type { CareScheduleResponse, CareScheduleDetailResponse, TreatmentPlan, Prescription } from '@/features/care/types';
+import type { CareScheduleDetailResponse, TreatmentPlan, Prescription } from '@/features/care/types';
 
 describe('Verification-First Team: Vet Actor Acceptance Tests', () => {
 

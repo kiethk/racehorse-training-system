@@ -18,6 +18,7 @@ import {
   Tabs,
   type TabItem,
 } from '@/components/ui';
+import { HorseProfilePhoto } from '../shared/components/HorseProfilePhoto';
 import { horseService } from '../services/horseService';
 import { trainingService } from '@/features/training/services/trainingService';
 import { HorseSpecialtyBadges } from '../shared/components/HorseSpecialtyBadges';
@@ -213,28 +214,30 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       {/* Horse Header Card */}
       <Panel padded className="space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <HorseAvatar name={horse.name} image={horse.imageUrl} size={64} rounded="md" />
-            <div>
+          <div className="flex min-w-0 items-center gap-5">
+            <HorseProfilePhoto name={horse.name} image={horse.imageUrl} />
+            <div className="min-w-0 space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
+                <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
                   {horse.name}
                 </h1>
                 <StatusBadge status={horse.currentStatus} size="sm" />
               </div>
-              <p className="text-[13px] text-[var(--color-text-muted)] mt-0.5">
-                {horse.breed || 'Breed not specified'} · Born: {formatDate(horse.dateOfBirth)}
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                {horse.breed?.trim() || 'Breed not specified'} · Born: {formatDate(horse.dateOfBirth)}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col items-start sm:items-end gap-1.5">
-            <span className="text-[11px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-              Stall Assignment
-            </span>
-            <span className="text-[13px] font-medium text-[var(--color-text-primary)]">
-              {horse.currentStallId ? `Stall #${horse.currentStallId}` : 'Not assigned to a stall'}
-            </span>
+          <div className="flex flex-col items-start sm:items-end gap-2">
+            <div className="text-left sm:text-right">
+              <span className="block text-[11px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+                Stall Assignment
+              </span>
+              <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
+                {horse.currentStallId ? `Stall #${horse.currentStallId}` : 'Unassigned'}
+              </span>
+            </div>
             <Button
               size="sm"
               variant="primary"
@@ -245,9 +248,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
             >
               Edit horse profile
             </Button>
-            {editBlockedReason && (
-              <span className="max-w-[16rem] text-[11px] text-[var(--color-text-muted)] sm:text-right">{editBlockedReason}</span>
-            )}
           </div>
         </div>
 
@@ -272,9 +272,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
           <Notice tone="warning" title="Your last change request was rejected">
             {latestRequest.reviewFeedback || 'No reason was given.'}
           </Notice>
-        )}
-        {latestRequest?.status === 'APPROVED' && (
-          <Notice tone="success" title="Your last change request was approved" />
         )}
 
         {/* Veterinary Training Restriction Notice */}

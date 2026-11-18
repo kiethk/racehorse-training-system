@@ -39,6 +39,86 @@ interface EdaScatterChartProps {
   yAxisLabel?: string;
 }
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: ChartDataPoint }>;
+}
+
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const data: ChartDataPoint = payload[0].payload;
+  if (!data.label) return null;
+
+  return (
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md p-2.5 shadow-lg text-xs min-w-[200px]">
+      <div className="font-semibold text-sm text-[var(--color-text-primary)] mb-0.5">
+        {data.label}
+      </div>
+      {data.subLabel && (
+        <div className="text-[11px] text-[var(--color-text-secondary)] mb-2">
+          {data.subLabel}
+        </div>
+      )}
+      <div className="space-y-1">
+        {data.horseName && data.horseName !== data.label && (
+          <div className="flex justify-between gap-4">
+            <span className="text-[var(--color-text-secondary)]">Horse:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">{data.horseName}</span>
+          </div>
+        )}
+        {data.date && (
+          <div className="flex justify-between gap-4">
+            <span className="text-[var(--color-text-secondary)]">Date:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">{data.date}</span>
+          </div>
+        )}
+        {data.subject && (
+          <div className="flex justify-between gap-4">
+            <span className="text-[var(--color-text-secondary)]">Subject:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">{data.subject}</span>
+          </div>
+        )}
+        <div className="flex justify-between gap-4">
+          <span className="text-[var(--color-text-secondary)]">
+            {data.isFleet ? 'Avg Speed:' : 'Speed:'}
+          </span>
+          <span className="font-medium text-[var(--color-text-primary)]">{data.x} km/h</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-[var(--color-text-secondary)]">Recovery HR:</span>
+          <span className="font-medium text-[var(--color-text-primary)]">{data.y} bpm</span>
+        </div>
+        {data.maxHr != null && (
+          <div className="flex justify-between gap-4">
+            <span className="text-[var(--color-text-secondary)]">Max HR:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">{data.maxHr} bpm</span>
+          </div>
+        )}
+        {data.distanceMeters != null && (
+          <div className="flex justify-between gap-4">
+            <span className="text-[var(--color-text-secondary)]">Distance:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">{data.distanceMeters} m</span>
+          </div>
+        )}
+        {data.isOutlier && (
+          <div className="mt-1.5 pt-1.5 border-t border-[var(--color-danger)]/30 text-[11px] text-[var(--color-danger)] space-y-0.5">
+            <div className="flex justify-between items-center gap-2 font-medium">
+              <span>Outlier:</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-[var(--color-danger-subtle)] text-[var(--color-danger)]">
+                Anomaly
+              </span>
+            </div>
+            <div className="font-normal text-[10px] text-[var(--color-text-primary)] mt-0.5">
+              <span className="text-[var(--color-text-secondary)]">Reason: </span>
+              {data.outlierReason || 'Unusual workout reading'}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function EdaScatterChart({
   title,
   points,
@@ -76,81 +156,6 @@ export function EdaScatterChart({
       trendLineData: trend,
     };
   }, [points, slope, intercept]);
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const data: ChartDataPoint = payload[0].payload;
-    if (!data.label) return null;
-
-    return (
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md p-2.5 shadow-lg text-xs min-w-[200px]">
-        <div className="font-semibold text-sm text-[var(--color-text-primary)] mb-0.5">
-          {data.label}
-        </div>
-        {data.subLabel && (
-          <div className="text-[11px] text-[var(--color-text-secondary)] mb-2">
-            {data.subLabel}
-          </div>
-        )}
-        <div className="space-y-1">
-          {data.horseName && data.horseName !== data.label && (
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--color-text-secondary)]">Horse:</span>
-              <span className="font-medium text-[var(--color-text-primary)]">{data.horseName}</span>
-            </div>
-          )}
-          {data.date && (
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--color-text-secondary)]">Date:</span>
-              <span className="font-medium text-[var(--color-text-primary)]">{data.date}</span>
-            </div>
-          )}
-          {data.subject && (
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--color-text-secondary)]">Subject:</span>
-              <span className="font-medium text-[var(--color-text-primary)]">{data.subject}</span>
-            </div>
-          )}
-          <div className="flex justify-between gap-4">
-            <span className="text-[var(--color-text-secondary)]">
-              {data.isFleet ? 'Avg Speed:' : 'Speed:'}
-            </span>
-            <span className="font-medium text-[var(--color-text-primary)]">{data.x} km/h</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-[var(--color-text-secondary)]">Recovery HR:</span>
-            <span className="font-medium text-[var(--color-text-primary)]">{data.y} bpm</span>
-          </div>
-          {data.maxHr != null && (
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--color-text-secondary)]">Max HR:</span>
-              <span className="font-medium text-[var(--color-text-primary)]">{data.maxHr} bpm</span>
-            </div>
-          )}
-          {data.distanceMeters != null && (
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--color-text-secondary)]">Distance:</span>
-              <span className="font-medium text-[var(--color-text-primary)]">{data.distanceMeters} m</span>
-            </div>
-          )}
-          {data.isOutlier && (
-            <div className="mt-1.5 pt-1.5 border-t border-[var(--color-danger)]/30 text-[11px] text-[var(--color-danger)] space-y-0.5">
-              <div className="flex justify-between items-center gap-2 font-medium">
-                <span>Outlier:</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-[var(--color-danger-subtle)] text-[var(--color-danger)]">
-                  Anomaly
-                </span>
-              </div>
-              <div className="font-normal text-[10px] text-[var(--color-text-primary)] mt-0.5">
-                <span className="text-[var(--color-text-secondary)]">Reason: </span>
-                {data.outlierReason || 'Unusual workout reading'}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="w-full flex flex-col space-y-2">

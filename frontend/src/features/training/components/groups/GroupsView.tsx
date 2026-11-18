@@ -217,7 +217,6 @@ export function GroupsView() {
               horses={trainerHorses}
               groups={groups}
               loading={horsesLoading}
-              onAddHorse={addHorse}
               onRemoveHorse={(horse) => askLeave(horse)}
               disabled={busy}
             />

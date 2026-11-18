@@ -10,21 +10,21 @@ describe('AI SVG Chart Parsing and Geometry Tests', () => {
   it('correctly parses a Donut chart JSON payload', () => {
     const rawJson = JSON.stringify({
       type: 'donut',
-      title: 'Công suất chuồng trại',
+      title: 'Stall Occupancy',
       data: [
-        { label: 'Đang nuôi', value: 45, color: '#10b981' },
-        { label: 'Cách ly', value: 5, color: '#f59e0b' },
-        { label: 'Trống', value: 10, color: '#94a3b8' },
+        { label: 'Occupied', value: 45, color: '#10b981' },
+        { label: 'Quarantined', value: 5, color: '#f59e0b' },
+        { label: 'Vacant', value: 10, color: '#94a3b8' },
       ],
     });
 
     const config = parseChartConfig(rawJson);
     assert.ok(config !== null);
     assert.equal(config.type, 'donut');
-    assert.equal(config.title, 'Công suất chuồng trại');
+    assert.equal(config.title, 'Stall Occupancy');
     assert.equal(config.total, 60);
     assert.equal(config.data.length, 3);
-    assert.equal(config.data[0].label, 'Đang nuôi');
+    assert.equal(config.data[0].label, 'Occupied');
     assert.equal(config.data[0].value, 45);
     assert.equal(config.data[0].percentage, 75);
     assert.equal(config.data[1].percentage, (5 / 60) * 100);
@@ -35,7 +35,7 @@ describe('AI SVG Chart Parsing and Geometry Tests', () => {
     const rawWithFence = `\`\`\`chart
     {
       "type": "pie",
-      "title": "Phân loại giống ngựa",
+      "title": "Horse Breed Distribution",
       "items": [
         { "name": "Thoroughbred", "count": "30" },
         { "name": "Arabian", "count": "10" }
@@ -46,7 +46,7 @@ describe('AI SVG Chart Parsing and Geometry Tests', () => {
     const config = parseChartConfig(rawWithFence);
     assert.ok(config !== null);
     assert.equal(config.type, 'pie');
-    assert.equal(config.title, 'Phân loại giống ngựa');
+    assert.equal(config.title, 'Horse Breed Distribution');
     assert.equal(config.total, 40);
     assert.equal(config.data[0].label, 'Thoroughbred');
     assert.equal(config.data[0].value, 30);
@@ -59,21 +59,21 @@ describe('AI SVG Chart Parsing and Geometry Tests', () => {
   it('correctly parses a Bar chart with labels and values parallel arrays', () => {
     const rawJson = JSON.stringify({
       type: 'bar',
-      heading: 'Số buổi tập theo tuần',
+      heading: 'Training Sessions per Week',
       orientation: 'vertical',
-      labels: ['T2', 'T3', 'T4', 'T5'],
+      labels: ['Mon', 'Tue', 'Wed', 'Thu'],
       values: [8, 12, 10, 15],
     });
 
     const config = parseChartConfig(rawJson);
     assert.ok(config !== null);
     assert.equal(config.type, 'bar');
-    assert.equal(config.title, 'Số buổi tập theo tuần');
+    assert.equal(config.title, 'Training Sessions per Week');
     assert.equal(config.orientation, 'vertical');
     assert.equal(config.data.length, 4);
-    assert.equal(config.data[0].label, 'T2');
+    assert.equal(config.data[0].label, 'Mon');
     assert.equal(config.data[0].value, 8);
-    assert.equal(config.data[3].label, 'T5');
+    assert.equal(config.data[3].label, 'Thu');
     assert.equal(config.data[3].value, 15);
     assert.equal(config.total, 45);
   });
@@ -81,17 +81,17 @@ describe('AI SVG Chart Parsing and Geometry Tests', () => {
   it('correctly maps line chart type into bar chart', () => {
     const rawJson = JSON.stringify({
       type: 'line',
-      title: 'Chỉ số sinh hiệu',
+      title: 'Vital Signs',
       data: [
-        { label: 'Thân nhiệt', value: 38.2 },
-        { label: 'Nhịp tim', value: 36 },
+        { label: 'Body Temperature', value: 38.2 },
+        { label: 'Heart Rate', value: 36 },
       ],
     });
 
     const config = parseChartConfig(rawJson);
     assert.ok(config !== null);
     assert.equal(config.type, 'bar');
-    assert.equal(config.title, 'Chỉ số sinh hiệu');
+    assert.equal(config.title, 'Vital Signs');
     assert.equal(config.data.length, 2);
   });
 

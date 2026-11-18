@@ -2,6 +2,7 @@ package com.rtms.backend.horse.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.horse.dto.HorseDocumentSlotResponse;
 import com.rtms.backend.horse.entity.HorseEditRequestDocument;
 import com.rtms.backend.horse.service.HorseEditRequestService;
@@ -16,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
@@ -52,6 +54,7 @@ public class HorseDocumentController {
     public ResponseEntity<Resource> editDocumentFile(
             @PathVariable Long horseId,
             @PathVariable Long documentId,
+            @RequestParam(required = false) FileVariant size,
             @AuthenticationPrincipal AuthenticatedUser viewer) {
         horseService.getHorseById(horseId, viewer);
         HorseEditRequestDocument document = editRequests.editDocument(horseId, documentId);
@@ -63,6 +66,6 @@ public class HorseDocumentController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.inline().filename(filename, StandardCharsets.UTF_8).build().toString())
                 .header("X-Content-Type-Options", "nosniff")
-                .body(storage.load(document.getFileUrl()));
+                .body(storage.load(document.getFileUrl(), size));
     }
 }

@@ -2,10 +2,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type {
   ManagerEdaOverviewResponse,
-  VetDelaysEdaDto,
-  TrainerEvaluationEdaDto,
-  StallOccupancyEdaDto,
-  AdmissionFunnelEdaDto,
 } from '../types/managerEda.ts';
 
 describe('Manager EDA Domain Analytics Contract Tests', () => {
@@ -52,7 +48,8 @@ describe('Manager EDA Domain Analytics Contract Tests', () => {
       ],
     },
     trainerEvaluation: {
-      overallAdherenceRate: 85.5,
+      overallAdherenceRate: 89.5,
+      overallCancellationRate: 4.7,
       totalWorkoutsScheduled: 300,
       totalWorkoutsCompleted: 256,
       trainers: [
@@ -63,7 +60,8 @@ describe('Manager EDA Domain Analytics Contract Tests', () => {
           completedWorkouts: 135,
           heldWorkouts: 10,
           cancelledWorkouts: 5,
-          adherenceRate: 90.0,
+          adherenceRate: 93.1,
+          cancellationRate: 3.3,
           averageRating: 8.7,
           averageSpeedKmh: 42.5,
           averageRecoveryHeartRate: 75,
@@ -77,7 +75,8 @@ describe('Manager EDA Domain Analytics Contract Tests', () => {
           completedWorkouts: 121,
           heldWorkouts: 20,
           cancelledWorkouts: 9,
-          adherenceRate: 80.7,
+          adherenceRate: 85.8,
+          cancellationRate: 6.0,
           averageRating: 7.9,
           averageSpeedKmh: 40.8,
           averageRecoveryHeartRate: 82,
@@ -171,13 +170,19 @@ describe('Manager EDA Domain Analytics Contract Tests', () => {
 
   it('evaluates trainer execution discipline and physiological gains', () => {
     const { trainerEvaluation } = mockOverview;
-    assert.equal(trainerEvaluation.overallAdherenceRate, 85.5);
+    assert.equal(trainerEvaluation.overallAdherenceRate, 89.5);
+    assert.equal(trainerEvaluation.overallCancellationRate, 4.7);
     assert.equal(trainerEvaluation.trainers.length, 2);
 
     const tom = trainerEvaluation.trainers[0];
-    assert.equal(tom.adherenceRate, 90.0);
+    assert.equal(tom.adherenceRate, 93.1);
+    assert.equal(tom.cancellationRate, 3.3);
     assert.equal(tom.speedGainKmh, 3.2);
     assert.equal(tom.hrRecoveryImprovementBpm, 7.5);
+
+    const sarah = trainerEvaluation.trainers.find((trainer) => trainer.trainerName === 'Trainer Sarah');
+    assert.ok(sarah);
+    assert.equal(sarah.adherenceRate, 85.8);
   });
 
   it('detects quarantine buffer stress when inbound arrivals exceed available quarantine stalls', () => {

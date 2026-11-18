@@ -7,6 +7,7 @@ import { entityHref } from '@/lib/entityRoute';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { fileVariantUrl } from '@/lib/fileVariant';
 import { useProtectedFileUrl } from '@/lib/protectedFile';
 import { formatDate } from '@/lib/display';
 import { formatHorseSex } from '@/features/horses/lib/sex';
@@ -55,7 +56,9 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (candidate as any)?.imageUrl ||
     null;
-  const { url: protectedPhotoUrl } = useProtectedFileUrl(effectivePhoto);
+  // The 56 px avatar uses the small copy; the original is only downloaded when the photo is opened.
+  const { url: protectedPhotoUrl } = useProtectedFileUrl(fileVariantUrl(effectivePhoto, 'THUMB'));
+  const { url: originalPhotoUrl } = useProtectedFileUrl(photoOpen ? effectivePhoto : null);
 
   if (!candidate) return null;
 
@@ -108,7 +111,7 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
 
       {photoOpen && protectedPhotoUrl && (
         <ImageLightbox
-          images={[{ src: protectedPhotoUrl, alt: `${candidate.name}'s admission photo` }]}
+          images={[{ src: originalPhotoUrl ?? protectedPhotoUrl, alt: `${candidate.name}'s admission photo` }]}
           index={0}
           onIndexChange={() => undefined}
           onClose={() => setPhotoOpen(false)}

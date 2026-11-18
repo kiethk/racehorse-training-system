@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -20,6 +20,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { collapsed, canToggle, toggle } = useSidebarState();
 
+  useEffect(() => {
+    if (user?.role) {
+      document.documentElement.setAttribute('data-role', user.role);
+    }
+    return () => {
+      document.documentElement.removeAttribute('data-role');
+    };
+  }, [user?.role]);
+
   if (!user) return null;
 
   const sections = getNavigationForRole(user.role);
@@ -30,7 +39,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     // shrink-0: <body> is a fixed-height flex column, so without it this box is clamped to the
     // viewport, the page overflows it, and the sticky sidebar scrolls away with the content.
-    <div className="flex min-h-dvh min-w-0 shrink-0 bg-[var(--color-background)]">
+    <div
+      data-role={user.role}
+      className="flex min-h-dvh min-w-0 shrink-0 bg-[var(--color-background)]"
+    >
       <Sidebar sections={sections} role={user.role} collapsed={collapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar

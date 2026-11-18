@@ -69,10 +69,10 @@ INSERT INTO seed_check VALUES
             WHERE c.admission_id = a.id AND c.care_type = 'INITIAL' AND c.status = 'COMPLETED')) $q$),
 ('Trainer step without an assigned trainer',
  $q$ SELECT id FROM admission_applications WHERE status IN ('TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED') AND trainer_id IS NULL $q$),
-('Manager step without the trainer assessment of this admission',
- $q$ SELECT a.id FROM admission_applications a
-     WHERE (a.status IN ('MANAGER_REVIEW', 'APPROVED') OR a.manager_decision = 'REJECTED')
-       AND NOT EXISTS (SELECT 1 FROM racing_readiness_assessments r WHERE r.admission_id = a.id AND r.trainer_id = a.trainer_id) $q$),
+('Manager step without the trainer feedback of this admission',
+ $q$ SELECT id FROM admission_applications
+     WHERE (status IN ('MANAGER_REVIEW', 'APPROVED') OR manager_decision = 'REJECTED')
+       AND (trainer_feedback IS NULL OR trainer_reviewed_at IS NULL) $q$),
 ('Steps out of time order',
  $q$ SELECT id FROM admission_applications
      WHERE groom_reviewed_at < submitted_at OR arrived_at < groom_reviewed_at OR vet_reviewed_at < arrived_at
@@ -233,12 +233,6 @@ INSERT INTO seed_check VALUES
 ('Task completed without a completion row of the same groom, or completed before its time',
  $q$ SELECT t.id FROM groom_daily_tasks t LEFT JOIN groom_task_completions c ON c.id = t.completion_id
      WHERE t.is_completed AND (c.id IS NULL OR c.groom_id <> t.groom_id OR t.completed_at < t.scheduled_time) $q$),
-('Trainer assessment score that is not a whole number from 0 to 10',
- $q$ SELECT id FROM racing_readiness_assessments
-     WHERE conformation_score <> trunc(conformation_score) OR temperament_score <> trunc(temperament_score)
-        OR gait_quality_score <> trunc(gait_quality_score)
-        OR conformation_score NOT BETWEEN 0 AND 10 OR temperament_score NOT BETWEEN 0 AND 10
-        OR gait_quality_score NOT BETWEEN 0 AND 10 $q$),
 ('Course with more exercises than sessions',
  $q$ SELECT c.id FROM courses c WHERE (SELECT count(*) FROM course_exercises cs WHERE cs.course_id = c.id) > c.total_sessions $q$),
 ('Two courses of one trainer with the same exercises in the same order',

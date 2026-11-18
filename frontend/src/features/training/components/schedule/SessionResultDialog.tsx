@@ -82,11 +82,11 @@ function ResultForm({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    setError(null);
     const errors = validateReadings(readings);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
     setSubmitting(true);
-    setError(null);
     try {
       const request = readingsToRequest(readings, feedback);
       const saved = editing

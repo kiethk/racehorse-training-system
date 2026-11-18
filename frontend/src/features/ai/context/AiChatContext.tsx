@@ -4,12 +4,12 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useR
 import { toast } from '@/lib/toast';
 import {
   deleteConversation,
-  getConversationMessages,
   getConversations,
   renameConversation,
   sendChatMessage,
 } from '../services/aiService';
 import type { AiConversation, ChatMessage } from '../types';
+import { useConversationSelection } from '../hooks/useConversationSelection';
 
 export interface AiChatContextValue {
   isOpen: boolean;
@@ -83,28 +83,31 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Tự động tải danh sách hội thoại khi mở khung chat
+  // Automatically load the conversation list when the chat window opens
   useEffect(() => {
     if (isOpen) {
       let isMounted = true;
-      setIsLoadingConversations(true);
-      getConversations()
-        .then((list) => {
-          if (isMounted) setConversations(list || []);
-        })
-        .catch(() => {
-          // Ignored if user not yet logged in
-        })
-        .finally(() => {
-          if (isMounted) setIsLoadingConversations(false);
-        });
+      void Promise.resolve().then(() => {
+        if (!isMounted) return;
+        setIsLoadingConversations(true);
+        return getConversations()
+          .then((list) => {
+            if (isMounted) setConversations(list || []);
+          })
+          .catch(() => {
+            // Ignored if user not yet logged in
+          })
+          .finally(() => {
+            if (isMounted) setIsLoadingConversations(false);
+          });
+      });
       return () => {
         isMounted = false;
       };
     }
   }, [isOpen]);
 
-  // Hủy request nếu component unmount
+  // Cancel the request if the component unmounts
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -114,47 +117,13 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const selectConversation = useCallback(async (id: number) => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    try {
-      setIsLoading(true);
-      setCurrentConversationId(id);
-      const history = await getConversationMessages(id);
-      if (history && history.length > 0) {
-        const mapped = history.map((m) => {
-          let executedTools: Record<string, unknown>[] | undefined;
-          if (m.toolCalls) {
-            try {
-              const parsed = JSON.parse(m.toolCalls);
-              if (Array.isArray(parsed)) executedTools = parsed;
-            } catch {}
-          }
-          return {
-            id: `msg-${m.id}`,
-            role: m.role,
-            content: m.content,
-            timestamp: m.createdAt,
-            toolCalls: m.toolCalls,
-            executedTools,
-            status: 'done' as const,
-          };
-        });
-        messagesRef.current = mapped;
-        setMessages(mapped);
-      } else {
-        messagesRef.current = [];
-        setMessages([]);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải lịch sử trò chuyện';
-      toast.error(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const selectConversation = useConversationSelection({
+    abortControllerRef,
+    messagesRef,
+    setIsLoading,
+    setCurrentConversationId,
+    setMessages,
+  });
 
   const createNewChat = useCallback(() => {
     if (abortControllerRef.current) {
@@ -185,10 +154,10 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
 
       try {
         await deleteConversation(id);
-        toast.success('Đã xóa cuộc trò chuyện');
+        toast.success('Conversation deleted');
       } catch (err: unknown) {
         void refreshConversations();
-        const msg = err instanceof Error ? err.message : 'Lỗi khi xóa cuộc trò chuyện';
+        const msg = err instanceof Error ? err.message : 'Error deleting conversation';
         toast.error(msg);
       }
     },
@@ -202,10 +171,10 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await renameConversation(id, trimmed);
       setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title: updated.title } : c)));
-      toast.success('Đã cập nhật tiêu đề cuộc trò chuyện');
+      toast.success('Conversation title updated');
     } catch (err: unknown) {
       void refreshConversations();
-      const msg = err instanceof Error ? err.message : 'Lỗi khi đổi tên cuộc trò chuyện';
+      const msg = err instanceof Error ? err.message : 'Error renaming conversation';
       toast.error(msg);
     }
   }, [refreshConversations]);
@@ -268,7 +237,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         const assistantMessage: ChatMessage = {
           id: assistantMsgId,
           role: 'assistant',
-          content: response.reply || 'Đã xử lý xong yêu cầu của bạn.',
+          content: response.reply || 'Your request has been processed.',
           timestamp: new Date().toISOString(),
           executedTools,
           toolCalls: response.executedTools ? JSON.stringify(response.executedTools) : undefined,
@@ -297,13 +266,13 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           messagesRef.current = updatedMessages;
           setMessages(updatedMessages);
         } else {
-          const errorMsg = err instanceof Error ? err.message : 'Có lỗi khi trò chuyện với AI';
+          const errorMsg = err instanceof Error ? err.message : 'An error occurred while communicating with the AI assistant.';
           toast.error(errorMsg);
 
           const errorAssistantMsg: ChatMessage = {
             id: `ast-err-${Date.now()}`,
             role: 'assistant',
-            content: 'Trợ lý chưa trả lời được.',
+            content: 'The assistant could not respond.',
             errorMessage: errorMsg,
             timestamp: new Date().toISOString(),
             status: 'error',

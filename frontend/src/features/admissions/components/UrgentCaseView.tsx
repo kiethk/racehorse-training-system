@@ -120,9 +120,11 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       setUrgentCase((current) => (current ? { ...current, status: schedule.status } : current));
     } catch (cause) {
       setError(
-        cause instanceof ApiError
-          ? displayError(cause, 'Unable to start the examination.')
-          : 'Unable to start the examination.',
+        cause instanceof ApiError && cause.errorCode === 'HORSE_EXAM_IN_PROGRESS'
+          ? 'This horse already has an examination in progress. Finish that examination first, then start this urgent case.'
+          : cause instanceof ApiError
+            ? displayError(cause, 'Unable to start the examination.')
+            : 'Unable to start the examination.',
       );
     } finally {
       setStarting(false);
@@ -279,6 +281,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           {urgentCase.imageUrl && (
             <div className="group relative h-28 w-28 sm:h-32 sm:w-32 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
               <ProtectedImage
+                size="THUMB"
                 src={urgentCase.imageUrl}
                 alt="Urgent case report incident photo"
                 openOnClick
@@ -333,6 +336,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       {report.imageUrl && (
                         <div className="group relative h-20 w-20 sm:h-22 sm:w-22 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
                           <ProtectedImage
+                            size="THUMB"
                             src={report.imageUrl}
                             alt={`Report: ${report.title}`}
                             openOnClick
@@ -378,6 +382,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       {/* Main Workspace Area */}
       {urgentCase.status === 'SCHEDULED' && (
         <Panel padded className="border-l-4 border-l-[var(--color-warning)] bg-[var(--color-warning-soft)]/20">
+          {error && <Notice tone="error">{error}</Notice>}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
@@ -404,16 +409,15 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       {urgentCase.status === 'IN_PROGRESS' && (
         <ClinicalExamForm
           ref={formRef}
-          variant="STANDARD"
           admissionId={0}
           horseId={urgentCase.horseId}
           candidateName={urgentCase.horseName}
           careScheduleId={urgentCase.scheduleId}
           careType="URGENT"
           scheduleStatus={urgentCase.status}
+          incidentType={urgentCase.incidentType}
           asideTop={urgentAsideTop}
           onSuccess={handleSuccess}
-          prefillFindings={urgentCase.description}
           waitingFollowUpAt={waitingFollowUp?.at}
         />
       )}

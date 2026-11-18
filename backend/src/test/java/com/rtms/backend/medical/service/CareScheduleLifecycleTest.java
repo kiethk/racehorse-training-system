@@ -13,7 +13,6 @@ import java.time.LocalDate;
 
 
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -76,9 +75,9 @@ class CareScheduleLifecycleTest {
     }
 
     @Test
-    @DisplayName("startCareSchedule rejects non-SCHEDULED status with 409 CONFLICT")
+    @DisplayName("startCareSchedule rejects a COMPLETED schedule with 409 CONFLICT")
     void testStart_invalidStatus_throwsConflict() {
-        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setStatus(CareScheduleStatus.COMPLETED);
         when(userRepository.findById(assignedVet.getId())).thenReturn(Optional.of(assignedVet));
         when(careScheduleRepository.findById(schedule.getId())).thenReturn(Optional.of(schedule));
         when(horseRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(new Horse()));
@@ -113,5 +112,90 @@ class CareScheduleLifecycleTest {
     void testCancelCareSchedule_abolished() {
         // Under AD-022, cancelCareSchedule is removed; stuck exams are moved via reschedule().
         assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
+    }
+
+    @Test
+    @DisplayName("AD-037: kéo Follow-up đang chờ về ngày Vet chọn mà ngựa đã bận ngày đó → 409, không dời lặng lẽ")
+    void testMergeIntoWaitingFollowUp_chosenDayBusy_throwsConflict() {
+        LocalDate chosen = LocalDate.now().plusDays(5);
+        CareSchedule source = new CareSchedule();
+        source.setId(10L);
+        source.setHorseId(100L);
+        source.setVeterinarianId(assignedVet.getId());
+        source.setStatus(CareScheduleStatus.COMPLETED);
+        CareSchedule waiting = new CareSchedule();
+        waiting.setId(20L);
+        waiting.setHorseId(100L);
+        waiting.setCareType(CareType.ROUTINE);
+        waiting.setStatus(CareScheduleStatus.SCHEDULED);
+        waiting.setRequestedAt(chosen.plusDays(5).atTime(14, 0));
+        CareSchedule busy = new CareSchedule();
+        busy.setId(30L);
+        busy.setHorseId(100L);
+        busy.setCareType(CareType.ROUTINE);
+        busy.setStatus(CareScheduleStatus.SCHEDULED);
+        busy.setScheduledDate(chosen);
+        when(userRepository.findById(assignedVet.getId())).thenReturn(Optional.of(assignedVet));
+        when(careScheduleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(source));
+        when(horseRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(new Horse()));
+        when(careScheduleRepository.findByRequestedByIdAndIdempotencyKey(assignedVet.getId(), "k1")).thenReturn(Optional.empty());
+        when(careScheduleRepository.findByHorseIdAndStatusIn(100L, java.util.List.of(CareScheduleStatus.SCHEDULED)))
+                .thenReturn(java.util.List.of(waiting));
+        when(careScheduleRepository.findByHorseIdAndStatusIn(100L, CareScheduleStatus.BOOKED_OR_ACTIVE))
+                .thenReturn(java.util.List.of(waiting, busy));
+        com.rtms.backend.medical.dto.CreateNextScheduleRequest request = new com.rtms.backend.medical.dto.CreateNextScheduleRequest();
+        request.setSourceScheduleId(10L);
+        request.setCareType(CareType.ROUTINE);
+        request.setScheduledDate(chosen.toString());
+        request.setDescription("Recheck");
+        request.setIdempotencyKey("k1");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> careScheduleService.createNextSchedule(request, assignedVet.getId()));
+
+        assertEquals("HORSE_BUSY_THAT_DAY", ex.getErrorCode());
+        verify(careScheduleRepository, never()).save(waiting);
+    }
+
+    @Test
+    @DisplayName("assertHorseFreeOnDay chặn ca thứ hai cùng ngày của cùng ngựa: 409 HORSE_BUSY_THAT_DAY")
+    void testAssertHorseFreeOnDay_existingRoutineThatDay_throwsConflict() {
+        CareSchedule existing = new CareSchedule();
+        existing.setId(11L);
+        existing.setHorseId(100L);
+        existing.setCareType(CareType.ROUTINE);
+        existing.setStatus(CareScheduleStatus.SCHEDULED);
+        existing.setScheduledDate(LocalDate.of(2026, 11, 16));
+        when(careScheduleRepository.findByHorseIdAndStatusIn(100L, CareScheduleStatus.BOOKED_OR_ACTIVE))
+                .thenReturn(java.util.List.of(existing));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> careScheduleService.assertHorseFreeOnDay(100L, LocalDate.of(2026, 11, 16), null));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("HORSE_BUSY_THAT_DAY", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("assertHorseFreeOnDay bỏ qua ca URGENT và chính ca đang xét")
+    void testAssertHorseFreeOnDay_urgentOrSelf_doesNotBlock() {
+        CareSchedule urgent = new CareSchedule();
+        urgent.setId(12L);
+        urgent.setHorseId(100L);
+        urgent.setCareType(CareType.URGENT);
+        urgent.setStatus(CareScheduleStatus.SCHEDULED);
+        urgent.setScheduledAt(LocalDate.of(2026, 11, 16).atTime(14, 0));
+
+        CareSchedule self = new CareSchedule();
+        self.setId(13L);
+        self.setHorseId(100L);
+        self.setCareType(CareType.ROUTINE);
+        self.setStatus(CareScheduleStatus.SCHEDULED);
+        self.setScheduledDate(LocalDate.of(2026, 11, 16));
+
+        when(careScheduleRepository.findByHorseIdAndStatusIn(100L, CareScheduleStatus.BOOKED_OR_ACTIVE))
+                .thenReturn(java.util.List.of(urgent, self));
+
+        assertDoesNotThrow(() -> careScheduleService.assertHorseFreeOnDay(100L, LocalDate.of(2026, 11, 16), 13L));
     }
 }

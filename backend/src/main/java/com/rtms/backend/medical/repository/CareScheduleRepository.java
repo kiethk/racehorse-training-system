@@ -65,7 +65,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     @Query(value = """
             SELECT cs.* FROM care_schedule cs
             LEFT JOIN horse_incident_reports gir ON gir.id = cs.source_incident_id
-            WHERE cs.status = 'SCHEDULED' AND cs.veterinarian_id IS NULL
+            WHERE cs.status = 'SCHEDULED'
+              AND (cs.veterinarian_id IS NULL OR (cs.scheduled_date IS NULL AND cs.scheduled_at IS NULL))
               AND (cs.care_type IN ('URGENT', 'INITIAL') OR cs.requested_at IS NULL OR cs.requested_at < :horizon)
             ORDER BY CASE cs.care_type WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
                      CASE WHEN cs.care_type = 'URGENT' THEN

@@ -13,13 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 /**
- * Dịch vụ truy xuất tri thức y khoa lâm sàng (RAG Retrieval Service).
+ * Clinical knowledge retrieval service (RAG Retrieval Service).
  *
- * Thực hiện tìm kiếm tương đồng ngữ nghĩa bằng Cosine Similarity trên pgvector:
- * 1. Mở rộng từ điển triệu chứng trong câu hỏi bằng RuleBasedSymptomExpander.
- * 2. Tính toán vector 1536 chiều bằng EmbeddingService.
- * 3. Truy vấn toán tử `<=>` trên bảng rag_knowledge_embeddings kết hợp phân quyền allowed_roles.
- * 4. Tự động fallback tìm kiếm từ khóa ngữ nghĩa nếu không có kết quả cosine vượt ngưỡng.
+ * Performs semantic similarity search using Cosine Similarity on pgvector:
+ * 1. Expands symptoms in the question using RuleBasedSymptomExpander.
+ * 2. Computes a 1536-dimensional vector using EmbeddingService.
+ * 3. Queries the `<=>` operator on the rag_knowledge_embeddings table with allowed_roles authorization.
+ * 4. Automatically falls back to semantic keyword search if no cosine result exceeds the threshold.
  */
 @Service
 public class ClinicalRetrievalService {
@@ -51,7 +51,7 @@ public class ClinicalRetrievalService {
     }
 
     /**
-     * Tìm kiếm các đoạn tài liệu/bệnh án lâm sàng tương đồng nhất với câu hỏi.
+     * Finds the clinical document or medical record chunks most similar to the question.
      */
     @Transactional(readOnly = true)
     public List<ClinicalChunkResponseDto> retrieveSimilarClinicalRecords(String queryText,
@@ -64,22 +64,22 @@ public class ClinicalRetrievalService {
         }
 
         try {
-            // 1. Mở rộng triệu chứng bằng từ điển chuẩn hóa y khoa
+            // 1. Expand symptoms using the normalized medical dictionary
             String expandedQuery = symptomExpander.expand(queryText);
 
-            // 2. Sinh vector embedding cho câu hỏi
+            // 2. Generate an embedding vector for the question
             float[] queryVector = embeddingService.embed(expandedQuery);
             String vectorString = formatVectorForPgvector(queryVector);
 
             double minSimilarity = threshold != null ? threshold : DEFAULT_SIMILARITY_THRESHOLD;
             int maxResults = (limit != null && limit > 0) ? limit : DEFAULT_LIMIT;
 
-            // Chuẩn bị điều kiện vai trò (PostgreSQL array format: {ROLE})
+            // Prepare the role condition (PostgreSQL array format: {ROLE})
             String roleFilter = (userRole != null && !userRole.isBlank())
                     ? "{" + userRole.trim().toUpperCase() + "}"
                     : null;
 
-            // 3. Câu lệnh SQL tìm kiếm vector cosine distance trên pgvector
+            // 3. SQL query for cosine distance vector search on pgvector
             String sql = """
                     SELECT e.id AS embedding_id,
                            d.title AS doc_title,
@@ -122,8 +122,8 @@ public class ClinicalRetrievalService {
                 return results;
             }
 
-            // 4. Fallback tìm kiếm từ khóa ngữ nghĩa khi vector distance không đủ ngưỡng
-            String cleanQuery = queryText.replaceAll("[^a-zA-Z0-9\\sàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]", " ").trim();
+            // 4. Fall back to semantic keyword search when the vector distance does not meet the threshold
+            String cleanQuery = queryText.replaceAll("[^\\p{L}\\p{N}\\s]", " ").trim();
             String[] tokens = cleanQuery.split("\\s+");
             String mainKeyword = tokens.length > 0 ? "%" + tokens[0].toLowerCase() + "%" : "%";
 
@@ -163,7 +163,7 @@ public class ClinicalRetrievalService {
                 return fallbackResults;
             }
 
-            // Top tài liệu lâm sàng tham khảo chung
+            // Top general clinical reference documents
             String topDocsSql = """
                     SELECT e.id AS embedding_id,
                            d.title AS doc_title,
@@ -189,16 +189,16 @@ public class ClinicalRetrievalService {
             );
 
         } catch (Exception ex) {
-            log.error("ClinicalRetrievalService: Lỗi khi truy vấn tri thức vector: {}", ex.getMessage(), ex);
+            log.error("ClinicalRetrievalService: Failed to query vector knowledge: {}", ex.getMessage(), ex);
             return Collections.emptyList();
         }
     }
 
     /**
-     * Đồng bộ lại (re-index) vector embeddings cho toàn bộ bản ghi tri thức lâm sàng
-     * sử dụng mô hình embedding đang kích hoạt (OpenAI text-embedding-3-small hoặc fallback).
+     * Re-indexes vector embeddings for all clinical knowledge records
+     * using the active embedding model (OpenAI text-embedding-3-small or the fallback).
      *
-     * @return Số lượng bản ghi đã được cập nhật vector thành công
+     * @return Number of records whose vectors were updated successfully
      */
     @Transactional
     public int reindexAllEmbeddings() {
@@ -225,10 +225,10 @@ public class ClinicalRetrievalService {
                 );
             }
 
-            log.info("ClinicalRetrievalService: Đã re-index thành công {} bản ghi embeddings.", rows.size());
+            log.info("ClinicalRetrievalService: Successfully re-indexed embeddings for {} records.", rows.size());
             return rows.size();
         } catch (Exception ex) {
-            log.error("ClinicalRetrievalService: Lỗi trong quá trình re-index embeddings: {}", ex.getMessage(), ex);
+            log.error("ClinicalRetrievalService: Error while re-indexing embeddings: {}", ex.getMessage(), ex);
             return 0;
         }
     }

@@ -30,4 +30,11 @@ public class AccessControlController {
             @RequestBody RolePermissionUpdateRequest request) {
         return ApiResponse.success(accessControlService.updateRolePermissions(roleId, request));
     }
+
+    @PutMapping("/roles/permissions/bulk")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    public ApiResponse<java.util.List<AccessControlMatrixResponse.RolePermissionSummary>> updateBulkRolePermissions(
+            @RequestBody java.util.List<com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest> requests) {
+        return ApiResponse.success(accessControlService.updateBulkRolePermissions(requests));
+    }
 }

@@ -4,6 +4,7 @@ import java.util.List;
 
 public class AccountSummaryResponse extends StaffSummaryResponse {
     private Long ownedHorsesCount;
+    private Long activeHorsesCount;
     private String assignmentStatus;
     private String assignedAreaCode;
     private String assignedAreaType;
@@ -16,6 +17,14 @@ public class AccountSummaryResponse extends StaffSummaryResponse {
 
     public void setOwnedHorsesCount(Long ownedHorsesCount) {
         this.ownedHorsesCount = ownedHorsesCount;
+    }
+
+    public Long getActiveHorsesCount() {
+        return activeHorsesCount;
+    }
+
+    public void setActiveHorsesCount(Long activeHorsesCount) {
+        this.activeHorsesCount = activeHorsesCount;
     }
 
     public String getAssignmentStatus() {

@@ -17,10 +17,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Listener đồng bộ sự kiện miền Y tế bất đồng bộ vào cơ sở dữ liệu Vector pgvector.
+ * Listener that asynchronously synchronizes clinical domain events to the pgvector database.
  *
- * Chỉ kích hoạt khi giao dịch lưu bệnh án ban đầu đã COMMIT thành công 100% (AFTER_COMMIT).
- * Chạy bất đồng bộ qua @Async("applicationTaskExecutor") với ngữ cảnh bảo mật được bảo toàn.
+ * Runs only after the original medical record transaction has successfully COMMITted (AFTER_COMMIT).
+ * Executes asynchronously through @Async("applicationTaskExecutor") while preserving the security context.
  */
 @Component
 public class ClinicalVectorSyncListener {
@@ -45,16 +45,16 @@ public class ClinicalVectorSyncListener {
     @Async("applicationTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onClinicalRecordCreated(ClinicalRecordCreatedEvent event) {
-        log.info("ClinicalVectorSyncListener: Nhận sự kiện bệnh án mới #{} cho ngựa UELN={}",
+        log.info("ClinicalVectorSyncListener: Received new medical record event #{} for horse UELN={}",
                 event.healthRecordId(), event.registrationNumber());
 
         try {
-            // 1. Tiền xử lý mở rộng triệu chứng sang thuật ngữ y khoa chuyên sâu
+            // 1. Preprocess and expand symptoms into specialized medical terminology
             String rawFindings = event.findings() != null ? event.findings() : "";
             String expandedFindings = symptomExpander.expand(rawFindings);
             String diagnosis = event.diagnosis() != null ? event.diagnosis() : "";
 
-            // 2. Đóng gói nội dung ngữ nghĩa để RAG vector hóa
+            // 2. Package semantic content for RAG vectorization
             String title = String.format("Clinical record for horse %s (Record #%d)",
                     event.registrationNumber() != null ? event.registrationNumber() : event.horseId(),
                     event.healthRecordId());
@@ -62,11 +62,11 @@ public class ClinicalVectorSyncListener {
             String content = String.format("Horse UELN: %s (ID: %d). Clinical findings: %s. Medical diagnosis: %s.",
                     event.registrationNumber(), event.horseId(), expandedFindings, diagnosis);
 
-            // 3. Sinh vector embedding 1536 chiều
+            // 3. Generate a 1536-dimensional embedding vector
             float[] vector = embeddingService.embed(content);
             String vectorString = formatVector(vector);
 
-            // 4. Tạo metadata JSON
+            // 4. Create JSON metadata
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("healthRecordId", event.healthRecordId());
             metadata.put("horseId", event.horseId());
@@ -75,13 +75,13 @@ public class ClinicalVectorSyncListener {
             metadata.put("allowedRoles", event.allowedRoles());
             String metadataJson = objectMapper.writeValueAsString(metadata);
 
-            // 5. Chuẩn bị mảng allowed_roles định dạng PostgreSQL Array: {ROLE_1,ROLE_2,...}
+            // 5. Prepare the allowed_roles array in PostgreSQL array format: {ROLE_1,ROLE_2,...}
             String[] rolesArray = event.allowedRoles() != null && !event.allowedRoles().isEmpty()
                     ? event.allowedRoles().toArray(new String[0])
                     : new String[]{"VETERINARIAN", "HEAD_TRAINER", "CLUB_MANAGER"};
             String pgRolesArray = "{" + String.join(",", rolesArray) + "}";
 
-            // 6. Lưu bản ghi tri thức vào rag_knowledge_documents
+            // 6. Save the knowledge record to rag_knowledge_documents
             String insertDocSql = """
                     INSERT INTO rag_knowledge_documents (title, category, source_url, allowed_roles)
                     VALUES (?, 'CLINICAL_RECORD', NULL, ?::text[])
@@ -91,11 +91,11 @@ public class ClinicalVectorSyncListener {
             Long documentId = jdbcTemplate.queryForObject(insertDocSql, Long.class, title, pgRolesArray);
 
             if (documentId == null) {
-                log.error("ClinicalVectorSyncListener: Không thể tạo documentId cho bệnh án #{}", event.healthRecordId());
+                log.error("ClinicalVectorSyncListener: Unable to create a documentId for medical record #{}", event.healthRecordId());
                 return;
             }
 
-            // 7. Lưu vector embedding vào rag_knowledge_embeddings
+            // 7. Save the embedding vector to rag_knowledge_embeddings
             String insertEmbeddingSql = """
                     INSERT INTO rag_knowledge_embeddings (document_id, chunk_index, content, metadata, embedding)
                     VALUES (?, 0, ?, ?::jsonb, ?::vector)
@@ -103,11 +103,11 @@ public class ClinicalVectorSyncListener {
 
             jdbcTemplate.update(insertEmbeddingSql, documentId, content, metadataJson, vectorString);
 
-            log.info("ClinicalVectorSyncListener: Đồng bộ vector pgvector thành công cho bệnh án #{} (Document ID: {})",
+            log.info("ClinicalVectorSyncListener: Successfully synchronized pgvector for medical record #{} (Document ID: {})",
                     event.healthRecordId(), documentId);
 
         } catch (Exception ex) {
-            log.error("ClinicalVectorSyncListener: Lỗi khi đồng bộ vector cho bệnh án #{}: {}",
+            log.error("ClinicalVectorSyncListener: Failed to synchronize the vector for medical record #{}: {}",
                     event.healthRecordId(), ex.getMessage(), ex);
         }
     }

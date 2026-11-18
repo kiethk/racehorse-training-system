@@ -2,7 +2,9 @@ package com.rtms.backend.analytics.service;
 
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.analytics.dto.manager.AdmissionFunnelEdaDto;
 import com.rtms.backend.analytics.dto.manager.ManagerEdaOverviewResponse;
+import com.rtms.backend.analytics.dto.manager.TrainerEvaluationEdaDto;
 import com.rtms.backend.analytics.util.AdmissionFunnelEdaCalculator;
 import com.rtms.backend.analytics.util.OccupancyEdaCalculator;
 import com.rtms.backend.analytics.util.TrainerEdaCalculator;
@@ -49,7 +51,7 @@ public class ManagerEdaAnalyticsService {
     }
 
     public ManagerEdaOverviewResponse getOverview(Integer daysParam) {
-        int days = daysParam != null ? Math.max(7, Math.min(daysParam, 365)) : 90;
+        int days = normalizeDays(daysParam);
         LocalDate sinceDate = LocalDate.now().minusDays(days);
         LocalDateTime sinceDateTime = sinceDate.atStartOfDay();
 
@@ -82,5 +84,23 @@ public class ManagerEdaAnalyticsService {
                 stallOccupancy,
                 admissionFunnel
         );
+    }
+
+    public AdmissionFunnelEdaDto getAdmissionFunnel(Integer daysParam) {
+        LocalDateTime sinceDateTime = LocalDate.now().minusDays(normalizeDays(daysParam)).atStartOfDay();
+        var admissions = admissionApplicationRepository.findAdmissionsSince(sinceDateTime);
+        return AdmissionFunnelEdaCalculator.calculate(admissions);
+    }
+
+    public TrainerEvaluationEdaDto getTrainerEvaluation(Integer daysParam) {
+        LocalDate sinceDate = LocalDate.now().minusDays(normalizeDays(daysParam));
+        Map<Long, String> userNameMap = userRepository.findAll().stream()
+                .collect(Collectors.toMap(User::getId, User::getFullName, (existing, replacement) -> existing));
+        var trainerRows = trainingWorkoutRepository.findTrainerWorkoutsSince(sinceDate);
+        return TrainerEdaCalculator.calculate(trainerRows, userNameMap);
+    }
+
+    private int normalizeDays(Integer daysParam) {
+        return daysParam != null ? Math.max(7, Math.min(daysParam, 365)) : 90;
     }
 }

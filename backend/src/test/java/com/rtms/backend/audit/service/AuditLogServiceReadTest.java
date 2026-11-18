@@ -137,6 +137,26 @@ class AuditLogServiceReadTest {
         verify(repository).findAll(any(Specification.class), any(Pageable.class));
     }
 
+    @Test
+    void filterByStatusCodeSuccess_passedToRepository() {
+        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        service.getAuditLogs(null, null, 200, null, null, null, PageRequest.of(0, 20));
+
+        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    void filterByStatusCodeFailed_passedToRepository() {
+        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        service.getAuditLogs(null, null, 400, null, null, null, PageRequest.of(0, 20));
+
+        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
     // 8. Filter by from
     @Test
     void filterByFrom_passedToRepository() {

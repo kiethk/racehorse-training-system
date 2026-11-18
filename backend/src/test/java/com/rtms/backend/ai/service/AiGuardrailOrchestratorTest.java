@@ -12,6 +12,7 @@ import org.mockito.Mockito;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.rtms.backend.ai.dto.AiChatMessageDto;
 import com.rtms.backend.ai.dto.AiChatRequestDto;
 import com.rtms.backend.ai.dto.AiChatResponseDto;
 import java.util.List;
@@ -40,55 +41,55 @@ class AiGuardrailOrchestratorTest {
     }
 
     @Test
-    @DisplayName("Guardrail 1: System prompt chứa đầy đủ chính sách Domain Confinement và Out-of-Domain Refusal")
+    @DisplayName("Guardrail 1: System prompt includes the complete Domain Confinement and Out-of-Domain Refusal policies")
     void testSystemPrompt_DomainConfinementRulesPresent() {
         AuthenticatedUser owner = new AuthenticatedUser(10L, "owner@example.com", "HORSE_OWNER");
         String prompt = service.buildSystemPrompt(owner);
 
         assertNotNull(prompt);
-        assertTrue(prompt.contains("16. NGUYÊN TẮC THẾ GIỚI ĐÓNG & GIỚI HẠN PHẠM VI NGHIỆP VỤ TUYỆT ĐỐI"));
+        assertTrue(prompt.contains("16. CLOSED-WORLD WHITELIST DOMAIN CONFINEMENT"));
         assertTrue(prompt.contains("IN-DOMAIN WHITELIST"));
         assertTrue(prompt.contains("CLOSED-WORLD ASSUMPTION"));
         assertTrue(prompt.contains("MULTI-INTENT & COMPOUND QUERIES"));
-        assertTrue(prompt.contains("Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?"));
-        assertTrue(prompt.contains("TUYỆT ĐỐI KHÔNG trả lời đáp án dù chỉ là 1 chữ cái hay 1 từ đơn"));
+        assertTrue(prompt.contains("My mother is Nga, what is the first letter of her name?"));
+        assertTrue(prompt.contains("ABSOLUTELY FORBIDDEN to provide the answer or reasoning (never answer even a single letter or single word)"));
     }
 
     @Test
-    @DisplayName("Guardrail 2: Domain Ontology được nạp riêng biệt và chính xác cho cả 5 Vai trò (RBAC)")
+    @DisplayName("Guardrail 2: Domain ontology is loaded separately and accurately for all five roles (RBAC)")
     void testSystemPrompt_RoleBasedOntologyCoverage() {
         for (String role : new String[]{"HORSE_OWNER", "HEAD_TRAINER", "VETERINARIAN", "GROOM", "CLUB_MANAGER"}) {
             AuthenticatedUser user = new AuthenticatedUser(99L, role.toLowerCase() + "@rtms.com", role);
             String prompt = service.buildSystemPrompt(user);
 
             assertNotNull(prompt);
-            assertTrue(prompt.contains("17. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO"),
-                    "Role " + role + " phải có mục 17 Domain Ontology");
+            assertTrue(prompt.contains("17. BUSINESS ENTITY MODEL & REASONING RULES FOR"),
+                    "Role " + role + " must have section 17, Domain Ontology");
             assertTrue(prompt.contains(role) || prompt.contains(role.replace("HEAD_", "")),
-                    "Prompt phải chứa từ khóa ontology của role " + role);
+                    "Prompt must contain the ontology keyword for role " + role);
         }
     }
 
     @Test
-    @DisplayName("Guardrail 3: Xác thực quy tắc phân tách nghiêm ngặt giữa Ngựa và Chuồng trại")
+    @DisplayName("Guardrail 3: Verify the strict distinction between horses and stalls")
     void testSystemPrompt_StallsVsHorsesGuardrail() {
         AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
         String prompt = service.buildSystemPrompt(manager);
 
         assertNotNull(prompt);
-        assertTrue(prompt.contains("PHÂN BIỆT RÕ RÀNG GIỮA SỐ LƯỢNG NGỰA VÀ SỐ LƯỢNG CHUỒNG TRẠI (STALLS)"));
-        assertTrue(prompt.contains("TUYỆT ĐỐI KHÔNG đánh đồng hoặc lấy số lượng chuồng trại để trả lời thay cho số lượng ngựa"));
+        assertTrue(prompt.contains("CLEARLY DISTINGUISH HORSE COUNT FROM STALL COUNT"));
+        assertTrue(prompt.contains("NEVER equate or use the stall count to answer a question about the horse count"));
         assertTrue(prompt.contains("getStableOccupancyMetrics"));
     }
 
     @Test
-    @DisplayName("Guardrail 4 (ReAct-Level): Fast Short-Circuit 100% Out-of-Domain không kích hoạt ReAct loop")
+    @DisplayName("Guardrail 4 (ReAct-Level): A pure out-of-domain fast short-circuit does not start the ReAct loop")
     void testReActLevel_PureOutOfDomain_ShortCircuit() {
         IntentDecompositionService mockDecomposer = mock(IntentDecompositionService.class);
         when(mockDecomposer.decompose(anyString(), anyString())).thenReturn(
                 new IntentDecompositionService.DecomposedIntents(
                         Collections.emptyList(),
-                        List.of("Giải phương trình vi phân y'' + y = 0")
+                        List.of("Solve the differential equation y'' + y = 0")
                 )
         );
 
@@ -103,27 +104,27 @@ class AiGuardrailOrchestratorTest {
         );
 
         AuthenticatedUser trainer = new AuthenticatedUser(2L, "trainer@rtms.com", "HEAD_TRAINER");
-        AiChatRequestDto request = new AiChatRequestDto("Giải phương trình vi phân y'' + y = 0", List.of());
+        AiChatRequestDto request = new AiChatRequestDto("Solve the differential equation y'' + y = 0", List.of());
 
         AiChatResponseDto response = serviceWithDecomposer.processChat(request, trainer);
 
         assertNotNull(response);
-        assertTrue(response.reply().contains("Trợ lý AI RTMS"));
-        assertTrue(response.reply().contains("ngoài phạm vi nghiệp vụ"));
+        assertTrue(response.reply().contains("I am the RTMS AI Assistant, specialized exclusively in racehorse training and management operations"));
+        assertTrue(response.reply().contains("Your request is outside my assigned operational scope, so I cannot assist with it."));
         assertTrue(response.executedTools().isEmpty());
-        // Khẳng định chắc chắn không có tool nào được gọi hoặc tra cứu
+        // Confirm that no tools were called or queried.
         verify(toolRegistryService, never()).getFunctionSpecsForRole(anyString());
         verify(toolExecutionService, never()).executeTool(anyString(), any(), any());
     }
 
     @Test
-    @DisplayName("Guardrail 5 (ReAct-Level): Bóc tách câu hỏi hỗn hợp, chỉ nạp In-Domain vào ReAct và đính kèm từ chối OOD")
+    @DisplayName("Guardrail 5 (ReAct-Level): Decompose a compound query, send only in-domain content to ReAct, and append an OOD refusal")
     void testReActLevel_CompoundQuery_AppendsOodRefusal() {
         IntentDecompositionService mockDecomposer = mock(IntentDecompositionService.class);
         when(mockDecomposer.decompose(anyString(), anyString())).thenReturn(
                 new IntentDecompositionService.DecomposedIntents(
-                        List.of("Danh sách chiến mã của tôi", "hướng dẫn tôi trở thành chủ ngựa"),
-                        List.of("Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?")
+                        List.of("List my horses", "Show me how to become a horse owner"),
+                        List.of("My mother is Nga, what is the first letter of her name?")
                 )
         );
 
@@ -139,7 +140,7 @@ class AiGuardrailOrchestratorTest {
 
         AuthenticatedUser owner = new AuthenticatedUser(10L, "owner@rtms.com", "HORSE_OWNER");
         AiChatRequestDto request = new AiChatRequestDto(
-                "Danh sách chiến mã của tôi và hướng dẫn tôi trở thành chủ ngựa. Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?",
+                "List my horses and show me how to become a horse owner. My mother is Nga, what is the first letter of her name?",
                 List.of()
         );
 
@@ -148,8 +149,107 @@ class AiGuardrailOrchestratorTest {
         AiChatResponseDto response = serviceWithDecomposer.processChat(request, owner);
 
         assertNotNull(response);
-        // Kiểm tra phần từ chối OOD được đính kèm ở đuôi câu trả lời một cách tất định
-        assertTrue(response.reply().contains("Lưu ý: Về yêu cầu ngoài nghiệp vụ [Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?]"));
-        assertTrue(response.reply().contains("từ chối giải đáp"));
+        // Confirm that the OOD refusal is deterministically appended to the end of the reply.
+        assertTrue(response.reply().contains("*Note: Regarding the out-of-scope request [My mother is Nga, what is the first letter of her name?], the RTMS AI Assistant is specialized in racehorse operations and management, and cannot assist with external requests.*"));
+        assertTrue(response.reply().contains("cannot assist with external requests"));
+    }
+
+    @Test
+    @DisplayName("Guardrail 6 (End-to-End Multi-Turn): Vietnamese queries, language directives, rollover thresholds, and alerts bypass pre-flight OOD refusal")
+    void testMultiTurnConversation_GuardrailAllowsBilingualAndContextualQueries() {
+        // Instantiate a real DefaultIntentDecompositionService with empty API key (deterministic heuristic/regex router)
+        DefaultIntentDecompositionService realDecomposer = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "",
+                "gpt-4o-mini",
+                objectMapper
+        );
+
+        AgentOrchestratorService orchestrator = new AgentOrchestratorService(
+                "https://api.openai.com/v1",
+                "test-api-key",
+                "gpt-4o-mini",
+                toolRegistryService,
+                toolExecutionService,
+                realDecomposer,
+                objectMapper
+        );
+
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+        when(toolRegistryService.getFunctionSpecsForRole("CLUB_MANAGER")).thenReturn(List.of());
+
+        String oodSnippet = "outside my assigned operational scope";
+
+        // Turn 1: "Phân tích trạng thái Vet"
+        AiChatRequestDto req1 = new AiChatRequestDto("Phân tích trạng thái Vet", List.of());
+        AiChatResponseDto res1 = orchestrator.processChat(req1, manager);
+        assertNotNull(res1);
+        assertFalse(res1.reply().contains(oodSnippet), "Turn 1 must NOT be rejected as out-of-domain");
+
+        // History after Turn 1
+        List<AiChatMessageDto> history1 = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "## Veterinarian Status Analysis\nRollover rate is 22.1%...")
+        );
+
+        // Turn 2: "Trả lời tiếng Việt"
+        AiChatRequestDto req2 = new AiChatRequestDto("Trả lời tiếng Việt", history1);
+        AiChatResponseDto res2 = orchestrator.processChat(req2, manager);
+        assertNotNull(res2);
+        assertFalse(res2.reply().contains(oodSnippet), "Turn 2 (Language directive) must NOT be rejected as out-of-domain");
+
+        // History after Turn 2
+        List<AiChatMessageDto> history2 = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "## Veterinarian Status Analysis..."),
+                new AiChatMessageDto("user", "Trả lời tiếng Việt"),
+                new AiChatMessageDto("assistant", "## Phân tích trạng thái Bác sĩ Thú y...")
+        );
+
+        // Turn 3: "Ngưỡng rollover rate là bao nhiêu?"
+        AiChatRequestDto req3 = new AiChatRequestDto("Ngưỡng rollover rate là bao nhiêu?", history2);
+        AiChatResponseDto res3 = orchestrator.processChat(req3, manager);
+        assertNotNull(res3);
+        assertFalse(res3.reply().contains(oodSnippet), "Turn 3 (Rollover rate threshold) must NOT be rejected as out-of-domain");
+
+        // History after Turn 3
+        List<AiChatMessageDto> history3 = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "## Veterinarian Status Analysis..."),
+                new AiChatMessageDto("user", "Trả lời tiếng Việt"),
+                new AiChatMessageDto("assistant", "## Phân tích trạng thái Bác sĩ Thú y..."),
+                new AiChatMessageDto("user", "Ngưỡng rollover rate là bao nhiêu?"),
+                new AiChatMessageDto("assistant", "Ngưỡng rollover rate thông thường...")
+        );
+
+        // Turn 4: "Có alert nào trong hệ thống"
+        AiChatRequestDto req4 = new AiChatRequestDto("Có alert nào trong hệ thống", history3);
+        AiChatResponseDto res4 = orchestrator.processChat(req4, manager);
+        assertNotNull(res4);
+        assertFalse(res4.reply().contains(oodSnippet), "Turn 4 (System alert inquiry) must NOT be rejected as out-of-domain");
+
+        // Turn 5: Contextual follow-up without horse nouns in active conversation
+        AiChatRequestDto req5 = new AiChatRequestDto("Tại sao lại như vậy?", history3);
+        AiChatResponseDto res5 = orchestrator.processChat(req5, manager);
+        assertNotNull(res5);
+        assertFalse(res5.reply().contains(oodSnippet), "Turn 5 (Contextual follow-up 'Tại sao lại như vậy?') must NOT be rejected as out-of-domain");
+
+        // Turn 6: Obvious OOD in active conversation must STILL be rejected by pre-flight guardrail
+        AiChatRequestDto req6 = new AiChatRequestDto("Thời tiết hôm nay thế nào?", history3);
+        AiChatResponseDto res6 = orchestrator.processChat(req6, manager);
+        assertNotNull(res6);
+        assertTrue(res6.reply().contains(oodSnippet), "Obvious OOD question in active conversation MUST still be rejected");
+
+        // Turn 7: Greeting combined with language switch directive (Turn 1, no history)
+        AiChatRequestDto req7 = new AiChatRequestDto("Xin chào, hãy trả lời bằng tiếng Việt nhé", List.of());
+        AiChatResponseDto res7 = orchestrator.processChat(req7, manager);
+        assertNotNull(res7);
+        assertFalse(res7.reply().contains(oodSnippet), "Greeting with language switch directive must NOT be rejected as out-of-domain");
+
+        // Turn 8: System identity & guidance inquiry
+        AiChatRequestDto req8 = new AiChatRequestDto("RTMS là gì?", List.of());
+        AiChatResponseDto res8 = orchestrator.processChat(req8, manager);
+        assertNotNull(res8);
+        assertFalse(res8.reply().contains(oodSnippet), "RTMS system guidance inquiry must NOT be rejected as out-of-domain");
     }
 }

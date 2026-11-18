@@ -5,5 +5,7 @@ public record AdmissionCapacitySummary(
         long availableRegularStalls,
         long occupiedQuarantineStalls,
         boolean admissionCapacityAvailable,
-        String blockingReason) {
+        String blockingReason,
+        long requiredRegularStallsForApproval,
+        boolean approvalCapacityAvailable) {
 }

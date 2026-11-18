@@ -14,13 +14,18 @@ public final class TrainerEdaCalculator {
 
     public static TrainerEvaluationEdaDto calculate(List<TrainerWorkoutRow> rows, Map<Long, String> trainerNames) {
         if (rows == null || rows.isEmpty()) {
-            return new TrainerEvaluationEdaDto(0.0, 0, 0, Collections.emptyList());
+            return new TrainerEvaluationEdaDto(0.0, 0.0, 0, 0, Collections.emptyList());
         }
 
         int totalScheduled = rows.size();
         int totalCompleted = (int) rows.stream().filter(r -> r.status() == WorkoutStatus.RAN).count();
-        double overallAdherence = totalScheduled > 0
-                ? Math.round(((double) totalCompleted / totalScheduled * 100.0) * 10.0) / 10.0
+        int totalCancelled = (int) rows.stream().filter(r -> r.status() == WorkoutStatus.CANCELLED).count();
+        int overallEffectiveScheduled = totalScheduled - totalCancelled;
+        double overallAdherence = overallEffectiveScheduled > 0
+                ? Math.round(((double) totalCompleted / overallEffectiveScheduled * 100.0) * 10.0) / 10.0
+                : 0.0;
+        double overallCancellationRate = totalScheduled > 0
+                ? Math.round(((double) totalCancelled / totalScheduled * 100.0) * 10.0) / 10.0
                 : 0.0;
 
         Map<Long, List<TrainerWorkoutRow>> byTrainer = rows.stream()
@@ -37,7 +42,13 @@ public final class TrainerEdaCalculator {
             int completed = (int) trainerRows.stream().filter(r -> r.status() == WorkoutStatus.RAN).count();
             int held = (int) trainerRows.stream().filter(r -> r.status() == WorkoutStatus.HELD).count();
             int cancelled = (int) trainerRows.stream().filter(r -> r.status() == WorkoutStatus.CANCELLED).count();
-            double adherence = scheduled > 0 ? Math.round(((double) completed / scheduled * 100.0) * 10.0) / 10.0 : 0.0;
+            int effectiveScheduled = scheduled - cancelled;
+            double adherence = effectiveScheduled > 0
+                    ? Math.round(((double) completed / effectiveScheduled * 100.0) * 10.0) / 10.0
+                    : 0.0;
+            double cancellationRate = scheduled > 0
+                    ? Math.round(((double) cancelled / scheduled * 100.0) * 10.0) / 10.0
+                    : 0.0;
 
             List<TrainerWorkoutRow> ranRows = trainerRows.stream()
                     .filter(r -> r.status() == WorkoutStatus.RAN)
@@ -99,6 +110,7 @@ public final class TrainerEdaCalculator {
                     held,
                     cancelled,
                     adherence,
+                    cancellationRate,
                     Math.round(avgRating * 10.0) / 10.0,
                     Math.round(avgSpeed * 10.0) / 10.0,
                     Math.round(avgRecoveryHr * 10.0) / 10.0,
@@ -111,6 +123,7 @@ public final class TrainerEdaCalculator {
 
         return new TrainerEvaluationEdaDto(
                 overallAdherence,
+                overallCancellationRate,
                 totalScheduled,
                 totalCompleted,
                 trainerDtos

@@ -8,6 +8,32 @@ const blobUrlCache = new Map<string, string>();
 const inFlightRequests = new Map<string, Promise<string>>();
 const MAX_BLOB_CACHE_SIZE = 100;
 
+/**
+ * A stored file can take many seconds (the backend fetches it from cloud storage first), and a browser opens at most
+ * 6 connections to the API host. Without a cap, a page full of horse photos holds all 6 and every data request
+ * queues behind them, so pages sit on their loading skeletons. Downloading at most 2 files at a time keeps the other
+ * connections free for data.
+ */
+const MAX_CONCURRENT_DOWNLOADS = 2;
+let activeDownloads = 0;
+const waitingDownloads: Array<() => void> = [];
+
+export async function withDownloadSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activeDownloads < MAX_CONCURRENT_DOWNLOADS) {
+    activeDownloads += 1;
+  } else {
+    // The slot is handed over by the download that finishes, so the count stays the same.
+    await new Promise<void>((resolve) => waitingDownloads.push(resolve));
+  }
+  try {
+    return await task();
+  } finally {
+    const next = waitingDownloads.shift();
+    if (next) next();
+    else activeDownloads -= 1;
+  }
+}
+
 function cacheBlobUrl(source: string, url: string): void {
   if (blobUrlCache.size >= MAX_BLOB_CACHE_SIZE) {
     const oldestKey = blobUrlCache.keys().next().value;
@@ -93,7 +119,7 @@ export async function fetchProtectedBlobUrl(source: string, signal?: AbortSignal
   // does not abort concurrent or subsequent requests sharing this URL or break the cache.
   const promise = (async () => {
     try {
-      const rawBlob = await apiGetBlob(source);
+      const rawBlob = await withDownloadSlot(() => apiGetBlob(source));
       const blob = await ensureCorrectMimeType(rawBlob, source);
       const url = URL.createObjectURL(blob);
       cacheBlobUrl(source, url);
@@ -114,21 +140,13 @@ export async function fetchProtectedBlobUrl(source: string, signal?: AbortSignal
  */
 export function useProtectedFileUrl(source: string | null | undefined): { url: string | null; failed: boolean } {
   const direct = source && /^(blob:|data:)/.test(source) ? source : null;
-  const initialCached = source ? blobUrlCache.get(source) ?? null : null;
+  // A file already downloaded is read straight from the cache while rendering, so no effect has to copy it into state.
+  const cached = source && !direct ? blobUrlCache.get(source) ?? null : null;
 
-  const [loaded, setLoaded] = useState<{ source: string; url: string | null } | null>(() => {
-    if (direct) return { source: direct, url: direct };
-    if (initialCached && source) return { source, url: initialCached };
-    return null;
-  });
+  const [loaded, setLoaded] = useState<{ source: string; url: string | null } | null>(null);
 
   useEffect(() => {
-    if (!source || direct) return;
-
-    if (blobUrlCache.has(source)) {
-      setLoaded({ source, url: blobUrlCache.get(source)! });
-      return;
-    }
+    if (!source || direct || blobUrlCache.has(source)) return;
 
     let active = true;
     fetchProtectedBlobUrl(source)
@@ -149,6 +167,7 @@ export function useProtectedFileUrl(source: string | null | undefined): { url: s
   }, [source, direct]);
 
   if (direct) return { url: direct, failed: false };
+  if (cached) return { url: cached, failed: false };
   const current = loaded && loaded.source === source ? loaded : null;
   return { url: current?.url ?? null, failed: current !== null && current.url === null };
 }
@@ -208,7 +227,7 @@ export function useProtectedFileUrls(sources: readonly string[]): Record<string,
  * Opens a local or existing blob URL in a new tab using the application's document viewer.
  * Avoids browser iframe/blob auto-download quirks and presents an interactive viewer.
  */
-export function openBlobInTab(blobUrl: string, title: string = 'Document Preview', _isPdf?: boolean): void {
+export function openBlobInTab(blobUrl: string, title: string = 'Document Preview'): void {
   const viewerUrl = `/document-viewer?url=${encodeURIComponent(blobUrl)}&name=${encodeURIComponent(title)}`;
   window.open(viewerUrl, '_blank');
 }

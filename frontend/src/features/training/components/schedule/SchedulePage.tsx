@@ -10,7 +10,7 @@ import {
   PageHeader,
   Panel,
   ScreenLayout,
-  Select,
+  SearchCombobox,
   Tabs,
 } from '@/components/ui';
 import { useHorses } from '@/features/horses/hooks/useHorses';
@@ -18,11 +18,11 @@ import { displayError, formatDate } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { useTrainingRules } from '../../hooks/useTrainingRules';
 import { shiftIsoDate, toIsoDate, DAY_HEADING_FORMAT } from '../../lib/dateRange';
-import { groupByDate, mondayOf, sessionTitle, totalNeedingResult } from '../../lib/groupSchedule';
+import { mondayOf, sessionTitle, totalNeedingResult } from '../../lib/groupSchedule';
 import { trainingService } from '../../services/trainingService';
 import type { SessionSummary, TrainingGroup } from '../../types';
 import { ScheduleWeekCalendar } from './ScheduleWeekCalendar';
-import { SessionCard } from './SessionCard';
+import { NeedsResultGrid } from './NeedsResultGrid';
 import { SessionDialog, SessionDetailContent } from './SessionDialog';
 import { TimelineStrip } from './TimelineStrip';
 
@@ -75,8 +75,19 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
   }, [loadMissingCount]);
 
   const activeHorse = useMemo(
-    () => horses.find((h) => h.id === selectedHorseId) ?? horses[0] ?? null,
+    () => horses.find((h) => h.id === selectedHorseId) ?? null,
     [horses, selectedHorseId],
+  );
+  const horseOptions = useMemo(
+    () => horses.map((h) => ({ value: String(h.id), label: h.name, hint: h.breed ?? undefined })),
+    [horses],
+  );
+  const groupOptions = useMemo(
+    () =>
+      groups
+        .filter((g) => !g.disbanded)
+        .map((g) => ({ value: String(g.id), label: g.name, hint: `${g.members.length} horses` })),
+    [groups],
   );
 
   useEffect(() => {
@@ -148,12 +159,6 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
     }
   }
 
-  const todaySessions = useMemo(() => {
-    return sessions.filter((s) => s.status !== 'CANCELLED');
-  }, [sessions]);
-
-  const byDate = useMemo(() => groupByDate(sessions), [sessions]);
-
   return (
     <ScreenLayout variant="list">
       <PageHeader title="Schedule" />
@@ -183,39 +188,26 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
             }
           }}
         />
-        <div className="flex flex-wrap items-center gap-2">
-          {canManage && (
-            <>
-              {view === 'horse' && horses.length > 0 && (
-                <Select
-                  aria-label="Select horse"
-                  value={activeHorse?.id ?? ''}
-                  onChange={(event) => {
-                    const id = event.target.value ? Number(event.target.value) : null;
-                    setSelectedHorseId(id);
-                  }}
-                  className="w-48 text-xs font-medium"
-                >
-                  {horses.map((h) => (
-                    <option key={h.id} value={h.id}>{h.name}</option>
-                  ))}
-                </Select>
-              )}
-              {view === 'week' && (
-                <Select
-                  aria-label="Group"
-                  value={groupId}
-                  onChange={(event) => setGroupId(event.target.value ? Number(event.target.value) : '')}
-                >
-                  <option value="">All groups</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>{group.name}</option>
-                  ))}
-                </Select>
-              )}
-            </>
-          )}
-        </div>
+        {view === 'horse' && horses.length > 0 && (
+          <SearchCombobox
+            label="Horse"
+            placeholder="Search horse name"
+            options={horseOptions}
+            value={selectedHorseId === null ? null : String(selectedHorseId)}
+            onChange={(value) => setSelectedHorseId(value === null ? null : Number(value))}
+            className="w-64"
+          />
+        )}
+        {view === 'week' && canManage && (
+          <SearchCombobox
+            label="Group"
+            placeholder="Search group name (all groups)"
+            options={groupOptions}
+            value={groupId === '' ? null : String(groupId)}
+            onChange={(value) => setGroupId(value === null ? '' : Number(value))}
+            className="w-64"
+          />
+        )}
       </div>
 
       {view === 'horse' ? (
@@ -230,7 +222,11 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
           />
         ) : (
           <Panel padded>
-            <EmptyState icon="horse" title="No horses available" description="You do not have any horses assigned." />
+            {horses.length > 0 ? (
+              <EmptyState icon="search" title="Search for a horse to see its week" />
+            ) : (
+              <EmptyState icon="horse" title="No horses available" description="You do not have any horses assigned." />
+            )}
           </Panel>
         )
       ) : loading ? (
@@ -245,7 +241,7 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
           />
         </Panel>
       ) : view === 'needs-result' ? (
-        <DayList byDate={byDate} onOpen={setOpenId} emptyTitle="Nothing is waiting for a result" />
+        <NeedsResultGrid sessions={sessions} rules={rules} onOpen={setOpenId} />
       ) : view === 'today' ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
@@ -286,7 +282,7 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
 
           {rules && (
             <TimelineStrip
-              sessions={todaySessions}
+              sessions={sessions}
               rules={rules}
               movable={canManage}
               showTrainers={showTrainers}
@@ -295,7 +291,7 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
             />
           )}
 
-          {todaySessions.length === 0 ? (
+          {sessions.length === 0 ? (
             <Panel padded>
               <EmptyState
                 icon="calendar"
@@ -308,7 +304,7 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
                 {formatDate(selectedDate, DAY_HEADING_FORMAT)}
               </h2>
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                {todaySessions.map((session) => (
+                {sessions.map((session) => (
                   <Panel padded key={session.id}>
                     <SessionDetailContent
                       sessionId={session.id}
@@ -348,31 +344,3 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
   );
 }
 
-function DayList({
-  byDate,
-  onOpen,
-  emptyTitle,
-}: {
-  byDate: Record<string, SessionSummary[]>;
-  onOpen: (id: number) => void;
-  emptyTitle: string;
-}) {
-  const dates = Object.keys(byDate).sort();
-  if (dates.length === 0) {
-    return <Panel padded><EmptyState icon="calendar" title={emptyTitle} /></Panel>;
-  }
-  return (
-    <div className="space-y-4">
-      {dates.map((day) => (
-        <section key={day} className="space-y-2">
-          <h2 className="text-sm font-semibold text-[var(--color-text-secondary)]">{formatDate(day, DAY_HEADING_FORMAT)}</h2>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {byDate[day].map((session) => (
-              <SessionCard key={session.id} session={session} onOpen={onOpen} />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}

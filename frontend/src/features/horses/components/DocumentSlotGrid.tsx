@@ -68,7 +68,6 @@ export function DocumentSlotGrid({ slots, chosen, onChoose, onlyTypes }: Documen
             uploadedAt: preview.updatedAt ?? '',
           }}
           label={documentTypeLabel(preview.documentType)}
-          fileUrl={preview.fileUrl}
           onClose={() => setPreview(null)}
         />
       )}
@@ -179,7 +178,7 @@ function SlotTile({ state, editable, error, file, onPick, onUndo, onView, onPrev
       {editable && (
         <FileInput
           ref={input}
-          className="sr-only"
+          className="hidden"
           tabIndex={-1}
           aria-hidden
           aria-describedby={error ? errorId : undefined}

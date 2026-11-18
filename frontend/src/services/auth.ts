@@ -3,7 +3,11 @@ import type { ApiResponse } from '@/types/horse';
 import type { AuthUser, LoginRequest, OwnerRegistrationRequest, OwnerRegistrationResponse } from '@/types/auth';
 
 export async function login(request: LoginRequest): Promise<ApiResponse<AuthUser>> {
-  const res = await apiPost<ApiResponse<AuthUser & { accessToken?: string }>>('/api/auth/login', request);
+  const normalized = {
+    ...request,
+    email: request.email ? request.email.trim().toLowerCase() : '',
+  };
+  const res = await apiPost<ApiResponse<AuthUser & { accessToken?: string }>>('/api/auth/login', normalized);
   if (res.success && res.data.accessToken) {
     setAccessToken(res.data.accessToken);
   }

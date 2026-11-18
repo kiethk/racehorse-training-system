@@ -13,12 +13,13 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Panel, Button, Spinner, Notice, Pill } from '@/components/ui';
+import { FormField } from '@/components/ui/FormField';
+import { Select } from '@/components/ui/Input';
+import { Table, THead, TBody, Tr, Th, Td } from '@/components/ui/Table';
 import { medicalEdaService } from '../services/medicalEdaService';
 import type {
   SurvivalStratifyBy,
   SurvivalEdaResponse,
-  SurvivalStratum,
-  KaplanMeierStep,
 } from '../types/medicalEda';
 
 const STRATUM_COLORS = [
@@ -33,7 +34,7 @@ const STRATUM_COLORS = [
 ];
 
 export const KaplanMeierSurvivalChart: React.FC = () => {
-  const [stratifyBy, setStratifyBy] = useState<SurvivalStratifyBy>('TREATMENT_PLAN');
+  const [stratifyBy, setStratifyBy] = useState<SurvivalStratifyBy>('SEVERITY');
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<SurvivalEdaResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
   }, [stratifyBy]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load; the fetch owns its loading flag
     void fetchData();
   }, [fetchData]);
 
@@ -107,7 +109,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div>
           <h3 className="text-base font-bold text-[var(--color-text-primary)]">
-            Injury Recovery Timeline by Treatment
+            Injury Recovery Timeline (Kaplan-Meier)
           </h3>
           <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
             Time required for horses to recover and return to full training.
@@ -115,20 +117,16 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
         </div>
 
         {/* Stratification Selector */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="stratify-select" className="text-xs font-semibold text-[var(--color-text-secondary)]">
-            Compare By:
-          </label>
-          <select
+        <FormField label="Compare By" htmlFor="stratify-select" className="w-56">
+          <Select
             id="stratify-select"
             value={stratifyBy}
             onChange={(e) => setStratifyBy(e.target.value as SurvivalStratifyBy)}
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] shadow-sm focus:border-[var(--color-primary)] focus:outline-none"
           >
-            <option value="TREATMENT_PLAN">Compare by Treatment Plan</option>
+            <option value="SEVERITY">Compare by Severity</option>
             <option value="BODY_ZONE">Compare by Body Zone</option>
-          </select>
-        </div>
+          </Select>
+        </FormField>
       </div>
 
       {error && (
@@ -257,19 +255,18 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
           </div>
 
           {/* Stratum Summary Table */}
-          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
-            <table className="w-full text-left text-xs text-[var(--color-text-primary)]">
-              <thead className="bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] font-semibold border-b border-[var(--color-border)]">
-                <tr>
-                  <th className="px-3 py-2">{stratifyBy === 'TREATMENT_PLAN' ? 'Treatment Plan' : 'Body Zone'}</th>
-                  <th className="px-3 py-2 text-right">Cases Under Care</th>
-                  <th className="px-3 py-2 text-right">Recovered</th>
-                  <th className="px-3 py-2 text-right">Still Recovering</th>
-                  <th className="px-3 py-2 text-right">Recovery Rate</th>
-                  <th className="px-3 py-2 text-right">Typical Recovery (Days)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
+          <Table className="text-xs">
+            <THead>
+              <Tr>
+                <Th className="px-3 py-2">{stratifyBy === 'SEVERITY' ? 'Injury Severity' : 'Body Zone'}</Th>
+                <Th className="px-3 py-2 text-right">Cases Under Care</Th>
+                <Th className="px-3 py-2 text-right">Recovered</Th>
+                <Th className="px-3 py-2 text-right">Still Recovering</Th>
+                <Th className="px-3 py-2 text-right">Recovery Rate</Th>
+                <Th className="px-3 py-2 text-right">Typical Recovery (Days)</Th>
+              </Tr>
+            </THead>
+            <TBody>
                 {data.strata.map((stratum, idx) => {
                   const rate =
                     stratum.totalCases > 0
@@ -278,23 +275,23 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                   const color = STRATUM_COLORS[idx % STRATUM_COLORS.length];
 
                   return (
-                    <tr key={stratum.stratumId} className="hover:bg-[var(--color-surface-subtle)]">
-                      <td className="px-3 py-2 font-medium flex items-center gap-2">
+                    <Tr key={stratum.stratumId} className="hover:bg-[var(--color-surface-subtle)]">
+                      <Td className="px-3 py-2 font-medium flex items-center gap-2">
                         <span
                           className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
                           style={{ backgroundColor: color }}
                         />
                         <span>{stratum.stratumName}</span>
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">{stratum.totalCases}</td>
-                      <td className="px-3 py-2 text-right font-mono text-emerald-600 font-semibold">
+                      </Td>
+                      <Td className="px-3 py-2 text-right font-mono">{stratum.totalCases}</Td>
+                      <Td className="px-3 py-2 text-right font-mono text-[var(--color-success)] font-semibold">
                         {stratum.recoveredCount}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-amber-600 font-semibold">
+                      </Td>
+                      <Td className="px-3 py-2 text-right font-mono text-[var(--color-warning)] font-semibold">
                         {stratum.censoredCount}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">{rate}%</td>
-                      <td className="px-3 py-2 text-right font-mono font-bold">
+                      </Td>
+                      <Td className="px-3 py-2 text-right font-mono">{rate}%</Td>
+                      <Td className="px-3 py-2 text-right font-mono font-bold">
                         {stratum.medianRecoveryDays != null ? (
                           <Pill tone="info" size="sm">
                             {stratum.medianRecoveryDays.toFixed(1)} days
@@ -302,13 +299,12 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                         ) : (
                           <span className="text-[var(--color-text-muted)] italic">Not reached (&gt;50% active)</span>
                         )}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+            </TBody>
+          </Table>
         </div>
       )}
     </Panel>

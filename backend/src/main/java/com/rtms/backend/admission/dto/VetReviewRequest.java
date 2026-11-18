@@ -42,6 +42,7 @@ public class VetReviewRequest {
     private String findings;
     private String diagnosis;
     private String treatment;
+    private String generalCareInstructions;
     private String notes;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
     private CreateNextScheduleRequest nextSchedule;
@@ -78,6 +79,8 @@ public class VetReviewRequest {
     public void setDiagnosis(String diagnosis) { this.diagnosis = diagnosis; }
     public String getTreatment() { return treatment; }
     public void setTreatment(String treatment) { this.treatment = treatment; }
+    public String getGeneralCareInstructions() { return generalCareInstructions; }
+    public void setGeneralCareInstructions(String generalCareInstructions) { this.generalCareInstructions = generalCareInstructions; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public List<VaccinationRequest> getVaccinations() { return vaccinations; }

@@ -25,14 +25,11 @@ export const auditLogApi = {
     if (filters.role && filters.role !== 'ALL') params.set('role', filters.role);
     
     if (filters.from) {
-      const fromDate = new Date(filters.from);
-      params.set('from', fromDate.toISOString());
+      params.set('from', filters.from);
     }
     
     if (filters.to) {
-      const toDate = new Date(filters.to);
-      toDate.setHours(23, 59, 59, 999);
-      params.set('to', toDate.toISOString());
+      params.set('to', filters.to);
     }
     
     params.set('page', String(filters.page));

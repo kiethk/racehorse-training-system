@@ -124,6 +124,9 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       }
       setDecisionError(message);
       toast.error(message);
+      if (cause instanceof ApiError && cause.errorCode === 'REGULAR_RESERVE_INSUFFICIENT') {
+        void load();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -211,7 +214,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
                 id: 'documents',
                 label: 'Documents',
                 count: detail.documents.length,
-                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+                content: <AdmissionDocumentsSection documents={detail.documents} />,
               },
             ]}
           />
@@ -229,6 +232,11 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
                 {!isReady && capacity && (
                   <span className="mt-1 block text-xs">Regular reserve required: {capacity.occupiedQuarantineStalls + 1} available regular stall(s).</span>
                 )}
+                {!isReady && (
+                  <span className="mt-1 block text-xs">
+                    A regular stall must be free for every horse in quarantine, including this one, before a new horse can be admitted.
+                  </span>
+                )}
               </Notice>
             </AdmissionSideCard>
 
@@ -245,7 +253,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
                 {detail.assignedGroomFull && <Pill tone="warning" size="sm">Full</Pill>}
                 {detail.assignedGroomFull && <Notice tone="warning">{GROOM_FULL_MESSAGE}</Notice>}
                 <div className="space-y-2">
-                  <Button type="button" variant="primary" className="w-full" disabled={submitting || detail.assignedGroomFull} onClick={() => setDecision('APPROVED')}>Approve</Button>
+                  <Button type="button" variant="primary" className="w-full" disabled={submitting || detail.assignedGroomFull || !isReady} onClick={() => setDecision('APPROVED')}>Approve</Button>
                   <Button type="button" variant="destructive" className="w-full" disabled={submitting} onClick={() => setDecision('REJECTED')}>Reject</Button>
                 </div>
               </AdmissionSideCard>

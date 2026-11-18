@@ -32,7 +32,7 @@ public class AiConversationService {
     }
 
     /**
-     * Lấy danh sách các cuộc hội thoại của người dùng, sắp xếp theo thời gian cập nhật mới nhất.
+     * Gets the user's conversations, sorted by most recently updated.
      */
     @Transactional(readOnly = true)
     public List<AiConversationDto> getUserConversations(Long userId) {
@@ -43,13 +43,13 @@ public class AiConversationService {
     }
 
     /**
-     * Lấy lịch sử tin nhắn của một cuộc hội thoại (kiểm tra quyền sở hữu).
+     * Gets a conversation's message history (after verifying ownership).
      */
     @Transactional(readOnly = true)
     public List<AiChatMessageDetailDto> getConversationMessages(Long conversationId, Long userId) {
         AiConversation conversation = conversationRepository.findByIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND",
-                        "Không tìm thấy cuộc hội thoại hoặc bạn không có quyền truy cập."));
+                        "Conversation not found or you do not have access."));
 
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId())
                 .stream()
@@ -65,42 +65,42 @@ public class AiConversationService {
     }
 
     /**
-     * Tạo mới hoặc lấy cuộc trò chuyện hiện có.
+     * Creates a new conversation or retrieves an existing one.
      */
     @Transactional
     public AiConversation getOrCreateConversation(Long conversationId, Long userId, String initialMessage) {
         if (conversationId != null) {
             return conversationRepository.findByIdAndUserId(conversationId, userId)
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND",
-                            "Không tìm thấy cuộc hội thoại hoặc bạn không có quyền truy cập."));
+                            "Conversation not found or you do not have access."));
         }
 
-        // Tạo tiêu đề từ tin nhắn đầu tiên (tối đa 40 ký tự)
+        // Generate a title from the first message (up to 40 characters)
         String title = generateTitle(initialMessage);
         AiConversation newConversation = new AiConversation(userId, title);
         return conversationRepository.save(newConversation);
     }
 
     /**
-     * Tạo cuộc trò chuyện mới có chủ đích (ví dụ người dùng bấm nút "New Chat").
+     * Explicitly creates a new conversation (for example, when the user clicks "New Chat").
      */
     @Transactional
     public AiConversationDto createNewConversation(Long userId, String customTitle) {
-        String title = (customTitle != null && !customTitle.isBlank()) ? customTitle.trim() : "Cuộc trò chuyện mới";
+        String title = (customTitle != null && !customTitle.isBlank()) ? customTitle.trim() : "New conversation";
         AiConversation conversation = new AiConversation(userId, title);
         AiConversation saved = conversationRepository.save(conversation);
         return new AiConversationDto(saved.getId(), saved.getTitle(), saved.getCreatedAt(), saved.getUpdatedAt());
     }
 
     /**
-     * Lưu tin nhắn của người dùng hoặc AI vào cơ sở dữ liệu.
+     * Saves a user or AI message to the database.
      */
     @Transactional
     public AiChatMessage saveMessage(Long conversationId, String role, String content, String toolCallsJson) {
         AiChatMessage message = new AiChatMessage(conversationId, role, content, toolCallsJson);
         AiChatMessage saved = messageRepository.save(message);
 
-        // Cập nhật timestamp cho cuộc hội thoại
+        // Update the conversation timestamp
         conversationRepository.findById(conversationId).ifPresent(c -> {
             c.setUpdatedAt(LocalDateTime.now());
             conversationRepository.save(c);
@@ -110,13 +110,13 @@ public class AiConversationService {
     }
 
     /**
-     * Đổi tên cuộc trò chuyện.
+     * Renames a conversation.
      */
     @Transactional
     public AiConversationDto renameConversation(Long conversationId, Long userId, String newTitle) {
         AiConversation conversation = conversationRepository.findByIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND",
-                        "Không tìm thấy cuộc hội thoại."));
+                        "Conversation not found."));
 
         conversation.setTitle(newTitle.trim());
         conversation.setUpdatedAt(LocalDateTime.now());
@@ -125,13 +125,13 @@ public class AiConversationService {
     }
 
     /**
-     * Xóa cuộc trò chuyện và toàn bộ tin nhắn liên quan.
+     * Deletes a conversation and all related messages.
      */
     @Transactional
     public void deleteConversation(Long conversationId, Long userId) {
         AiConversation conversation = conversationRepository.findByIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND",
-                        "Không tìm thấy cuộc hội thoại."));
+                        "Conversation not found."));
 
         messageRepository.deleteByConversationId(conversation.getId());
         conversationRepository.delete(conversation);
@@ -140,7 +140,7 @@ public class AiConversationService {
 
     private String generateTitle(String message) {
         if (message == null || message.isBlank()) {
-            return "Cuộc trò chuyện mới";
+            return "New conversation";
         }
         String clean = message.replaceAll("\\r?\\n", " ").trim();
         if (clean.length() <= 40) {

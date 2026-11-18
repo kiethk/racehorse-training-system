@@ -27,7 +27,7 @@ import {
   PeriodBarChart,
   Pill,
   ProgressBar,
-  ScoreScale,
+  SearchCombobox,
   SearchInput,
   SectionTitle,
   SegmentedControl,
@@ -73,9 +73,9 @@ export default function DesignTestPage() {
   const [selectedCard, setSelectedCard] = useState<'a' | 'b'>('a');
   const [collapsed, setCollapsed] = useState(false);
   const [view, setView] = useState<'week' | 'month'>('week');
-  const [score, setScore] = useState<number | null>(7);
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'DONE'>('ALL');
   const [search, setSearch] = useState('');
+  const [pickedHorse, setPickedHorse] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -142,18 +142,25 @@ export default function DesignTestPage() {
           <FormField label="Search">
             <SearchInput value={search} onChange={setSearch} placeholder="Search horses" />
           </FormField>
+          <FormField label="Pick a horse">
+            <SearchCombobox
+              label="Horse"
+              placeholder="Search horse name"
+              options={[
+                { value: '1', label: 'Northern Star', hint: 'Thoroughbred' },
+                { value: '2', label: 'Desert Wind', hint: 'Arabian' },
+                { value: '3', label: 'Night Runner', hint: 'Thoroughbred' },
+              ]}
+              value={pickedHorse}
+              onChange={setPickedHorse}
+            />
+          </FormField>
           <FormField label="Notes" className="sm:col-span-2">
             <Textarea placeholder="Anything the vet should know" />
           </FormField>
           <Checkbox label="Isolate on arrival" description="Keeps the horse out of shared paddocks." />
           <Checkbox type="radio" name="demo" label="Radio option" />
         </Panel>
-      </Section>
-
-      <Section title="Score scale">
-        <div className="max-w-md">
-          <ScoreScale label="Temperament" value={score} onChange={setScore} required />
-        </div>
       </Section>
 
       <Section title="Segmented control and filter chips">

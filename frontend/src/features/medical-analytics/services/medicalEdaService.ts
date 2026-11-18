@@ -5,14 +5,14 @@ import type { BioMetricType, BioSpcSeriesResponse, SurvivalEdaResponse, Survival
 export const medicalEdaService = {
   getBioSpcSeries: async (horseId: number, metric: BioMetricType = 'TEMPERATURE'): Promise<BioSpcSeriesResponse> => {
     const res = await apiGet<ApiResponse<BioSpcSeriesResponse>>(
-      `/api/medical-analytics/bio-spc/${horseId}?metric=${metric}`
+      `/api/analytics/medical/bio-spc/${horseId}?metric=${metric}`
     );
     return res.data;
   },
 
-  getSurvivalAnalytics: async (stratifyBy: SurvivalStratifyBy = 'TREATMENT_PLAN'): Promise<SurvivalEdaResponse> => {
+  getSurvivalAnalytics: async (stratifyBy: SurvivalStratifyBy = 'SEVERITY'): Promise<SurvivalEdaResponse> => {
     const res = await apiGet<ApiResponse<SurvivalEdaResponse>>(
-      `/api/medical-analytics/survival?stratifyBy=${stratifyBy}`
+      `/api/analytics/medical/survival?stratifyBy=${stratifyBy}`
     );
     return res.data;
   },

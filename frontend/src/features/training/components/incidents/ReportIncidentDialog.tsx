@@ -20,7 +20,7 @@ interface ReportIncidentDialogProps {
 
 const INCIDENT_TYPE_OPTIONS: { value: IncidentType; label: string }[] = [
   { value: 'PROBLEM', label: 'Problem — Next routine vet slot, keeps training' },
-  { value: 'TRAUMA', label: 'Trauma — Vet called now, stops training and leaves its group' },
+  { value: 'TRAUMA', label: 'Trauma — Vet called now; training is decided after the examination' },
 ];
 
 export function ReportIncidentDialog({
@@ -152,9 +152,12 @@ export function ReportIncidentDialog({
             onChange={(e) => {
               const selected = e.target.files?.[0] ?? null;
               if (selected && selected.size > 10 * 1024 * 1024) {
+                e.target.value = '';
+                setFile(null);
                 setError('Image file must not exceed 10 MB.');
                 return;
               }
+              setError(null);
               setFile(selected);
             }}
           />

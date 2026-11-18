@@ -97,6 +97,23 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
 
   async function handleSave() {
     if (!detail || !form || !userId) return;
+    const today = new Date().toISOString().split('T')[0];
+    if (form.fullName && form.fullName.trim().length > 255) {
+      setSaveError('Full name cannot exceed 255 characters.');
+      return;
+    }
+    if (form.phone && form.phone.trim().length > 20) {
+      setSaveError('Phone number cannot exceed 20 characters.');
+      return;
+    }
+    if (form.licenseIssuedDate && form.licenseIssuedDate > today) {
+      setSaveError('License issued date cannot be in the future.');
+      return;
+    }
+    if (form.certificationIssuedDate && form.certificationIssuedDate > today) {
+      setSaveError('Certification issued date cannot be in the future.');
+      return;
+    }
     setSaving(true);
     setSaveError('');
     try {
@@ -302,7 +319,8 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                     {field('License Issued Date', String((detail.profile as Record<string, unknown>)?.licenseIssuedDate ?? ''), (
                       <Input
                         type="date"
-                                                value={form?.licenseIssuedDate ?? ''}
+                        max={new Date().toISOString().split('T')[0]}
+                        value={form?.licenseIssuedDate ?? ''}
                         onChange={e => setForm(f => f ? { ...f, licenseIssuedDate: e.target.value } : f)}
                         disabled={saving}
                       />
@@ -329,7 +347,8 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                     {field('Certification Issued Date', String((detail.profile as Record<string, unknown>)?.certificationIssuedDate ?? ''), (
                       <Input
                         type="date"
-                                                value={form?.certificationIssuedDate ?? ''}
+                        max={new Date().toISOString().split('T')[0]}
+                        value={form?.certificationIssuedDate ?? ''}
                         onChange={e => setForm(f => f ? { ...f, certificationIssuedDate: e.target.value } : f)}
                         disabled={saving}
                       />

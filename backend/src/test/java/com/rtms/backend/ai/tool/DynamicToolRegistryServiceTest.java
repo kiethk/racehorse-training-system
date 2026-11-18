@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.rtms.backend.ai.tool.handler.eda.EdaAnalysisType;
+
 import java.util.List;
 import java.util.Map;
 
@@ -19,7 +21,7 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("Tất cả 5 vai trò đều không chứa bất kỳ HITL proposal mutation tool nào")
+    @DisplayName("None of the five roles includes any HITL proposal mutation tools")
     void testNoHitlToolsInAnyRole() {
         List<String> roles = List.of("HEAD_TRAINER", "VETERINARIAN", "HORSE_OWNER", "GROOM", "CLUB_MANAGER");
         List<String> hitlToolNames = List.of("proposeEditWorkoutMetric", "proposeUpdateHorseMedicalRestriction");
@@ -28,38 +30,38 @@ class DynamicToolRegistryServiceTest {
             List<AiToolDefinition> tools = registryService.getToolsForRole(role);
             for (String hitlTool : hitlToolNames) {
                 boolean hasHitl = tools.stream().anyMatch(t -> t.name().equalsIgnoreCase(hitlTool));
-                assertFalse(hasHitl, "Vai trò " + role + " không được chứa tool mutation HITL " + hitlTool);
+                assertFalse(hasHitl, "Role " + role + " must not include the HITL mutation tool " + hitlTool);
                 assertFalse(registryService.isToolAllowedForRole(hitlTool, role),
-                        "isToolAllowedForRole phải trả về false cho HITL tool " + hitlTool + " với vai trò " + role);
+                        "isToolAllowedForRole must return false for HITL tool " + hitlTool + " for role " + role);
             }
         }
     }
 
     @Test
-    @DisplayName("Ngưỡng nhận thức Cognitive Sweet Spot: mỗi vai trò <= 12 tool, riêng Trainer 11")
+    @DisplayName("Cognitive Sweet Spot limit: at most 12 tools per role")
     void testCognitiveSweetSpotToolLimits() {
         List<AiToolDefinition> ownerTools = registryService.getToolsForRole("HORSE_OWNER");
-        assertEquals(9, ownerTools.size(), "HORSE_OWNER phải có đúng 9 tools (<= 12)");
+        assertEquals(10, ownerTools.size(), "HORSE_OWNER must have exactly 10 tools (<= 12)");
 
         List<AiToolDefinition> groomTools = registryService.getToolsForRole("GROOM");
-        assertEquals(8, groomTools.size(), "GROOM phải có đúng 8 tools (<= 12)");
+        assertEquals(9, groomTools.size(), "GROOM must have exactly 9 tools (<= 12)");
 
         List<AiToolDefinition> trainerTools = registryService.getToolsForRole("HEAD_TRAINER");
-        assertEquals(11, trainerTools.size(), "HEAD_TRAINER phải có đúng 11 tools");
+        assertEquals(12, trainerTools.size(), "HEAD_TRAINER must have exactly 12 tools (<= 12)");
 
         List<AiToolDefinition> vetTools = registryService.getToolsForRole("VETERINARIAN");
-        assertEquals(11, vetTools.size(), "VETERINARIAN phải có đúng 11 tools (<= 12)");
+        assertEquals(12, vetTools.size(), "VETERINARIAN must have exactly 12 tools (<= 12)");
 
         List<AiToolDefinition> managerTools = registryService.getToolsForRole("CLUB_MANAGER");
-        assertEquals(10, managerTools.size(), "CLUB_MANAGER phải có đúng 10 tools (<= 12)");
+        assertEquals(11, managerTools.size(), "CLUB_MANAGER must have exactly 11 tools (<= 12)");
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER có 11 công cụ (kể cả Training Group) và hỗ trợ tương thích ngược qua alias")
+    @DisplayName("HEAD_TRAINER has 12 tools, including Training Group, and supports backward-compatible aliases")
     void testHeadTrainerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("HEAD_TRAINER");
         assertNotNull(tools);
-        assertEquals(11, tools.size());
+        assertEquals(12, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getTrainerHorses"));
@@ -74,8 +76,7 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getAssignedAdmissionReviews"));
         assertTrue(toolNames.contains("recommendTrainerStrategy"));
 
-        // Kiểm tra tương thích ngược alias
-        assertTrue(registryService.isToolAllowedForRole("getRacingReadinessAssessment", "HEAD_TRAINER"));
+        // Verify backward-compatible aliases
         assertTrue(registryService.isToolAllowedForRole("analyzeWorkoutLoadAndOvertrainingRisk", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("recommendOptimalRaceDistanceAndTrack", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("recommendNextWorkoutAdjustment", "HEAD_TRAINER"));
@@ -84,15 +85,15 @@ class DynamicToolRegistryServiceTest {
 
         AiToolDefinition specialtyDef = tools.stream().filter(t -> t.name().equals("getHorseSpecialtyAnalysis")).findFirst().orElseThrow();
         Map<?, ?> props = (Map<?, ?>) specialtyDef.parameters().get("properties");
-        assertTrue(props.containsKey("sortBy"), "getHorseSpecialtyAnalysis phải có tham số sortBy");
+        assertTrue(props.containsKey("sortBy"), "getHorseSpecialtyAnalysis must include the sortBy parameter");
     }
 
     @Test
-    @DisplayName("VETERINARIAN có 11 công cụ tối ưu và hỗ trợ tương thích ngược qua alias")
+    @DisplayName("VETERINARIAN has 12 optimized tools and supports backward-compatible aliases")
     void testVeterinarianTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("VETERINARIAN");
         assertNotNull(tools);
-        assertEquals(11, tools.size());
+        assertEquals(12, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("searchClinicalKnowledge"));
@@ -114,7 +115,7 @@ class DynamicToolRegistryServiceTest {
         assertTrue(registryService.isToolAllowedForRole("getPendingAdmissionExams", "VET"));
         assertTrue(registryService.isToolAllowedForRole("getUrgentCareAndIncidentAlerts", "VETERINARIAN"));
 
-        // Kiểm tra tương thích ngược alias
+        // Verify backward-compatible aliases
         assertTrue(registryService.isToolAllowedForRole("getActivePrescriptions", "VETERINARIAN"));
         assertTrue(registryService.isToolAllowedForRole("getRecentIncidentReports", "VETERINARIAN"));
         assertTrue(registryService.isToolAllowedForRole("getUrgentCareAlerts", "VETERINARIAN"));
@@ -122,11 +123,11 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("HORSE_OWNER là 100% Read-Only và có 9 công cụ tối ưu")
+    @DisplayName("HORSE_OWNER is 100% read-only and has 10 optimized tools")
     void testHorseOwnerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("HORSE_OWNER");
         assertNotNull(tools);
-        assertEquals(9, tools.size());
+        assertEquals(10, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getMyHorses"));
@@ -139,17 +140,17 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getMyHorsePedigreeInfo"));
         assertTrue(toolNames.contains("analyzeHorseInvestmentAndFitnessROI"));
 
-        // Kiểm tra alias
+        // Verify aliases
         assertTrue(registryService.isToolAllowedForRole("getHorseTrainingSummary", "HORSE_OWNER"));
         assertFalse(registryService.isToolAllowedForRole("getTrainerHorses", "HORSE_OWNER"));
     }
 
     @Test
-    @DisplayName("GROOM có 8 công cụ tối ưu sau khi gom getDailyGroomTasks vào getTodayAggregatedTasks")
+    @DisplayName("GROOM has 9 optimized tools after consolidating getDailyGroomTasks into getTodayAggregatedTasks")
     void testGroomTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("GROOM");
         assertNotNull(tools);
-        assertEquals(8, tools.size());
+        assertEquals(9, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getMyAssignedHorses"));
@@ -161,18 +162,18 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("detectHorseBehavioralAnomaly"));
         assertTrue(toolNames.contains("recommendDailyCarePriorityOrder"));
 
-        // Tương thích ngược alias
+        // Backward-compatible aliases
         assertTrue(registryService.isToolAllowedForRole("getDailyGroomTasks", "GROOM"));
         assertTrue(registryService.isToolAllowedForRole("getMyAssignedHorses", "STABLE_STAFF"));
         assertFalse(registryService.isToolAllowedForRole("getStableOccupancyMetrics", "GROOM"));
     }
 
     @Test
-    @DisplayName("CLUB_MANAGER có 10 công cụ tối ưu sau khi hợp nhất đơn nhập đàn")
+    @DisplayName("CLUB_MANAGER has 11 optimized tools after consolidating admission tools")
     void testClubManagerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("CLUB_MANAGER");
         assertNotNull(tools);
-        assertEquals(10, tools.size());
+        assertEquals(11, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getStableOccupancyMetrics"));
@@ -185,7 +186,7 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("analyzeStableCapacityAndStallBottlenecks"));
         assertTrue(toolNames.contains("recommendGroomWorkloadRebalancing"));
         assertTrue(toolNames.contains("getHorseSpecialtyAnalysis"));
-        assertFalse(toolNames.contains("getUpcomingRacesAndCompetitions"), "getUpcomingRacesAndCompetitions phải được bỏ");
+        assertFalse(toolNames.contains("getUpcomingRacesAndCompetitions"), "getUpcomingRacesAndCompetitions must be excluded");
 
         // Alias RACING_MANAGER & ADMIN
         assertTrue(registryService.isToolAllowedForRole("getTrainerAreaDistribution", "RACING_MANAGER"));
@@ -198,40 +199,40 @@ class DynamicToolRegistryServiceTest {
         assertTrue(registryService.isToolAllowedForRole("getHorseSpecialtyAnalysis", "CLUB_MANAGER"));
         assertTrue(registryService.isToolAllowedForRole("getHorseSpecialtyAnalysis", "ADMIN"));
 
-        // Tương thích ngược alias
+        // Backward-compatible aliases
         assertTrue(registryService.isToolAllowedForRole("getAdmissionRequestsOverview", "CLUB_MANAGER"));
         assertTrue(registryService.isToolAllowedForRole("getAdmissionPipelineDetails", "CLUB_MANAGER"));
         assertTrue(registryService.isToolAllowedForRole("getAdmissionPipelineOverview", "ADMIN"));
 
         AiToolDefinition mgrSpecialtyDef = tools.stream().filter(t -> t.name().equals("getHorseSpecialtyAnalysis")).findFirst().orElseThrow();
         Map<?, ?> mgrProps = (Map<?, ?>) mgrSpecialtyDef.parameters().get("properties");
-        assertTrue(mgrProps.containsKey("sortBy"), "getHorseSpecialtyAnalysis của Manager phải có tham số sortBy");
+        assertTrue(mgrProps.containsKey("sortBy"), "The Manager's getHorseSpecialtyAnalysis must include the sortBy parameter");
     }
 
     @Test
-    @DisplayName("100% Phân vùng bảo mật RBAC: Chặn triệt để mọi hành vi gọi chéo quyền giữa 5 vai trò")
+    @DisplayName("100% RBAC isolation: block all cross-role access across the five roles")
     void testStrictRbacIsolationAcrossAllRoles() {
-        // Owner không thể gọi tool quản lý/thú y/huấn luyện
+        // Owners cannot call management, veterinary, or training tools
         assertFalse(registryService.isToolAllowedForRole("getStableOccupancyMetrics", "HORSE_OWNER"));
         assertFalse(registryService.isToolAllowedForRole("searchClinicalKnowledge", "HORSE_OWNER"));
         assertFalse(registryService.isToolAllowedForRole("getTodayAggregatedTasks", "HORSE_OWNER"));
 
-        // Groom không thể gọi tool thú y hoặc quản lý
+        // Grooms cannot call veterinary or management tools
         assertFalse(registryService.isToolAllowedForRole("searchClinicalKnowledge", "GROOM"));
         assertFalse(registryService.isToolAllowedForRole("getRecentAuditLogs", "GROOM"));
         assertFalse(registryService.isToolAllowedForRole("getTrainerSchedule", "GROOM"));
 
-        // Veterinarian không thể gọi tool tập luyện hoặc quản trị chuồng trại
+        // Veterinarians cannot call training or stable-management tools
         assertFalse(registryService.isToolAllowedForRole("getTrainerSchedule", "VETERINARIAN"));
         assertFalse(registryService.isToolAllowedForRole("getStableOccupancyMetrics", "VETERINARIAN"));
 
-        // Head Trainer không thể gọi tool chẩn đoán thú y hoặc kiểm toán hệ thống
+        // Head Trainers cannot call veterinary diagnostic or system-audit tools
         assertFalse(registryService.isToolAllowedForRole("searchClinicalKnowledge", "HEAD_TRAINER"));
         assertFalse(registryService.isToolAllowedForRole("getRecentAuditLogs", "HEAD_TRAINER"));
     }
 
     @Test
-    @DisplayName("getFunctionSpecsForRole tạo Function Spec đúng chuẩn JSON Schema cho AI / OpenAI Function Calling")
+    @DisplayName("getFunctionSpecsForRole creates valid JSON Schema function specs for AI / OpenAI function calling")
     void testGetFunctionSpecsForRole() {
         List<String> roles = List.of("HORSE_OWNER", "GROOM", "HEAD_TRAINER", "VETERINARIAN", "CLUB_MANAGER");
         for (String role : roles) {
@@ -248,6 +249,53 @@ class DynamicToolRegistryServiceTest {
                 assertNotNull(fn.get("description"), "Tool description must not be null for role " + role);
                 assertNotNull(fn.get("parameters"), "Tool parameters must not be null for role " + role);
             }
+        }
+    }
+
+    @Test
+    @DisplayName("Each role exposes one getEdaAnalytics function with only its allowed analysis modes")
+    void testEdaAnalyticsToolIsRoleScopedWithAllowedModes() {
+        Map<String, List<String>> expectedModes = Map.of(
+                "HORSE_OWNER", List.of("HORSE_PERFORMANCE", "BIO_SPC"),
+                "HEAD_TRAINER", List.of("FLEET_PERFORMANCE", "HORSE_PERFORMANCE", "BIO_SPC"),
+                "VETERINARIAN", List.of("HORSE_PERFORMANCE", "BIO_SPC", "SURVIVAL"),
+                "GROOM", List.of("BIO_SPC"),
+                "CLUB_MANAGER", List.of(
+                        "FLEET_PERFORMANCE",
+                        "HORSE_PERFORMANCE",
+                        "BIO_SPC",
+                        "SURVIVAL",
+                        "MANAGER_OVERVIEW",
+                        "ADMISSION_FUNNEL",
+                        "TRAINER_PERFORMANCE"
+                )
+        );
+
+        for (Map.Entry<String, List<String>> entry : expectedModes.entrySet()) {
+            String role = entry.getKey();
+            List<String> allowedModes = EdaAnalysisType.allowedForRole(role).stream()
+                    .map(Enum::name)
+                    .toList();
+            assertEquals(entry.getValue(), allowedModes, "Unexpected EDA access modes for " + role);
+
+            List<AiToolDefinition> edaTools = registryService.getToolsForRole(role).stream()
+                    .filter(tool -> tool.name().equals("getEdaAnalytics"))
+                    .toList();
+            assertEquals(1, edaTools.size(), role + " must expose exactly one getEdaAnalytics function");
+
+            Map<?, ?> parameters = edaTools.get(0).parameters();
+            Map<?, ?> properties = (Map<?, ?>) parameters.get("properties");
+            Map<?, ?> analysisType = (Map<?, ?>) properties.get("analysisType");
+            assertEquals("string", analysisType.get("type"));
+            assertEquals(allowedModes, analysisType.get("enum"), role + " analysisType enum must match its allowed modes");
+            assertEquals(List.of("analysisType"), parameters.get("required"));
+            assertEquals("integer", ((Map<?, ?>) properties.get("horseId")).get("type"));
+            assertEquals("string", ((Map<?, ?>) properties.get("horseName")).get("type"));
+            assertEquals("integer", ((Map<?, ?>) properties.get("days")).get("type"));
+            assertEquals(List.of("TEMPERATURE", "RESTING_HEART_RATE"),
+                    ((Map<?, ?>) properties.get("metric")).get("enum"));
+            assertEquals(List.of("SEVERITY", "BODY_ZONE"),
+                    ((Map<?, ?>) properties.get("stratifyBy")).get("enum"));
         }
     }
 }

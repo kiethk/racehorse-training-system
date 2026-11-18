@@ -24,6 +24,8 @@ import {
   Lock,
 } from 'lucide-react';
 
+const HERO_IMAGE = '/images/hero.jpg';
+
 export default function LandingPage() {
   const router = useRouter();
   const { user, loading, isAuthenticated } = useAuth();
@@ -396,8 +398,10 @@ export default function LandingPage() {
         <section className="relative h-[100svh] min-h-[600px] max-h-[1080px] flex flex-col justify-between overflow-hidden bg-black text-white">
           {/* Interactive WebGL RippleDistortion background */}
           <div className="absolute inset-0 z-0 bg-black">
+            {/* Static copy of the hero image, rendered by the server: it shows at once and stays if WebGL or JavaScript fails. */}
+            <Image src={HERO_IMAGE} alt="" fill priority sizes="100vw" className="object-cover" />
             <RippleDistortion
-              src="/hero.jpg"
+              src={HERO_IMAGE}
               brushSize={60}
               strength={0.05}
               swirl={0.9}

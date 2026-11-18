@@ -6,7 +6,8 @@ import { Icon } from '@/components/ui/Icon';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
 import { cn } from '@/lib/cn';
 import { displayError, formatDate } from '@/lib/display';
-import { openProtectedFile, useProtectedFileUrls } from '@/lib/protectedFile';
+import { fileVariantUrl } from '@/lib/fileVariant';
+import { openProtectedFile, useProtectedFileUrl, useProtectedFileUrls } from '@/lib/protectedFile';
 import { toast } from '@/lib/toast';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
 import type { AdmissionDocument } from '../../types';
@@ -33,21 +34,29 @@ function date(value: string | null) {
 const typeName = (document: AdmissionDocument) => documentNames[document.documentType] || document.documentType;
 const fileName = (document: AdmissionDocument) => document.originalFileName || typeName(document);
 
-export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: AdmissionDocument[]; assetUrl: (url: string) => string }) {
+export function AdmissionDocumentsSection({ documents }: { documents: AdmissionDocument[] }) {
   const [selectedDocument, setSelectedDocument] = useState<AdmissionDocument | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Images open in the lightbox; PDFs and unknown files keep the document preview.
   const imageDocuments = useMemo(() => documents.filter(isImageDocument), [documents]);
-  const imageSources = useMemo(() => imageDocuments.map((document) => document.fileUrl), [imageDocuments]);
-  const loaded = useProtectedFileUrls(imageSources);
-  const gallery = imageDocuments.map((document) => ({
-    url: loaded[document.fileUrl]?.url ?? null,
-    failed: loaded[document.fileUrl]?.failed ?? false,
+  // Tiles show the small copy of each image.
+  const thumbSources = useMemo(
+    () => imageDocuments.map((document) => fileVariantUrl(document.fileUrl, 'THUMB')),
+    [imageDocuments],
+  );
+  const loaded = useProtectedFileUrls(thumbSources);
+  const gallery = imageDocuments.map((document, index) => ({
+    url: loaded[thumbSources[index]]?.url ?? null,
+    failed: loaded[thumbSources[index]]?.failed ?? false,
     alt: `${fileName(document)} · ${typeName(document)}`,
   }));
   // The lightbox shows only loaded images; map gallery positions to lightbox positions and back.
-  const viewable = gallery.flatMap((image, index) => (image.url ? [{ index, src: image.url, alt: image.alt }] : []));
+  const thumbnails = gallery.flatMap((image, index) => (image.url ? [{ index, src: image.url, alt: image.alt }] : []));
+  // Only the image open in the lightbox downloads its original; the others keep their small copy until shown.
+  const shown = lightboxIndex === null ? null : thumbnails[lightboxIndex] ?? null;
+  const { url: originalUrl } = useProtectedFileUrl(shown ? imageDocuments[shown.index].fileUrl : null);
+  const viewable = thumbnails.map((image) => (image === shown && originalUrl ? { ...image, src: originalUrl } : image));
   const openImage = (galleryIndex: number) => {
     const position = viewable.findIndex((image) => image.index === galleryIndex);
     if (position >= 0) setLightboxIndex(position);
@@ -91,7 +100,6 @@ export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: 
           key={selectedDocument.id}
           document={selectedDocument}
           label={typeName(selectedDocument)}
-          fileUrl={assetUrl(selectedDocument.fileUrl)}
           onClose={() => setSelectedDocument(null)}
         />
       )}

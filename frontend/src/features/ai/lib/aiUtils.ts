@@ -1,5 +1,5 @@
 /**
- * Tiện ích hỗ trợ AI Assistant & Quick Prompts
+ * AI Assistant & Quick Prompts Utilities
  */
 
 import type { Role } from '../../../types/auth.ts';
@@ -7,44 +7,44 @@ import { ROLE_LABELS } from '../../../lib/roleRoute.ts';
 
 export const PROMPTS_BY_ROLE: Record<Role, string[]> = {
   HEAD_TRAINER: [
-    'Lịch tập các ca hôm nay',
-    'Tiến độ các kế hoạch huấn luyện',
-    'Cảnh báo nguy cơ chấn thương & nhịp tim',
-    'Phân tích sở trường của ngựa',
-    'Danh sách Groom làm việc cùng',
+    "Today's workout session schedule",
+    'Training plan progress & milestones',
+    'Injury risk & recovery heart rate alerts',
+    'Horse distance & track preferences',
+    'Assigned grooms on duty',
   ],
   VETERINARIAN: [
-    'Tổng quan ngựa đang & chờ khám',
-    'Tra cứu ca bệnh lâm sàng qua RAG',
-    'Lịch chăm sóc y tế định kỳ',
-    'Danh sách ngựa cách ly y tế',
-    'Báo cáo sự cố chuồng trại 48h qua',
+    'Pending & active clinical exam queue',
+    'Clinical case literature lookup via RAG',
+    'Preventive care & vaccination schedule',
+    'Medical quarantine horse list',
+    'Stable incident reports in past 48h',
   ],
   GROOM: [
-    'Checklist công việc hôm nay (3 nguồn)',
-    'Chuồng và ngựa tôi phụ trách',
-    'Cảnh báo ăn uống & vận động của ngựa',
-    'Tra cứu vị trí chuồng & người phụ trách',
+    "Today's care task checklist",
+    'My assigned stalls and horses',
+    'Feed intake & activity warnings',
+    'Stall assignments & caretaker directory',
   ],
   CLUB_MANAGER: [
-    'Danh sách nhân sự & bác sĩ',
-    'Vẽ biểu đồ công suất chuồng trại',
-    'Các đơn nhập chuồng chờ duyệt',
-    'Nhật ký kiểm toán gần đây',
+    'Staff directory & roster overview',
+    'Barn & stall occupancy chart',
+    'Pending admission applications',
+    'Recent compliance & audit log',
   ],
   HORSE_OWNER: [
-    'Danh sách chiến mã của tôi',
-    'Lịch tập sắp tới của ngựa',
-    'Tóm tắt sức khỏe và lần khám gần nhất',
-    'Tiến độ khóa huấn luyện của ngựa',
+    'My racehorses directory',
+    'Upcoming workout schedule',
+    'Health summary & recent vet exams',
+    'Training course progress & fitness',
   ],
 };
 
 /**
- * Trả về tên hiển thị chuẩn thân thiện cho vai trò của người dùng (thay vì enum thô như HEAD_TRAINER)
+ * Returns user-friendly display name for user role (instead of raw enum like HEAD_TRAINER)
  */
 export function getRoleDisplayName(role?: Role | string | null): string {
-  if (!role) return 'Trợ lý AI';
+  if (!role) return 'AI Assistant';
   return (ROLE_LABELS as Record<string, string>)[role] || role;
 }
 
@@ -67,4 +67,119 @@ export function getQuickPromptsByRole(role?: Role | string | null): string[] {
     return PROMPTS_BY_ROLE.HORSE_OWNER;
   }
   return PROMPTS_BY_ROLE.HORSE_OWNER;
+}
+
+export interface Coordinates {
+  x: number;
+  y: number;
+}
+
+/**
+ * Clamps floating dialog position within viewport boundaries with safety margin.
+ */
+export function clampDialogPosition(
+  pos: Coordinates,
+  width: number,
+  height: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  minMargin = 8
+): Coordinates {
+  const effectiveWidth = Math.min(width, Math.max(0, viewportWidth - minMargin * 2));
+  const effectiveHeight = Math.min(height, Math.max(0, viewportHeight - minMargin * 2));
+
+  const maxX = Math.max(minMargin, viewportWidth - effectiveWidth - minMargin);
+  const maxY = Math.max(minMargin, viewportHeight - effectiveHeight - minMargin);
+
+  return {
+    x: Math.min(Math.max(minMargin, Math.round(pos.x)), Math.round(maxX)),
+    y: Math.min(Math.max(minMargin, Math.round(pos.y)), Math.round(maxY)),
+  };
+}
+
+/**
+ * Checks whether two rectangular areas intersect.
+ */
+export function checkRectsOverlap(
+  r1: { x: number; y: number; width: number; height: number },
+  r2: { x: number; y: number; width: number; height: number }
+): boolean {
+  return !(
+    r1.x + r1.width <= r2.x ||
+    r1.x >= r2.x + r2.width ||
+    r1.y + r1.height <= r2.y ||
+    r1.y >= r2.y + r2.height
+  );
+}
+
+/**
+ * Calculates popup position relative to the floating action button (FAB),
+ * ensuring the popup appears beside or above without covering the button.
+ */
+export function getPopupPositionFromFab(
+  fab: Coordinates,
+  isExpanded: boolean,
+  viewportWidth: number,
+  viewportHeight: number
+): Coordinates {
+  const width = isExpanded ? 800 : 380;
+  const height = isExpanded ? 720 : 560;
+  const fabSize = 56;
+  const gap = 12;
+
+  const fabRect = { x: fab.x, y: fab.y, width: fabSize, height: fabSize };
+
+  // Candidate 1: Try placing above the FAB (ideal when FAB is near bottom corner)
+  const candidateAboveX =
+    fab.x + fabSize / 2 > viewportWidth / 2
+      ? fab.x + fabSize - width
+      : fab.x;
+  const candidateAboveY = fab.y - height - gap;
+
+  const clampedAbove = clampDialogPosition(
+    { x: candidateAboveX, y: candidateAboveY },
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+    gap
+  );
+
+  // If candidateAbove fits above without overlapping the FAB, use it
+  if (!checkRectsOverlap({ ...clampedAbove, width, height }, fabRect)) {
+    return clampedAbove;
+  }
+
+  // Candidate 2: Place side-by-side so the popup never covers the FAB
+  const spaceLeft = fab.x - gap;
+  const spaceRight = viewportWidth - (fab.x + fabSize) - gap;
+
+  let sideX: number;
+  if (spaceLeft >= width) {
+    // Prefer left side if it has enough space
+    sideX = fab.x - width - gap;
+  } else if (spaceRight >= width) {
+    // Or right side if it fits
+    sideX = fab.x + fabSize + gap;
+  } else if (spaceLeft >= spaceRight) {
+    sideX = fab.x - width - gap;
+  } else {
+    sideX = fab.x + fabSize + gap;
+  }
+
+  // Vertically align centered with the FAB, clamped safely to viewport
+  const idealY = fab.y + fabSize / 2 - height / 2;
+  const clampedSideY = Math.min(
+    Math.max(gap, idealY),
+    Math.max(gap, viewportHeight - height - gap)
+  );
+
+  return clampDialogPosition(
+    { x: sideX, y: clampedSideY },
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+    gap
+  );
 }

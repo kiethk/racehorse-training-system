@@ -25,7 +25,7 @@ export interface BioSpcSeriesResponse {
   points: BioSpcPoint[];
 }
 
-export type SurvivalStratifyBy = 'TREATMENT_PLAN' | 'BODY_ZONE';
+export type SurvivalStratifyBy = 'SEVERITY' | 'BODY_ZONE';
 
 export interface KaplanMeierStep {
   days: number;

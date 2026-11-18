@@ -1,5 +1,4 @@
 import type { CareType, TrainingDecision } from '../../types';
-import type { ExamVariant } from './examVariantConfig';
 
 /**
  * Marker → decision coupling (user-approved 2026-11-12):
@@ -14,8 +13,8 @@ export type MarkerCouplingResult = {
 };
 
 /** The coupling only applies to the standard admission and routine exam forms. */
-export function markerCouplingEnabled(variant: ExamVariant, careType: CareType): boolean {
-  return variant === 'STANDARD' && (careType === 'INITIAL' || careType === 'ROUTINE');
+export function markerCouplingEnabled(careType: CareType): boolean {
+  return careType === 'INITIAL' || careType === 'ROUTINE';
 }
 
 /**

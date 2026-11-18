@@ -60,6 +60,9 @@ public final class TrainingLimits {
     /** Độ dài tối đa của nhận xét của Trainer. (Longest trainer feedback.) */
     public static final int MAX_TRAINER_FEEDBACK_LENGTH = 2000;
 
+    /** Độ dài tối đa của nhận xét Trainer trên đơn nhập học. (Longest Trainer Feedback on an admission.) */
+    public static final int MAX_ADMISSION_TRAINER_FEEDBACK_LENGTH = 3000;
+
     /** Ngưỡng nhịp tim an toàn của hệ thống: vượt ngưỡng thì buổi tập bị coi là quá sức. (Safe heart-rate thresholds: above them a workout counts as over-exertion.) */
     public static final int MAX_HEART_RATE_LIMIT = 220;
     public static final int AVERAGE_HEART_RATE_LIMIT = 180;

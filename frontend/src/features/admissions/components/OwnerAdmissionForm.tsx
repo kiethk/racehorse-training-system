@@ -136,6 +136,8 @@ export function OwnerAdmissionForm() {
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
   const [dragActiveDocType, setDragActiveDocType] = useState<AdmissionDocumentType | null>(null);
 
+  const totalRequired = DOCUMENTS.filter(section => section.required).length;
+  const totalOptional = DOCUMENTS.filter(section => !section.required).length;
   const completed = DOCUMENTS.filter(section => section.required && selections[section.type]?.file).length;
   const optionalSelected = DOCUMENTS.filter(section => !section.required && selections[section.type]?.file).length;
   const now = new Date();
@@ -168,7 +170,7 @@ export function OwnerAdmissionForm() {
     const docName = type === 'REGISTRATION_DOCUMENT' ? 'Registration document' : 'Pedigree certificate';
     setOcrNotice({
       tone: 'info',
-      message: `AI is scanning and extracting data from ${docName}... Document inputs are temporarily locked to prevent data conflicts.`,
+      message: `AI is scanning ${docName}... Form inputs are locked during extraction.`,
     });
 
     try {
@@ -527,7 +529,7 @@ export function OwnerAdmissionForm() {
           {isThisScanning && (
             <div className="flex items-center gap-2.5 rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] p-3 text-xs font-medium text-[var(--color-primary)]">
               <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
-              <span>AI is scanning and extracting data from document...</span>
+              <span>AI scanning and extracting data...</span>
             </div>
           )}
 
@@ -624,14 +626,14 @@ export function OwnerAdmissionForm() {
               >
                 <Icon name="upload" size={20} className="mb-1 text-[var(--color-primary)]" />
                 <span className="text-xs font-medium text-[var(--color-text-primary)]">
-                  Choose file or drag & drop here
+                  Choose file or drag here
                 </span>
                 <span className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
-                  PDF, JPEG, PNG, WebP · Up to 10 MB
+                  PDF, PNG, JPG (up to 10 MB)
                 </span>
                 <FileInput
                   id={`file-${doc.type}`}
-                  className="sr-only"
+                  className="hidden"
                   ref={element => { fileInputs.current[doc.type] = element; }}
                   accept=".pdf,.jpg,.jpeg,.png,.webp"
                   disabled={isAnyScanning}
@@ -902,7 +904,7 @@ export function OwnerAdmissionForm() {
               Upload horse photo and quarantine vaccination records before stable admission.
             </p>
             <span role="status" className="rounded bg-[var(--color-surface-muted)] px-2.5 py-1 font-semibold text-[var(--color-text-primary)]">
-              Required documents uploaded: {completed}/4
+              Required documents uploaded: {completed}/{totalRequired}
             </span>
           </div>
 
@@ -914,7 +916,7 @@ export function OwnerAdmissionForm() {
             <summary className="cursor-pointer rounded text-sm font-medium text-[var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
               Optional medical documents
               <span className="ml-2 font-normal text-[var(--color-text-muted)]">
-                {optionalSelected ? `${optionalSelected} selected` : '4 optional document types'}
+                {optionalSelected ? `${optionalSelected} selected` : `${totalOptional} optional document types`}
               </span>
             </summary>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">

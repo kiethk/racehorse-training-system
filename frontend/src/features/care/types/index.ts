@@ -116,7 +116,7 @@ export interface Prescription {
   startDate: string;
   endDate: string;
   instructions: string;
-  status: 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED';
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   administeredByRole: 'GROOM' | 'VETERINARIAN';
 }
 

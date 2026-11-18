@@ -154,6 +154,8 @@ The codebase is fully on the shared primitives. Use this task when a file drifts
 
 Known clean-up (safe to pick up when working nearby):
 
+- **Lint baseline (14/11/2026):** `public/**`, `**/*.min.*`, `coverage/**` are ignored in `eslint.config.mjs` — before that, the vendored `public/pdf.worker.min.mjs` alone produced 1566 of 1667 problems. The **Vet scope is now clean: 0 errors, 0 warnings** (`src/features/{admissions,care,medical-analytics}`, `src/app/(app)/veterinarian`, `src/components/ui/CreatableCombobox.tsx`). The remaining ~29 repo-wide errors belong to Manager/Owner/Trainer/Groom screens and the shared file-viewer/AI widgets — leave them to those actors.
+
 - Local date formatting instead of `formatDate` / `formatDateTime`: `ManagerAuditLogView` (output already byte-identical, code-only), groom `lib/incidentDisplay.ts` (feeds `IncidentList` and `IncidentDetailModal`), `training/charts/ChartParts.tsx` `DateLabels` (ISO x-axis labels), raw dates in `TrainerReviewActionPanel` and `OwnerAdmissionDetailView`, `HorseRacingHistory` (`eventTime` DTO shape unverified), shared `NotificationBell` and `AiChatWidget`. Switching changes the displayed date string, so confirm with the user first. (`UrgentCaseView` and `VetAdmissionQueue` are DONE — vet group 3.1, now display-only. `TrainerRaceList`, `TrainerRaceDetail`, `HorseFitnessTrendView` were stale list entries; they already use `@/lib/display`.)
 - `VetReviewForm` and `VetAdmissionQueue` are far over the 400-line guideline.
 - `AdmissionDocumentPreview` uses a native `<dialog>` instead of `Modal`.
@@ -193,8 +195,8 @@ Import from `@/components/ui`.
 | Checkbox or radio | `Checkbox` (`type="radio"` for radios); `ChoiceInput` for a bare one inside a custom option card |
 | File picker | `FileInput` |
 | Search box | `SearchInput` |
+| Search with suggestions; the value changes only when a suggestion is picked | `SearchCombobox` (`label`, `options`, `value`, `onChange`) |
 | View switch (Week / Month) | `SegmentedControl` |
-| Score picked from a bar of cells (0 to 10) | `ScoreScale` |
 | Name that opens its record when clicked (a horse in a lot) | `ChipButton` |
 | Quick filters with counts | `FilterChips` |
 | Section tabs | `Tabs` |

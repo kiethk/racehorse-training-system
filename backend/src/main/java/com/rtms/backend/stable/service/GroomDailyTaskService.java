@@ -1,6 +1,8 @@
 package com.rtms.backend.stable.service;
 import com.rtms.backend.identity.entity.Role;
+import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.enums.CareType;
 
 
 import com.rtms.backend.stable.dto.CreateGroomDailyTaskRequest;
@@ -21,9 +23,11 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
+import java.time.LocalTime;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -249,8 +253,8 @@ public class GroomDailyTaskService {
         return completion.getPhotoKeys().get(index);
     }
 
-    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser) {
-        return fileStorage.load(completionPhotoKey(completionId, index, currentUser));
+    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser, FileVariant size) {
+        return fileStorage.load(completionPhotoKey(completionId, index, currentUser), size);
     }
 
     public MediaType completionPhotoMediaType(Long completionId, int index, AuthenticatedUser currentUser) {
@@ -423,11 +427,19 @@ public class GroomDailyTaskService {
         }
 
         for (CareSchedule s : schedules) {
+            // Day-level visits (ROUTINE/INITIAL/preventive) carry a scheduledDate but no time;
+            // urgent ones carry scheduledAt. Fall back to the vet window instead of NPE-ing.
+            LocalTime startTime = s.getScheduledAt() != null
+                    ? s.getScheduledAt().toLocalTime()
+                    : (s.getCareType() == CareType.ROUTINE
+                            ? FarmSchedulePolicy.VET_WINDOW_START
+                            : LocalTime.of(8, 0));
+            int duration = s.getDurationMinutes() > 0 ? s.getDurationMinutes() : 30;
             items.add(new TodayTaskItemResponse(
                     TaskSource.PREVENTIVE_CARE,
                     s.getId(),
-                    s.getScheduledAt().toLocalTime(),
-                    s.getScheduledAt().plusMinutes(s.getDurationMinutes()).toLocalTime(),
+                    startTime,
+                    startTime.plusMinutes(duration),
                     s.getHorseId(),
                     nameOf(horseNameById, s.getHorseId()),
                     "Veterinary · " + s.getCareType(),

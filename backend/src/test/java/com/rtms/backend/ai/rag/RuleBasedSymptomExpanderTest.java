@@ -23,16 +23,16 @@ class RuleBasedSymptomExpanderTest {
     void setUp() {
         mockRepository = Mockito.mock(MedicalSymptomMappingRepository.class);
 
-        // Khởi tạo fixture dữ liệu giả lập từ Database (100% data-driven)
+        // Initialize a database fixture (100% data-driven).
         List<MedicalSymptomMapping> testMappings = List.of(
-                new MedicalSymptomMapping("cào đất", "đau bụng cấp tính ở ngựa (equine colic)", "DIGESTIVE"),
-                new MedicalSymptomMapping("quay đầu nhìn sườn", "đau bụng cấp tính (colic)", "DIGESTIVE"),
-                new MedicalSymptomMapping("nằm lăn", "đau bụng cấp dữ dội (severe colic)", "DIGESTIVE"),
-                new MedicalSymptomMapping("tập tễnh", "què/khập khiễng (equine lameness)", "LOCOMOTOR"),
-                new MedicalSymptomMapping("khập khiễng", "què/khập khiễng (equine lameness)", "LOCOMOTOR"),
-                new MedicalSymptomMapping("nóng móng", "viêm màng đáy móng (laminitis)", "LOCOMOTOR"),
-                new MedicalSymptomMapping("sưng khớp", "viêm khớp (arthritis / synovitis)", "LOCOMOTOR"),
-                new MedicalSymptomMapping("ho", "hen suyễn hoặc cảm cúm ngựa", "RESPIRATORY")
+                new MedicalSymptomMapping("paws at the ground", "equine colic", "DIGESTIVE"),
+                new MedicalSymptomMapping("turns to look at its flank", "colic", "DIGESTIVE"),
+                new MedicalSymptomMapping("rolls on the ground", "severe colic", "DIGESTIVE"),
+                new MedicalSymptomMapping("limping", "equine lameness", "LOCOMOTOR"),
+                new MedicalSymptomMapping("lameness", "equine lameness", "LOCOMOTOR"),
+                new MedicalSymptomMapping("hot hooves", "laminitis", "LOCOMOTOR"),
+                new MedicalSymptomMapping("swollen joints", "arthritis / synovitis", "LOCOMOTOR"),
+                new MedicalSymptomMapping("pain", "musculoskeletal pain", "LOCOMOTOR")
         );
 
         when(mockRepository.findByIsActiveTrue()).thenReturn(testMappings);
@@ -42,34 +42,34 @@ class RuleBasedSymptomExpanderTest {
     }
 
     @Test
-    @DisplayName("Đối soát triệu chứng đau bụng cấp (Colic) từ dữ liệu DB nạp vào Cache")
+    @DisplayName("Resolve acute colic symptoms from data loaded into the database cache")
     void testColicSymptomsExpansion() {
-        String input = "Chiến mã H-001 sáng nay liên tục cào đất và hay quay đầu nhìn sườn, có lúc nằm lăn ra chuồng.";
+        String input = "Racehorse H-001 paws at the ground and turns to look at its flank this morning, and sometimes rolls on the ground in the stall.";
         Set<String> terms = expander.extractMedicalTerms(input);
 
-        assertFalse(terms.isEmpty(), "Phải trích xuất được thuật ngữ y khoa");
-        assertTrue(terms.stream().anyMatch(t -> t.contains("colic")), "Phải nhận diện được hội chứng đau bụng cấp Colic");
+        assertFalse(terms.isEmpty(), "A medical term should be extracted.");
+        assertTrue(terms.stream().anyMatch(t -> t.contains("colic")), "Acute colic should be recognized.");
 
         String expanded = expander.expand(input);
-        assertTrue(expanded.contains("[Thuật ngữ y khoa liên quan:"));
+        assertTrue(expanded.contains("[Related medical terms:"));
         assertTrue(expanded.contains("equine colic"));
     }
 
     @Test
-    @DisplayName("Đối soát triệu chứng què/khập khiễng và sưng khớp từ DB Cache")
+    @DisplayName("Resolve lameness and swollen-joint symptoms from the database cache")
     void testLamenessSymptomsExpansion() {
-        String input = "Ngựa đi lại tập tễnh sau buổi tập sáng, chân sau sưng khớp và nóng móng.";
+        String input = "The horse is limping after the morning workout, with swollen joints and hot hooves in its hind legs.";
         Set<String> terms = expander.extractMedicalTerms(input);
 
-        assertTrue(terms.stream().anyMatch(t -> t.contains("lameness") || t.contains("khập khiễng")));
+        assertTrue(terms.stream().anyMatch(t -> t.contains("lameness")));
         assertTrue(terms.stream().anyMatch(t -> t.contains("laminitis")));
-        assertTrue(terms.stream().anyMatch(t -> t.contains("arthritis") || t.contains("viêm khớp")));
+        assertTrue(terms.stream().anyMatch(t -> t.contains("arthritis")));
     }
 
     @Test
-    @DisplayName("Không thêm thuật ngữ nếu văn bản không chứa triệu chứng bệnh (Tránh bắt nhầm chuỗi con 'ho' trong 'hoàn thành')")
+    @DisplayName("Do not match a symptom term inside an unrelated word ('pain' inside 'painted')")
     void testNoSymptomsFound() {
-        String input = "Ngựa hôm nay hoàn thành tốt bài tập cự ly 1600m trên mặt sân cỏ.";
+        String input = "The horse completed its 1600 m grass-track workout while the stable gate was being painted.";
         Set<String> terms = expander.extractMedicalTerms(input);
 
         assertTrue(terms.isEmpty());
@@ -77,20 +77,20 @@ class RuleBasedSymptomExpanderTest {
     }
 
     @Test
-    @DisplayName("Cập nhật In-Memory Cache tức thì khi reload() dữ liệu mới từ Database")
+    @DisplayName("Immediately update the in-memory cache when reload() receives new database data")
     void testDynamicReloadFromDatabase() {
-        // Giả lập DB có thêm triệu chứng mới được Bác sĩ thú y thêm qua giao diện web
+        // Simulate a new symptom added by a veterinarian through the web interface.
         MedicalSymptomMapping customMapping = new MedicalSymptomMapping(
-                "mắt lờ đờ", "viêm màng bồ đào ngựa (equine recurrent uveitis / moon blindness)", "OPHTHALMIC");
+                "glassy eyes", "equine recurrent uveitis / moon blindness", "OPHTHALMIC");
         when(mockRepository.findByIsActiveTrue()).thenReturn(List.of(customMapping));
 
-        // Gọi reload() để cập nhật lại cache
+        // Reload the cache.
         expander.reload();
 
-        String input = "Ngựa có dấu hiệu mỏi mệt, mắt lờ đờ không chịu nhìn.";
+        String input = "The horse appears fatigued and has glassy eyes.";
         Set<String> terms = expander.extractMedicalTerms(input);
 
         assertFalse(terms.isEmpty());
-        assertTrue(terms.stream().anyMatch(t -> t.contains("uveitis") || t.contains("bồ đào")));
+        assertTrue(terms.stream().anyMatch(t -> t.contains("uveitis")));
     }
 }

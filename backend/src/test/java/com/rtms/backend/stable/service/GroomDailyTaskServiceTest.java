@@ -437,8 +437,49 @@ class GroomDailyTaskServiceTest {
         when(completionRepository.findById(9L)).thenReturn(Optional.of(completion));
 
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> taskService.loadCompletionPhoto(9L, 0, new AuthenticatedUser(9L, "other@example.com", "GROOM")));
+                () -> taskService.loadCompletionPhoto(9L, 0, new AuthenticatedUser(9L, "other@example.com", "GROOM"), null));
         verify(fileStorage, never()).load(any());
+    }
+
+    @Test
+    @DisplayName("14. Ca thú y chỉ có ngày (scheduledAt null) không làm vỡ danh sách việc hôm nay")
+    void testTodayAggregatedTasks_DayLevelVisitWithoutTime() {
+        LocalDate targetDate = LocalDate.of(2026, 11, 14);
+
+        when(taskRepository.findByGroomIdAndScheduledTimeBetween(eq(4L), any(), any()))
+                .thenReturn(List.of());
+        when(workoutRepository.findGroomWorkoutRows(4L, targetDate)).thenReturn(List.of());
+
+        StableStall stall = new StableStall();
+        stall.setId(10L);
+        stall.setGroomId(4L);
+        when(stableStallRepository.findByGroomId(4L)).thenReturn(List.of(stall));
+
+        Horse horse = new Horse();
+        horse.setId(1L);
+        horse.setName("Silver Moon");
+        horse.setCurrentStallId(10L);
+        when(horseRepository.findByCurrentStallIdIn(List.of(10L))).thenReturn(List.of(horse));
+
+        CareSchedule routine = new CareSchedule();
+        routine.setId(301L);
+        routine.setHorseId(1L);
+        routine.setCareType(CareType.ROUTINE);
+        routine.setScheduledDate(targetDate);
+        routine.setScheduledAt(null);
+        routine.setDurationMinutes(30);
+        routine.setDescription("Khám định kỳ");
+        routine.setStatus(CareScheduleStatus.SCHEDULED);
+
+        when(careScheduleRepository.findByHorseIdInAndScheduledAtBetweenAndStatusIn(eq(List.of(1L)), any(), any(), any()))
+                .thenReturn(List.of(routine));
+
+        List<TodayTaskItemResponse> items = taskService.getTodayAggregatedTasks(null, targetDate, groom());
+
+        assertEquals(1, items.size());
+        assertEquals(TaskSource.PREVENTIVE_CARE, items.get(0).getSource());
+        assertEquals(FarmSchedulePolicy.VET_WINDOW_START, items.get(0).getStartTime());
+        assertEquals(FarmSchedulePolicy.VET_WINDOW_START.plusMinutes(30), items.get(0).getEndTime());
     }
 
     private static GroomDailyTask task(Long id, Long groomId) {

@@ -1,9 +1,9 @@
 package com.rtms.backend.incident.service;
 
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
-import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
@@ -14,13 +14,11 @@ import com.rtms.backend.incident.enums.IncidentType;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
-import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.TrainingDecisionService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,22 +32,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class HorseIncidentReportService {
-
-    /** Ca chưa khám. */
-    private static final Set<CareScheduleStatus> NOT_EXAMINED =
-            Set.of(CareScheduleStatus.SCHEDULED);
 
     private final HorseIncidentReportRepository incidentReportRepository;
     private final HorseRepository horseRepository;
     private final FileStorageService fileStorage;
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
-    private final TrainingDecisionService trainingDecisionService;
     private final UserRepository userRepository;
     private final StableStallRepository stableStallRepository;
 
@@ -58,7 +50,6 @@ public class HorseIncidentReportService {
                                       FileStorageService fileStorage,
                                       CareScheduleRepository careScheduleRepository,
                                       CareScheduleService careScheduleService,
-                                      TrainingDecisionService trainingDecisionService,
                                       UserRepository userRepository,
                                       StableStallRepository stableStallRepository) {
         this.incidentReportRepository = incidentReportRepository;
@@ -66,14 +57,15 @@ public class HorseIncidentReportService {
         this.fileStorage = fileStorage;
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
-        this.trainingDecisionService = trainingDecisionService;
         this.userRepository = userRepository;
         this.stableStallRepository = stableStallRepository;
     }
 
     /**
-     * Mức độ quyết định ca khám: LOW, MEDIUM thành ca ROUTINE, ngựa vẫn tập. HIGH, CRITICAL thành ca URGENT và chặn tập.
-     * Mỗi ngựa chỉ có một ca sự cố đang mở: báo cáo mới gắn vào ca đó, ca ROUTINE chưa khám thì nhường chỗ cho ca URGENT.
+     * Mức độ quyết định ca khám: LOW, MEDIUM thành ca ROUTINE, ngựa vẫn tập. HIGH, CRITICAL thành ca URGENT nhưng KHÔNG
+     * chặn tập: quyền quyết định nằm ở lần khám của Vet (duyệt 14/11/2026).
+     * Mỗi ngựa chỉ có một ca sự cố đang mở: báo cáo mới gắn vào ca đó. Ca ROUTINE đang khám mà gặp TRAUMA thì
+     * tạm dừng (vẫn mở, giữ Vet để khám tiếp sau) và mở ca URGENT song song.
      */
     @Transactional
     public HorseIncidentReport createReport(CreateIncidentReportRequest request, AuthenticatedUser currentUser) {
@@ -91,24 +83,27 @@ public class HorseIncidentReportService {
         boolean serious = saved.getIncidentType() == IncidentType.TRAUMA;
 
         CareSchedule openCase = careScheduleService.findOpenIncidentCase(horse.getId()).orElse(null);
-        boolean escalate = serious && openCase != null && openCase.getCareType() == CareType.ROUTINE
-                && NOT_EXAMINED.contains(openCase.getStatus());
+        boolean escalate = serious && openCase != null && openCase.getCareType() == CareType.ROUTINE;
 
         CareSchedule target = openCase;
-        if (openCase == null || escalate) {
+        if (escalate) {
+            // Tạm dừng trước khi gán ca URGENT: ca routine về SCHEDULED, Vet khám tiếp sau khi xong cấp cứu.
+            careScheduleService.interruptForUrgent(openCase);
+            target = createCase(horse, saved, serious);
+        } else if (openCase == null) {
             target = createCase(horse, saved, serious);
         }
         if (escalate) {
             List<HorseIncidentReport> moved = incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(openCase.getId());
-            moved.forEach(report -> report.setCareScheduleId(saved.getCareScheduleId()));
+            Long newCaseId = target.getId();
+            moved.forEach(report -> report.setCareScheduleId(newCaseId));
             incidentReportRepository.saveAll(moved);
-            careScheduleService.cancelSupersededCase(openCase);
         }
         saved.setCareScheduleId(target.getId());
         incidentReportRepository.save(saved);
 
         syncReportsWithCase(target);
-        return saved;
+        return withHorseNames(withPeopleNames(List.of(saved))).get(0);
     }
 
     private CareSchedule createCase(Horse horse, HorseIncidentReport report, boolean serious) {
@@ -186,7 +181,7 @@ public class HorseIncidentReportService {
         if (status != null) {
             base = base.stream().filter(r -> r.getStatus() == status).toList();
         }
-        return withHorseNames(withHandlerNames(base));
+        return withHorseNames(withPeopleNames(base));
     }
 
     @Transactional
@@ -221,7 +216,7 @@ public class HorseIncidentReportService {
         }
 
         HorseIncidentReport saved = incidentReportRepository.save(report);
-        withHandlerNames(List.of(saved));
+        withPeopleNames(List.of(saved));
         return saved;
     }
 
@@ -235,7 +230,7 @@ public class HorseIncidentReportService {
         if (isTrainer(currentUser) && !ownReport && !isTrainerOf(report.getHorseId(), currentUser)) {
             throw new AccessDeniedException("You can only view incident reports for horses in your areas");
         }
-        withHorseNames(withHandlerNames(List.of(report)));
+        withHorseNames(withPeopleNames(List.of(report)));
         return report;
     }
 
@@ -273,12 +268,12 @@ public class HorseIncidentReportService {
         }
     }
 
-    public Resource loadImage(Long reportId, AuthenticatedUser currentUser) {
+    public Resource loadImage(Long reportId, AuthenticatedUser currentUser, FileVariant size) {
         HorseIncidentReport report = getReportById(reportId, currentUser);
         if (report.getImageUrl() == null) {
             throw new RuntimeException("Incident report #" + reportId + " has no image attached");
         }
-        return fileStorage.load(report.getImageUrl());
+        return fileStorage.load(report.getImageUrl(), size);
     }
 
     public MediaType imageMediaType(Long reportId, AuthenticatedUser currentUser) {
@@ -294,12 +289,13 @@ public class HorseIncidentReportService {
     }
 
     /**
-     * Gắn tên vet được giao để người báo biết ai đang nhận ca. Ưu tiên vet đã xử lý báo cáo
-     * (handledById); nếu chưa có thì lấy vet của ca urgent mà báo cáo được gắn vào
-     * (báo cáo thứ hai trên cùng ngựa dùng chung ca urgent đang mở, nên không có handledById).
-     * Mỗi loại dữ liệu chỉ truy vấn một lần cho cả danh sách.
+     * Gắn tên người gửi và tên vet được giao để ai xem cũng biết ai báo, ai đang nhận ca
+     * (attach the reporter's name and the assigned vet's name).
+     * Vet: ưu tiên vet đã xử lý báo cáo (handledById); nếu chưa có thì lấy vet của ca mà báo cáo được gắn vào
+     * (báo cáo thứ hai trên cùng ngựa dùng chung ca đang mở, nên không có handledById).
+     * Mỗi loại dữ liệu chỉ truy vấn một lần cho cả danh sách (one query per kind of data for the whole list).
      */
-    private List<HorseIncidentReport> withHandlerNames(List<HorseIncidentReport> reports) {
+    private List<HorseIncidentReport> withPeopleNames(List<HorseIncidentReport> reports) {
         List<Long> scheduleIds = reports.stream()
                 .filter(report -> report.getHandledById() == null)
                 .map(HorseIncidentReport::getCareScheduleId)
@@ -318,13 +314,20 @@ public class HorseIncidentReportService {
                     : null;
             if (vetId != null) vetByReport.put(report, vetId);
         }
-        if (vetByReport.isEmpty()) return reports;
 
-        Map<Long, String> names = userRepository.findAllById(vetByReport.values().stream().distinct().toList()).stream()
+        List<Long> userIds = java.util.stream.Stream.concat(
+                        vetByReport.values().stream(),
+                        reports.stream().map(HorseIncidentReport::getReportedById).filter(Objects::nonNull))
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) return reports;
+
+        Map<Long, String> names = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getFullName, (a, b) -> a));
         reports.forEach(report -> {
             Long vetId = vetByReport.get(report);
             report.setHandlerName(vetId == null ? null : names.get(vetId));
+            report.setReportedByName(report.getReportedById() == null ? null : names.get(report.getReportedById()));
         });
         return reports;
     }

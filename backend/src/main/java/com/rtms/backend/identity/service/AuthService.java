@@ -118,7 +118,9 @@ public class AuthService {
 
     @Transactional
     public LoginResult login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(email)
+                .or(() -> userRepository.findByEmailIgnoreCase(email))
                 .orElseThrow(() -> invalidCredentials());
 
         if (!user.isActive()) {
@@ -337,7 +339,7 @@ public class AuthService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ADDRESS", "Address must be at most 255 characters");
         }
 
-        if (userRepository.findByEmail(email).isPresent()) {
+        if (userRepository.findByEmail(email).isPresent() || userRepository.findByEmailIgnoreCase(email).isPresent()) {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_EXISTS",
                     "An account with this email already exists");
         }

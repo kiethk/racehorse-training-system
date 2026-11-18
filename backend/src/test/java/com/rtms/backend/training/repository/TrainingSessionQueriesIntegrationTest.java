@@ -65,6 +65,7 @@ class TrainingSessionQueriesIntegrationTest {
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private StableStallRepository stalls;
+    @Autowired private com.rtms.backend.horse.repository.HorseRepository horses;
     @Autowired private JdbcTemplate jdbc;
 
     private final LocalDate today = LocalDate.now();
@@ -167,13 +168,13 @@ class TrainingSessionQueriesIntegrationTest {
     // ---------------------------------------------------------------- schedules
 
     @Test
-    void aHorseScheduleIncludesCancelledSessionsInOrder() {
+    void aHorseScheduleSkipsCancelledWorkoutsAndKeepsTheOrder() {
         List<HorseScheduleItemResponse> schedule = workouts.findHorseSchedule(thunder.getId(), today.minusDays(10), today.plusDays(10));
 
-        assertEquals(4, schedule.size());
+        assertEquals(3, schedule.size());
         assertEquals(today.minusDays(3), schedule.get(0).sessionDate());
-        assertEquals(SessionStatus.CANCELLED, schedule.get(3).sessionStatus());
-        assertEquals(WorkoutStatus.CANCELLED, schedule.get(3).workoutStatus());
+        assertEquals(today.plusDays(2), schedule.get(2).sessionDate());
+        assertTrue(schedule.stream().noneMatch(item -> item.workoutStatus() == WorkoutStatus.CANCELLED));
     }
 
     @Test
@@ -240,6 +241,19 @@ class TrainingSessionQueriesIntegrationTest {
     void horsesInTrainingCountEachHorseOnce() {
         long before = courseRuns.countHorsesInTraining();
         assertTrue(before >= 2);
+
+        // A blocked horse should no longer be counted as in training
+        thunder.setTrainingDecision(com.rtms.backend.training.enums.TrainingDecision.BLOCKED);
+        horses.saveAndFlush(thunder);
+        long afterBlocked = courseRuns.countHorsesInTraining();
+        assertEquals(before - 1, afterBlocked);
+
+        // An inactive horse should not be counted either
+        thunder.setTrainingDecision(com.rtms.backend.training.enums.TrainingDecision.ALLOWED);
+        thunder.setCurrentStatus(com.rtms.backend.horse.enums.HorseStatus.INACTIVE);
+        horses.saveAndFlush(thunder);
+        long afterInactive = courseRuns.countHorsesInTraining();
+        assertEquals(before - 1, afterInactive);
     }
 
     @Test
