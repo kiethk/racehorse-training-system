@@ -5,23 +5,23 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Dịch vụ sinh vector embeddings kích thước 1536 chiều cho mô hình RAG.
+ * Service for generating 1536-dimensional embedding vectors for the RAG model.
  */
 public interface EmbeddingService {
 
     /**
-     * Sinh vector embedding 1536 chiều từ văn bản đầu vào.
+     * Generates a 1536-dimensional embedding vector from the input text.
      *
-     * @param text Văn bản cần nhúng vector
-     * @return Mảng float 1536 phần tử đã được chuẩn hóa (L2-normalized)
+     * @param text Text to embed
+     * @return L2-normalized array of 1536 floats
      */
     float[] embed(String text);
 
     /**
-     * Sinh danh sách vector embeddings cho nhiều văn bản theo lô (batching).
+     * Generates embedding vectors for multiple text inputs in a batch.
      *
-     * @param texts Danh sách các chuỗi văn bản cần nhúng
-     * @return Danh sách mảng float tương ứng
+     * @param texts List of text strings to embed
+     * @return Corresponding list of float arrays
      */
     default List<float[]> embedBatch(List<String> texts) {
         if (texts == null || texts.isEmpty()) {

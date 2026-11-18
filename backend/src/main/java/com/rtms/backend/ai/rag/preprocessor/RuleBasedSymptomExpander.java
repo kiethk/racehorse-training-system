@@ -12,13 +12,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
- * Tiền xử lý mở rộng triệu chứng lâm sàng dựa trên Database + In-Memory Cache.
+ * Preprocesses and expands clinical symptoms using the database and an in-memory cache.
  *
- * Toàn bộ dữ liệu triệu chứng được quản trị 100% trong Database (bảng medical_symptom_mappings),
- * hoàn toàn không hardcode trong mã nguồn.
+ * All symptom data is managed entirely in the database (medical_symptom_mappings table),
+ * with no hardcoded entries in the source code.
  *
- * Lúc khởi động (@PostConstruct) hoặc khi gọi reload(), hệ thống nạp dữ liệu từ DB vào RAM
- * với các mẫu Regex biên từ Unicode đã biên dịch sẵn, đảm bảo tốc độ phản hồi < 0.1ms cho AI.
+ * At startup (@PostConstruct) or when reload() is called, the system loads data from the database into memory
+ * with precompiled Unicode word-boundary regex patterns, ensuring AI response times < 0.1ms.
  */
 @Component
 public class RuleBasedSymptomExpander {
@@ -40,7 +40,7 @@ public class RuleBasedSymptomExpander {
     }
 
     /**
-     * Tải lại toàn bộ từ điển triệu chứng từ cơ sở dữ liệu vào In-Memory Cache.
+     * Reloads the entire symptom dictionary from the database into the in-memory cache.
      */
     public synchronized void reload() {
         symptomToMedicalTerms.clear();
@@ -51,9 +51,9 @@ public class RuleBasedSymptomExpander {
             for (MedicalSymptomMapping mapping : dbMappings) {
                 registerSingle(mapping.getRawSymptom(), mapping.getMedicalTerm());
             }
-            log.info("RuleBasedSymptomExpander: Đã nạp thành công {} triệu chứng y khoa từ Database vào In-Memory Cache.", dbMappings.size());
+            log.info("RuleBasedSymptomExpander: Successfully loaded {} medical symptoms from the database into the in-memory cache.", dbMappings.size());
         } else {
-            log.warn("RuleBasedSymptomExpander: Bảng medical_symptom_mappings đang rỗng hoặc chưa kích hoạt bản ghi nào.");
+            log.warn("RuleBasedSymptomExpander: The medical_symptom_mappings table is empty or has no active records.");
         }
     }
 
@@ -64,17 +64,17 @@ public class RuleBasedSymptomExpander {
         String key = rawSymptom.toLowerCase(Locale.ROOT).trim();
         symptomToMedicalTerms.computeIfAbsent(key, k -> new ArrayList<>()).add(medicalTerm.trim());
 
-        // Regex ranh giới từ theo chuẩn Unicode: (?<!\p{L}) và (?!\p{L}) để tránh match chuỗi con
+        // Unicode word-boundary regex: (?<!\p{L}) and (?!\p{L}) to avoid matching substrings
         Pattern pattern = Pattern.compile("(?<!\\p{L})" + Pattern.quote(key) + "(?!\\p{L})",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
         compiledPatterns.put(key, pattern);
     }
 
     /**
-     * Trích xuất các thuật ngữ y khoa tương ứng từ văn bản mô tả triệu chứng.
+     * Extracts the corresponding medical terms from symptom description text.
      *
-     * @param rawText Văn bản đầu vào (ví dụ: "Ngựa có biểu hiện cào đất và hay quay đầu nhìn bụng")
-     * @return Tập hợp các thuật ngữ y học chuyên ngành được ánh xạ
+     * @param rawText Input text (for example: "The horse paws at the ground and often turns to look at its belly")
+     * @return Set of mapped specialized medical terms
      */
     public Set<String> extractMedicalTerms(String rawText) {
         if (rawText == null || rawText.isBlank()) {
@@ -96,11 +96,11 @@ public class RuleBasedSymptomExpander {
     }
 
     /**
-     * Mở rộng văn bản đầu vào: giữ nguyên câu hỏi/triệu chứng gốc và bổ sung
-     * các thuật ngữ y khoa liên quan để tối ưu hóa vector semantic search.
+     * Expands the input text by preserving the original question or symptom and adding
+     * related medical terms to optimize vector semantic search.
      *
-     * @param rawText Câu hỏi hoặc ghi chú triệu chứng ban đầu
-     * @return Văn bản đã được làm giàu ngữ nghĩa y học
+     * @param rawText Original question or symptom note
+     * @return Text enriched with medical context
      */
     public String expand(String rawText) {
         if (rawText == null || rawText.isBlank()) {
@@ -113,7 +113,7 @@ public class RuleBasedSymptomExpander {
         }
 
         StringBuilder sb = new StringBuilder(rawText.trim());
-        sb.append(" [Thuật ngữ y khoa liên quan: ");
+        sb.append(" [Related medical terms: ");
         sb.append(String.join(", ", medicalTerms));
         sb.append("]");
 
@@ -121,7 +121,7 @@ public class RuleBasedSymptomExpander {
     }
 
     /**
-     * Lấy toàn bộ từ điển ánh xạ trong Cache (Read-only view phục vụ kiểm thử / kiểm toán).
+     * Gets the entire mapping dictionary in the cache (read-only view for testing and auditing).
      */
     public Map<String, List<String>> getDictionary() {
         return Collections.unmodifiableMap(symptomToMedicalTerms);

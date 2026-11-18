@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Controller tiếp nhận yêu cầu hội thoại AI Agent (quản lý phiên chat bền vững và realtime SSE streaming).
+ * Controller that handles AI Agent conversation requests (persistent chat session management and real-time SSE streaming).
  */
 @RestController
 @RequestMapping("/api/v1/ai")
@@ -44,7 +44,7 @@ public class AiChatController {
     }
 
     /**
-     * Lấy danh sách các cuộc hội thoại của người dùng hiện tại.
+     * Gets the current user's conversations.
      */
     @GetMapping("/conversations")
     @PreAuthorize("isAuthenticated()")
@@ -55,7 +55,7 @@ public class AiChatController {
     }
 
     /**
-     * Lấy danh sách tin nhắn của một cuộc hội thoại cụ thể.
+     * Gets the messages in a specific conversation.
      */
     @GetMapping("/conversations/{id}/messages")
     @PreAuthorize("isAuthenticated()")
@@ -67,7 +67,7 @@ public class AiChatController {
     }
 
     /**
-     * Tạo một cuộc trò chuyện mới.
+     * Creates a new conversation.
      */
     @PostMapping("/conversations")
     @PreAuthorize("isAuthenticated()")
@@ -80,7 +80,7 @@ public class AiChatController {
     }
 
     /**
-     * Đổi tên một cuộc hội thoại.
+     * Renames a conversation.
      */
     @PutMapping("/conversations/{id}/title")
     @PreAuthorize("isAuthenticated()")
@@ -93,7 +93,7 @@ public class AiChatController {
     }
 
     /**
-     * Xóa một cuộc hội thoại và toàn bộ lịch sử tin nhắn.
+     * Deletes a conversation and its entire message history.
      */
     @DeleteMapping("/conversations/{id}")
     @PreAuthorize("isAuthenticated()")
@@ -105,7 +105,7 @@ public class AiChatController {
     }
 
     /**
-     * Endpoint chat đồng bộ với AI Agent.
+     * Synchronous chat endpoint for the AI Agent.
      */
     @PostMapping("/chat")
     @PreAuthorize("isAuthenticated()")
@@ -117,7 +117,7 @@ public class AiChatController {
     }
 
     /**
-     * Endpoint chat qua Server-Sent Events (SSE) để truyền dữ liệu thời gian thực.
+     * Chat endpoint using Server-Sent Events (SSE) for real-time data delivery.
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("isAuthenticated()")

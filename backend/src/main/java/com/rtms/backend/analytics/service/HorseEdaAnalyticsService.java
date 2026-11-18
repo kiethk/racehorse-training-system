@@ -31,8 +31,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Dịch vụ xử lý và tổng hợp dữ liệu cho module EDA (Exploratory Data Analysis),
- * trích xuất thống kê mô tả và phân tích tương quan hai chiều hiệu suất - sức khỏe.
+ * Service that processes and aggregates data for the EDA (Exploratory Data Analysis) module,
+ * extracting descriptive statistics and analyzing the bivariate correlation between performance and health.
  */
 @Service
 public class HorseEdaAnalyticsService {
@@ -52,7 +52,7 @@ public class HorseEdaAnalyticsService {
     }
 
     /**
-     * Phân tích EDA cho toàn bộ đàn ngựa trong phạm vi quyền hạn của người dùng.
+     * Performs EDA for the entire horse population within the user's authorization scope.
      */
     @Transactional(readOnly = true)
     public FleetEdaResponse getFleetEdaAnalytics(AuthenticatedUser currentUser, Integer days) {
@@ -126,7 +126,7 @@ public class HorseEdaAnalyticsService {
     }
 
     /**
-     * Phân tích EDA chi tiết cho một chiến mã theo chuỗi các buổi tập đã hoàn thành.
+     * Performs detailed EDA for an individual horse based on its completed workout history.
      */
     @Transactional(readOnly = true)
     public IndividualHorseEdaResponse getIndividualEdaAnalytics(Long horseId, AuthenticatedUser currentUser, Integer days) {

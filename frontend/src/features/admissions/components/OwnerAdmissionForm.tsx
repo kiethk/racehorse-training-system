@@ -633,7 +633,7 @@ export function OwnerAdmissionForm() {
                 </span>
                 <FileInput
                   id={`file-${doc.type}`}
-                  className="sr-only"
+                  className="hidden"
                   ref={element => { fileInputs.current[doc.type] = element; }}
                   accept=".pdf,.jpg,.jpeg,.png,.webp"
                   disabled={isAnyScanning}

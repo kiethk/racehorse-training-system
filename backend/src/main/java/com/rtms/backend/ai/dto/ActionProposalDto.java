@@ -3,7 +3,7 @@ package com.rtms.backend.ai.dto;
 import java.util.Map;
 
 /**
- * DTO đóng gói đề xuất hành động HITL gửi về cho người dùng (UI Modal).
+ * DTO that packages an HITL action proposal for the user (UI modal).
  */
 public record ActionProposalDto(
         Long actionId,

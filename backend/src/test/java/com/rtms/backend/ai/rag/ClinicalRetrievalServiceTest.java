@@ -44,11 +44,11 @@ class ClinicalRetrievalServiceTest {
     }
 
     @Test
-    @DisplayName("Truy xuất RAG thành công: mở rộng triệu chứng, sinh vector và trả danh sách chunk")
+    @DisplayName("RAG retrieval succeeds: expand symptoms, generate an embedding, and return the chunks")
     @SuppressWarnings("unchecked")
     void testRetrieveSimilarClinicalRecords_Success() {
-        String query = "Ngựa bị khập khiễng chân sau";
-        when(symptomExpander.expand(query)).thenReturn("Ngựa bị khập khiễng [Lameness] chân sau");
+        String query = "The horse is limping on a hind leg";
+        when(symptomExpander.expand(query)).thenReturn("The horse is limping [Equine lameness] on a hind leg");
 
         float[] mockVector = new float[1536];
         mockVector[0] = 0.5f;
@@ -56,9 +56,9 @@ class ClinicalRetrievalServiceTest {
 
         ClinicalChunkResponseDto mockChunk = new ClinicalChunkResponseDto(
                 10L,
-                "Bệnh án viêm gân",
+                "Medical record: tendonitis",
                 "CLINICAL_RECORD",
-                "Ngựa có dấu hiệu viêm gân và khập khiễng nhẹ...",
+                "The horse shows signs of tendonitis and mild limping...",
                 0.88,
                 java.util.Map.of("horseId", 12L)
         );
@@ -76,12 +76,12 @@ class ClinicalRetrievalServiceTest {
 
         assertNotNull(results);
         assertEquals(1, results.size());
-        assertEquals("Bệnh án viêm gân", results.get(0).title());
+        assertEquals("Medical record: tendonitis", results.get(0).title());
         assertEquals(0.88, results.get(0).similarity());
     }
 
     @Test
-    @DisplayName("Truy xuất trả về danh sách rỗng khi câu hỏi null hoặc blank")
+    @DisplayName("Retrieval returns an empty list when the query is null or blank")
     void testRetrieveSimilarClinicalRecords_EmptyQuery() {
         List<ClinicalChunkResponseDto> results = retrievalService.retrieveSimilarClinicalRecords(
                 "   ",
@@ -96,11 +96,11 @@ class ClinicalRetrievalServiceTest {
     }
 
     @Test
-    @DisplayName("Reindex toàn bộ embeddings thành công theo batch")
+    @DisplayName("Successfully reindex all embeddings in batches")
     void testReindexAllEmbeddings_Success() {
         List<Map<String, Object>> mockRows = List.of(
-                Map.of("id", 1L, "content", "Nội dung bệnh án 1"),
-                Map.of("id", 2L, "content", "Nội dung bệnh án 2")
+                Map.of("id", 1L, "content", "Medical record content 1"),
+                Map.of("id", 2L, "content", "Medical record content 2")
         );
 
         when(jdbcTemplate.queryForList(anyString())).thenReturn(mockRows);

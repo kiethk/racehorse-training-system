@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Kết quả phản hồi từ AI Agent bao gồm câu trả lời, conversationId, danh sách công cụ đã gọi và các đề xuất HITL (nếu có).
+ * AI Agent response containing the answer, conversationId, list of called tools, and any pending HITL proposals.
  */
 public record AiChatResponseDto(
         String reply,

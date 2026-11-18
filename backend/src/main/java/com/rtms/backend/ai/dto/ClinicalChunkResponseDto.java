@@ -3,7 +3,7 @@ package com.rtms.backend.ai.dto;
 import java.util.Map;
 
 /**
- * DTO biểu diễn một đoạn tri thức y khoa lâm sàng tìm kiếm được qua RAG Retrieval.
+ * DTO representing a clinical knowledge chunk retrieved through RAG.
  */
 public record ClinicalChunkResponseDto(
         Long embeddingId,

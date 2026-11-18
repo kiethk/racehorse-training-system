@@ -20,11 +20,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Triển khai EmbeddingService kết nối với OpenAI API (text-embedding-3-small).
+ * EmbeddingService implementation that connects to the OpenAI API (text-embedding-3-small).
  * 
- * Tạo vector 1536 chiều từ mô hình OpenAI thế hệ mới.
- * Nếu không có API Key, gặp lỗi kết nối hoặc bị vô hiệu hóa, tự động fallback sang
- * DefaultEmbeddingService (Deterministic SHA-256 Hashing) để đảm bảo hệ thống không bị crash.
+ * Generates 1536-dimensional vectors using the latest OpenAI model.
+ * If no API key is available, a connection error occurs, or the service is disabled, it automatically falls back to
+ * DefaultEmbeddingService (Deterministic SHA-256 Hashing) to prevent the system from crashing.
  */
 @Service
 @Primary
@@ -115,12 +115,12 @@ public class OpenAiEmbeddingService implements EmbeddingService {
                         return vector;
                     }
                 }
-                log.warn("OpenAI Embedding phản hồi cấu trúc không hợp lệ: {}", response.body());
+                log.warn("OpenAI Embedding returned an invalid response structure: {}", response.body());
             } else {
-                log.warn("Gọi OpenAI Embedding thất bại (HTTP {}): {}. Chuyển sang fallback.", response.statusCode(), response.body());
+                log.warn("OpenAI Embedding call failed (HTTP {}): {}. Falling back.", response.statusCode(), response.body());
             }
         } catch (Exception e) {
-            log.warn("Lỗi ngoại lệ khi kết nối OpenAI Embedding: {}. Chuyển sang fallback.", e.getMessage());
+            log.warn("Exception while connecting to OpenAI Embedding: {}. Falling back.", e.getMessage());
         }
 
         return fallbackService.embed(text);
@@ -174,9 +174,9 @@ public class OpenAiEmbeddingService implements EmbeddingService {
                     return results;
                 }
             }
-            log.warn("Gọi OpenAI Batch Embedding thất bại (HTTP {}): {}. Chuyển sang fallback.", response.statusCode(), response.body());
+            log.warn("OpenAI Batch Embedding call failed (HTTP {}): {}. Falling back.", response.statusCode(), response.body());
         } catch (Exception e) {
-            log.warn("Lỗi ngoại lệ khi kết nối OpenAI Batch Embedding: {}. Chuyển sang fallback.", e.getMessage());
+            log.warn("Exception while connecting to OpenAI Batch Embedding: {}. Falling back.", e.getMessage());
         }
 
         return fallbackService.embedBatch(texts);

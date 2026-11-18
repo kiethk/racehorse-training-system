@@ -7,42 +7,42 @@ import type {
 } from '../types';
 
 /**
- * Lấy danh sách các cuộc hội thoại của người dùng.
+ * Get the user's conversations.
  */
 export async function getConversations(): Promise<AiConversation[]> {
   return apiGet<AiConversation[]>('/api/v1/ai/conversations');
 }
 
 /**
- * Lấy danh sách tin nhắn của một cuộc hội thoại.
+ * Get the messages for a conversation.
  */
 export async function getConversationMessages(conversationId: number): Promise<AiChatMessageDetail[]> {
   return apiGet<AiChatMessageDetail[]>(`/api/v1/ai/conversations/${conversationId}/messages`);
 }
 
 /**
- * Tạo mới một cuộc hội thoại.
+ * Create a new conversation.
  */
 export async function createConversation(title?: string): Promise<AiConversation> {
   return apiPost<AiConversation>('/api/v1/ai/conversations', title ? { title } : {});
 }
 
 /**
- * Đổi tên tiêu đề cuộc hội thoại.
+ * Rename a conversation.
  */
 export async function renameConversation(conversationId: number, title: string): Promise<AiConversation> {
   return apiPut<AiConversation>(`/api/v1/ai/conversations/${conversationId}/title`, { title });
 }
 
 /**
- * Xóa một cuộc hội thoại.
+ * Delete a conversation.
  */
 export async function deleteConversation(conversationId: number): Promise<void> {
   return apiDelete<void>(`/api/v1/ai/conversations/${conversationId}`);
 }
 
 /**
- * Gửi tin nhắn đồng bộ đến AI Agent Orchestrator.
+ * Send a synchronous message to the AI Agent Orchestrator.
  */
 export async function sendChatMessage(
   request: AiChatRequestDto,
@@ -52,7 +52,7 @@ export async function sendChatMessage(
 }
 
 /**
- * Gửi tin nhắn và nhận phản hồi SSE streaming từ AI Agent.
+ * Send a message and receive an SSE streaming response from the AI Agent.
  */
 export async function streamChatMessage(
   request: AiChatRequestDto,

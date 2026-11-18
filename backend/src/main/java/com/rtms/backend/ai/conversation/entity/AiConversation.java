@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Thực thể lưu trữ phiên hội thoại AI của người dùng.
+ * Entity that stores a user's AI conversation session.
  */
 @Entity
 @Table(name = "ai_conversations")

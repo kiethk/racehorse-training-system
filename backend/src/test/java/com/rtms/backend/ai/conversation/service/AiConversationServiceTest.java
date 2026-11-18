@@ -34,10 +34,10 @@ class AiConversationServiceTest {
     }
 
     @Test
-    @DisplayName("Lấy danh sách các cuộc hội thoại của user")
+    @DisplayName("Get the user's conversation list")
     void testGetUserConversations() {
         Long userId = 5L;
-        AiConversation c1 = new AiConversation(userId, "Lịch tập hôm nay");
+        AiConversation c1 = new AiConversation(userId, "Today's training schedule");
         c1.setId(101L);
         when(conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId)).thenReturn(List.of(c1));
 
@@ -45,11 +45,11 @@ class AiConversationServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(101L, result.get(0).id());
-        assertEquals("Lịch tập hôm nay", result.get(0).title());
+        assertEquals("Today's training schedule", result.get(0).title());
     }
 
     @Test
-    @DisplayName("Lấy lịch sử tin nhắn ném lỗi nếu không tìm thấy conversation hoặc sai userId")
+    @DisplayName("Getting message history throws an error when the conversation is not found or the user ID is incorrect")
     void testGetConversationMessages_NotFound() {
         when(conversationRepository.findByIdAndUserId(999L, 5L)).thenReturn(Optional.empty());
 
@@ -57,16 +57,16 @@ class AiConversationServiceTest {
     }
 
     @Test
-    @DisplayName("Lấy lịch sử tin nhắn thành công khi hợp lệ")
+    @DisplayName("Get message history successfully when the request is valid")
     void testGetConversationMessages_Success() {
         Long userId = 5L;
         Long convId = 101L;
-        AiConversation conv = new AiConversation(userId, "Tra cứu y tế");
+        AiConversation conv = new AiConversation(userId, "Medical lookup");
         conv.setId(convId);
 
-        AiChatMessage m1 = new AiChatMessage(convId, "user", "Ngựa #1 sao rồi?", null);
+        AiChatMessage m1 = new AiChatMessage(convId, "user", "How is horse #1 doing?", null);
         m1.setId(1L);
-        AiChatMessage m2 = new AiChatMessage(convId, "assistant", "Ngựa #1 hoàn toàn khỏe mạnh.", null);
+        AiChatMessage m2 = new AiChatMessage(convId, "assistant", "Horse #1 is completely healthy.", null);
         m2.setId(2L);
 
         when(conversationRepository.findByIdAndUserId(convId, userId)).thenReturn(Optional.of(conv));
@@ -80,7 +80,7 @@ class AiConversationServiceTest {
     }
 
     @Test
-    @DisplayName("Tự động tạo cuộc trò chuyện mới từ tin nhắn đầu tiên khi conversationId là null")
+    @DisplayName("Automatically create a new conversation from the first message when conversationId is null")
     void testGetOrCreateConversation_NewThread() {
         Long userId = 5L;
         when(conversationRepository.save(any(AiConversation.class))).thenAnswer(inv -> {
@@ -89,15 +89,15 @@ class AiConversationServiceTest {
             return c;
         });
 
-        AiConversation created = conversationService.getOrCreateConversation(null, userId, "Cho tôi xem danh sách ngựa đang bị chấn thương");
+        AiConversation created = conversationService.getOrCreateConversation(null, userId, "Show me the list of injured horses");
 
         assertNotNull(created);
         assertEquals(201L, created.getId());
-        assertTrue(created.getTitle().startsWith("Cho tôi xem danh sách"));
+        assertTrue(created.getTitle().startsWith("Show me the list"));
     }
 
     @Test
-    @DisplayName("Lưu tin nhắn và cập nhật thời gian updatedAt của hội thoại")
+    @DisplayName("Save a message and update the conversation's updatedAt timestamp")
     void testSaveMessage() {
         Long convId = 101L;
         AiConversation conv = new AiConversation(5L, "Test");
@@ -106,7 +106,7 @@ class AiConversationServiceTest {
         when(messageRepository.save(any(AiChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
         when(conversationRepository.findById(convId)).thenReturn(Optional.of(conv));
 
-        AiChatMessage saved = conversationService.saveMessage(convId, "user", "Tin nhắn test", null);
+        AiChatMessage saved = conversationService.saveMessage(convId, "user", "Test message", null);
 
         assertNotNull(saved);
         assertEquals(convId, saved.getConversationId());
@@ -114,7 +114,7 @@ class AiConversationServiceTest {
     }
 
     @Test
-    @DisplayName("Xóa cuộc trò chuyện và toàn bộ tin nhắn bên trong")
+    @DisplayName("Delete a conversation and all of its messages")
     void testDeleteConversation() {
         Long convId = 101L;
         Long userId = 5L;

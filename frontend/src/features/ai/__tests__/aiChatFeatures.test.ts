@@ -1,9 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CHART_PALETTE } from '../lib/chartUtils.ts';
-import { getQuickPromptsByRole } from '../lib/aiUtils.ts';
+import { getQuickPromptsByRole, clampDialogPosition, getPopupPositionFromFab, checkRectsOverlap } from '../lib/aiUtils.ts';
+
+function resolveSourcePath(relativePath: string): string {
+  const directPath = resolve(process.cwd(), relativePath);
+  if (existsSync(directPath)) return directPath;
+  return resolve(process.cwd(), 'frontend', relativePath);
+}
 
 describe('AI Chat Upgraded Features & Logic Tests', () => {
   it('CHART_PALETTE is aligned with RTMS Brand Tokens (#6657c7 primary)', () => {
@@ -23,29 +29,29 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
     assert.ok(starters[2].length > 0);
   });
 
-  it('correctly calculates tool execution summary and error count', () => {
-    const mockTools = [
-      { tool: 'getHorsesList', arguments: { status: 'ACTIVE' }, status: 'SUCCESS' },
-      { tool: 'getMedicalRecords', arguments: { horseId: 101 }, status: 'ERROR', error: 'Database timeout' },
-      { tool: 'getStallStatus', arguments: {}, status: 'SUCCESS' },
-    ];
-
-    const errorCount = mockTools.filter((t) => t.status === 'ERROR' || Boolean(t.error)).length;
-    assert.equal(errorCount, 1);
-
-    const summary = errorCount > 0
-      ? `Đã dùng ${mockTools.length} công cụ, ${errorCount} lỗi`
-      : `Đã dùng ${mockTools.length} công cụ`;
-
-    assert.equal(summary, 'Đã dùng 3 công cụ, 1 lỗi');
+  it('treats adjacent rectangles as separate and intersecting rectangles as overlapping', () => {
+    assert.equal(
+      checkRectsOverlap(
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 10, y: 0, width: 10, height: 10 }
+      ),
+      false
+    );
+    assert.equal(
+      checkRectsOverlap(
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 9, y: 0, width: 10, height: 10 }
+      ),
+      true
+    );
   });
 
   it('correctly calculates regenerate slice index for user messages', () => {
     const messages = [
-      { id: 'u1', role: 'user', content: 'Câu hỏi 1' },
-      { id: 'a1', role: 'assistant', content: 'Trả lời 1' },
-      { id: 'u2', role: 'user', content: 'Câu hỏi 2' },
-      { id: 'a2', role: 'assistant', content: 'Trả lời 2' },
+      { id: 'u1', role: 'user', content: 'Question 1' },
+      { id: 'a1', role: 'assistant', content: 'Answer 1' },
+      { id: 'u2', role: 'user', content: 'Question 2' },
+      { id: 'a2', role: 'assistant', content: 'Answer 2' },
     ];
 
     // Case 1: regenerate without targetId (defaults to last turn)
@@ -58,7 +64,7 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
     }
 
     assert.equal(userMsgIdx, 2);
-    assert.equal(messages[userMsgIdx].content, 'Câu hỏi 2');
+    assert.equal(messages[userMsgIdx].content, 'Question 2');
     const sliced = messages.slice(0, userMsgIdx);
     assert.equal(sliced.length, 2);
     assert.equal(sliced[0].id, 'u1');
@@ -74,7 +80,7 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
       }
     }
     assert.equal(targetUserIdx, 0);
-    assert.equal(messages[targetUserIdx].content, 'Câu hỏi 1');
+    assert.equal(messages[targetUserIdx].content, 'Question 1');
     const targetedSlice = messages.slice(0, targetUserIdx);
     assert.equal(targetedSlice.length, 0);
   });
@@ -130,14 +136,14 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
       tool: 'getMedicalRecords',
       arguments: { horseId: 101 },
       status: 'ERROR',
-      error: 'Kết nối CSDL thất bại',
+      error: 'Database connection failed',
     };
 
     const isError = errorTool.status === 'ERROR' || Boolean(errorTool.error);
     const errorMessage = typeof errorTool.error === 'string' ? errorTool.error : null;
-    const detailText = isError && errorMessage ? `Lỗi: ${errorMessage}` : 'Tham số';
+    const detailText = isError && errorMessage ? `Error: ${errorMessage}` : 'Arguments';
 
-    assert.equal(detailText, 'Lỗi: Kết nối CSDL thất bại');
+    assert.equal(detailText, 'Error: Database connection failed');
 
     const successTool = {
       tool: 'getHorsesList',
@@ -147,11 +153,11 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
 
     const successIsError = false;
     const resultCount = Array.isArray(successTool.result)
-      ? `${successTool.result.length} bản ghi`
+      ? `${successTool.result.length} records`
       : null;
-    const successDetail = !successIsError && resultCount ? `Kết quả: ${resultCount}` : 'Khác';
+    const successDetail = !successIsError && resultCount ? `Result: ${resultCount}` : 'Other';
 
-    assert.equal(successDetail, 'Kết quả: 3 bản ghi');
+    assert.equal(successDetail, 'Result: 3 records');
   });
 
   it('trims trailing newline from code block copy payloads', () => {
@@ -164,16 +170,131 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
   });
 
   it('renders markdown tables according to natural content width with horizontal slider and no word breakage', () => {
-    const markdownSourcePath = resolve(process.cwd(), 'src/features/ai/components/MarkdownMessage.tsx');
+    const markdownSourcePath = resolveSourcePath('src/features/ai/components/MarkdownMessage.tsx');
     const sourceCode = readFileSync(markdownSourcePath, 'utf-8');
+    const tablePrimitivePath = resolveSourcePath('src/components/ui/Table.tsx');
+    const tablePrimitiveCode = readFileSync(tablePrimitivePath, 'utf-8');
 
-    // Asserts horizontal slider scroller uses scroll-slim
-    assert.ok(sourceCode.includes('scroll-slim relative w-full overflow-x-auto'), 'Table must have scroll-slim horizontal slider container');
-    // Asserts table uses natural content width w-max
-    assert.ok(sourceCode.includes('w-max min-w-full text-left text-xs border-collapse'), 'Table must render with w-max for natural content width');
+    // The shared Table primitive provides horizontal scrolling.
+    assert.ok(tablePrimitiveCode.includes('scroll-slim relative overflow-x-auto'), 'Table must have a horizontal scroller');
+    // Markdown tables use the shared primitive with natural content width.
+    assert.ok(sourceCode.includes('<Table bare className="w-max min-w-full text-left text-xs border-collapse">'), 'Table must render through the shared primitive with w-max');
     // Asserts cells do not aggressively break words everywhere
     assert.ok(!sourceCode.includes('[overflow-wrap:anywhere]'), 'Table cells must not use [overflow-wrap:anywhere] which breaks words arbitrarily');
     // Asserts whitespace-nowrap and break-normal for discrete word boundary wrapping
     assert.ok(sourceCode.includes('whitespace-nowrap'), 'Table headers and cells must maintain clean word spacing');
+  });
+
+  describe('AI Floating Popup Dragging & Clamping Logic', () => {
+    it('clamps negative or zero coordinates to safety margin', () => {
+      const clamped = clampDialogPosition({ x: -50, y: -20 }, 380, 560, 1920, 1080, 8);
+      assert.equal(clamped.x, 8);
+      assert.equal(clamped.y, 8);
+    });
+
+    it('clamps overflow coordinates beyond right and bottom viewport bounds', () => {
+      // dialog: 380x560, viewport: 1000x800, margin: 8
+      // maxX = 1000 - 380 - 8 = 612
+      // maxY = 800 - 560 - 8 = 232
+      const clamped = clampDialogPosition({ x: 900, y: 700 }, 380, 560, 1000, 800, 8);
+      assert.equal(clamped.x, 612);
+      assert.equal(clamped.y, 232);
+    });
+
+    it('preserves valid coordinates inside bounds', () => {
+      const clamped = clampDialogPosition({ x: 250, y: 150 }, 380, 560, 1920, 1080, 8);
+      assert.equal(clamped.x, 250);
+      assert.equal(clamped.y, 150);
+    });
+
+    it('handles viewports smaller than dialog dimensions safely', () => {
+      const clamped = clampDialogPosition({ x: 100, y: 100 }, 800, 720, 500, 600, 8);
+      assert.equal(clamped.x, 8);
+      assert.equal(clamped.y, 8);
+    });
+
+    it('wires header drag handlers to the hook and preserves drag affordances', () => {
+      const widgetPath = resolveSourcePath('src/features/ai/components/AiChatWidget.tsx');
+      const widgetCode = readFileSync(widgetPath, 'utf-8');
+      const hookPath = resolveSourcePath('src/features/ai/hooks/useChatWindowDrag.ts');
+      const hookCode = readFileSync(hookPath, 'utf-8');
+
+      assert.ok(widgetCode.includes('onPointerDown={handleHeaderPointerDown}'), 'Must attach onPointerDown on header');
+      assert.ok(widgetCode.includes('onPointerMove={handleHeaderPointerMove}'), 'Must attach onPointerMove on header');
+      assert.ok(widgetCode.includes('onPointerUp={handleHeaderPointerUp}'), 'Must attach onPointerUp on header');
+      assert.ok(widgetCode.includes('onDoubleClick={handleResetPosition}'), 'Must support double-click to reset position');
+      assert.ok(hookCode.includes('setPointerCapture'), 'Must use setPointerCapture for smooth dragging across boundaries');
+      assert.ok(widgetCode.includes('cursor-grab'), 'Must provide cursor-grab visual affordance');
+      assert.ok(widgetCode.includes('GripVertical'), 'Must display GripVertical handle icon');
+      assert.ok(widgetCode.includes('touch-none'), 'Must specify touch-none to prevent conflict with touch scrolling');
+    });
+
+    it('calculates popup position relative to FAB correctly, preferring side-by-side without covering FAB', () => {
+      // 1. FAB at right bottom: x: 1800, y: 1000 in 1920x1080 screen
+      const rightBottomPopup = getPopupPositionFromFab({ x: 1800, y: 1000 }, false, 1920, 1080);
+      assert.ok(rightBottomPopup.y < 1000, 'Popup sits cleanly above the FAB when enough vertical space');
+      assert.equal(
+        checkRectsOverlap(
+          { ...rightBottomPopup, width: 380, height: 560 },
+          { x: 1800, y: 1000, width: 56, height: 56 }
+        ),
+        false,
+        'Must not overlap FAB at bottom right'
+      );
+
+      // 2. FAB in the MIDDLE of screen: x: 960, y: 500 in 1920x1080 screen
+      // Placing above or below would cover the FAB; it must be positioned side-by-side
+      const middlePopup = getPopupPositionFromFab({ x: 960, y: 500 }, false, 1920, 1080);
+      assert.equal(
+        checkRectsOverlap(
+          { ...middlePopup, width: 380, height: 560 },
+          { x: 960, y: 500, width: 56, height: 56 }
+        ),
+        false,
+        'Popup must NEVER cover the FAB when in the middle of the screen'
+      );
+      // Popup should be beside the FAB (either to the left: right edge <= 960 - 12, or to the right: left edge >= 960 + 56 + 12)
+      const isBeside = middlePopup.x + 380 <= 960 || middlePopup.x >= 960 + 56;
+      assert.ok(isBeside, 'Popup must be positioned side-by-side when dragged to the middle');
+
+      // 3. FAB at top left: x: 30, y: 50 in 1920x1080 screen
+      const topLeftPopup = getPopupPositionFromFab({ x: 30, y: 50 }, false, 1920, 1080);
+      assert.equal(
+        checkRectsOverlap(
+          { ...topLeftPopup, width: 380, height: 560 },
+          { x: 30, y: 50, width: 56, height: 56 }
+        ),
+        false,
+        'Popup must not cover FAB at top left'
+      );
+      assert.ok(topLeftPopup.x >= 30 + 56, 'Popup must be placed on the right side of FAB at top left');
+    });
+
+    it('AiChatWidget source implements round FAB dragging with unified anchor and click-suppression', () => {
+      const widgetPath = resolveSourcePath('src/features/ai/components/AiChatWidget.tsx');
+      const widgetCode = readFileSync(widgetPath, 'utf-8');
+      const hookPath = resolveSourcePath('src/features/ai/hooks/useChatWindowDrag.ts');
+      const hookCode = readFileSync(hookPath, 'utf-8');
+
+      assert.ok(widgetCode.includes('onPointerDown={handleFabPointerDown}'), 'FAB must attach handleFabPointerDown');
+      assert.ok(widgetCode.includes('onPointerMove={handleFabPointerMove}'), 'FAB must attach handleFabPointerMove');
+      assert.ok(widgetCode.includes('onPointerUp={handleFabPointerUp}'), 'FAB must attach handleFabPointerUp');
+      assert.ok(widgetCode.includes('onClick={handleFabClick}'), 'FAB must use handleFabClick with drag suppression');
+      assert.ok(widgetCode.includes('onDoubleClick={handleResetPosition}'), 'FAB must support double-click to reset corner');
+      assert.ok(hookCode.includes('setAnchor'), 'Must use unified setAnchor to keep FAB and Popup in sync');
+      assert.ok(widgetCode.includes('dialogPosition'), 'Must derive dialogPosition directly from unified anchor');
+    });
+
+    it('AiChatInputBar textarea removes inner bounding box and border to integrate into outer form pill', () => {
+      const inputBarPath = resolveSourcePath('src/features/ai/components/AiChatInputBar.tsx');
+      const inputBarCode = readFileSync(inputBarPath, 'utf-8');
+
+      // The textarea must override controlClassName border & rings so no nested box is rendered
+      assert.ok(inputBarCode.includes('border-0'), 'Textarea must have border-0 to eliminate inner border');
+      assert.ok(inputBarCode.includes('border-transparent'), 'Textarea must have border-transparent');
+      assert.ok(inputBarCode.includes('focus-visible:border-transparent'), 'Textarea must prevent inner focus border');
+      assert.ok(inputBarCode.includes('focus-visible:ring-0'), 'Textarea must prevent inner focus ring');
+      assert.ok(inputBarCode.includes('max-h-[160px]'), 'Textarea max height class must match 160px JS clamp');
+    });
   });
 });
