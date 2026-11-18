@@ -43,7 +43,7 @@ import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.DistanceBand;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.RacingReadinessStatus;
+//
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.CourseRunStatus;
