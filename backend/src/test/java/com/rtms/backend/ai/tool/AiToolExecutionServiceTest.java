@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+
 class AiToolExecutionServiceTest extends AiToolExecutionServiceTestSupport {
 
     // =================================================================

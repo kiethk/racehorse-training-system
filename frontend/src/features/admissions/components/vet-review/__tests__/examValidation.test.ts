@@ -85,6 +85,33 @@ describe('validateExam', () => {
     assert.equal(withMarker.errors.injuryMarkers, undefined);
   });
 
+  it('requires at least one injury marker when incidentType is TRAUMA', () => {
+    const withoutMarker = validateExam(
+      base({
+        careType: 'URGENT' as CareType,
+        incidentType: 'TRAUMA',
+        trainingDecision: 'BLOCKED',
+        restrictionDetails: 'Tendon strain rest',
+        markerCount: 0,
+      }),
+    );
+    const withMarker = validateExam(
+      base({
+        careType: 'URGENT' as CareType,
+        incidentType: 'TRAUMA',
+        trainingDecision: 'BLOCKED',
+        restrictionDetails: 'Tendon strain rest',
+        markerCount: 1,
+      }),
+    );
+
+    assert.equal(
+      withoutMarker.errors.injuryMarkers,
+      'A trauma case must record at least one injury marker before it can be completed.',
+    );
+    assert.equal(withMarker.errors.injuryMarkers, undefined);
+  });
+
   it('returns per-dose vaccination errors only when vaccination applies', () => {
     const notApplicable = validateExam(
       base({ config: { ...EXAM_CONFIG, vaccination: false } }),

@@ -21,11 +21,15 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'sticky top-0 z-[var(--z-sidebar)] flex h-dvh shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]',
+        'relative sticky top-0 z-[var(--z-sidebar)] flex h-dvh shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]',
         'transition-[width] duration-[var(--duration-base)] ease-[var(--ease-out)]',
         collapsed ? 'w-[var(--sidebar-width-collapsed)]' : 'w-[var(--sidebar-width)]',
       )}
     >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[3px] bg-[var(--color-primary)] transition-colors duration-[var(--duration-base)]"
+      />
       <Link
         href={getRoleRoute(role)}
         aria-label="RTMS home"

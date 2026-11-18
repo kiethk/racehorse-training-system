@@ -189,8 +189,9 @@ export function AccountTable({
     if (account.role === 'GROOM' && account.assignedStallCodes && account.assignedStallCodes.length > 0) {
       return `This Groom is currently assigned to stalls (${account.assignedStallCodes.join(', ')}). All stalls must be unassigned or transferred before deactivation.`;
     }
-    if (account.role === 'HORSE_OWNER' && (account.ownedHorsesCount ?? 0) > 0) {
-      return `This Owner currently has ${account.ownedHorsesCount} registered horse(s) in the system. All horses must be discharged, transferred, or resolved before deactivation.`;
+    const activeHorses = account.activeHorsesCount !== undefined ? account.activeHorsesCount : (account.ownedHorsesCount ?? 0);
+    if (account.role === 'HORSE_OWNER' && activeHorses > 0) {
+      return `This Owner currently has ${activeHorses} active horse(s) in the facility. All active horses must be discharged, transferred, or resolved before deactivation.`;
     }
     return null;
   };
@@ -228,7 +229,7 @@ export function AccountTable({
             <div className="space-y-3">
               <p>
                 You cannot deactivate <strong>{confirmToggle?.fullName}</strong> because they still have active{' '}
-                {confirmToggle?.role === 'HORSE_OWNER' ? 'horses' : 'assignments'}:
+                {confirmToggle?.role === 'HORSE_OWNER' ? 'active horses' : 'assignments'}:
               </p>
               <div className="p-3 rounded-lg bg-[var(--color-bg-warning-subtle,#fffbeb)] border border-[var(--color-border-warning,#fef3c7)] text-xs text-[var(--color-warning-text,#92400e)] font-medium leading-relaxed">
                  {blockingReason}
@@ -236,7 +237,7 @@ export function AccountTable({
               <p className="text-xs text-[var(--color-text-secondary)]">
                 Please{' '}
                 {confirmToggle?.role === 'HORSE_OWNER'
-                  ? 'discharge or transfer all horses'
+                  ? 'discharge or transfer all active horses'
                   : 'reassign or unassign these responsibilities'}{' '}
                 first before deactivating this account.
               </p>

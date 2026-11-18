@@ -57,7 +57,7 @@ function HealthRecordsContent() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [page, setPage] = useState(0);
-  const pageSize = 20;
+  const pageSize = 10;
 
   const [selectedHorseId, setSelectedHorseId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -236,7 +236,7 @@ function HealthRecordsContent() {
           (s) => s.status === 'SCHEDULED' || s.status === 'IN_PROGRESS',
         );
         const next = open.find((s) => s.purpose === 'FOLLOW_UP') ?? open[0];
-        setOpenFollowUp(next ? { id: next.id, scheduledAt: next.scheduledAt ?? null } : null);
+        setOpenFollowUp(next ? { id: next.id, scheduledAt: next.scheduledAt ?? next.scheduledDate ?? null } : null);
       })
       .catch(() => {
         if (!ignore) setOpenFollowUp(null);

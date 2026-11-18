@@ -208,6 +208,30 @@ class CareSchedulePreemptionTest {
         assertEquals(CareScheduleStatus.IN_PROGRESS, pausedExam.getStatus());
     }
 
+    @Test
+    @DisplayName("WF-01: quota INITIAL 2 ca/ngày — Vet có 2 ca nhập học ở ngày khác vẫn được giao ca nhập học mới")
+    void initialQuotaCountsOnlyToday() {
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(vet));
+        CareSchedule later1 = activeExam(10L, 1L, 101L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
+        later1.setScheduledDate(java.time.LocalDate.now().plusDays(3));
+        CareSchedule later2 = activeExam(11L, 1L, 102L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
+        later2.setScheduledDate(java.time.LocalDate.now().plusDays(4));
+        when(schedules.findByVeterinarianIdAndCareTypeAndStatusIn(1L, CareType.INITIAL, CareScheduleStatus.BOOKED_OR_ACTIVE))
+                .thenReturn(List.of(later1, later2));
+        CareSchedule initial = new CareSchedule();
+        initial.setId(900L);
+        initial.setHorseId(600L);
+        initial.setCareType(CareType.INITIAL);
+        initial.setStatus(CareScheduleStatus.SCHEDULED);
+        initial.setDurationMinutes(30);
+
+        service.assignRequestedSchedule(initial);
+
+        assertEquals(1L, initial.getVeterinarianId());
+    }
+
     private User eligibleVet(Long id) {
         Role role = new Role();
         role.setName("VETERINARIAN");
@@ -365,6 +389,36 @@ class CareSchedulePreemptionTest {
         verify(schedules, never()).delete(any());
         verify(notifications).sendAssignmentNotification(eq(1L), any(), eq(10L), eq(101L),
                 eq(NotificationTypes.CARE_SCHEDULE_PAUSED), any(), any());
+    }
+
+    @Test
+    @DisplayName("AD-035: URGENT của ngựa đang khám dở vẫn được gán; ca dở giữ nguyên IN_PROGRESS")
+    void urgentForHorseWithRunningExamIsStillAssigned() {
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(vet));
+
+        CareSchedule running = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        running.setScheduledAt(null);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenReturn(List.of(running));
+        when(schedules.findByHorseIdAndStatusIn(101L, List.of(CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of(running));
+        when(schedules.findByStatusInAndVeterinarianIdIsNotNull(anyList())).thenReturn(List.of(running));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of());
+        report(IncidentType.TRAUMA);
+
+        CareSchedule urgent = new CareSchedule();
+        urgent.setId(999L);
+        urgent.setHorseId(101L);
+        urgent.setCareType(CareType.URGENT);
+        urgent.setStatus(CareScheduleStatus.SCHEDULED);
+        urgent.setSourceIncidentId(500L);
+
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(1L, urgent.getVeterinarianId(), "ca URGENT phải có Vet ngay cả khi ngựa đang khám dở");
+        assertEquals(CareScheduleStatus.IN_PROGRESS, running.getStatus(), "ca đang khám không bị đổi trạng thái");
+        assertNull(running.getScheduledAt(), "ca đang khám không bị đổi giờ");
     }
 
     private User busyVet() {

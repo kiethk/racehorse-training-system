@@ -333,4 +333,56 @@ class AdmissionQueryServiceTest {
         when(stalls.findGroomIdsWithFreeQuarantineStall(List.of(7L))).thenReturn(List.of(7L));
         assertFalse(service.getAdmissionDetail(500L).isAssignedGroomFull());
     }
+
+    @Test
+    void detailExposesApprovalCapacityIncludingTheHorseAlreadyInQuarantine() {
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(600L);
+        app.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        app.setQuarantineStallId(99L);
+        when(admissions.findById(600L)).thenReturn(Optional.of(app));
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setName("Mercury");
+        when(candidates.findByAdmissionId(600L)).thenReturn(Optional.of(profile));
+        when(documents.findByAdmissionId(600L)).thenReturn(List.of());
+        StableStall qStall = new StableStall();
+        qStall.setId(99L);
+        qStall.setStallCode("Q-01");
+        when(stalls.findById(99L)).thenReturn(Optional.of(qStall));
+        when(stalls.findAllAvailableRegularStallsOrdered()).thenReturn(List.of());
+        when(stalls.countAvailableQuarantineStalls()).thenReturn(1L);
+        when(stalls.countAvailableRegularStalls()).thenReturn(5L);
+        when(stalls.countOccupiedQuarantineStalls()).thenReturn(5L);
+        when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(600L, CareType.INITIAL))
+                .thenReturn(Optional.empty());
+
+        AdmissionDetailResponse response = service.getAdmissionDetail(600L);
+
+        assertEquals(5L, response.getCapacity().requiredRegularStallsForApproval());
+        assertTrue(response.getCapacity().approvalCapacityAvailable());
+        assertFalse(response.getCapacity().admissionCapacityAvailable());
+    }
+
+    @Test
+    void detailApprovalCapacityAddsTheHorseWhenNoQuarantineStallIsLinked() {
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(601L);
+        app.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        when(admissions.findById(601L)).thenReturn(Optional.of(app));
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setName("Mercury");
+        when(candidates.findByAdmissionId(601L)).thenReturn(Optional.of(profile));
+        when(documents.findByAdmissionId(601L)).thenReturn(List.of());
+        when(stalls.findAllAvailableRegularStallsOrdered()).thenReturn(List.of());
+        when(stalls.countAvailableQuarantineStalls()).thenReturn(1L);
+        when(stalls.countAvailableRegularStalls()).thenReturn(5L);
+        when(stalls.countOccupiedQuarantineStalls()).thenReturn(5L);
+        when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(601L, CareType.INITIAL))
+                .thenReturn(Optional.empty());
+
+        AdmissionDetailResponse response = service.getAdmissionDetail(601L);
+
+        assertEquals(6L, response.getCapacity().requiredRegularStallsForApproval());
+        assertFalse(response.getCapacity().approvalCapacityAvailable());
+    }
 }

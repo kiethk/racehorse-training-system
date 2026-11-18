@@ -1,0 +1,68 @@
+# Windows-first: Git stores LF in the repository and checks text files out as CRLF.
+# This keeps Notepad/Visual Studio/PowerShell users happy without committing CRLF.
+* text=auto eol=crlf
+
+# These must stay LF even on Windows, otherwise they break on Linux/WSL/Docker.
+*.sh text eol=lf
+mvnw text eol=lf
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+Makefile text eol=lf
+package-lock.json text eol=lf
+.env* text eol=lf
+
+# Windows-native scripts: explicit for clarity (already covered by *).
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# Flyway checksums are content-sensitive. Do not rewrite migrations that have
+# already been applied to a database; keep their bytes exactly as committed.
+backend/src/main/resources/db/migration/** -text
+
+# Binary assets — never apply text conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.rar binary
+*.jar binary
+*.class binary
+*.pt binary
+*.onnx binary
+*.glb binary
+*.mp4 binary
+*.mov binary
+*.webm binary
+*.mp3 binary
+*.wav binary
+*.xls binary
+*.xlsx binary
+*.doc binary
+*.docx binary
+*.ppt binary
+*.pptx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.sqlite binary
+*.db binary
+*.dump binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary

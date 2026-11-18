@@ -13,8 +13,8 @@ export interface FleetDistributionWidgetProps {
 export function FleetDistributionWidget({ summary, horses = [] }: FleetDistributionWidgetProps) {
   const total = summary.totalHorses;
 
-  // Compute ready/idle athletes without double-counting those in training or on medical hold
-  const readyHorses = Math.max(0, summary.activeEligible - summary.inTraining - summary.medicalBlocked);
+  // Compute ready/idle athletes: inTraining + ready + medicalHold = totalFleet
+  const readyHorses = summary.totalHorses - summary.inTraining - summary.medicalBlocked;
 
   const readinessSegments: DonutSegment[] = [
     {
@@ -34,12 +34,6 @@ export function FleetDistributionWidget({ summary, horses = [] }: FleetDistribut
       label: 'Medical Hold',
       value: summary.medicalBlocked,
       color: '#f59e0b', // Amber 500
-    },
-    {
-      id: 'inactive',
-      label: 'Inactive',
-      value: summary.inactive,
-      color: '#94a3b8', // Slate 400
     },
   ];
 

@@ -16,5 +16,10 @@ export const accessControlService = {
   updateRolePermissions: async (roleId: number, data: RolePermissionUpdateRequest): Promise<RolePermissionSummary> => {
     const res = await apiPut<ApiResponseData<RolePermissionSummary>>(`/api/access-control/roles/${roleId}/permissions`, data);
     return res.data;
+  },
+
+  updateBulkRolePermissions: async (data: { roleId: number; permissionCodes: string[] }[]): Promise<RolePermissionSummary[]> => {
+    const res = await apiPut<ApiResponseData<RolePermissionSummary[]>>('/api/access-control/roles/permissions/bulk', data);
+    return res.data;
   }
 };

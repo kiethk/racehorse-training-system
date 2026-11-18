@@ -22,7 +22,6 @@ import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge'
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { ArrivalPhotosBlock } from '../shared/components/ArrivalPhotosBlock';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
-import { ManagerTrainerAssessmentTab } from '../shared/components/ManagerTrainerAssessmentTab';
 import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
 import { ManagerGroomReassignment } from './ManagerGroomReassignment';
 import { ReviewDue } from '../shared/components/ReviewDue';
@@ -120,7 +119,6 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     { id: 'overview', label: 'Overview' },
     { id: 'documents', label: 'Documents', count: detail.documents.length },
     { id: 'medical', label: 'Medical Findings' },
-    { id: 'trainer-assessment', label: 'Trainer Assessment' },
     { id: 'history', label: 'Review History' },
   ];
 
@@ -219,12 +217,12 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         )}
         <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
           <InfoRow
-            label="Trainer Readiness"
+            label="Trainer Feedback"
             value={
               detail.trainerFeedback ? (
-                'Assessment submitted'
+                detail.trainerFeedback
               ) : detail.trainerId ? (
-                <span className="italic text-[var(--color-text-muted)]">Awaiting trainer evaluation</span>
+                <span className="italic text-[var(--color-text-muted)]">Awaiting trainer feedback</span>
               ) : (
                 <span className="italic text-[var(--color-text-muted)]">Pending trainer assignment</span>
               )
@@ -234,9 +232,6 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
             label="Assigned Trainer"
             value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'CLUB_MANAGER') : null}>{detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : null)}</EntityLink>}
           />
-          {detail.trainerFeedback && (
-            <InfoRow label="Trainer Notes" value={detail.trainerFeedback} />
-          )}
         </div>
       </AdmissionInfoSection>
     </div>
@@ -301,13 +296,13 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         
         {detail.trainerReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
-            <InfoGroupTitle>Trainer Readiness Assessment</InfoGroupTitle>
+            <InfoGroupTitle>Trainer Feedback</InfoGroupTitle>
             <InfoRow
-              label="Assessed by"
+              label="Reviewed by"
               value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'CLUB_MANAGER') : null}>{detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : 'Assigned Trainer')}</EntityLink>}
             />
-            <InfoRow label="Assessed At" value={datetime(detail.trainerReviewedAt)} />
-            {detail.trainerFeedback && <InfoRow label="Assessment Notes" value={detail.trainerFeedback} />}
+            <InfoRow label="Reviewed At" value={datetime(detail.trainerReviewedAt)} />
+            {detail.trainerFeedback && <InfoRow label="Feedback" value={detail.trainerFeedback} />}
           </div>
         )}
 
@@ -348,12 +343,6 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
               {activeTab === 'overview' && renderOverview()}
               {activeTab === 'documents' && renderDocuments()}
               {activeTab === 'medical' && renderMedical()}
-              {activeTab === 'trainer-assessment' && (
-                <ManagerTrainerAssessmentTab
-                  admissionId={admissionId}
-                  trainerName={detail.trainerName}
-                />
-              )}
               {activeTab === 'history' && renderHistory()}
             </div>
           </div>

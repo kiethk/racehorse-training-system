@@ -20,15 +20,11 @@ interface AuditLogExportModalProps {
 type ExportMode = 'current_filter' | 'all' | 'custom';
 
 function parseLocalDateStart(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
-  return date.toISOString();
+  return `${dateStr}T00:00:00`;
 }
 
 function parseLocalDateEnd(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d, 23, 59, 59, 999);
-  return date.toISOString();
+  return `${dateStr}T23:59:59`;
 }
 
 export function AuditLogExportModal({
@@ -79,12 +75,10 @@ export function AuditLogExportModal({
 
       if (mode === 'current_filter') {
         if (currentFilters.from) {
-          fromIso = new Date(currentFilters.from).toISOString();
+          fromIso = currentFilters.from.includes('T') ? currentFilters.from : `${currentFilters.from}T00:00:00`;
         }
         if (currentFilters.to) {
-          const t = new Date(currentFilters.to);
-          t.setHours(23, 59, 59, 999);
-          toIso = t.toISOString();
+          toIso = currentFilters.to.includes('T') ? currentFilters.to : `${currentFilters.to}T23:59:59`;
         }
       } else if (mode === 'custom') {
         if (!fromDate && !toDate) {

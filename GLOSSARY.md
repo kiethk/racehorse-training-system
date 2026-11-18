@@ -33,11 +33,11 @@ The state of a Held Workout once its results are recorded; the recorded results 
 _Avoid_: Attended, present, completed
 
 **Cancel**:
-Withdrawing a Session, one horse's Workout, or a whole Course Run before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone.
+Withdrawing a Session, one horse's Workout, or a whole Course Run before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone. A cancelled Workout is not shown anywhere: not among a Session's horses, not on the horse's own calendar, and a horse with no Workout left in a Course Run is not listed in it.
 _Avoid_: Skip, postpone
 
 **Did not run**:
-A mark set on a Held Workout whose horse did not actually take part; the Workout becomes cancelled. No reason is given: a horse unfit to train is blocked by the Vet instead.
+A mark set on a Held Workout whose horse did not actually take part; the Workout becomes cancelled. No reason is given: a horse unfit to train is blocked by the Vet instead. Once marked, the horse disappears from that Session like any other cancelled Workout, and nothing tells it apart from a Workout cancelled before the Session.
 _Avoid_: No-show, absent
 
 **Golden Window**:
@@ -49,7 +49,7 @@ How many of a Course Run's Sessions have been Held, shown against all the Sessio
 _Avoid_: Completion rate
 
 **Attendance**:
-How many of a Course Run's Sessions a horse took part in (its Workouts that Ran), shown against the same total as the Course Run progress (for example 4 of 10). Sessions from before the horse joined, and Sessions or Workouts that were cancelled, stay in the total: the horse simply goes on with its group.
+How many of a Course Run's Sessions a horse took part in (its Workouts that Ran), shown against the same total as the Course Run progress (for example 4 of 10). Sessions from before the horse joined, and Sessions or Workouts that were cancelled, stay in the total: the horse simply goes on with its group. A Course Run in which all of a horse's Workouts were cancelled is not listed for that horse.
 _Avoid_: Presence
 
 **Course**:
@@ -97,6 +97,10 @@ A Quarantine Groom with no free quarantine stall left. A Full Groom can still re
 The number of horses in a Groom's stalls plus the Admissions assigned to that Groom that are still waiting for the Groom's decision. The lower it is, the sooner the Groom gets the next Admission. On a tie, the Groom who last confirmed a horse's arrival longest ago (or never) goes first.
 _Avoid_: Load, capacity
 
+**Regular-stall reserve**:
+The free regular stalls that must cover every horse in quarantine and any horse about to enter it. A Groom may approve a new admission only when one more regular stall is free than the horses already in quarantine; a Manager may approve a horse out of quarantine only when the free regular stalls still cover every horse there, the approved horse included.
+_Avoid_: Buffer, spare capacity
+
 **Reassignment**:
 Handing an Admission in Groom review from its Assigned Groom to the Quarantine Groom with the next lowest Groom Workload who has not had it yet, because the Assigned Groom did not decide within 72 hours of being assigned, became Full, was deactivated or no longer looks after a quarantine stall. The 72 hours are counted around the clock and restart with every Reassignment. Once every Quarantine Groom has had it, the rotation starts again from the lowest Groom Workload. The Manager can also reassign an Admission by hand to any Quarantine Groom. The new Assigned Groom, the previous one and the Manager are told every time.
 _Avoid_: Escalation, transfer
@@ -104,3 +108,7 @@ _Avoid_: Escalation, transfer
 **Review Due**:
 The moment, 72 hours after the latest assignment, when an Admission still waiting for its Assigned Groom's decision is reassigned. Shown to the Groom and the Manager.
 _Avoid_: Deadline, SLA
+
+**Trainer Feedback**:
+The written opinion the Trainer assigned to an Admission gives on the candidate horse after the vet's examination. It is required, it is plain text with no scores or ratings, and handing it in moves the Admission on to Manager review. The Manager and the Owner read it as it was written.
+_Avoid_: Racing readiness assessment, readiness score, evaluation

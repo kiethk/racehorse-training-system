@@ -29,6 +29,9 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
     @Query("SELECT h.ownerId, COUNT(h.id) FROM Horse h WHERE h.ownerId IS NOT NULL GROUP BY h.ownerId")
     List<Object[]> countHorsesGroupedByOwner();
 
+    @Query("SELECT h.ownerId, COUNT(h.id) FROM Horse h WHERE h.ownerId IS NOT NULL AND (h.currentStallId IS NOT NULL OR h.currentStatus = 'ELIGIBLE') GROUP BY h.ownerId")
+    List<Object[]> countActiveHorsesGroupedByOwner();
+
     List<Horse> findByCurrentStatusInOrderByNameAsc(Collection<HorseStatus> statuses);
     List<Horse> findByRegistrationNumber(String registrationNumber);
 

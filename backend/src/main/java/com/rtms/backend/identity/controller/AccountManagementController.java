@@ -39,7 +39,7 @@ public class AccountManagementController {
     @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<AccountDetailResponse> updateAccount(
             @PathVariable Long id,
-            @RequestBody StaffUpdateRequest request) {
+            @Valid @RequestBody StaffUpdateRequest request) {
         return ApiResponse.success(accountManagementService.updateAccount(id, request));
     }
 

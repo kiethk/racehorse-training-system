@@ -52,7 +52,6 @@ final class AiToolHandlerFactory {
                 CourseRunRepository courseRunRepository,
                 HorseSpecialtyService horseSpecialtyService,
                 HorsePerformanceService horsePerformanceService,
-                RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
                 AreaRepository areaRepository,
                 UserRepository userRepository,
                 CourseRepository courseRepository,
@@ -105,7 +104,6 @@ final class AiToolHandlerFactory {
                 handlers.add(new GetTrainerPlansSummaryTool(courseRunRepository, horseAttendanceService, courseRepository, support));
                 handlers.add(new GetHorseSpecialtyAnalysisTool(horseRepository, horseSpecialtyService, trainingWorkoutRepository, support));
                 handlers.add(new GetTrainerRiskAlertsTool(horseRepository, horsePerformanceService, support));
-                handlers.add(new GetRacingReadinessAssessmentTool(racingReadinessAssessmentRepository, userRepository, support));
                 handlers.add(new GetTrainerAssignedGroomsTool(areaRepository, stableStallRepository, horseRepository, userRepository, support));
                 handlers.add(new GetAssignedAdmissionReviewsTool(admissionApplicationRepository, candidateHorseProfileRepository, userRepository, support));
                 handlers.add(new GetCourseCurriculumOverviewTool(courseRepository, exerciseRepository));

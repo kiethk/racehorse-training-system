@@ -99,6 +99,10 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
             int attended = (int) courseRunWorkouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.RAN).count();
             long tookPlace = attended + courseRunWorkouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count();
             long scheduled = courseRunWorkouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.SCHEDULED).count();
+            // Ngựa không còn Workout nào (đã bị hủy hết) thì không hiện khóa này. (A course run where all the horse's Workouts were cancelled is not listed.)
+            if (scheduled + tookPlace == 0) {
+                continue;
+            }
 
             String effectiveStatus;
             if (courseRun.getStatus() == CourseRunStatus.CANCELLED) {
@@ -107,10 +111,8 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
                 effectiveStatus = CourseRunStatus.COMPLETED.name();
             } else if (scheduled > 0) {
                 effectiveStatus = courseRun.getStatus().name();
-            } else if (tookPlace > 0) {
-                effectiveStatus = CourseRunStatus.COMPLETED.name();
             } else {
-                effectiveStatus = CourseRunStatus.CANCELLED.name();
+                effectiveStatus = CourseRunStatus.COMPLETED.name();
             }
 
             Map<SessionStatus, Long> byStatus = counts.getOrDefault(courseRun.getId(), Map.of());

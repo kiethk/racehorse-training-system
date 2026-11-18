@@ -77,7 +77,6 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("recommendTrainerStrategy"));
 
         // Verify backward-compatible aliases
-        assertTrue(registryService.isToolAllowedForRole("getRacingReadinessAssessment", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("analyzeWorkoutLoadAndOvertrainingRisk", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("recommendOptimalRaceDistanceAndTrack", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("recommendNextWorkoutAdjustment", "HEAD_TRAINER"));

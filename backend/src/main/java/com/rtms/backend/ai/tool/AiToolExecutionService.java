@@ -5,11 +5,6 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.ai.rag.service.ClinicalRetrievalService;
 import com.rtms.backend.ai.tool.handler.AiToolHandler;
-import com.rtms.backend.ai.tool.handler.groom.*;
-import com.rtms.backend.ai.tool.handler.manager.*;
-import com.rtms.backend.ai.tool.handler.owner.*;
-import com.rtms.backend.ai.tool.handler.trainer.*;
-import com.rtms.backend.ai.tool.handler.vet.*;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.repository.HorsePedigreeRepository;
@@ -84,7 +79,6 @@ public class AiToolExecutionService {
             CourseRunRepository courseRunRepository,
             HorseSpecialtyService horseSpecialtyService,
             HorsePerformanceService horsePerformanceService,
-            RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
             AreaRepository areaRepository,
             UserRepository userRepository,
             CourseRepository courseRepository,
@@ -118,7 +112,6 @@ public class AiToolExecutionService {
                 courseRunRepository,
                 horseSpecialtyService,
                 horsePerformanceService,
-                racingReadinessAssessmentRepository,
                 areaRepository,
                 userRepository,
                 courseRepository,

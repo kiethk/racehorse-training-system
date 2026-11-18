@@ -1,4 +1,6 @@
 package com.rtms.backend.identity.service;
+
+import java.time.LocalDate;
 import com.rtms.backend.identity.entity.GroomProfile;
 import com.rtms.backend.identity.entity.Role;
 import com.rtms.backend.identity.entity.TrainerProfile;
@@ -338,6 +340,9 @@ public class StaffManagementService {
                     }
                     vetProfile.setLicenseNumber(cleanedLicense);
                 }
+                if (request.getLicenseIssuedDate() != null && request.getLicenseIssuedDate().isAfter(LocalDate.now())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "License issued date cannot be in the future");
+                }
                 vetProfile.setLicenseIssuedDate(request.getLicenseIssuedDate());
                 vetProfile.setSpecialization(request.getSpecialization());
                 vetProfileRepository.save(vetProfile);
@@ -351,6 +356,9 @@ public class StaffManagementService {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "Certification number already in use");
                     }
                     trainerProfile.setCertificationNumber(cleanedCert);
+                }
+                if (request.getCertificationIssuedDate() != null && request.getCertificationIssuedDate().isAfter(LocalDate.now())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Certification issued date cannot be in the future");
                 }
                 trainerProfile.setCertificationIssuedDate(request.getCertificationIssuedDate());
                 trainerProfileRepository.save(trainerProfile);

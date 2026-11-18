@@ -113,3 +113,15 @@ backend/docs/*
 !backend/docs/STABLE_AREA_LIFECYCLE.md
 .worktrees/
 
+# Graphify
+graphify-out/
+.graphify/
+.graphify_labels.json*
+
+# Playwright (reports, traces, saved login sessions; test-results/ is ignored above)
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+.env.test
+diagram/
