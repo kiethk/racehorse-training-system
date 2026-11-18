@@ -1,9 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CHART_PALETTE } from '../lib/chartUtils.ts';
 import { getQuickPromptsByRole, clampDialogPosition, getPopupPositionFromFab, checkRectsOverlap } from '../lib/aiUtils.ts';
+
+function resolveSourcePath(relativePath: string): string {
+  const directPath = resolve(process.cwd(), relativePath);
+  if (existsSync(directPath)) return directPath;
+  return resolve(process.cwd(), 'frontend', relativePath);
+}
 
 describe('AI Chat Upgraded Features & Logic Tests', () => {
   it('CHART_PALETTE is aligned with RTMS Brand Tokens (#6657c7 primary)', () => {
@@ -164,9 +170,9 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
   });
 
   it('renders markdown tables according to natural content width with horizontal slider and no word breakage', () => {
-    const markdownSourcePath = resolve(process.cwd(), 'src/features/ai/components/MarkdownMessage.tsx');
+    const markdownSourcePath = resolveSourcePath('src/features/ai/components/MarkdownMessage.tsx');
     const sourceCode = readFileSync(markdownSourcePath, 'utf-8');
-    const tablePrimitivePath = resolve(process.cwd(), 'src/components/ui/Table.tsx');
+    const tablePrimitivePath = resolveSourcePath('src/components/ui/Table.tsx');
     const tablePrimitiveCode = readFileSync(tablePrimitivePath, 'utf-8');
 
     // The shared Table primitive provides horizontal scrolling.
@@ -208,9 +214,9 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
     });
 
     it('wires header drag handlers to the hook and preserves drag affordances', () => {
-      const widgetPath = resolve(process.cwd(), 'src/features/ai/components/AiChatWidget.tsx');
+      const widgetPath = resolveSourcePath('src/features/ai/components/AiChatWidget.tsx');
       const widgetCode = readFileSync(widgetPath, 'utf-8');
-      const hookPath = resolve(process.cwd(), 'src/features/ai/hooks/useChatWindowDrag.ts');
+      const hookPath = resolveSourcePath('src/features/ai/hooks/useChatWindowDrag.ts');
       const hookCode = readFileSync(hookPath, 'utf-8');
 
       assert.ok(widgetCode.includes('onPointerDown={handleHeaderPointerDown}'), 'Must attach onPointerDown on header');
@@ -265,9 +271,9 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
     });
 
     it('AiChatWidget source implements round FAB dragging with unified anchor and click-suppression', () => {
-      const widgetPath = resolve(process.cwd(), 'src/features/ai/components/AiChatWidget.tsx');
+      const widgetPath = resolveSourcePath('src/features/ai/components/AiChatWidget.tsx');
       const widgetCode = readFileSync(widgetPath, 'utf-8');
-      const hookPath = resolve(process.cwd(), 'src/features/ai/hooks/useChatWindowDrag.ts');
+      const hookPath = resolveSourcePath('src/features/ai/hooks/useChatWindowDrag.ts');
       const hookCode = readFileSync(hookPath, 'utf-8');
 
       assert.ok(widgetCode.includes('onPointerDown={handleFabPointerDown}'), 'FAB must attach handleFabPointerDown');

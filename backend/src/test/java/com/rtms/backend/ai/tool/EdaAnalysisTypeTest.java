@@ -49,8 +49,8 @@ class EdaAnalysisTypeTest {
 
         expectedModes.forEach((role, modes) -> {
             assertEquals(modes, EdaAnalysisType.allowedForRole(role), role + " EDA modes");
-            assertEquals(expectedToolCounts.get(role), registry.getToolsForRole(role).size() + 1,
-                    role + " tool count after adding the EDA tool");
+            assertEquals(expectedToolCounts.get(role), registry.getToolsForRole(role).size(),
+                    role + " tool count");
         });
 
         assertEquals(expectedModes.get("CLUB_MANAGER"), EdaAnalysisType.allowedForRole("ADMIN"));

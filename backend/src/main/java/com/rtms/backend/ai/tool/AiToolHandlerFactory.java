@@ -29,7 +29,11 @@ import com.rtms.backend.training.service.*;
 
 import java.util.*;
 
-/** Builds the handler list for the backwards-compatible constructor. */
+/**
+ * Builds the handler list for the backwards-compatible constructor.
+ * @deprecated Legacy test factory. Use Spring DI or inject mock handlers directly.
+ */
+@Deprecated(forRemoval = false)
 final class AiToolHandlerFactory {
     private AiToolHandlerFactory() {
     }

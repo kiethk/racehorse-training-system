@@ -229,7 +229,7 @@ public class AgentOrchestratorService {
                     result = Map.of(
                             "status", "ERROR",
                             "error", e.getMessage() != null ? e.getMessage() : "Tool execution failed",
-                            "huongDanAI", "The tool encountered an error or is missing parameters. First, look up any missing parameters using the relevant directory or listing tool, or politely explain the issue to the user."
+                            "aiGuidance", "The tool encountered an error or is missing parameters. First, look up any missing parameters using the relevant directory or listing tool, or politely explain the issue to the user."
                     );
                 }
 

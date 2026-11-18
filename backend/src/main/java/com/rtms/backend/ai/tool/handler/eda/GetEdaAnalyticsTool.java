@@ -87,8 +87,22 @@ public class GetEdaAnalyticsTool implements AiToolHandler {
     }
 
     private Long resolveHorseId(Map<String, Object> args) {
-        if (!hasValue(args.get("horseId")) && !hasValue(args.get("horseName"))) {
+        Object horseId = args.get("horseId");
+        if (!hasValue(horseId) && !hasValue(args.get("horseName"))) {
             throw invalidArguments("A horseId or horseName is required");
+        }
+        if (hasValue(horseId)) {
+            try {
+                if (horseId instanceof Number number) {
+                    new BigDecimal(number.toString()).longValueExact();
+                } else if (horseId instanceof String text) {
+                    Long.parseLong(text.trim());
+                } else {
+                    throw new NumberFormatException();
+                }
+            } catch (NumberFormatException | ArithmeticException exception) {
+                throw invalidArguments("horseId must be a signed 64-bit integer");
+            }
         }
 
         Horse horse = support.resolveHorse(args);

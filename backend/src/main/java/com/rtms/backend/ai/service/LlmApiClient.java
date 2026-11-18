@@ -31,9 +31,9 @@ public class LlmApiClient {
 
     @Autowired
     public LlmApiClient(
-            @Value("${app.ai.base-url:https://api.openai.com/v1}") String aiBaseUrl,
-            @Value("${app.ai.api-key:}") String aiApiKey,
-            @Value("${app.ai.model:gpt-4o-mini}") String aiModel,
+            @Value("${ai.api.base-url:${groq.api.base-url:https://api.openai.com/v1}}") String aiBaseUrl,
+            @Value("${ai.api.key:${groq.api.key:}}") String aiApiKey,
+            @Value("${ai.api.model:${groq.api.model:gpt-4o-mini}}") String aiModel,
             ObjectMapper objectMapper
     ) {
         this(aiBaseUrl, aiApiKey, aiModel, objectMapper, HttpClient.newBuilder()

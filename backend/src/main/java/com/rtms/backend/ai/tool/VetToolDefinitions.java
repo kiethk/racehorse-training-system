@@ -3,6 +3,8 @@ package com.rtms.backend.ai.tool;
 import java.util.List;
 import java.util.Map;
 
+import com.rtms.backend.ai.tool.handler.eda.EdaAnalysisType;
+
 /** Role-scoped AI tool definitions for VETERINARIAN. */
 final class VetToolDefinitions {
     private VetToolDefinitions() {
@@ -90,6 +92,30 @@ final class VetToolDefinitions {
                                                 "horseId", Map.of("type", "integer", "description", "Horse ID (optional)"),
                                                 "horseName", Map.of("type", "string", "description", "Horse name (optional)")
                                         ))
+                                ),
+                                new AiToolDefinition(
+                                        "getEdaAnalytics",
+                                        "Perform exploratory data analysis on horse performance, biomedical, and survival data.",
+                                        ToolDefinitionSchema.buildParamSchema(Map.of(
+                                                "analysisType", Map.of(
+                                                        "type", "string",
+                                                        "enum", EdaAnalysisType.allowedForRole("VETERINARIAN").stream().map(Enum::name).toList(),
+                                                        "description", "Required analysis mode: HORSE_PERFORMANCE, BIO_SPC, or SURVIVAL"
+                                                ),
+                                                "horseId", Map.of("type", "integer", "description", "Horse ID for individual horse analyses (optional)"),
+                                                "horseName", Map.of("type", "string", "description", "Horse name for individual horse analyses (optional)"),
+                                                "days", Map.of("type", "integer", "description", "Lookback period in days when supported by the analysis (optional)"),
+                                                "metric", Map.of(
+                                                        "type", "string",
+                                                        "enum", List.of("TEMPERATURE", "RESTING_HEART_RATE"),
+                                                        "description", "BIO_SPC metric: TEMPERATURE or RESTING_HEART_RATE (optional)"
+                                                ),
+                                                "stratifyBy", Map.of(
+                                                        "type", "string",
+                                                        "enum", List.of("SEVERITY", "BODY_ZONE"),
+                                                        "description", "Survival analysis grouping: SEVERITY or BODY_ZONE (optional)"
+                                                )
+                                        ), "analysisType")
                                 )
         );
     }

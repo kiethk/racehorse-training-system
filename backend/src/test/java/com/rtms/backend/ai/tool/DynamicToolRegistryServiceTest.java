@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.rtms.backend.ai.tool.handler.eda.EdaAnalysisType;
+
 import java.util.List;
 import java.util.Map;
 
@@ -36,30 +38,30 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("Cognitive Sweet Spot limit: at most 12 tools per role, and 11 for the Trainer")
+    @DisplayName("Cognitive Sweet Spot limit: at most 12 tools per role")
     void testCognitiveSweetSpotToolLimits() {
         List<AiToolDefinition> ownerTools = registryService.getToolsForRole("HORSE_OWNER");
-        assertEquals(9, ownerTools.size(), "HORSE_OWNER must have exactly 9 tools (<= 12)");
+        assertEquals(10, ownerTools.size(), "HORSE_OWNER must have exactly 10 tools (<= 12)");
 
         List<AiToolDefinition> groomTools = registryService.getToolsForRole("GROOM");
-        assertEquals(8, groomTools.size(), "GROOM must have exactly 8 tools (<= 12)");
+        assertEquals(9, groomTools.size(), "GROOM must have exactly 9 tools (<= 12)");
 
         List<AiToolDefinition> trainerTools = registryService.getToolsForRole("HEAD_TRAINER");
-        assertEquals(11, trainerTools.size(), "HEAD_TRAINER must have exactly 11 tools");
+        assertEquals(12, trainerTools.size(), "HEAD_TRAINER must have exactly 12 tools (<= 12)");
 
         List<AiToolDefinition> vetTools = registryService.getToolsForRole("VETERINARIAN");
-        assertEquals(11, vetTools.size(), "VETERINARIAN must have exactly 11 tools (<= 12)");
+        assertEquals(12, vetTools.size(), "VETERINARIAN must have exactly 12 tools (<= 12)");
 
         List<AiToolDefinition> managerTools = registryService.getToolsForRole("CLUB_MANAGER");
-        assertEquals(10, managerTools.size(), "CLUB_MANAGER must have exactly 10 tools (<= 12)");
+        assertEquals(11, managerTools.size(), "CLUB_MANAGER must have exactly 11 tools (<= 12)");
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER has 11 tools, including Training Group, and supports backward-compatible aliases")
+    @DisplayName("HEAD_TRAINER has 12 tools, including Training Group, and supports backward-compatible aliases")
     void testHeadTrainerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("HEAD_TRAINER");
         assertNotNull(tools);
-        assertEquals(11, tools.size());
+        assertEquals(12, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getTrainerHorses"));
@@ -88,11 +90,11 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("VETERINARIAN has 11 optimized tools and supports backward-compatible aliases")
+    @DisplayName("VETERINARIAN has 12 optimized tools and supports backward-compatible aliases")
     void testVeterinarianTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("VETERINARIAN");
         assertNotNull(tools);
-        assertEquals(11, tools.size());
+        assertEquals(12, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("searchClinicalKnowledge"));
@@ -122,11 +124,11 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("HORSE_OWNER is 100% read-only and has 9 optimized tools")
+    @DisplayName("HORSE_OWNER is 100% read-only and has 10 optimized tools")
     void testHorseOwnerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("HORSE_OWNER");
         assertNotNull(tools);
-        assertEquals(9, tools.size());
+        assertEquals(10, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getMyHorses"));
@@ -145,11 +147,11 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("GROOM has 8 optimized tools after consolidating getDailyGroomTasks into getTodayAggregatedTasks")
+    @DisplayName("GROOM has 9 optimized tools after consolidating getDailyGroomTasks into getTodayAggregatedTasks")
     void testGroomTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("GROOM");
         assertNotNull(tools);
-        assertEquals(8, tools.size());
+        assertEquals(9, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getMyAssignedHorses"));
@@ -168,11 +170,11 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("CLUB_MANAGER has 10 optimized tools after consolidating admission tools")
+    @DisplayName("CLUB_MANAGER has 11 optimized tools after consolidating admission tools")
     void testClubManagerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("CLUB_MANAGER");
         assertNotNull(tools);
-        assertEquals(10, tools.size());
+        assertEquals(11, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getStableOccupancyMetrics"));
@@ -248,6 +250,53 @@ class DynamicToolRegistryServiceTest {
                 assertNotNull(fn.get("description"), "Tool description must not be null for role " + role);
                 assertNotNull(fn.get("parameters"), "Tool parameters must not be null for role " + role);
             }
+        }
+    }
+
+    @Test
+    @DisplayName("Each role exposes one getEdaAnalytics function with only its allowed analysis modes")
+    void testEdaAnalyticsToolIsRoleScopedWithAllowedModes() {
+        Map<String, List<String>> expectedModes = Map.of(
+                "HORSE_OWNER", List.of("HORSE_PERFORMANCE", "BIO_SPC"),
+                "HEAD_TRAINER", List.of("FLEET_PERFORMANCE", "HORSE_PERFORMANCE", "BIO_SPC"),
+                "VETERINARIAN", List.of("HORSE_PERFORMANCE", "BIO_SPC", "SURVIVAL"),
+                "GROOM", List.of("BIO_SPC"),
+                "CLUB_MANAGER", List.of(
+                        "FLEET_PERFORMANCE",
+                        "HORSE_PERFORMANCE",
+                        "BIO_SPC",
+                        "SURVIVAL",
+                        "MANAGER_OVERVIEW",
+                        "ADMISSION_FUNNEL",
+                        "TRAINER_PERFORMANCE"
+                )
+        );
+
+        for (Map.Entry<String, List<String>> entry : expectedModes.entrySet()) {
+            String role = entry.getKey();
+            List<String> allowedModes = EdaAnalysisType.allowedForRole(role).stream()
+                    .map(Enum::name)
+                    .toList();
+            assertEquals(entry.getValue(), allowedModes, "Unexpected EDA access modes for " + role);
+
+            List<AiToolDefinition> edaTools = registryService.getToolsForRole(role).stream()
+                    .filter(tool -> tool.name().equals("getEdaAnalytics"))
+                    .toList();
+            assertEquals(1, edaTools.size(), role + " must expose exactly one getEdaAnalytics function");
+
+            Map<?, ?> parameters = edaTools.get(0).parameters();
+            Map<?, ?> properties = (Map<?, ?>) parameters.get("properties");
+            Map<?, ?> analysisType = (Map<?, ?>) properties.get("analysisType");
+            assertEquals("string", analysisType.get("type"));
+            assertEquals(allowedModes, analysisType.get("enum"), role + " analysisType enum must match its allowed modes");
+            assertEquals(List.of("analysisType"), parameters.get("required"));
+            assertEquals("integer", ((Map<?, ?>) properties.get("horseId")).get("type"));
+            assertEquals("string", ((Map<?, ?>) properties.get("horseName")).get("type"));
+            assertEquals("integer", ((Map<?, ?>) properties.get("days")).get("type"));
+            assertEquals(List.of("TEMPERATURE", "RESTING_HEART_RATE"),
+                    ((Map<?, ?>) properties.get("metric")).get("enum"));
+            assertEquals(List.of("SEVERITY", "BODY_ZONE"),
+                    ((Map<?, ?>) properties.get("stratifyBy")).get("enum"));
         }
     }
 }

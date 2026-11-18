@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronRight, AlertCircle, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { getEdaToolLabel } from '../lib/edaToolLabels';
 
 const TOOL_LABELS: Record<string, string> = {
   getHorsesList: 'Retrieve horses list',
@@ -139,6 +140,13 @@ export function AiToolExecutionSteps({
               const toolName = String(tool.tool || tool.name || `Tool ${idx + 1}`);
               const isError = tool.status === 'ERROR' || Boolean(tool.error);
               const errorMessage = typeof tool.error === 'string' ? tool.error : null;
+              const analysisType =
+                tool.arguments && typeof tool.arguments === 'object'
+                  ? (tool.arguments as Record<string, unknown>).analysisType
+                  : undefined;
+              const toolLabel = toolName === 'getEdaAnalytics'
+                ? getEdaToolLabel(analysisType) ?? 'Analyze EDA data'
+                : formatToolName(toolName);
               const argsSummary = formatToolArgs(tool.arguments || tool.input);
               const resultCount =
                 !isError && Array.isArray(tool.result)
@@ -159,7 +167,7 @@ export function AiToolExecutionSteps({
                   )}
                   <div className="min-w-0">
                     <p className="font-medium text-[var(--color-text-primary)]">
-                      {formatToolName(toolName)}
+                      {toolLabel}
                     </p>
                     {detailText && (
                       <p className="text-[11px] text-[var(--color-text-secondary)] truncate max-w-[280px] sm:max-w-[400px]">

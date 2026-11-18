@@ -66,7 +66,9 @@ public class AiToolExecutionService {
 
     /**
      * Backward-compatible constructor for unit tests that do not load the Spring context.
+     * @deprecated Use the Spring DI constructor {@link #AiToolExecutionService(DynamicToolRegistryService, List)} instead.
      */
+    @Deprecated(forRemoval = false)
     public AiToolExecutionService(
             DynamicToolRegistryService toolRegistryService,
             ClinicalRetrievalService clinicalRetrievalService,

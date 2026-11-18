@@ -99,10 +99,7 @@ export function AiMessageList({
                   {msg.content}
                 </p>
                 <span className="mt-1 pr-2 text-[10px] text-[var(--color-text-secondary)]">
-                  {new Date(msg.timestamp).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatClockLabel(msg.timestamp)}
                 </span>
               </div>
             );
