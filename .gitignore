@@ -69,6 +69,7 @@ backend/src/main/resources/application-local.properties
 .sdd/
 .kombai/
 .agents/
+.superpowers/
 .trail/
 .claude/
 .playwright-mcp/
@@ -77,6 +78,7 @@ skills-lock.json
 /IDEA.md
 /GEMINI.md
 /gemini.md
+**/graft/
 
 # OS Artifacts & Logs
 *.log
