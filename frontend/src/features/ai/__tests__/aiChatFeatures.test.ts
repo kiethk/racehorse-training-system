@@ -284,5 +284,17 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
       assert.ok(hookCode.includes('setAnchor'), 'Must use unified setAnchor to keep FAB and Popup in sync');
       assert.ok(widgetCode.includes('dialogPosition'), 'Must derive dialogPosition directly from unified anchor');
     });
+
+    it('AiChatInputBar textarea removes inner bounding box and border to integrate into outer form pill', () => {
+      const inputBarPath = resolveSourcePath('src/features/ai/components/AiChatInputBar.tsx');
+      const inputBarCode = readFileSync(inputBarPath, 'utf-8');
+
+      // The textarea must override controlClassName border & rings so no nested box is rendered
+      assert.ok(inputBarCode.includes('border-0'), 'Textarea must have border-0 to eliminate inner border');
+      assert.ok(inputBarCode.includes('border-transparent'), 'Textarea must have border-transparent');
+      assert.ok(inputBarCode.includes('focus-visible:border-transparent'), 'Textarea must prevent inner focus border');
+      assert.ok(inputBarCode.includes('focus-visible:ring-0'), 'Textarea must prevent inner focus ring');
+      assert.ok(inputBarCode.includes('max-h-[160px]'), 'Textarea max height class must match 160px JS clamp');
+    });
   });
 });

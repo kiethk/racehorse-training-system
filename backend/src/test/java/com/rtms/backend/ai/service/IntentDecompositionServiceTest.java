@@ -1,6 +1,7 @@
 package com.rtms.backend.ai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rtms.backend.ai.dto.AiChatMessageDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -276,5 +277,244 @@ class IntentDecompositionServiceTest {
             assertTrue(result.hasOutOfDomain(), "Must have out-of-domain for: " + query);
             assertTrue(result.isPureOutOfDomain(), "Must be pure OOD for: " + query);
         }
+    }
+
+    @Test
+    @DisplayName("Fast-path regex: Vietnamese greetings do not trigger an HTTP call to the LLM")
+    void testFastPath_VietnameseGreetings_NoHttpCall() throws Exception {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "test-api-key",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        for (String greeting : List.of("xin chào", "chào bạn", "chào", "chào bạn nhé", "chào buổi sáng", "cảm ơn", "cảm ơn bạn nhé", "tạm biệt", "bạn là ai", "bạn có thể giúp gì cho tôi", "what can you do")) {
+            IntentDecompositionService.DecomposedIntents result = service.decompose(greeting, "HORSE_OWNER");
+            assertNotNull(result);
+            assertTrue(result.hasInDomain(), "Greeting must be in-domain: " + greeting);
+            assertFalse(result.hasOutOfDomain(), "Greeting must not be OOD: " + greeting);
+            assertEquals(greeting.trim(), result.inDomainIntents().get(0));
+        }
+
+        verify(httpClient, never()).send(any(HttpRequest.class), any());
+    }
+
+    @Test
+    @DisplayName("Fast-path regex: Language switch and conversational directives are immediately in-domain without HTTP call")
+    void testFastPath_ConversationalDirectives_NoHttpCall() throws Exception {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "test-api-key",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        List<String> directives = List.of(
+                "Trả lời tiếng Việt",
+                "Trả lời bằng tiếng Việt",
+                "Nói tiếng Việt",
+                "tiếng Việt",
+                "Reply in Vietnamese",
+                "Please reply in Vietnamese",
+                "switch to Vietnamese",
+                "switch to English",
+                "in Vietnamese",
+                "bằng tiếng Việt",
+                "Trả lời tiếng Việt nha",
+                "Nói tiếng Việt giúp tôi",
+                "Xin chào, hãy trả lời bằng tiếng Việt nhé",
+                "Định dạng bảng",
+                "dưới dạng bảng",
+                "kẻ bảng",
+                "lập bảng",
+                "Format as table",
+                "Table format",
+                "Tóm tắt",
+                "Chi tiết hơn"
+        );
+
+        for (String directive : directives) {
+            IntentDecompositionService.DecomposedIntents result = service.decompose(directive, "CLUB_MANAGER");
+            assertNotNull(result);
+            assertTrue(result.hasInDomain(), "Directive must be in-domain: " + directive);
+            assertFalse(result.hasOutOfDomain(), "Directive must not be OOD: " + directive);
+            assertFalse(result.isPureOutOfDomain(), "Directive must not be pure OOD: " + directive);
+            assertEquals(directive.trim(), result.inDomainIntents().get(0));
+        }
+
+        verify(httpClient, never()).send(any(HttpRequest.class), any());
+    }
+
+    @Test
+    @DisplayName("Verification of the user 4-turn sequence: All four turns correctly decompose as in-domain")
+    void testUserFourTurnFlow_DecomposesInDomain() {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "", // empty api key: test heuristic & domain keyword matching
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        // Turn 1: "Phân tích trạng thái Vet" (starts conversation)
+        IntentDecompositionService.DecomposedIntents turn1 = service.decompose("Phân tích trạng thái Vet", "CLUB_MANAGER", List.of());
+        assertNotNull(turn1);
+        assertTrue(turn1.hasInDomain(), "Turn 1 must be in-domain");
+        assertFalse(turn1.isPureOutOfDomain(), "Turn 1 must not be pure OOD");
+
+        // History after Turn 1
+        List<AiChatMessageDto> historyAfterTurn1 = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "## Veterinarian Status Analysis\nThe system lists 3 veterinarians, rollover rate 22.1%...")
+        );
+
+        // Turn 2: "Trả lời tiếng Việt" (conversational directive)
+        IntentDecompositionService.DecomposedIntents turn2 = service.decompose("Trả lời tiếng Việt", "CLUB_MANAGER", historyAfterTurn1);
+        assertNotNull(turn2);
+        assertTrue(turn2.hasInDomain(), "Turn 2 must be in-domain");
+        assertFalse(turn2.isPureOutOfDomain(), "Turn 2 must not be pure OOD");
+
+        // History after Turn 2
+        List<AiChatMessageDto> historyAfterTurn2 = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "## Veterinarian Status Analysis\nThe system lists 3 veterinarians, rollover rate 22.1%..."),
+                new AiChatMessageDto("user", "Trả lời tiếng Việt"),
+                new AiChatMessageDto("assistant", "## Phân tích trạng thái Bác sĩ Thú y\nHệ thống ghi nhận 3 bác sĩ thú y đang hoạt động...")
+        );
+
+        // Turn 3: "Ngưỡng rollover rate là bao nhiêu?" (contextual inquiry with domain keywords)
+        IntentDecompositionService.DecomposedIntents turn3 = service.decompose("Ngưỡng rollover rate là bao nhiêu?", "CLUB_MANAGER", historyAfterTurn2);
+        assertNotNull(turn3);
+        assertTrue(turn3.hasInDomain(), "Turn 3 must be in-domain");
+        assertFalse(turn3.isPureOutOfDomain(), "Turn 3 must not be pure OOD");
+
+        // History after Turn 3
+        List<AiChatMessageDto> historyAfterTurn3 = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "## Veterinarian Status Analysis..."),
+                new AiChatMessageDto("user", "Trả lời tiếng Việt"),
+                new AiChatMessageDto("assistant", "## Phân tích trạng thái Bác sĩ Thú y..."),
+                new AiChatMessageDto("user", "Ngưỡng rollover rate là bao nhiêu?"),
+                new AiChatMessageDto("assistant", "Ngưỡng cảnh báo rollover rate thông thường được cấu hình...")
+        );
+
+        // Turn 4: "Có alert nào trong hệ thống" (contextual alert inquiry)
+        IntentDecompositionService.DecomposedIntents turn4 = service.decompose("Có alert nào trong hệ thống", "CLUB_MANAGER", historyAfterTurn3);
+        assertNotNull(turn4);
+        assertTrue(turn4.hasInDomain(), "Turn 4 must be in-domain");
+        assertFalse(turn4.isPureOutOfDomain(), "Turn 4 must not be pure OOD");
+    }
+
+    @Test
+    @DisplayName("Active conversation context: Short contextual follow-up without horse nouns is preserved in-domain")
+    void testActiveConversation_ContextualInquiry_PreservedInDomain() {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        List<AiChatMessageDto> history = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "## Veterinarian Status Analysis\nHannah Reed had 33.3% rollover rate.")
+        );
+
+        // Follow-up without horse noun
+        IntentDecompositionService.DecomposedIntents followUp = service.decompose("Tại sao lại như vậy?", "CLUB_MANAGER", history);
+        assertNotNull(followUp);
+        assertTrue(followUp.hasInDomain(), "Contextual follow-up in active conversation must be in-domain");
+        assertFalse(followUp.isPureOutOfDomain());
+
+        // BUT obvious out-of-domain query in active conversation MUST still be rejected
+        IntentDecompositionService.DecomposedIntents oodInChat = service.decompose("Thời tiết hôm nay thế nào?", "CLUB_MANAGER", history);
+        assertNotNull(oodInChat);
+        assertFalse(oodInChat.hasInDomain(), "OOD query must not be in-domain even in active conversation");
+        assertTrue(oodInChat.isPureOutOfDomain(), "OOD query must be pure OOD");
+    }
+
+    @Test
+    @DisplayName("Safety Rescue: When classification API erroneously marks contextual follow-up as OOD, safety check rescues it to in-domain")
+    @SuppressWarnings("unchecked")
+    void testSafetyRescue_ContextualFollowUp_RescuedFromClassifierOod() throws Exception {
+        String classifierPureOodJson = """
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "{\\"in_domain\\": [], \\"out_of_domain\\": [\\"Tại sao lại như vậy?\\"]}"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        when(httpResponse.statusCode()).thenReturn(200);
+        when(httpResponse.body()).thenReturn(classifierPureOodJson);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+
+        DefaultIntentDecompositionService serviceWithKey = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "test-api-key",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        List<AiChatMessageDto> history = List.of(
+                new AiChatMessageDto("user", "Phân tích trạng thái Vet"),
+                new AiChatMessageDto("assistant", "Hannah Reed rollover rate is 33.3%.")
+        );
+
+        IntentDecompositionService.DecomposedIntents result = serviceWithKey.decompose("Tại sao lại như vậy?", "CLUB_MANAGER", history);
+        assertNotNull(result);
+        assertTrue(result.hasInDomain(), "Contextual follow-up in active conversation must be rescued into in-domain");
+        assertFalse(result.isPureOutOfDomain(), "Contextual follow-up must not be pure OOD");
+    }
+
+    @Test
+    @DisplayName("Domain Keywords: RTMS system, staff statistics, and management terms are recognized in-domain")
+    void testDomainKeywords_SystemAndStaff_InDomain() {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        for (String query : List.of(
+                "RTMS là gì?",
+                "Thống kê nhân sự",
+                "Có bao nhiêu nhân viên trong hệ thống?",
+                "Quản lý có thể duyệt những đơn nào?"
+        )) {
+            IntentDecompositionService.DecomposedIntents res = service.decompose(query, "CLUB_MANAGER", List.of());
+            assertNotNull(res);
+            assertTrue(res.hasInDomain(), "Must be in-domain: " + query);
+            assertFalse(res.isPureOutOfDomain(), "Must not be pure OOD: " + query);
+        }
+    }
+
+    @Test
+    @DisplayName("Fallback Heuristics: Compound query containing both horse keywords and OOD does NOT fail-closed to pure OOD")
+    void testFallback_CompoundQuery_PreservesInDomain() {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        String compound = "Cho tôi xem danh sách ngựa và cho biết thời tiết hôm nay thế nào?";
+        IntentDecompositionService.DecomposedIntents res = service.decompose(compound, "CLUB_MANAGER", List.of());
+        assertNotNull(res);
+        assertTrue(res.hasInDomain(), "Compound query must have in-domain intent");
+        assertFalse(res.isPureOutOfDomain(), "Compound query must NOT fail-closed to pure OOD");
     }
 }

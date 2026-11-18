@@ -1,7 +1,9 @@
 package com.rtms.backend.ai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rtms.backend.ai.conversation.dto.AiChatMessageDetailDto;
 import com.rtms.backend.ai.conversation.service.AiConversationService;
+import com.rtms.backend.ai.dto.AiChatMessageDto;
 import com.rtms.backend.ai.dto.AiChatRequestDto;
 import com.rtms.backend.ai.dto.AiChatResponseDto;
 import com.rtms.backend.ai.tool.AiToolExecutionService;
@@ -119,9 +121,41 @@ public class AgentOrchestratorService {
         }
 
         // 2. Pre-Flight Intent Decomposition (intent decomposition and OOD isolation)
-        IntentDecompositionService.DecomposedIntents intents = intentDecompositionService != null
-                ? intentDecompositionService.decompose(request.message(), currentUser != null ? currentUser.getRole() : null)
-                : new IntentDecompositionService.DecomposedIntents(List.of(request.message()), Collections.emptyList());
+        List<AiChatMessageDto> effectiveHistory = request.conversationHistory();
+        if ((effectiveHistory == null || effectiveHistory.isEmpty())
+                && conversationService != null && conversationId != null
+                && currentUser != null && currentUser.getUserId() != null) {
+            try {
+                List<AiChatMessageDetailDto> dbMsgs = conversationService.getConversationMessages(conversationId, currentUser.getUserId());
+                if (dbMsgs != null && dbMsgs.size() > 1) {
+                    effectiveHistory = new ArrayList<>();
+                    for (int i = 0; i < dbMsgs.size() - 1; i++) {
+                        AiChatMessageDetailDto m = dbMsgs.get(i);
+                        effectiveHistory.add(new AiChatMessageDto(m.role(), m.content()));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("AgentOrchestratorService: Unable to load DB conversation history for pre-flight check: {}", e.getMessage());
+            }
+        }
+
+        IntentDecompositionService.DecomposedIntents intents = null;
+        if (intentDecompositionService != null) {
+            intents = intentDecompositionService.decompose(
+                    request.message(),
+                    currentUser != null ? currentUser.getRole() : null,
+                    effectiveHistory
+            );
+            if (intents == null) {
+                intents = intentDecompositionService.decompose(
+                        request.message(),
+                        currentUser != null ? currentUser.getRole() : null
+                );
+            }
+        }
+        if (intents == null) {
+            intents = new IntentDecompositionService.DecomposedIntents(List.of(request.message()), Collections.emptyList());
+        }
 
         // Fast Short-Circuit: If the entire question is outside the RTMS scope, decline immediately without starting the ReAct loop
         if (intents.isPureOutOfDomain()) {
@@ -319,7 +353,7 @@ public class AgentOrchestratorService {
 
     String buildSystemPrompt(AuthenticatedUser user) {
         return systemPromptBuilder.buildSystemPrompt(user)
-                + "\n\nRespond in English by default. Use another language only when the user explicitly requests it.";
+                + "\n\nRespond in English by default, or switch to Vietnamese/the requested language when the user requests it or converses in that language.";
     }
 
     String formatFallbackToolSummary(List<Map<String, Object>> executedTools) {

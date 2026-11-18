@@ -1,5 +1,7 @@
 package com.rtms.backend.ai.service;
 
+import com.rtms.backend.ai.dto.AiChatMessageDto;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -35,5 +37,10 @@ public interface IntentDecompositionService {
         }
     }
 
-    DecomposedIntents decompose(String rawMessage, String role);
+    default DecomposedIntents decompose(String rawMessage, String role) {
+        return decompose(rawMessage, role, Collections.emptyList());
+    }
+
+    DecomposedIntents decompose(String rawMessage, String role, List<AiChatMessageDto> conversationHistory);
 }
+

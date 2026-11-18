@@ -68,7 +68,7 @@ export function AiChatInputBar({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about training schedule, horse health, stabling..."
-            className="max-h-36 min-h-[48px] flex-1 resize-none bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] outline-hidden leading-normal overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="max-h-[160px] min-h-[48px] flex-1 resize-none border-0 border-transparent bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] shadow-none rounded-none outline-none focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:outline-none leading-normal overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           />
         </FormField>
 
