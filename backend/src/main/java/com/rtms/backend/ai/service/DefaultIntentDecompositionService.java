@@ -104,13 +104,13 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
 
     @Autowired
     public DefaultIntentDecompositionService(
-            @Value("${ai.api.base-url:${groq.api.base-url:https://api.openai.com/v1}}") String aiBaseUrl,
-            @Value("${ai.api.key:${groq.api.key:}}") String aiApiKey,
-            @Value("${ai.api.model:${groq.api.model:gpt-4o-mini}}") String aiModel,
+            @Value("${ai.api.base-url:https://api.openai.com/v1}") String aiBaseUrl,
+            @Value("${ai.api.key:}") String aiApiKey,
+            @Value("${ai.api.model:gpt-6-luna}") String aiModel,
             ObjectMapper objectMapper) {
         this.aiBaseUrl = aiBaseUrl != null && !aiBaseUrl.isBlank() ? aiBaseUrl.trim() : "https://api.openai.com/v1";
         this.aiApiKey = aiApiKey != null ? aiApiKey.trim() : "";
-        this.aiModel = aiModel != null && !aiModel.isBlank() ? aiModel.trim() : "gpt-4o-mini";
+        this.aiModel = aiModel != null && !aiModel.isBlank() ? aiModel.trim() : "gpt-6-luna";
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -125,7 +125,7 @@ public class DefaultIntentDecompositionService implements IntentDecompositionSer
             HttpClient httpClient) {
         this.aiBaseUrl = aiBaseUrl != null && !aiBaseUrl.isBlank() ? aiBaseUrl.trim() : "https://api.openai.com/v1";
         this.aiApiKey = aiApiKey != null ? aiApiKey.trim() : "";
-        this.aiModel = aiModel != null && !aiModel.isBlank() ? aiModel.trim() : "gpt-4o-mini";
+        this.aiModel = aiModel != null && !aiModel.isBlank() ? aiModel.trim() : "gpt-6-luna";
         this.objectMapper = objectMapper;
         this.httpClient = httpClient != null ? httpClient : HttpClient.newHttpClient();
     }

@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.util.*;
 
 /**
- * Client that connects to the LLM REST API (OpenAI / Groq) for Chat Completions.
+ * Client that connects to the LLM REST API (OpenAI-compatible) for Chat Completions.
  */
 @Component
 public class LlmApiClient {
@@ -31,9 +31,9 @@ public class LlmApiClient {
 
     @Autowired
     public LlmApiClient(
-            @Value("${ai.api.base-url:${groq.api.base-url:https://api.openai.com/v1}}") String aiBaseUrl,
-            @Value("${ai.api.key:${groq.api.key:}}") String aiApiKey,
-            @Value("${ai.api.model:${groq.api.model:gpt-4o-mini}}") String aiModel,
+            @Value("${ai.api.base-url:https://api.openai.com/v1}") String aiBaseUrl,
+            @Value("${ai.api.key:}") String aiApiKey,
+            @Value("${ai.api.model:gpt-6-luna}") String aiModel,
             ObjectMapper objectMapper
     ) {
         this(aiBaseUrl, aiApiKey, aiModel, objectMapper, HttpClient.newBuilder()
