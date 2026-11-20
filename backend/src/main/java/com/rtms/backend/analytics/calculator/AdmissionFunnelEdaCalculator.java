@@ -1,4 +1,4 @@
-package com.rtms.backend.analytics.util;
+package com.rtms.backend.analytics.calculator;
 
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;

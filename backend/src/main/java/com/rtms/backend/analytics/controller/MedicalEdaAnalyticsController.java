@@ -1,7 +1,7 @@
 package com.rtms.backend.analytics.controller;
 
-import com.rtms.backend.analytics.dto.BioSpcSeriesResponse;
-import com.rtms.backend.analytics.dto.SurvivalEdaResponse;
+import com.rtms.backend.analytics.dto.medical.BioSpcSeriesResponse;
+import com.rtms.backend.analytics.dto.medical.SurvivalEdaResponse;
 import com.rtms.backend.analytics.service.BioSpcAnalyticsService;
 import com.rtms.backend.analytics.service.SurvivalEdaAnalyticsService;
 import com.rtms.backend.common.dto.ApiResponse;

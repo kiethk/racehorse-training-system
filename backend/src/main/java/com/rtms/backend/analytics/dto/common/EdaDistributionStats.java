@@ -1,6 +1,6 @@
-package com.rtms.backend.analytics.dto;
+package com.rtms.backend.analytics.dto.common;
 
-import com.rtms.backend.analytics.util.EdaStatisticsCalculator.DistributionStats;
+import com.rtms.backend.analytics.calculator.EdaStatisticsCalculator.DistributionStats;
 
 public record EdaDistributionStats(
         double min,

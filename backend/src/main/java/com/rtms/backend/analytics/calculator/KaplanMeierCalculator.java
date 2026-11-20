@@ -1,6 +1,6 @@
-package com.rtms.backend.analytics.util;
+package com.rtms.backend.analytics.calculator;
 
-import com.rtms.backend.analytics.dto.SurvivalEdaResponse.KaplanMeierStepDto;
+import com.rtms.backend.analytics.dto.medical.SurvivalEdaResponse.KaplanMeierStepDto;
 
 import java.util.*;
 

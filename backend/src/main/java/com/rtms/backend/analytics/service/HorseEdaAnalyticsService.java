@@ -1,15 +1,15 @@
 package com.rtms.backend.analytics.service;
 
-import com.rtms.backend.analytics.dto.EdaCorrelationSummary;
-import com.rtms.backend.analytics.dto.EdaDistributionStats;
-import com.rtms.backend.analytics.dto.FleetEdaResponse;
-import com.rtms.backend.analytics.dto.FleetHorseEdaPoint;
-import com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow;
-import com.rtms.backend.analytics.dto.IndividualHorseEdaResponse;
-import com.rtms.backend.analytics.dto.IndividualWorkoutEdaPoint;
-import com.rtms.backend.analytics.util.EdaStatisticsCalculator;
-import com.rtms.backend.analytics.util.EdaStatisticsCalculator.CorrelationResult;
-import com.rtms.backend.analytics.util.EdaStatisticsCalculator.DistributionStats;
+import com.rtms.backend.analytics.dto.common.EdaCorrelationSummary;
+import com.rtms.backend.analytics.dto.common.EdaDistributionStats;
+import com.rtms.backend.analytics.dto.horse.FleetEdaResponse;
+import com.rtms.backend.analytics.dto.horse.FleetHorseEdaPoint;
+import com.rtms.backend.analytics.dto.horse.FleetWorkoutSummaryRow;
+import com.rtms.backend.analytics.dto.horse.IndividualHorseEdaResponse;
+import com.rtms.backend.analytics.dto.horse.IndividualWorkoutEdaPoint;
+import com.rtms.backend.analytics.calculator.EdaStatisticsCalculator;
+import com.rtms.backend.analytics.calculator.EdaStatisticsCalculator.CorrelationResult;
+import com.rtms.backend.analytics.calculator.EdaStatisticsCalculator.DistributionStats;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;

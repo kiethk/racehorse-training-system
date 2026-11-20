@@ -1,7 +1,7 @@
 package com.rtms.backend.analytics.service;
 
-import com.rtms.backend.analytics.dto.SurvivalEdaResponse;
-import com.rtms.backend.analytics.dto.SurvivalEdaResponse.SurvivalStratumDto;
+import com.rtms.backend.analytics.dto.medical.SurvivalEdaResponse;
+import com.rtms.backend.analytics.dto.medical.SurvivalEdaResponse.SurvivalStratumDto;
 import com.rtms.backend.medical.entity.HorseBodyRegion;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.medical.repository.HorseBodyRegionRepository;
