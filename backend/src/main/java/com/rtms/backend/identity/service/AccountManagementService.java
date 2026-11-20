@@ -63,6 +63,12 @@ public class AccountManagementService {
     private final CareScheduleService careScheduleService;
     private final TrainerHandoverService trainerHandoverService;
 
+    @Autowired(required = false)
+    private com.rtms.backend.config.SuperAdminProperties superAdminProperties;
+
+    @Autowired(required = false)
+    private com.rtms.backend.audit.service.AuditLogService auditLogService;
+
     public AccountManagementService(
             UserRepository userRepository,
             RoleRepository roleRepository,
@@ -197,6 +203,18 @@ public class AccountManagementService {
         this.trainerHandoverService = trainerHandoverService;
     }
 
+    public void setSuperAdminProperties(com.rtms.backend.config.SuperAdminProperties superAdminProperties) {
+        this.superAdminProperties = superAdminProperties;
+    }
+
+    public void setAuditLogService(com.rtms.backend.audit.service.AuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
+    }
+
+    private boolean isSuperAdmin(Long userId) {
+        return superAdminProperties != null && superAdminProperties.isSuperAdmin(userId);
+    }
+
     // ── READ ALL ─────────────────────────────────────────────────────────────
 
     public List<AccountSummaryResponse> getAllAccounts() {
@@ -291,6 +309,7 @@ public class AccountManagementService {
         response.setAddress(user.getAddress());
         response.setRole(roleName);
         response.setActive(user.isActive());
+        response.setSuperAdmin(isSuperAdmin(user.getId()));
         response.setCreatedAt(user.getCreatedAt());
 
         if (STAFF_ROLES.contains(roleName)) {
@@ -449,8 +468,29 @@ public class AccountManagementService {
 
     @Transactional
     public AccountDetailResponse updateAccount(Long userId, StaffUpdateRequest request) {
+        return updateAccount(null, userId, request);
+    }
+
+    @Transactional
+    public AccountDetailResponse updateAccount(Long currentUserId, Long userId, StaffUpdateRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (isSuperAdmin(userId) && (currentUserId == null || !currentUserId.equals(userId))) {
+            if (auditLogService != null) {
+                auditLogService.recordDomainEvent(com.rtms.backend.audit.dto.DomainAuditEvent.builder()
+                        .userId(currentUserId)
+                        .action("SUPER_ADMIN_EDIT_BLOCKED")
+                        .entityName("USER")
+                        .entityId(userId)
+                        .module("STAFF")
+                        .summary("Blocked attempt by user " + (currentUserId != null ? "#" + currentUserId : "unknown")
+                                + " to modify protected Super Admin " + user.getFullName() + " (User #" + userId + ")")
+                        .build());
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Cannot modify a protected system administrator account.");
+        }
 
         if (user.getRole() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User has no role");
@@ -549,6 +589,23 @@ public class AccountManagementService {
     private void validateDeactivationPrerequisites(User user, Long currentUserId, Long replacementTrainerId) {
         Long targetUserId = user.getId();
         String roleName = user.getRole() != null ? user.getRole().getName() : "";
+
+        // 0. Super Admin protection guard
+        if (isSuperAdmin(targetUserId)) {
+            if (auditLogService != null) {
+                auditLogService.recordDomainEvent(com.rtms.backend.audit.dto.DomainAuditEvent.builder()
+                        .userId(currentUserId)
+                        .action("SUPER_ADMIN_DEACTIVATE_BLOCKED")
+                        .entityName("USER")
+                        .entityId(targetUserId)
+                        .module("STAFF")
+                        .summary("Blocked attempt by user " + (currentUserId != null ? "#" + currentUserId : "unknown")
+                                + " to deactivate protected Super Admin " + user.getFullName() + " (User #" + targetUserId + ")")
+                        .build());
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Cannot deactivate a protected system administrator.");
+        }
 
         // 1. Self-lockout check
         if (currentUserId != null && currentUserId.equals(targetUserId)) {
@@ -759,6 +816,7 @@ public class AccountManagementService {
         summary.setAddress(user.getAddress());
         summary.setRole(user.getRole() != null ? user.getRole().getName() : null);
         summary.setActive(user.isActive());
+        summary.setSuperAdmin(isSuperAdmin(user.getId()));
         summary.setCreatedAt(user.getCreatedAt());
 
         if (summary.getRole() != null) {

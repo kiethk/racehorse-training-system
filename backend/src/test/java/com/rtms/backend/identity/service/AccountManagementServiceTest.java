@@ -13,6 +13,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
+import com.rtms.backend.config.SuperAdminProperties;
+
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -686,5 +690,144 @@ class AccountManagementServiceTest {
                 eq(targetManagerId),
                 anyString()
         );
+    }
+
+    @Test
+    void updateAccountStatus_superAdmin_throwsForbiddenAndLogsAudit() {
+        Long currentAdminId = 2L;
+        Long targetSuperAdminId = 1L;
+
+        User superAdmin = new User();
+        superAdmin.setId(targetSuperAdminId);
+        superAdmin.setFullName("Master Admin");
+        superAdmin.setEmail("admin@rtms.com");
+        superAdmin.setActive(true);
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        superAdmin.setRole(role);
+
+        when(userRepository.findById(targetSuperAdminId)).thenReturn(Optional.of(superAdmin));
+
+        SuperAdminProperties props = new SuperAdminProperties();
+        props.setSuperAdminIds(Set.of(1L));
+        accountService.setSuperAdminProperties(props);
+
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        accountService.setAuditLogService(auditLogService);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, targetSuperAdminId, false)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot deactivate a protected system administrator"));
+        verify(userRepository, never()).save(any());
+        verify(auditLogService).recordDomainEvent(argThat(event ->
+                "SUPER_ADMIN_DEACTIVATE_BLOCKED".equals(event.action()) &&
+                Long.valueOf(1L).equals(event.entityId()) &&
+                Long.valueOf(2L).equals(event.userId())
+        ));
+    }
+
+    @Test
+    void updateAccount_superAdmin_byAnotherUser_throwsForbiddenAndLogsAudit() {
+        Long currentAdminId = 2L;
+        Long targetSuperAdminId = 1L;
+
+        User superAdmin = new User();
+        superAdmin.setId(targetSuperAdminId);
+        superAdmin.setFullName("Master Admin");
+        superAdmin.setEmail("admin@rtms.com");
+        superAdmin.setActive(true);
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        superAdmin.setRole(role);
+
+        when(userRepository.findById(targetSuperAdminId)).thenReturn(Optional.of(superAdmin));
+
+        SuperAdminProperties props = new SuperAdminProperties();
+        props.setSuperAdminIds(Set.of(1L));
+        accountService.setSuperAdminProperties(props);
+
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        accountService.setAuditLogService(auditLogService);
+
+        StaffUpdateRequest req = new StaffUpdateRequest();
+        req.setFullName("Hacked Name");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccount(currentAdminId, targetSuperAdminId, req)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot modify a protected system administrator"));
+        verify(userRepository, never()).save(any());
+        verify(auditLogService).recordDomainEvent(argThat(event ->
+                "SUPER_ADMIN_EDIT_BLOCKED".equals(event.action()) &&
+                Long.valueOf(1L).equals(event.entityId()) &&
+                Long.valueOf(2L).equals(event.userId())
+        ));
+    }
+
+    @Test
+    void updateAccount_superAdmin_bySelf_allowed() {
+        Long superAdminId = 1L;
+
+        User superAdmin = new User();
+        superAdmin.setId(superAdminId);
+        superAdmin.setFullName("Master Admin");
+        superAdmin.setEmail("admin@rtms.com");
+        superAdmin.setActive(true);
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        superAdmin.setRole(role);
+
+        when(userRepository.findById(superAdminId)).thenReturn(Optional.of(superAdmin));
+
+        SuperAdminProperties props = new SuperAdminProperties();
+        props.setSuperAdminIds(Set.of(1L));
+        accountService.setSuperAdminProperties(props);
+
+        StaffUpdateRequest req = new StaffUpdateRequest();
+        req.setFullName("Updated Master Admin");
+
+        AccountDetailResponse res = accountService.updateAccount(superAdminId, superAdminId, req);
+
+        assertNotNull(res);
+        assertEquals("Updated Master Admin", superAdmin.getFullName());
+        assertTrue(res.isSuperAdmin());
+    }
+
+    @Test
+    void getAllAccounts_populatesSuperAdminFlagCorrectly() {
+        User admin1 = new User();
+        admin1.setId(1L);
+        admin1.setFullName("Super Admin");
+        Role roleManager = new Role();
+        roleManager.setName("CLUB_MANAGER");
+        admin1.setRole(roleManager);
+        admin1.setActive(true);
+
+        User groom = new User();
+        groom.setId(2L);
+        groom.setFullName("Groom User");
+        Role roleGroom = new Role();
+        roleGroom.setName("GROOM");
+        groom.setRole(roleGroom);
+        groom.setActive(true);
+
+        when(userRepository.findAll()).thenReturn(List.of(admin1, groom));
+
+        SuperAdminProperties props = new SuperAdminProperties();
+        props.setSuperAdminIds(Set.of(1L));
+        accountService.setSuperAdminProperties(props);
+
+        List<AccountSummaryResponse> results = accountService.getAllAccounts();
+
+        assertEquals(2, results.size());
+        AccountSummaryResponse adminSummary = results.stream().filter(a -> a.getUserId().equals(1L)).findFirst().orElseThrow();
+        AccountSummaryResponse groomSummary = results.stream().filter(a -> a.getUserId().equals(2L)).findFirst().orElseThrow();
+        assertTrue(adminSummary.isSuperAdmin());
+        assertFalse(groomSummary.isSuperAdmin());
     }
 }

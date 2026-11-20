@@ -187,18 +187,36 @@ BEGIN
     RETURN v_start;
 END $$ LANGUAGE plpgsql;
 
--- Chia các ngựa đã cho thành các nhóm tối đa 6 ngựa; seed chủ ý rải Groom khác nhau vào mỗi nhóm cho dữ liệu đa dạng (luật không bắt buộc). Ngựa đang bị chặn tập bỏ qua.
+-- Các ngựa (khóa seed) đang ở khu của một Trainer, theo thứ tự được duyệt: Trainer chỉ thêm được ngựa ở khu mình phụ trách.
+-- (Seed keys of the ELIGIBLE horses living in a Trainer's areas, in approval order.)
+CREATE FUNCTION pg_temp.trainer_horses(p_trainer TEXT) RETURNS TEXT[] AS $$
+    SELECT COALESCE(array_agg(x.k ORDER BY x.approved, x.k), '{}')
+      FROM (SELECT sh.k, (SELECT max(a.manager_reviewed_at) FROM admission_applications a
+                           WHERE a.horse_id = h.id AND a.status = 'APPROVED') AS approved
+              FROM seed_horse_id sh
+              JOIN horses h ON h.id = sh.id AND h.current_status = 'ELIGIBLE'
+              JOIN stable_stalls ss ON ss.id = h.current_stall_id
+              JOIN areas ar ON ar.id = ss.area_id
+             WHERE ar.trainer_id = pg_temp.uid(p_trainer)) x
+$$ LANGUAGE sql;
+
+-- Chia các ngựa đã cho thành các nhóm tối đa 6 ngựa. Ngựa đang bị chặn tập bỏ qua.
 -- Nhóm thứ i có sở trường p_specialties[i] (các cự ly cách nhau dấu phẩy, ví dụ 'SPRINT,MILE') và tên theo sở trường đó.
 -- Chọn cự ly nhóm chạy đủ nhiều (từ 4 buổi trong 90 ngày) để mọi con có huy hiệu.
--- (Splits the horses into groups of at most 6; the seed deliberately spreads grooms across a group for variety, the rules do not require it. Horses blocked right now are skipped.
--- Group i gets specialty p_specialties[i] (comma-separated bands, e.g. 'SPRINT,MILE') and is named after it. Pick distances the
--- group runs often enough (4 times in 90 days) so every horse earns the badge.)
-CREATE FUNCTION pg_temp.make_groups(p_trainer TEXT, p_specialties TEXT[], p_horses TEXT[]) RETURNS BIGINT[] AS $$
+-- Ngày vào nhóm là lúc Trainer thêm ngựa (TrainingGroupServiceImpl.join): sáng hôm sau khi Manager duyệt, sau khi hết chặn tập
+-- lúc nhập trại, và sau khi ngựa rời nhóm cũ.
+-- p_late_k: ngựa Trainer chỉ thêm vào nhóm p_late_days ngày trước, tức vào giữa một khóa đang chạy (có Workout từ các buổi chưa bắt đầu).
+-- (Splits the horses into groups of at most 6; blocked horses are skipped. The join time is when the Trainer adds the horse:
+-- the morning after approval, after any admission rest ended, and after the horse left an earlier group. p_late_k is added
+-- only p_late_days ago, so it joins a course that is already running.)
+CREATE FUNCTION pg_temp.make_groups(p_trainer TEXT, p_specialties TEXT[], p_horses TEXT[], p_late_k TEXT DEFAULT NULL,
+                                    p_late_days INT DEFAULT 6) RETURNS BIGINT[] AS $$
 DECLARE
     v_trainer BIGINT := pg_temp.uid(p_trainer);
     v_groups BIGINT[] := '{}';
     v_created TIMESTAMP := pg_temp.at(-92, TIME '09:00');
     v_k TEXT; v_horse BIGINT; v_groom BIGINT; v_group BIGINT; v_placed BOOLEAN; v_bands TEXT[];
+    v_joined TIMESTAMP; v_approved TIMESTAMP; v_left TIMESTAMP; v_to TIMESTAMP;
 BEGIN
     FOREACH v_k IN ARRAY p_horses LOOP
         v_horse := pg_temp.hid(v_k);
@@ -207,12 +225,20 @@ BEGIN
             CONTINUE;
         END IF;
         SELECT ss.groom_id INTO v_groom FROM horses h JOIN stable_stalls ss ON ss.id = h.current_stall_id WHERE h.id = v_horse;
+        SELECT max(manager_reviewed_at) INTO v_approved FROM admission_applications WHERE horse_id = v_horse AND status = 'APPROVED';
+        v_joined := GREATEST(v_created, v_approved::DATE + 1 + TIME '08:30');
+        SELECT max(left_at) INTO v_left FROM training_group_members WHERE horse_id = v_horse;
+        IF v_left IS NOT NULL THEN v_joined := GREATEST(v_joined, v_left + INTERVAL '10 minutes'); END IF;
+        IF v_k = p_late_k THEN v_joined := GREATEST(v_joined, pg_temp.at(-p_late_days, TIME '09:00')); END IF;
+        WHILE pg_temp.blocked_at(v_horse, v_joined) LOOP
+            SELECT to_ts INTO v_to FROM seed_block WHERE horse_id = v_horse AND from_ts <= v_joined ORDER BY from_ts DESC LIMIT 1;
+            v_joined := v_to::DATE + 1 + TIME '08:30';
+        END LOOP;
         v_placed := FALSE;
         IF array_length(v_groups, 1) IS NOT NULL THEN
             FOREACH v_group IN ARRAY v_groups LOOP
-                IF (SELECT count(*) FROM training_group_members WHERE group_id = v_group) < 6
-                   AND NOT EXISTS (SELECT 1 FROM training_group_members m WHERE m.group_id = v_group AND m.groom_id = v_groom) THEN
-                    INSERT INTO training_group_members (group_id, horse_id, groom_id, joined_at) VALUES (v_group, v_horse, v_groom, v_created);
+                IF (SELECT count(*) FROM training_group_members WHERE group_id = v_group) < 6 THEN
+                    INSERT INTO training_group_members (group_id, horse_id, groom_id, joined_at) VALUES (v_group, v_horse, v_groom, v_joined);
                     v_placed := TRUE;
                     EXIT;
                 END IF;
@@ -228,7 +254,7 @@ BEGIN
             RETURNING id INTO v_group;
             INSERT INTO seed_group_bands (group_id, bands) VALUES (v_group, v_bands);
             v_groups := v_groups || v_group;
-            INSERT INTO training_group_members (group_id, horse_id, groom_id, joined_at) VALUES (v_group, v_horse, v_groom, v_created);
+            INSERT INTO training_group_members (group_id, horse_id, groom_id, joined_at) VALUES (v_group, v_horse, v_groom, v_joined);
             PERFORM pg_temp.audit(v_trainer, 'Create Training Group', 'TrainingGroup', v_group,
                                   'Trainer created a new training group', v_created, 'POST', '/api/training-groups');
         END IF;
@@ -262,18 +288,18 @@ END $$ LANGUAGE plpgsql;
 -- Một khóa giao cho một nhóm (CourseRunService.createPlan): các buổi xếp first-fit, mỗi thành viên có một Workout mỗi buổi.
 -- Trạng thái suy ra từ đồng hồ và các khoảng nghỉ trong seed_block. Chỉ buổi của các ngày TRƯỚC hôm nay mới có kết quả; buổi
 -- đã hết giờ hôm nay luôn chưa ghi để demo việc ghi kết quả. p_unrecorded: buổi đã qua gần nhất cũng để trống kết quả.
--- p_exclude: ngựa chưa vào nhóm lúc tạo plan (vào giữa khóa bằng pg_temp.join_plan).
+-- Ngựa vào nhóm sau lúc tạo plan chỉ có Workout của các buổi chưa bắt đầu lúc nó vào.
 -- (One course assigned to a group. Sessions are placed first-fit and every member gets a Workout per Session. Statuses follow the
 -- clock and the rest windows in seed_block. Only Sessions before today have results; Sessions that ended today are left to
--- record. p_unrecorded leaves the latest past Session without results too. p_exclude: horses not yet in the group when the plan
--- was created (they join mid-course with pg_temp.join_plan).)
+-- record. p_unrecorded leaves the latest past Session without results too. A horse that joins after the plan was
+-- created only gets the Sessions that had not started when it joined.)
 CREATE FUNCTION pg_temp.make_course_run(p_group BIGINT, p_course BIGINT, p_start DATE, p_days TEXT,
-                                        p_unrecorded BOOLEAN DEFAULT FALSE, p_exclude BIGINT[] DEFAULT '{}',
+                                        p_unrecorded BOOLEAN DEFAULT FALSE,
                                         p_fatigue BIGINT DEFAULT NULL) RETURNS BIGINT AS $$
 DECLARE
     v_trainer BIGINT; v_total INT; v_exercises BIGINT[]; v_dates DATE[]; v_created TIMESTAMP;
     v_plan BIGINT; v_exercise BIGINT; v_minutes INT; v_start TIME; v_end TIME; v_last_past INT := 0;
-    s RECORD; m RECORD; v_block TIMESTAMP; v_approved TIMESTAMP; v_ability NUMERIC; v_end_ts TIMESTAMP;
+    s RECORD; m RECORD; v_block TIMESTAMP; v_from TIMESTAMP; v_ability NUMERIC; v_end_ts TIMESTAMP;
     v_rec TIMESTAMP; v_status TEXT; v_recorded BOOLEAN;
 BEGIN
     SELECT trainer_id INTO v_trainer FROM training_groups WHERE id = p_group;
@@ -308,30 +334,34 @@ BEGIN
           FROM training_sessions WHERE course_run_id = v_plan) x
      WHERE x.status = 'HELD' AND x.session_date < pg_temp.today();
 
-    FOR m IN SELECT hm.horse_id, hm.groom_id FROM training_group_members hm
-              WHERE hm.group_id = p_group AND (hm.left_at IS NULL OR hm.left_at > v_created)
-                AND NOT (hm.horse_id = ANY (p_exclude)) ORDER BY hm.id LOOP
-        SELECT manager_reviewed_at INTO v_approved FROM admission_applications WHERE horse_id = m.horse_id AND status = 'APPROVED';
-        IF v_approved IS NULL OR v_created < v_approved OR pg_temp.blocked_at(m.horse_id, v_created) THEN
-            CONTINUE;      -- not admitted yet, or resting when the plan was made: not part of this plan
+    -- Thành viên có mặt lúc tạo plan có Workout ở mọi buổi; ngựa vào nhóm sau đó chỉ có Workout của các buổi chưa bắt đầu
+    -- (GroupMemberSync.createFutureWorkouts), tạo đúng lúc Trainer thêm ngựa.
+    -- (A member present when the plan is created gets a Workout in every Session; a horse that joins later only gets the
+    -- Sessions that have not started yet, created when the Trainer adds it.)
+    FOR m IN SELECT hm.horse_id, hm.groom_id, hm.joined_at FROM training_group_members hm
+              WHERE hm.group_id = p_group AND (hm.left_at IS NULL OR hm.left_at > v_created) ORDER BY hm.id LOOP
+        v_from := GREATEST(v_created, m.joined_at);
+        IF pg_temp.blocked_at(m.horse_id, v_from) THEN
+            CONTINUE;      -- resting when the plan was made or the horse joined: not part of this plan
         END IF;
-        SELECT min(from_ts) INTO v_block FROM seed_block WHERE horse_id = m.horse_id AND from_ts > v_created;
+        SELECT min(from_ts) INTO v_block FROM seed_block WHERE horse_id = m.horse_id AND from_ts > v_from;
         v_ability := pg_temp.rnd('ability' || m.horse_id, 0.0, 1.0);
-        FOR s IN SELECT id, idx, session_date, end_time, status FROM (
-                     SELECT id, row_number() OVER (ORDER BY session_date, start_time) idx, session_date, end_time, status
+        FOR s IN SELECT id, idx, session_date, start_time, end_time, status FROM (
+                     SELECT id, row_number() OVER (ORDER BY session_date, start_time) idx, session_date, start_time, end_time, status
                        FROM training_sessions WHERE course_run_id = v_plan) q ORDER BY idx LOOP
+            CONTINUE WHEN m.joined_at > v_created AND s.session_date + s.start_time <= m.joined_at;
             v_end_ts := s.session_date + s.end_time;
             v_rec := v_end_ts + make_interval(mins => pg_temp.rndi('rec' || v_plan || m.horse_id || s.idx, 5, 35));
             IF v_block IS NOT NULL AND v_end_ts > v_block THEN
                 -- Bị chặn tập: ra khỏi nhóm, mọi buổi chưa kết thúc lúc đó bị hủy. (Blocked: leaves the group, what had not ended is cancelled.)
-                PERFORM pg_temp.put_workout(s.id, v_plan, m.horse_id, m.groom_id, 'CANCELLED', FALSE, v_ability, FALSE, v_created, v_block);
+                PERFORM pg_temp.put_workout(s.id, v_plan, m.horse_id, m.groom_id, 'CANCELLED', FALSE, v_ability, FALSE, v_from, v_block);
             ELSIF s.status = 'HELD' THEN
                 v_recorded := s.session_date < pg_temp.today() AND NOT (p_unrecorded AND s.idx = v_last_past);
                 PERFORM pg_temp.put_workout(s.id, v_plan, m.horse_id, m.groom_id, 'HELD', v_recorded, v_ability + 0.015 * s.idx,
-                                            p_fatigue = m.horse_id AND s.session_date >= pg_temp.today() - 7, v_created,
+                                            p_fatigue = m.horse_id AND s.session_date >= pg_temp.today() - 7, v_from,
                                             CASE WHEN v_recorded THEN v_rec ELSE v_end_ts END);
             ELSE
-                PERFORM pg_temp.put_workout(s.id, v_plan, m.horse_id, m.groom_id, 'SCHEDULED', FALSE, v_ability, FALSE, v_created, v_created);
+                PERFORM pg_temp.put_workout(s.id, v_plan, m.horse_id, m.groom_id, 'SCHEDULED', FALSE, v_ability, FALSE, v_from, v_from);
             END IF;
         END LOOP;
         IF v_block IS NOT NULL THEN
@@ -343,26 +373,6 @@ BEGIN
     PERFORM pg_temp.audit(v_trainer, 'Create Training Plan', 'CourseRun', v_plan,
                           'Trainer created a new training plan for a group', v_created, 'POST', '/api/course-runs');
     RETURN v_plan;
-END $$ LANGUAGE plpgsql;
-
--- Một ngựa vào nhóm giữa khóa: chỉ có Workout từ ngày p_from trở đi (như GroupWorkoutSyncService.createFutureWorkouts).
--- (A horse joins the group mid-course: Workouts only from p_from on.)
-CREATE FUNCTION pg_temp.join_plan(p_plan BIGINT, p_horse BIGINT, p_from DATE) RETURNS VOID AS $$
-DECLARE
-    v_groom BIGINT; v_ability NUMERIC := pg_temp.rnd('ability' || p_horse, 0.0, 1.0);
-    s RECORD; v_rec TIMESTAMP; v_recorded BOOLEAN;
-BEGIN
-    SELECT hm.groom_id INTO v_groom FROM training_group_members hm JOIN course_runs p ON p.group_id = hm.group_id
-     WHERE p.id = p_plan AND hm.horse_id = p_horse;
-    IF v_groom IS NULL THEN RAISE EXCEPTION 'Horse % is not a member of the group of plan %', p_horse, p_plan; END IF;
-    FOR s IN SELECT id, session_date, end_time, status, row_number() OVER (ORDER BY session_date, start_time) idx
-               FROM training_sessions WHERE course_run_id = p_plan ORDER BY session_date, start_time LOOP
-        CONTINUE WHEN s.session_date < p_from OR s.status = 'CANCELLED';
-        v_rec := s.session_date + s.end_time + make_interval(mins => pg_temp.rndi('rec' || p_plan || p_horse || s.idx, 5, 35));
-        v_recorded := s.status = 'HELD' AND s.session_date < pg_temp.today();
-        PERFORM pg_temp.put_workout(s.id, p_plan, p_horse, v_groom, s.status, v_recorded, v_ability + 0.015 * s.idx, FALSE,
-                                    (p_from - 1) + TIME '18:00', CASE WHEN v_recorded THEN v_rec ELSE (p_from - 1) + TIME '18:00' END);
-    END LOOP;
 END $$ LANGUAGE plpgsql;
 
 -- Trainer hủy Workout của riêng một ngựa trước khi buổi bắt đầu. (The Trainer cancels one horse's Workout before it starts.)
@@ -414,34 +424,28 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 
 -- Chuỗi khóa của các nhóm: mỗi nhóm chạy lần lượt các khóa, khóa sau bắt đầu ngay sau khóa trước, đến khi có một khóa xếp hàng chờ
--- (bắt đầu sau hôm nay). p_unrecorded_group: nhóm có buổi gần nhất chưa ghi kết quả; p_late_group: nhóm có ngựa vào giữa khóa.
--- (Each group runs its courses back to back until one is queued after today.)
-CREATE FUNCTION pg_temp.run_timeline(p_trainer TEXT, p_groups BIGINT[], p_courses TEXT[], p_unrecorded_group INT DEFAULT NULL,
-                                     p_late_group INT DEFAULT NULL) RETURNS VOID AS $$
+-- (bắt đầu sau hôm nay). p_unrecorded_group: nhóm có buổi gần nhất chưa ghi kết quả. Khóa đầu của nhóm chỉ được tạo khi nhóm đã có
+-- thành viên (CourseRunScheduler: GROUP_EMPTY). Ngựa được duyệt giữa chừng vào nhóm giữa khóa một cách tự nhiên.
+-- (Each group runs its courses back to back until one is queued after today; the first is created once the group has a member.
+-- Horses approved part-way simply join mid-course.)
+CREATE FUNCTION pg_temp.run_timeline(p_trainer TEXT, p_groups BIGINT[], p_courses TEXT[],
+                                     p_unrecorded_group INT DEFAULT NULL) RETURNS VOID AS $$
 DECLARE
     v_week TEXT[] := ARRAY['MONDAY,WEDNESDAY,FRIDAY', 'TUESDAY,THURSDAY,SATURDAY', 'MONDAY,THURSDAY', 'WEDNESDAY,SATURDAY', 'SUNDAY'];
-    v_days TEXT; v_start DATE; v_course BIGINT; v_total INT; v_dates DATE[]; v_plan BIGINT; v_ci INT; v_late BIGINT;
+    v_days TEXT; v_start DATE; v_course BIGINT; v_total INT; v_dates DATE[]; v_plan BIGINT; v_ci INT;
     v_current BOOLEAN;
 BEGIN
     FOR gi IN 1..COALESCE(array_length(p_groups, 1), 0) LOOP
         v_days := v_week[((gi - 1) % array_length(v_week, 1)) + 1];
-        v_start := pg_temp.today() - 91 + gi;
+        v_start := GREATEST(pg_temp.today() - 91 + gi,
+                            (SELECT min(joined_at)::DATE + 2 FROM training_group_members WHERE group_id = p_groups[gi]));
         v_ci := gi;
         LOOP
             SELECT id, total_sessions INTO v_course, v_total FROM courses
              WHERE name = p_courses[((v_ci - 1) % array_length(p_courses, 1)) + 1] AND trainer_id = pg_temp.uid(p_trainer);
             v_dates := pg_temp.session_dates(v_start, v_days, v_total);
             v_current := v_dates[1] <= pg_temp.today() AND v_dates[v_total] >= pg_temp.today();
-            v_late := NULL;
-            IF v_current AND p_late_group = gi THEN
-                SELECT horse_id INTO v_late FROM training_group_members WHERE group_id = p_groups[gi] AND left_at IS NULL ORDER BY id DESC LIMIT 1;
-            END IF;
-            v_plan := pg_temp.make_course_run(p_groups[gi], v_course, v_start, v_days,
-                                              v_current AND p_unrecorded_group = gi,
-                                              CASE WHEN v_late IS NULL THEN '{}'::BIGINT[] ELSE ARRAY[v_late] END);
-            IF v_late IS NOT NULL THEN
-                PERFORM pg_temp.join_plan(v_plan, v_late, v_dates[3]);
-            END IF;
+            v_plan := pg_temp.make_course_run(p_groups[gi], v_course, v_start, v_days, v_current AND p_unrecorded_group = gi);
             EXIT WHEN v_dates[1] > pg_temp.today();
             v_start := v_dates[v_total] + 1;
             v_ci := v_ci + 1;
@@ -502,51 +506,51 @@ DECLARE
     v_horse BIGINT;
 BEGIN
     -- ----------------------------------------------------------------- exercises and courses
-    PERFORM pg_temp.exercise('TR01', 'Aerobic Base Canter', 'Steady canter on turf to build the aerobic base.', 'TURF', 1600, 'MEDIUM', 'ENDURANCE', 60, 120);
-    PERFORM pg_temp.exercise('TR01', 'Long Stride Gallop', 'Sustained gallop to condition long-stride rhythm.', 'DIRT', 2000, 'MEDIUM', 'ENDURANCE', 60, 120);
-    PERFORM pg_temp.exercise('TR01', 'Uphill Power Gallop', 'Incline work for hindquarter drive and cardiac economy.', 'DIRT', 1600, 'HIGH', 'ENDURANCE', 60, 118);
-    PERFORM pg_temp.exercise('TR01', 'Gate Breakout Sprint', 'Explosive gate opening and a 400 m initial drive.', 'DIRT', 400, 'HIGH', 'GATE_START', 45, 118);
-    PERFORM pg_temp.exercise('TR01', 'Turn and Straight Sprint', 'Hold the line through the turn, accelerate on the straight.', 'SYNTHETIC', 1000, 'HIGH', 'SPEED', 60, 117);
-    PERFORM pg_temp.exercise('TR01', 'Furlong Interval Bursts', 'Short bursts with 2-minute recovery between furlongs.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 117);
-    PERFORM pg_temp.exercise('TR01', 'Walk and Hydro Cooling', 'Active walking and cold-water hosing to clear lactate.', 'SYNTHETIC', 800, 'LOW', 'RECOVERY', 45, 116);
-    PERFORM pg_temp.exercise('TR01', 'Trot Balance Work', 'Balance, stride symmetry and joint mobility at trot.', 'TURF', 1200, 'LOW', 'RECOVERY', 45, 116);
-    PERFORM pg_temp.exercise('TR01', 'Gate Loading Composure', 'Calm loading into the starting stall and a quiet stand.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 115);
-    PERFORM pg_temp.exercise('TR01', 'Official Speed Trial', 'Full mock trial with electronic timing.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 115);
+    PERFORM pg_temp.exercise('TR01', 'Aerobic Base Canter', 'Steady canter on turf to build the aerobic base.', 'TURF', 1600, 'MEDIUM', 'ENDURANCE', 60, 140);
+    PERFORM pg_temp.exercise('TR01', 'Long Stride Gallop', 'Sustained gallop to condition long-stride rhythm.', 'DIRT', 2000, 'MEDIUM', 'ENDURANCE', 60, 140);
+    PERFORM pg_temp.exercise('TR01', 'Uphill Power Gallop', 'Incline work for hindquarter drive and cardiac economy.', 'DIRT', 1600, 'HIGH', 'ENDURANCE', 60, 140);
+    PERFORM pg_temp.exercise('TR01', 'Gate Breakout Sprint', 'Explosive gate opening and a 400 m initial drive.', 'DIRT', 400, 'HIGH', 'GATE_START', 45, 140);
+    PERFORM pg_temp.exercise('TR01', 'Turn and Straight Sprint', 'Hold the line through the turn, accelerate on the straight.', 'SYNTHETIC', 1000, 'HIGH', 'SPEED', 60, 140);
+    PERFORM pg_temp.exercise('TR01', 'Furlong Interval Bursts', 'Short bursts with 2-minute recovery between furlongs.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 140);
+    PERFORM pg_temp.exercise('TR01', 'Walk and Hydro Cooling', 'Active walking and cold-water hosing to clear lactate.', 'SYNTHETIC', 800, 'LOW', 'RECOVERY', 45, 140);
+    PERFORM pg_temp.exercise('TR01', 'Trot Balance Work', 'Balance, stride symmetry and joint mobility at trot.', 'TURF', 1200, 'LOW', 'RECOVERY', 45, 140);
+    PERFORM pg_temp.exercise('TR01', 'Gate Loading Composure', 'Calm loading into the starting stall and a quiet stand.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 140);
+    PERFORM pg_temp.exercise('TR01', 'Official Speed Trial', 'Full mock trial with electronic timing.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 140);
     PERFORM pg_temp.exercise('TR01', 'Sand Track Stamina', 'Deep sand work for stamina, not in any course yet.', 'DIRT', 1800, 'MEDIUM', 'ENDURANCE', 60, 20);
     PERFORM pg_temp.course('TR01', 'Gate Confidence Drill', 'Calm, confident loading and stand in the starting gate.', 6,
-                           ARRAY['Gate Loading Composure'], 110);
+                           ARRAY['Gate Loading Composure'], 135);
     PERFORM pg_temp.course('TR01', 'Novice Foundation', 'Base fitness and steady rhythm for newly admitted horses.', 10,
-                           ARRAY['Aerobic Base Canter', 'Trot Balance Work', 'Gate Loading Composure', 'Long Stride Gallop', 'Walk and Hydro Cooling'], 110);
+                           ARRAY['Aerobic Base Canter', 'Trot Balance Work', 'Gate Loading Composure', 'Long Stride Gallop', 'Walk and Hydro Cooling'], 135);
     PERFORM pg_temp.course('TR01', 'Sprint Acceleration', 'Top speed and acceleration out of the gate and the turn.', 8,
-                           ARRAY['Gate Breakout Sprint', 'Turn and Straight Sprint', 'Furlong Interval Bursts', 'Walk and Hydro Cooling'], 108);
+                           ARRAY['Gate Breakout Sprint', 'Turn and Straight Sprint', 'Furlong Interval Bursts', 'Walk and Hydro Cooling'], 135);
     PERFORM pg_temp.course('TR01', 'Classic Endurance', 'Stamina for 1,800-2,400 m races.', 12,
-                           ARRAY['Aerobic Base Canter', 'Long Stride Gallop', 'Uphill Power Gallop', 'Walk and Hydro Cooling'], 108);
+                           ARRAY['Aerobic Base Canter', 'Long Stride Gallop', 'Uphill Power Gallop', 'Walk and Hydro Cooling'], 135);
     PERFORM pg_temp.course('TR01', 'Championship Trial Protocol', 'Six different race-specific sessions ending with a timed trial.', 6,
-                           ARRAY['Turn and Straight Sprint', 'Furlong Interval Bursts', 'Uphill Power Gallop', 'Gate Breakout Sprint', 'Long Stride Gallop', 'Official Speed Trial'], 100);
+                           ARRAY['Turn and Straight Sprint', 'Furlong Interval Bursts', 'Uphill Power Gallop', 'Gate Breakout Sprint', 'Long Stride Gallop', 'Official Speed Trial'], 135);
     PERFORM pg_temp.course('TR01', 'Recovery Maintenance', 'Light work after a heavy block or a rest period.', 4,
-                           ARRAY['Trot Balance Work', 'Walk and Hydro Cooling'], 100);
+                           ARRAY['Trot Balance Work', 'Walk and Hydro Cooling'], 135);
     PERFORM pg_temp.course('TR01', 'Winter Base Block', 'Planned for the winter break, no horse enrolled yet.', 20,
                            ARRAY['Aerobic Base Canter', 'Sand Track Stamina', 'Trot Balance Work'], 10);
-    PERFORM pg_temp.exercise('TR02', 'Distance Canter', 'Even canter over a long distance.', 'TURF', 2000, 'MEDIUM', 'ENDURANCE', 60, 90);
-    PERFORM pg_temp.exercise('TR02', 'Hill Repeats', 'Repeated short climbs at a strong canter.', 'DIRT', 1400, 'HIGH', 'ENDURANCE', 60, 90);
-    PERFORM pg_temp.exercise('TR02', 'Breeze Work', 'Fast work over 800 m at race pace.', 'TURF', 800, 'HIGH', 'SPEED', 45, 90);
-    PERFORM pg_temp.exercise('TR02', 'Pace Change Drill', 'Switch between canter and gallop on command.', 'SYNTHETIC', 1200, 'MEDIUM', 'SPEED', 60, 88);
-    PERFORM pg_temp.exercise('TR02', 'Starting Stall Practice', 'Walk-in, stand and walk-out of the starting stalls.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 88);
-    PERFORM pg_temp.exercise('TR02', 'Pool Recovery Swim', 'Low-impact swimming after hard work.', 'SYNTHETIC', 400, 'LOW', 'RECOVERY', 45, 88);
+    PERFORM pg_temp.exercise('TR02', 'Distance Canter', 'Even canter over a long distance.', 'TURF', 2000, 'MEDIUM', 'ENDURANCE', 60, 140);
+    PERFORM pg_temp.exercise('TR02', 'Hill Repeats', 'Repeated short climbs at a strong canter.', 'DIRT', 1400, 'HIGH', 'ENDURANCE', 60, 140);
+    PERFORM pg_temp.exercise('TR02', 'Breeze Work', 'Fast work over 800 m at race pace.', 'TURF', 800, 'HIGH', 'SPEED', 45, 140);
+    PERFORM pg_temp.exercise('TR02', 'Pace Change Drill', 'Switch between canter and gallop on command.', 'SYNTHETIC', 1200, 'MEDIUM', 'SPEED', 60, 140);
+    PERFORM pg_temp.exercise('TR02', 'Starting Stall Practice', 'Walk-in, stand and walk-out of the starting stalls.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 140);
+    PERFORM pg_temp.exercise('TR02', 'Pool Recovery Swim', 'Low-impact swimming after hard work.', 'SYNTHETIC', 400, 'LOW', 'RECOVERY', 45, 140);
     PERFORM pg_temp.course('TR02', 'Distance Builder', 'Build stamina for 2,000 m and longer.', 9,
-                           ARRAY['Distance Canter', 'Hill Repeats', 'Pool Recovery Swim'], 85);
+                           ARRAY['Distance Canter', 'Hill Repeats', 'Pool Recovery Swim'], 135);
     PERFORM pg_temp.course('TR02', 'Speed Sharpening', 'Race pace and quick changes of speed.', 8,
-                           ARRAY['Breeze Work', 'Pace Change Drill', 'Hill Repeats', 'Pool Recovery Swim'], 85);
+                           ARRAY['Breeze Work', 'Pace Change Drill', 'Hill Repeats', 'Pool Recovery Swim'], 135);
     PERFORM pg_temp.course('TR02', 'Starting Stall Basics', 'Stall manners for horses new to racing.', 4,
-                           ARRAY['Starting Stall Practice'], 85);
-    PERFORM pg_temp.exercise('TR03', 'Desert Endurance Trot', 'Long, even trot for Arabian endurance.', 'DIRT', 3000, 'LOW', 'ENDURANCE', 60, 50);
-    PERFORM pg_temp.exercise('TR03', 'Tempo Canter', 'Canter at a fixed tempo with heart-rate targets.', 'TURF', 1800, 'MEDIUM', 'ENDURANCE', 60, 50);
-    PERFORM pg_temp.exercise('TR03', 'Short Sprint Repeats', '3 x 300 m sprints with walk recovery.', 'TURF', 900, 'HIGH', 'SPEED', 45, 50);
-    PERFORM pg_temp.exercise('TR03', 'Stretch and Walk', 'Hand walking and stretching.', 'SYNTHETIC', 600, 'LOW', 'RECOVERY', 45, 50);
+                           ARRAY['Starting Stall Practice'], 135);
+    PERFORM pg_temp.exercise('TR03', 'Desert Endurance Trot', 'Long, even trot for Arabian endurance.', 'DIRT', 3000, 'LOW', 'ENDURANCE', 60, 140);
+    PERFORM pg_temp.exercise('TR03', 'Tempo Canter', 'Canter at a fixed tempo with heart-rate targets.', 'TURF', 1800, 'MEDIUM', 'ENDURANCE', 60, 140);
+    PERFORM pg_temp.exercise('TR03', 'Short Sprint Repeats', '3 x 300 m sprints with walk recovery.', 'TURF', 900, 'HIGH', 'SPEED', 45, 140);
+    PERFORM pg_temp.exercise('TR03', 'Stretch and Walk', 'Hand walking and stretching.', 'SYNTHETIC', 600, 'LOW', 'RECOVERY', 45, 140);
     PERFORM pg_temp.course('TR03', 'Arabian Endurance Base', 'Aerobic base for endurance racing.', 6,
-                           ARRAY['Desert Endurance Trot', 'Tempo Canter'], 45);
+                           ARRAY['Desert Endurance Trot', 'Tempo Canter'], 135);
     PERFORM pg_temp.course('TR03', 'Pace Variation', 'Tempo, sprints and recovery in one block.', 6,
-                           ARRAY['Tempo Canter', 'Short Sprint Repeats', 'Stretch and Walk'], 45);
+                           ARRAY['Tempo Canter', 'Short Sprint Repeats', 'Stretch and Walk'], 135);
 
 
     -- Trainer1, an early group that ran two plans and was then Disbanded; its horses go into the specialty groups below.
@@ -577,25 +581,23 @@ BEGIN
         UPDATE training_group_members SET left_at = v_gone WHERE group_id = v_old AND left_at IS NULL;
         UPDATE training_groups SET disbanded_at = v_gone, updated_at = v_gone WHERE id = v_old;
         PERFORM pg_temp.audit(v_trainer, 'Disband Training Group', 'TrainingGroup', v_old,
-                              'Trainer disbanded a training group', v_gone, 'POST', '/api/training-groups/' || v_old || '/disband');
+                              'Trainer disbanded a training group', v_gone, 'DELETE', '/api/training-groups/' || v_old);
     END;
 
     -- ----------------------------------------------------------------- groups and their courses
     -- Mỗi nhóm một sở trường khác nhau trong số cự ly các khóa của Trainer chạy nhiều.
     -- (Each group a different specialty among the distances the Trainer's courses run most.)
-    v_tr01 := pg_temp.make_groups('TR01', ARRAY['SPRINT', 'SPRINT,MILE', 'MILE'],
-        ARRAY['H001','H002','H003','H004','H005','H006','H007','H008','H009','H010','H011','H012','H013','H014','H015','H016','H017','H018']);
+    v_tr01 := pg_temp.make_groups('TR01', ARRAY['SPRINT', 'SPRINT,MILE', 'MILE'], pg_temp.trainer_horses('TR01'),
+        (SELECT t.k FROM unnest(pg_temp.trainer_horses('TR01')) WITH ORDINALITY t(k, o) ORDER BY t.o DESC LIMIT 1));
     PERFORM pg_temp.run_timeline('TR01', v_tr01,
         ARRAY['Novice Foundation', 'Sprint Acceleration', 'Classic Endurance', 'Championship Trial Protocol', 'Recovery Maintenance'],
-        1, 2);
+        1);
 
-    v_tr02 := pg_temp.make_groups('TR02', ARRAY['MILE', 'SPRINT,MILE', 'SPRINT'],
-        ARRAY['H019','H020','H021','H022','H023','H024','H025','H026','H027','H028','H029','H030','H031','H032','H033','H034','H035','H036']);
-    PERFORM pg_temp.run_timeline('TR02', v_tr02, ARRAY['Distance Builder', 'Speed Sharpening', 'Starting Stall Basics'], 2, NULL);
+    v_tr02 := pg_temp.make_groups('TR02', ARRAY['MILE', 'SPRINT,MILE', 'SPRINT'], pg_temp.trainer_horses('TR02'));
+    PERFORM pg_temp.run_timeline('TR02', v_tr02, ARRAY['Distance Builder', 'Speed Sharpening', 'Starting Stall Basics'], 2);
 
-    v_groups := pg_temp.make_groups('TR03', ARRAY['STAYER', 'MIDDLE,STAYER', 'MIDDLE'],
-        ARRAY['H037','H038','H039','H040','H041','H042']);
-    PERFORM pg_temp.run_timeline('TR03', v_groups, ARRAY['Arabian Endurance Base', 'Pace Variation'], NULL, NULL);
+    v_groups := pg_temp.make_groups('TR03', ARRAY['STAYER', 'MIDDLE,STAYER', 'MIDDLE'], pg_temp.trainer_horses('TR03'));
+    PERFORM pg_temp.run_timeline('TR03', v_groups, ARRAY['Arabian Endurance Base', 'Pace Variation']);
 
     -- ----------------------------------------------------------------- demo scenarios
     -- Trainer1, group 1, second course: one horse did not actually run in the third Session.

@@ -3,11 +3,11 @@ package com.rtms.backend.ai.tool;
 import java.util.*;
 
 /** Builds JSON Schema parameter definitions for AI tools. */
-final class ToolDefinitionSchema {
+public final class ToolDefinitionSchema {
     private ToolDefinitionSchema() {
     }
 
-    static Map<String, Object> buildParamSchema(Map<String, Object> properties, String... requiredFields) {
+    public static Map<String, Object> buildParamSchema(Map<String, Object> properties, String... requiredFields) {
             Map<String, Object> schema = new LinkedHashMap<>();
             schema.put("type", "object");
             schema.put("properties", properties);

@@ -5,7 +5,7 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 
 - Dữ liệu trải từ khoảng 5 tháng trước tới vài tuần sau, tính theo **ngày bạn chạy seed**. Chạy hôm nào thì dữ liệu "kết thúc" đúng hôm đó.
 - Seed xóa sạch dữ liệu cũ trước khi nạp. Chạy lại bao nhiêu lần cũng ra cùng một bộ dữ liệu.
-- Toàn bộ chạy trong một transaction. Cuối cùng có hơn 50 kiểm tra luật nghiệp vụ; vi phạm thì dừng và DB giữ nguyên.
+- Toàn bộ chạy trong một transaction. Cuối cùng có gần 90 kiểm tra luật nghiệp vụ (so với luật trong code, gồm cả thứ tự thời gian của từng thao tác); vi phạm thì dừng và DB giữ nguyên.
 - Đây là dữ liệu tối ưu cho **cấu trúc bảng hiện tại**. Ai đổi bảng của mình (migration mới) thì sửa luôn seed (xem mục "Sửa seed").
 
 ## Chạy
@@ -36,12 +36,12 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 | Horse Owner | owner@rtms.com | owner2..owner8@rtms.com |
 | Head Trainer | trainer1@rtms.com (khu A, B) | trainer2 (C, D), trainer3 (E) |
 | Veterinarian | vet1@rtms.com | vet2, vet3 |
-| Groom | groom1@rtms.com (chuồng A01-A03) | groom2, 22 Groom `@demo.rtms.example` khác, 1 Groom đã nghỉ (bị khóa) |
+| Groom | groom1@rtms.com (Groom khu cách ly: chuồng Q-A01..03, có đơn chờ duyệt) | groom2 (khu thường), 22 Groom `@demo.rtms.example` khác (jack.wilson: A01-A03), 1 Groom đã nghỉ (bị khóa) |
 
 ## Có gì trong dữ liệu
 
 - **Nhập học:** 55 đơn ở đủ trạng thái: GROOM_REVIEW, WAITING_FOR_ARRIVAL, ARRIVAL_EXPIRED, VET_REVIEW, TRAINER_REVIEW,
-  MANAGER_REVIEW, APPROVED, bị Groom từ chối, bị Manager từ chối rồi nộp lại và được duyệt. Mỗi đơn có đủ ảnh và PDF.
+  MANAGER_REVIEW, APPROVED, bị Groom từ chối, bị Manager từ chối rồi nộp lại và được duyệt. Mỗi đơn có đủ ảnh và PDF, và ngựa đã tới trại có ảnh xác nhận tới. Groom duyệt đơn, chuồng cách ly, chuồng thường và Head Trainer của mỗi đơn đều do `sql/25_assign.sql` chọn lại đúng như code (Groom ít việc nhất, chuồng Q trống nhỏ nhất, Groom ít ngựa nhất, Trainer ít ngựa nhất); riêng đơn chờ duyệt của groom1 do Manager giao tay.
   Có ngựa bị Thú y cho tạm nghỉ ngay lúc nhập trại, và ngựa có bố là một ngựa khác trong trại (phả hệ liên kết).
 - **Thú y:** khám nhập trại; tiêm phòng / tẩy giun định kỳ theo phác đồ (gồm một lần hoãn tiêm, tiêm từ "To do", một lịch
   quá giờ chưa khám); sự cố do Groom báo ở mọi trạng thái (đang khám, vừa giao, đã xong, báo hai lần gắn chung một ca).
@@ -52,16 +52,16 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 - **Huấn luyện:** 3 Trainer, mỗi người có bài tập và khóa riêng. Khóa có nhiều kiểu: một bài lặp lại, nhiều bài xoay vòng,
   toàn bài khác nhau, khóa chưa ai học. Ngựa được chia vào các Training Group (tối đa 6 ngựa) theo sở trường cự ly, và nhóm đặt tên theo sở trường đó
   ("Sprint Group", "Sprint & Mile Group", "Mile Group", "Stayer Group"...): ngựa trong nhóm chạy tốt ở cự ly sở trường và đuối
-  ở cự ly khác, nên có cùng huy hiệu; ngựa đang bị chặn tập không nằm trong nhóm nào. Mỗi nhóm chạy nối tiếp các khóa trong khoảng 13 tuần lịch sử: Group
+  ở cự ly khác, nên có cùng huy hiệu; ngựa đang bị chặn tập không nằm trong nhóm nào. Mỗi nhóm chạy nối tiếp các khóa kể từ lúc nhóm có thành viên (tối đa 13 tuần lịch sử): Group
   Plan COMPLETED / ACTIVE và một plan UPCOMING xếp hàng sau plan đang chạy. Trạng thái theo đồng hồ: Session hết giờ là HELD, dù
   đã ghi kết quả hay chưa. Có sẵn các kịch bản demo: Session đã HELD còn thiếu kết quả (nhãn "Needs result"), ngựa vào giữa
   khóa, ngựa bị hủy riêng một buổi, ngựa "không chạy", Session bị hủy vì mưa, plan bị bỏ giữa chừng, ngựa bị chặn tập ra khỏi
   nhóm, ngựa có dấu hiệu mệt. Điểm phong độ trải từ thấp tới cao và tính đúng công thức của app.
   Trainer1 còn có nhóm đã giải tán "Foundation Group" (Disbanded, không còn ngựa, không còn plan chưa đóng; plan COMPLETED và
   plan CANCELLED vẫn giữ nhóm, có Session đã HELD) và nhóm đang hoạt động "Reserve Group" chưa có ngựa, chưa có plan.
-- **Groom:** 5 việc SOP mỗi ngày trong 14 ngày gần nhất, theo đúng Groom của chuồng ngựa đang ở; việc giao thêm; hoàn thành
-  theo khối có ghi chú và ảnh; vài khối bị bỏ lỡ. groom1 còn việc hôm nay để thử tick.
-- Thông báo và nhật ký hoạt động sinh ra như app thật.
+- **Groom:** 5 việc SOP mỗi ngày trong 14 ngày gần nhất, giao cho Groom của chuồng ngựa lúc 00:00 (ngày ngựa tới chưa có việc); việc giao thêm; hoàn thành
+  theo khối có ghi chú và ảnh; vài khối bị bỏ lỡ. groom1 còn việc hôm nay (cho ngựa ở chuồng Q) để thử tick.
+- Thông báo (nhập học, khám định kỳ, tập lại) và nhật ký sinh ra như app thật. Hai chỗ khác app thật có chủ ý: tên và đường dẫn nhật ký của vài thao tác (xác nhận ngựa tới, nhận xét Trainer, tạo Course Run, tạo/giải tán nhóm) dùng chữ dễ đọc thay vì nhãn dự phòng của `AuditActivityResolver`; ảnh hoàn thành việc của Groom và hồ sơ nhập học đơn nộp lại dùng lại file có sẵn trên Cloudinary.
 
 ## Cấu trúc
 
@@ -72,6 +72,7 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 | `sql/01_cleanup.sql` | TRUNCATE mọi bảng trừ bảng danh mục do migration nạp |
 | `sql/10_data.sql` | Dữ liệu định danh: tài khoản, khu, ngựa, đơn, URL Cloudinary của file hồ sơ |
 | `sql/20_accounts_stable.sql` | Tài khoản, hồ sơ nhân viên, khu, chuồng, phân Groom |
+| `sql/25_assign.sql` | Chọn Groom duyệt, chuồng Q, chuồng thường, Trainer cho từng đơn như code |
 | `sql/30_admissions.sql` | Luồng nhập học từng đơn |
 | `sql/40_vet_cases.sql` | Ca Thú y sau nhập trại |
 | `sql/45_preventive.sql` | Tiêm phòng tới hôm nay |

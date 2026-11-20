@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Pill } from '@/components/ui/StatusBadge';
@@ -56,6 +57,9 @@ export function AccountTable({
   }, [confirmToggle]);
 
   function handleToggle(account: AccountSummary) {
+    if (account.superAdmin) {
+      return; // Protected against deactivation
+    }
     if (account.userId === currentUserId && account.active) {
       return; // Protected against self-lockout
     }
@@ -77,6 +81,15 @@ export function AccountTable({
           <div>
             <div className="flex items-center gap-1.5 font-medium text-[var(--color-text-primary)]">
               <span>{account.fullName}</span>
+              {account.superAdmin && (
+                <span
+                  title="Protected System Administrator"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  Protected
+                </span>
+              )}
               {isSelf && (
                 <span className="rounded bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-primary)]">
                   You
@@ -159,7 +172,17 @@ export function AccountTable({
                 View
               </Button>
             )}
-            {isSelf && account.active ? (
+            {account.superAdmin ? (
+              <span
+                className="inline-block"
+                title="Protected system administrator cannot be deactivated"
+              >
+                <Button size="sm" variant="secondary" disabled className="opacity-80">
+                  <ShieldCheck className="mr-1 h-3.5 w-3.5 text-amber-600" />
+                  Protected
+                </Button>
+              </span>
+            ) : isSelf && account.active ? (
               <span
                 className="inline-block"
                 title="You cannot deactivate your own administrator account"

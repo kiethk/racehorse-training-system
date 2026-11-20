@@ -1,7 +1,9 @@
 -- =====================================================================
--- 65_vitals.sql — chỉ số sinh hiệu Thú y đo khi đi buồng (không gắn ca khám) trong 5 tuần gần nhất, cho mọi ngựa đang ở
--- trong chuồng. (Vital readings taken by the vets on stable rounds, not tied to a visit, for the last 5 weeks, for every
--- stabled horse.)
+-- 65_vitals.sql — chỉ số sinh hiệu Thú y đo khi đi buồng trong 5 tuần gần nhất, cho mọi ngựa đang ở trong chuồng. Mỗi lần
+-- đo Thú y ghi một bệnh án rồi gắn chỉ số vào bệnh án đó (HealthRecordController + HorseHealthMetricController), nên
+-- không có chỉ số nào đứng riêng.
+-- (Vital readings taken by the vets on stable rounds, for the last 5 weeks, for every stabled horse. Each reading is written
+-- as a health record and the metric is attached to it, so no metric stands on its own.)
 --
 -- Chạy SAU 50_training.sql vì buổi tập mệt (nhịp tim hồi phục cao) để lại số đo bất thường chiều hôm đó.
 -- (Runs AFTER 50_training.sql because a tiring session leaves an abnormal reading that afternoon.)
@@ -14,29 +16,10 @@
 -- (Weekly round on a different weekday per horse with occasional mild deviations; daily abnormal readings while a
 -- horse is resting; a high reading after a tiring session. Abnormal limits: HealthReadingPolicy.)
 -- =====================================================================
-INSERT INTO horse_health_metrics (horse_id, recorded_at, heart_rate, temperature, weight, respiratory_rate, hydration_status,
-                                  body_condition_score, notes, created_at)
-SELECT r.horse_id, r.at,
-       CASE r.kind WHEN 'sick' THEN pg_temp.rndi('hs' || r.horse_id || r.at, 45, 56)
-                   WHEN 'fatigue' THEN pg_temp.rndi('hf' || r.horse_id || r.at, 46, 50)
-                   WHEN 'high_hr' THEN pg_temp.rndi('hh' || r.horse_id || r.at, 45, 48)
-                   ELSE pg_temp.rndi('hn' || r.horse_id || r.at, 30, 40) END,
-       CASE r.kind WHEN 'sick' THEN round(pg_temp.rnd('ts' || r.horse_id || r.at, 38.6, 39.3), 1)
-                   WHEN 'fever' THEN round(pg_temp.rnd('tf' || r.horse_id || r.at, 38.6, 38.9), 1)
-                   WHEN 'fatigue' THEN round(pg_temp.rnd('tg' || r.horse_id || r.at, 38.2, 38.5), 1)
-                   ELSE round(pg_temp.rnd('tn' || r.horse_id || r.at, 37.4, 38.1), 1) END,
-       round(pg_temp.rnd('w' || r.horse_id, 410, 480) + pg_temp.rnd('wd' || r.horse_id || r.at, -4, 4), 1),
-       CASE r.kind WHEN 'sick' THEN pg_temp.rndi('rs' || r.horse_id || r.at, 16, 24)
-                   ELSE pg_temp.rndi('rn' || r.horse_id || r.at, 10, 16) END,
-       CASE WHEN r.kind = 'sick' AND pg_temp.rndi('dh' || r.horse_id || r.at, 1, 3) = 1 THEN 'MILD_DEHYDRATION'
-            ELSE 'NORMAL' END,
-       pg_temp.rndi('b' || r.horse_id, 9, 13) / 2.0,
-       CASE r.kind WHEN 'sick' THEN 'Daily check during the rest period.'
-                   WHEN 'fatigue' THEN 'Rechecked after a tiring session: heart rate still up in the afternoon.'
-                   WHEN 'fever' THEN 'Slightly warm on the round, recheck tomorrow.'
-                   WHEN 'high_hr' THEN 'Heart rate up on the round, settled after 15 minutes.'
-                   ELSE 'Stable round.' END,
-       r.at
+CREATE TEMP TABLE seed_round AS
+SELECT r.horse_id, r.at, r.kind,
+       (SELECT a.veterinarian_id FROM admission_applications a WHERE a.horse_id = r.horse_id AND a.veterinarian_id IS NOT NULL
+         ORDER BY a.id DESC LIMIT 1) AS vet_id
   FROM (
         -- Đo thường lệ hằng tuần, mỗi ngựa một ngày riêng. (Weekly round, a weekday of its own for each horse.)
         SELECT st.horse_id, d + TIME '15:45' + make_interval(mins => (st.horse_id % 4)::INT * 10) AS at,
@@ -59,5 +42,41 @@ SELECT r.horse_id, r.at,
           FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
          WHERE w.status = 'RAN' AND w.recovery_heart_rate >= 118 AND s.session_date >= pg_temp.today() - 34
        ) r
- WHERE r.at <= pg_temp.clock()
+ WHERE r.at <= pg_temp.clock();
+
+INSERT INTO health_records (horse_id, veterinarian_id, examined_at, findings, diagnosis, notes, created_at, updated_at, record_type)
+SELECT horse_id, vet_id, at,
+       CASE kind WHEN 'sick' THEN 'Daily check during the rest period.' WHEN 'fatigue' THEN 'Rechecked after a tiring session.'
+                 ELSE 'Seen on the stable round.' END,
+       CASE kind WHEN 'sick' THEN 'Under treatment, daily recheck' WHEN 'fatigue' THEN 'Tired after training, monitoring'
+                 WHEN 'fever' THEN 'Slightly warm, recheck tomorrow' WHEN 'high_hr' THEN 'Heart rate up, settled on rest'
+                 ELSE 'Stable round check, no concerns' END,
+       NULL, at, at, CASE kind WHEN 'sick' THEN 'ILLNESS' ELSE 'ROUTINE' END
+  FROM seed_round;
+
+INSERT INTO horse_health_metrics (horse_id, recorded_at, heart_rate, temperature, weight, respiratory_rate, hydration_status,
+                                  body_condition_score, notes, created_at, health_record_id)
+SELECT r.horse_id, r.at,
+       CASE r.kind WHEN 'sick' THEN pg_temp.rndi('hs' || r.horse_id || r.at, 45, 56)
+                   WHEN 'fatigue' THEN pg_temp.rndi('hf' || r.horse_id || r.at, 46, 50)
+                   WHEN 'high_hr' THEN pg_temp.rndi('hh' || r.horse_id || r.at, 45, 48)
+                   ELSE pg_temp.rndi('hn' || r.horse_id || r.at, 30, 40) END,
+       CASE r.kind WHEN 'sick' THEN round(pg_temp.rnd('ts' || r.horse_id || r.at, 38.6, 39.3), 1)
+                   WHEN 'fever' THEN round(pg_temp.rnd('tf' || r.horse_id || r.at, 38.6, 38.9), 1)
+                   WHEN 'fatigue' THEN round(pg_temp.rnd('tg' || r.horse_id || r.at, 38.2, 38.5), 1)
+                   ELSE round(pg_temp.rnd('tn' || r.horse_id || r.at, 37.4, 38.1), 1) END,
+       round(pg_temp.rnd('w' || r.horse_id, 410, 480) + pg_temp.rnd('wd' || r.horse_id || r.at, -4, 4), 1),
+       CASE r.kind WHEN 'sick' THEN pg_temp.rndi('rs' || r.horse_id || r.at, 16, 24)
+                   ELSE pg_temp.rndi('rn' || r.horse_id || r.at, 10, 16) END,
+       CASE WHEN r.kind = 'sick' AND pg_temp.rndi('dh' || r.horse_id || r.at, 1, 3) = 1 THEN 'MILD_DEHYDRATION'
+            ELSE 'NORMAL' END,
+       pg_temp.rndi('b' || r.horse_id, 9, 13) / 2.0,
+       CASE r.kind WHEN 'sick' THEN 'Daily check during the rest period.'
+                   WHEN 'fatigue' THEN 'Rechecked after a tiring session: heart rate still up in the afternoon.'
+                   WHEN 'fever' THEN 'Slightly warm on the round, recheck tomorrow.'
+                   WHEN 'high_hr' THEN 'Heart rate up on the round, settled after 15 minutes.'
+                   ELSE 'Stable round.' END,
+       r.at, hr.id
+  FROM seed_round r
+  JOIN health_records hr ON hr.horse_id = r.horse_id AND hr.examined_at = r.at AND hr.care_schedule_id IS NULL
  ORDER BY r.at, r.horse_id;
