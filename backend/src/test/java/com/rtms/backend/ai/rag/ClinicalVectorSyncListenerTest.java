@@ -8,7 +8,6 @@ import com.rtms.backend.event.ClinicalRecordCreatedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.jdbc.core.JdbcTemplate;
 

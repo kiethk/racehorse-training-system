@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -336,7 +337,7 @@ class CourseServiceTest {
         existing.setName(name);
         existing.setTrainerId(9L);
         when(courseRepository.findByTrainerId(9L)).thenReturn(List.of(existing));
-        List<CourseExercise> rows = new java.util.ArrayList<>();
+        List<CourseExercise> rows = new ArrayList<>();
         for (int i = 0; i < exerciseIds.length; i++) {
             CourseExercise row = new CourseExercise();
             row.setCourseId(courseId);

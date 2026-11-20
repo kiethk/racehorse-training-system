@@ -4,14 +4,15 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "health_conditions")
 public class InjuryRecord {
 
     /** D4 (WF-02 §3.3): một bộ từ vựng severity duy nhất cho bệnh lý/chấn thương. */
-    public static final java.util.Set<String> SEVERITY_VALUES =
-            java.util.Set.of("MILD", "MODERATE", "SEVERE", "CRITICAL");
+    public static final Set<String> SEVERITY_VALUES =
+            Set.of("MILD", "MODERATE", "SEVERE", "CRITICAL");
 
     public static boolean isValidSeverity(String severity) {
         return severity != null && SEVERITY_VALUES.contains(severity.trim().toUpperCase());

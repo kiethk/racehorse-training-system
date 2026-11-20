@@ -5,7 +5,6 @@ import com.rtms.backend.ai.dto.AiChatMessageDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;

@@ -18,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * Xác nhận Workout của buổi đã diễn ra: ghi kết quả chuyển HELD thành RAN (bằng chứng con ngựa đã chạy), "Did not run" chuyển HELD
  * thành CANCELLED. Session và kế hoạch vẫn theo đồng hồ.
@@ -149,7 +151,7 @@ public class TrainingWorkoutService {
         return ownOrNotFound(workoutRepository.findByIdForUpdate(workoutId), currentUser);
     }
 
-    private TrainingWorkout ownOrNotFound(java.util.Optional<TrainingWorkout> found, AuthenticatedUser currentUser) {
+    private TrainingWorkout ownOrNotFound(Optional<TrainingWorkout> found, AuthenticatedUser currentUser) {
         TrainingWorkout workout = found
                 .filter(w -> w.getSessionId() != null)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WORKOUT_NOT_FOUND", "Workout not found!"));

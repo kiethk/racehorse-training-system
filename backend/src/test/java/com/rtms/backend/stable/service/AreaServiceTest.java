@@ -7,6 +7,7 @@ import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class AreaServiceTest {
     void setUp() {
         areaService = new AreaService(areaRepository, stableStallRepository, entityManager, lifecycle);
         lenient().when(lifecycle.restoreFirst(any())).thenReturn(null);
-        jakarta.persistence.Query lock = mock(jakarta.persistence.Query.class);
+        Query lock = mock(Query.class);
         lenient().when(entityManager.createNativeQuery(any(String.class))).thenReturn(lock);
         lenient().when(lock.setParameter(any(String.class), any())).thenReturn(lock);
     }

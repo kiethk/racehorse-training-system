@@ -125,3 +125,4 @@ playwright/.cache/
 playwright/.auth/
 .env.test
 diagram/
+backend/src/main/resources/application.properties

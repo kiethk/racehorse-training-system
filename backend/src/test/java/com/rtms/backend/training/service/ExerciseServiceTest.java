@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateExerciseRequest;
 import com.rtms.backend.training.entity.Exercise;
@@ -179,8 +180,8 @@ class ExerciseServiceTest {
         s1.setName("Trainer 9 Exercise");
         s1.setTrainerId(9L);
 
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
 
         when(exerciseRepository.findByTrainerId(9L)).thenReturn(List.of(s1));
 
@@ -199,8 +200,8 @@ class ExerciseServiceTest {
         other.setName("Other Exercise");
         other.setTrainerId(10L); // different trainer
 
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
 
         when(exerciseRepository.findById(50L)).thenReturn(Optional.of(other));
 
@@ -210,8 +211,8 @@ class ExerciseServiceTest {
     @Test
     @DisplayName("The owner of a new exercise is the signed-in trainer")
     void testCreateExercise_OwnerIsTheSignedInTrainer() {
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
         when(exerciseRepository.save(any(Exercise.class))).thenAnswer(inv -> {
             Exercise s = inv.getArgument(0);
             s.setId(100L);
@@ -228,8 +229,8 @@ class ExerciseServiceTest {
     @Test
     @DisplayName("A name is trimmed and a duplicate is found whatever its case")
     void testCreateExercise_DuplicateNameIgnoresCaseAndSpaces() {
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", Roles.HEAD_TRAINER);
         CreateExerciseRequest req = validRequest();
         req.setName("  45-MINUTE heart-rate run ");
         when(exerciseRepository.existsByNameIgnoreCaseAndTrainerId("45-MINUTE heart-rate run", 9L)).thenReturn(true);

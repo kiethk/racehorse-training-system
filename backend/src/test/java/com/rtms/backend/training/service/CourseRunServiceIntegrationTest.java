@@ -43,6 +43,7 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -302,7 +303,7 @@ class CourseRunServiceIntegrationTest {
     }
 
     private TrainingGroupResponse groupOf(String name, int horseCount) {
-        List<Long> horseIds = new java.util.ArrayList<>();
+        List<Long> horseIds = new ArrayList<>();
         for (int i = 0; i < horseCount; i++) {
             horseIds.add(horse("H" + System.nanoTime(), user(Roles.GROOM, "groom")).getId());
         }

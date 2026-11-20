@@ -1,5 +1,6 @@
 package com.rtms.backend.security;
 
+import com.rtms.backend.identity.entity.Permission;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import io.jsonwebtoken.Claims;
@@ -17,6 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -48,7 +50,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 List<GrantedAuthority> authorities = roleRepository.findByName(role)
                         .map(r -> {
-                            List<GrantedAuthority> auths = (r.getPermissions() != null ? r.getPermissions().stream() : java.util.stream.Stream.<com.rtms.backend.identity.entity.Permission>empty())
+                            List<GrantedAuthority> auths = (r.getPermissions() != null ? r.getPermissions().stream() : Stream.<Permission>empty())
                                     .map(p -> (GrantedAuthority) new SimpleGrantedAuthority(p.getCode()))
                                     .collect(Collectors.toList());
                             if (role != null) {

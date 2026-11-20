@@ -6,6 +6,7 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -19,6 +20,7 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.notification.repository.NotificationRepository;
+import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
@@ -29,9 +31,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -165,17 +169,17 @@ class AdmissionVetReviewIntegrationTest {
         assertEquals(StallStatus.AVAILABLE, updatedStall.getStatus());
 
         long openSchedules = careSchedules.findByHorseIdAndStatusIn(horse.getId(),
-                java.util.List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)).size();
+                List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)).size();
         assertEquals(0L, openSchedules);
 
         long completedHealthRecords = healthRecords.findByHorseIdOrderByExaminedAtDesc(horse.getId()).size();
         assertEquals(0L, completedHealthRecords, "Reject must not create a HealthRecord");
 
         long ownerNotifications = notifications.findByRecipientIdOrderByCreatedAtDesc(ownerId).stream()
-                .filter(n -> com.rtms.backend.notification.service.NotificationTypes.ADMISSION_REJECTED.equals(n.getNotificationType()))
+                .filter(n -> NotificationTypes.ADMISSION_REJECTED.equals(n.getNotificationType()))
                 .count();
         long managerNotifications = notifications.findByRecipientIdOrderByCreatedAtDesc(managerId).stream()
-                .filter(n -> com.rtms.backend.notification.service.NotificationTypes.ADMISSION_REJECTED.equals(n.getNotificationType()))
+                .filter(n -> NotificationTypes.ADMISSION_REJECTED.equals(n.getNotificationType()))
                 .count();
         assertTrue(ownerNotifications >= 1, "Owner must be notified");
         assertTrue(managerNotifications >= 1, "Manager must be notified");
@@ -186,10 +190,10 @@ class AdmissionVetReviewIntegrationTest {
         VetReviewRequest req = new VetReviewRequest();
         req.setDecision(ReviewDecision.REJECT);
 
-        com.rtms.backend.config.ApiException ex = assertThrows(com.rtms.backend.config.ApiException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> admissionReviewService.reviewByVet(admission.getId(), req, vetId));
 
-        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         assertEquals("VALIDATION_ERROR", ex.getErrorCode());
         assertEquals(AdmissionStatus.VET_REVIEW, admissions.findById(admission.getId()).orElseThrow().getStatus());
     }
@@ -208,10 +212,10 @@ class AdmissionVetReviewIntegrationTest {
         req.setDecision(ReviewDecision.REJECT);
         req.setRejectReason("Reason");
 
-        com.rtms.backend.config.ApiException ex = assertThrows(com.rtms.backend.config.ApiException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> admissionReviewService.reviewByVet(admission.getId(), req, otherVetId));
 
-        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
         assertEquals("FORBIDDEN", ex.getErrorCode());
     }
 }

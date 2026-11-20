@@ -1,5 +1,7 @@
 package com.rtms.backend.identity.dto;
 
+import com.rtms.backend.stable.enums.AreaType;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -9,9 +11,9 @@ import java.util.List;
  * so the frontend can display what was assigned on creation.
  */
 public class StaffCreationResponse {
-    private com.rtms.backend.stable.enums.AreaType assignedAreaType;
-    public com.rtms.backend.stable.enums.AreaType getAssignedAreaType() { return assignedAreaType; }
-    public void setAssignedAreaType(com.rtms.backend.stable.enums.AreaType type) { assignedAreaType=type; }
+    private AreaType assignedAreaType;
+    public AreaType getAssignedAreaType() { return assignedAreaType; }
+    public void setAssignedAreaType(AreaType type) { assignedAreaType=type; }
 
     private Long userId;
     private String fullName;

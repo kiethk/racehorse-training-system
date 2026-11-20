@@ -1,5 +1,7 @@
 package com.rtms.backend.training.repository;
 
+import com.rtms.backend.analytics.dto.horse.FleetWorkoutSummaryRow;
+import com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow;
 import com.rtms.backend.training.repository.projection.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
@@ -284,9 +286,9 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
              AND s.sessionDate >= :since
            GROUP BY w.horseId
            """)
-    List<com.rtms.backend.analytics.dto.horse.FleetWorkoutSummaryRow> findFleetWorkoutSummaries(
-            @Param("horseIds") java.util.Collection<Long> horseIds,
-            @Param("since") java.time.LocalDate since);
+    List<FleetWorkoutSummaryRow> findFleetWorkoutSummaries(
+            @Param("horseIds") Collection<Long> horseIds,
+            @Param("since") LocalDate since);
     @Query("""
             SELECT new com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow(
                 s.trainerId,
@@ -302,6 +304,6 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
             WHERE s.sessionDate >= :since
             ORDER BY s.sessionDate ASC
             """)
-    List<com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow> findTrainerWorkoutsSince(
-            @Param("since") java.time.LocalDate since);
+    List<TrainerWorkoutRow> findTrainerWorkoutsSince(
+            @Param("since") LocalDate since);
 }

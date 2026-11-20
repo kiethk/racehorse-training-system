@@ -26,7 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -362,16 +362,16 @@ class TrainerHandoverServiceTest {
         TrainingSession sessionToTransfer = new TrainingSession();
         sessionToTransfer.setId(401L);
         sessionToTransfer.setSessionDate(sessionDate);
-        sessionToTransfer.setStartTime(java.time.LocalTime.of(9, 0));
-        sessionToTransfer.setEndTime(java.time.LocalTime.of(10, 0));
+        sessionToTransfer.setStartTime(LocalTime.of(9, 0));
+        sessionToTransfer.setEndTime(LocalTime.of(10, 0));
         sessionToTransfer.setTrainerId(oldTrainerId);
 
         // Replacement trainer already has session: 09:30 - 10:30 (overlaps!)
         TrainingSession existingReplacementSession = new TrainingSession();
         existingReplacementSession.setId(901L);
         existingReplacementSession.setSessionDate(sessionDate);
-        existingReplacementSession.setStartTime(java.time.LocalTime.of(9, 30));
-        existingReplacementSession.setEndTime(java.time.LocalTime.of(10, 30));
+        existingReplacementSession.setStartTime(LocalTime.of(9, 30));
+        existingReplacementSession.setEndTime(LocalTime.of(10, 30));
         existingReplacementSession.setTrainerId(replacementId);
 
         when(trainingSessionRepository.findLiveSessionsFromDate(eq(oldTrainerId), eq(SessionStatus.CANCELLED), any()))

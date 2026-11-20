@@ -16,6 +16,9 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.AreaTrainerAssignmentPolicy;
 import com.rtms.backend.stable.dto.AreaTrainerChangeCheck;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
+import jakarta.validation.Validator;
 
 
 import com.rtms.backend.admission.entity.AdmissionApplication;
@@ -39,6 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -60,8 +64,8 @@ class StaffManagementServiceTest {
     private CareScheduleService careScheduleService;
     private StaffManagementService staffService;
     private AreaTrainerAssignmentPolicy trainerAssignmentPolicy;
-    private jakarta.persistence.EntityManager em;
-    private jakarta.validation.Validator validator;
+    private EntityManager em;
+    private Validator validator;
     private TrainerHandoverService trainerHandoverService;
 
     @BeforeEach
@@ -80,15 +84,15 @@ class StaffManagementServiceTest {
         careScheduleService = mock(CareScheduleService.class);
         trainerHandoverService = mock(TrainerHandoverService.class);
         trainerAssignmentPolicy = mock(AreaTrainerAssignmentPolicy.class);
-        em = mock(jakarta.persistence.EntityManager.class);
-        var query = mock(jakarta.persistence.Query.class);
+        em = mock(EntityManager.class);
+        var query = mock(Query.class);
         when(em.createNativeQuery(anyString())).thenReturn(query);
         when(query.setParameter(anyString(), any())).thenReturn(query);
-        validator = mock(jakarta.validation.Validator.class);
+        validator = mock(Validator.class);
         when(trainerAssignmentPolicy.check(anyLong())).thenAnswer(i ->
                 new AreaTrainerChangeCheck(i.getArgument(0), null, true, List.of()));
         when(stableStallRepository.findBlockForUpdate(anyLong(), eq(1), eq(12))).thenAnswer(i ->
-                java.util.stream.IntStream.rangeClosed(1,12).mapToObj(n -> stall(n,i.getArgument(0),n,null)).toList());
+                IntStream.rangeClosed(1,12).mapToObj(n -> stall(n,i.getArgument(0),n,null)).toList());
 
         staffService = new StaffManagementService(
                 userRepository, roleRepository, passwordEncoder,

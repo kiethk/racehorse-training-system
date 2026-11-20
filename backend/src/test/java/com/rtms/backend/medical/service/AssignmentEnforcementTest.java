@@ -2,11 +2,8 @@ package com.rtms.backend.medical.service;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
-import com.rtms.backend.identity.entity.Role;
-import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
-import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
@@ -22,9 +19,7 @@ import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
-import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
-import com.rtms.backend.medical.enums.CareType;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +28,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
 
 import java.util.Optional;
 

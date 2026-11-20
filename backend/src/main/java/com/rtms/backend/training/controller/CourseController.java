@@ -4,7 +4,6 @@ import com.rtms.backend.training.dto.CourseResponse;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.training.dto.CourseDetailResponse;
 import com.rtms.backend.training.dto.CreateCourseRequest;
-import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.service.CourseService;
 import jakarta.validation.Valid;

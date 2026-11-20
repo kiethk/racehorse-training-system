@@ -32,6 +32,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+
 import java.time.LocalDateTime;
 
 import java.util.UUID;
@@ -221,7 +223,7 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
         // Postgres ROUNDS nanoseconds to microseconds (±1µs) — so sánh tổng drift, không truncate.
 
-        long driftNanos = Math.abs(java.time.Duration
+        long driftNanos = Math.abs(Duration
 
                 .between(urgent.getScheduledAt(), kept.getScheduledAt()).toNanos());
 

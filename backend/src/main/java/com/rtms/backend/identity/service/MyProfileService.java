@@ -8,6 +8,7 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -97,7 +98,7 @@ public class MyProfileService {
         }
     }
 
-    public record Photo(Resource resource, org.springframework.http.MediaType mediaType) {}
+    public record Photo(Resource resource, MediaType mediaType) {}
     private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private static ResponseStatusException bad(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
 }

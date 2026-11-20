@@ -3,10 +3,13 @@ package com.rtms.backend.horse.controller;
 import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.horse.dto.CreateHorseRequest;
+import com.rtms.backend.horse.dto.HorseAdmissionHistoryResponse;
 import jakarta.validation.Valid;
 import com.rtms.backend.horse.dto.HorseResponse;
+import com.rtms.backend.horse.dto.HorseStatusChangeRequest;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.service.HorseAdmissionService;
 import com.rtms.backend.horse.service.HorsePhotoService;
 import com.rtms.backend.horse.service.HorseService;
 import com.rtms.backend.identity.entity.User;
@@ -40,19 +43,19 @@ public class HorseController {
     private final HorseService horseService;
     private final HorseSpecialtyService specialtyService;
     private final HorsePhotoService photoService;
-    private final com.rtms.backend.horse.service.HorseAdmissionService admissionService;
+    private final HorseAdmissionService admissionService;
     private final UserRepository userRepository;
 
     public HorseController(HorseService horseService,
                            HorseSpecialtyService specialtyService, HorsePhotoService photoService,
-                           com.rtms.backend.horse.service.HorseAdmissionService admissionService) {
+                           HorseAdmissionService admissionService) {
         this(horseService, specialtyService, photoService, admissionService, null);
     }
 
     @Autowired
     public HorseController(HorseService horseService,
                            HorseSpecialtyService specialtyService, HorsePhotoService photoService,
-                           com.rtms.backend.horse.service.HorseAdmissionService admissionService,
+                           HorseAdmissionService admissionService,
                            @Autowired(required = false) UserRepository userRepository) {
         this.horseService = horseService;
         this.specialtyService = specialtyService;
@@ -179,7 +182,7 @@ public class HorseController {
      */
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping("/{id}/admissions")
-    public ApiResponse<List<com.rtms.backend.horse.dto.HorseAdmissionHistoryResponse>> getAdmissions(
+    public ApiResponse<List<HorseAdmissionHistoryResponse>> getAdmissions(
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(admissionService.getAdmissionsForHorse(id, currentUser));
@@ -189,7 +192,7 @@ public class HorseController {
     @PutMapping("/{id}/status")
     public ApiResponse<HorseResponse> changeStatus(
             @PathVariable Long id,
-            @Valid @RequestBody com.rtms.backend.horse.dto.HorseStatusChangeRequest request,
+            @Valid @RequestBody HorseStatusChangeRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         Horse horse = horseService.changeHorseStatus(id, request, currentUser);
         Map<Long, String> imageUrls = photoService.resolveImageUrls(List.of(id), BASE_URL);

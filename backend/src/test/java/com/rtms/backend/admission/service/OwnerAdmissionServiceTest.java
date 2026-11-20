@@ -17,7 +17,6 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.notification.service.NotificationService;
-import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.event.AdmissionEnteredGroomReviewEvent;

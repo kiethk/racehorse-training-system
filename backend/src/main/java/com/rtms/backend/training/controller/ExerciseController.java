@@ -4,7 +4,6 @@ import com.rtms.backend.training.dto.ExerciseResponse;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateExerciseRequest;
-import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.enums.ExerciseCategory;
 import com.rtms.backend.training.service.ExerciseService;
 import jakarta.validation.Valid;

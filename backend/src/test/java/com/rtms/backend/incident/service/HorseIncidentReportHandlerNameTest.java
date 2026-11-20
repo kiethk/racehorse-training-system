@@ -8,9 +8,11 @@ import com.rtms.backend.incident.dto.HandleIncidentRequest;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
 import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
+import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.stable.repository.StableStallRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,7 +43,7 @@ class HorseIncidentReportHandlerNameTest {
     @Mock CareScheduleRepository schedules;
     @Mock CareScheduleService careScheduleService;
     @Mock UserRepository users;
-    @Mock com.rtms.backend.stable.repository.StableStallRepository stalls;
+    @Mock StableStallRepository stalls;
 
     private HorseIncidentReportService service;
     private final AuthenticatedUser groom = new AuthenticatedUser(10L, "groom1@rtms.com", "GROOM");
@@ -85,7 +88,7 @@ class HorseIncidentReportHandlerNameTest {
 
         assertEquals("Hannah Reed", joined.getHandlerName());
         assertNull(unassignedCase.getHandlerName(), "the urgent case has no vet yet");
-        verify(schedules, times(1)).findAllById(argThat(ids -> java.util.Set.copyOf((Collection<Long>) ids).equals(java.util.Set.of(94L, 95L))));
+        verify(schedules, times(1)).findAllById(argThat(ids -> Set.copyOf((Collection<Long>) ids).equals(Set.of(94L, 95L))));
     }
 
     @Test
@@ -152,8 +155,8 @@ class HorseIncidentReportHandlerNameTest {
         return report;
     }
 
-    private static com.rtms.backend.medical.entity.CareSchedule schedule(long id, Long vetId) {
-        com.rtms.backend.medical.entity.CareSchedule schedule = new com.rtms.backend.medical.entity.CareSchedule();
+    private static CareSchedule schedule(long id, Long vetId) {
+        CareSchedule schedule = new CareSchedule();
         schedule.setId(id);
         schedule.setVeterinarianId(vetId);
         return schedule;

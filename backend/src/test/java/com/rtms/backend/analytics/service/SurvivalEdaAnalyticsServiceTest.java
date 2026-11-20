@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -183,7 +184,7 @@ class SurvivalEdaAnalyticsServiceTest {
 
         // Use reflection to set updatedAt
         try {
-            java.lang.reflect.Field updatedAtField = InjuryRecord.class.getDeclaredField("updatedAt");
+            Field updatedAtField = InjuryRecord.class.getDeclaredField("updatedAt");
             updatedAtField.setAccessible(true);
             updatedAtField.set(inj, resolvedAtUpdate);
         } catch (Exception e) {

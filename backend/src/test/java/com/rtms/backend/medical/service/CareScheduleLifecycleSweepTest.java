@@ -75,7 +75,8 @@ import org.springframework.context.ApplicationEventPublisher;
 
 
 
-import java.time.LocalDateTime;
+
+import java.util.ArrayList;
 
 import java.util.List;
 
@@ -467,7 +468,7 @@ class CareScheduleLifecycleSweepTest {
         rolled.setScheduledDate(LocalDate.of(2026, 11, 1));
         rolled.setRolloverCount(1);
         LocalDate t1 = LocalDate.of(2026, 11, 2);
-        List<CareSchedule> full = new java.util.ArrayList<>();
+        List<CareSchedule> full = new ArrayList<>();
         for (long i = 0; i < 3; i++) {
             CareSchedule booked = schedule(200L + i, CareType.ROUTINE, CareScheduleStatus.SCHEDULED, null);
             booked.setHorseId(11L + i);

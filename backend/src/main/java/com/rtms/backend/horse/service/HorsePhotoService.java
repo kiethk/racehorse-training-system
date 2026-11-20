@@ -7,6 +7,8 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.common.storage.FileVariant;
+import com.rtms.backend.horse.entity.HorseEditRequestDocument;
+import com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,12 +53,12 @@ public class HorsePhotoService {
     private final AdmissionApplicationRepository admissionRepo;
     private final AdmissionDocumentRepository documentRepo;
     private final FileStorageService storage;
-    private final com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments;
+    private final HorseEditRequestDocumentRepository editDocuments;
 
     public HorsePhotoService(AdmissionApplicationRepository admissionRepo,
                              AdmissionDocumentRepository documentRepo,
                              FileStorageService storage,
-                             com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments) {
+                             HorseEditRequestDocumentRepository editDocuments) {
         this.admissionRepo = admissionRepo;
         this.documentRepo = documentRepo;
         this.storage = storage;
@@ -76,7 +79,7 @@ public class HorsePhotoService {
         // An approved edit request may have replaced (or added) the photo.
         Set<Long> withEditedPhoto = editDocuments
                 .findByHorseIdInAndDocumentTypeAndCurrentTrue(horseIds, AdmissionDocumentType.HORSE_PHOTO).stream()
-                .map(com.rtms.backend.horse.entity.HorseEditRequestDocument::getHorseId)
+                .map(HorseEditRequestDocument::getHorseId)
                 .collect(Collectors.toSet());
 
         // Step 1: Find admissions for these horses; pick latest per horse.
@@ -108,7 +111,7 @@ public class HorsePhotoService {
                         (a, b) -> a.getId() > b.getId() ? a : b));
 
         // Step 3: Build horseId → imageUrl.
-        Set<Long> withPhoto = new java.util.HashSet<>(withEditedPhoto);
+        Set<Long> withPhoto = new HashSet<>(withEditedPhoto);
         latestPerHorse.entrySet().stream()
                 .filter(e -> photoByAdmission.containsKey(e.getValue().getId()))
                 .forEach(e -> withPhoto.add(e.getKey()));

@@ -12,7 +12,6 @@ import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.stable.entity.StableStall;
-import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.repository.projection.GroomWorkoutRow;
 import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.enums.SopSlot;

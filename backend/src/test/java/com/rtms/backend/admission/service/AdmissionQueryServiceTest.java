@@ -17,13 +17,17 @@ import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -84,8 +88,8 @@ class AdmissionQueryServiceTest {
 
     @Test
     void managerListBatchesAll54RowsAndPreservesOrderNullStallsAndFirstPhoto() {
-        var rows = new java.util.ArrayList<AdmissionApplication>();
-        var profiles = new java.util.ArrayList<CandidateHorseProfile>();
+        var rows = new ArrayList<AdmissionApplication>();
+        var profiles = new ArrayList<CandidateHorseProfile>();
         for (long id=1; id<=54; id++) {
             var row = new AdmissionApplication(); row.setId(id); row.setStatus(AdmissionStatus.APPROVED);
             row.setTrainerId(7L); row.setSubmittedAt(LocalDateTime.of(2026,3,1,9,0));
@@ -94,7 +98,7 @@ class AdmissionQueryServiceTest {
             profile.setBreed("Arabian"); profiles.add(profile);
         }
         rows.getFirst().setQuarantineStallId(500L);
-        java.util.Collections.reverse(profiles);
+        Collections.reverse(profiles);
         var stall = new StableStall(); stall.setId(500L); stall.setStallCode("Q-A01");
         var later = new AdmissionDocument(); later.setId(12L); later.setAdmissionId(1L);
         var first = new AdmissionDocument(); first.setId(11L); first.setAdmissionId(1L);
@@ -156,7 +160,7 @@ class AdmissionQueryServiceTest {
 
         assertEquals(10, response.size());
         assertEquals(2, response.page());
-        var pageable = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        var pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(admissions).findGroomQueue(eq(7L), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), eq(LocalDateTime.of(2026, 1, 2, 0, 0)),
                 eq(true), eq(LocalDateTime.of(2026, 1, 9, 0, 0)), pageable.capture());
@@ -263,7 +267,7 @@ class AdmissionQueryServiceTest {
 
         HorseHealthMetric metric = new HorseHealthMetric();
         metric.setHealthRecordId(healthRecordId);
-        metric.setHeartRate(java.math.BigDecimal.valueOf(42));
+        metric.setHeartRate(BigDecimal.valueOf(42));
         metric.setRecordedAt(LocalDateTime.of(2026, 3, 2, 14, 15));
         when(healthMetrics.findByHealthRecordIdOrderByRecordedAtAsc(healthRecordId))
                 .thenReturn(List.of(metric));
@@ -281,7 +285,7 @@ class AdmissionQueryServiceTest {
         assertEquals("Clear lungs, sound gait", exam.getFindings());
         assertNotNull(exam.getMetrics());
         assertEquals(1, exam.getMetrics().size());
-        assertEquals(java.math.BigDecimal.valueOf(42), exam.getMetrics().get(0).heartRate());
+        assertEquals(BigDecimal.valueOf(42), exam.getMetrics().get(0).heartRate());
     }
 
     @Test

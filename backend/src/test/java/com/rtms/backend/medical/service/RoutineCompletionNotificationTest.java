@@ -9,7 +9,6 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
-import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
@@ -36,7 +35,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.context.ApplicationEventPublisher;
 
-import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
@@ -44,7 +42,6 @@ import com.rtms.backend.medical.enums.HydrationStatus;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;

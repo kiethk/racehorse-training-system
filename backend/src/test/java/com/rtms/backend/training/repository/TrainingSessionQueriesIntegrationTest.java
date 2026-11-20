@@ -2,6 +2,8 @@ package com.rtms.backend.training.repository;
 
 import com.rtms.backend.security.Roles;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.repository.projection.DashboardHorseRow;
@@ -22,8 +24,10 @@ import com.rtms.backend.training.entity.Exercise;
 import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
+import com.rtms.backend.training.enums.ExerciseCategory;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.TrainingDay;
+import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.support.TrainingFixtures;
@@ -40,7 +44,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -65,7 +68,7 @@ class TrainingSessionQueriesIntegrationTest {
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private StableStallRepository stalls;
-    @Autowired private com.rtms.backend.horse.repository.HorseRepository horses;
+    @Autowired private HorseRepository horses;
     @Autowired private JdbcTemplate jdbc;
 
     private final LocalDate today = LocalDate.now();
@@ -94,7 +97,7 @@ class TrainingSessionQueriesIntegrationTest {
 
         sprint = fixtures.exercise(trainer, "Sprint", 60);
         recovery = fixtures.exercise(trainer, "Walk", 30);
-        recovery.setCategory(com.rtms.backend.training.enums.ExerciseCategory.RECOVERY);
+        recovery.setCategory(ExerciseCategory.RECOVERY);
         recovery = fixtures.save(recovery);
         Course course = fixtures.course(trainer, "Sprint Base", 4, sprint);
 
@@ -244,14 +247,14 @@ class TrainingSessionQueriesIntegrationTest {
         assertTrue(before >= 2);
 
         // A blocked horse should no longer be counted as in training
-        thunder.setTrainingDecision(com.rtms.backend.training.enums.TrainingDecision.BLOCKED);
+        thunder.setTrainingDecision(TrainingDecision.BLOCKED);
         horses.saveAndFlush(thunder);
         long afterBlocked = courseRuns.countHorsesInTraining();
         assertEquals(before - 1, afterBlocked);
 
         // An inactive horse should not be counted either
-        thunder.setTrainingDecision(com.rtms.backend.training.enums.TrainingDecision.ALLOWED);
-        thunder.setCurrentStatus(com.rtms.backend.horse.enums.HorseStatus.INACTIVE);
+        thunder.setTrainingDecision(TrainingDecision.ALLOWED);
+        thunder.setCurrentStatus(HorseStatus.INACTIVE);
         horses.saveAndFlush(thunder);
         long afterInactive = courseRuns.countHorsesInTraining();
         assertEquals(before - 1, afterInactive);

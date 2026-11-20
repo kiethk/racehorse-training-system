@@ -1,9 +1,12 @@
 package com.rtms.backend.medical.service;
 
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.dto.CorrectInjuryRecordRequest;
 import com.rtms.backend.medical.dto.CreateHealthRecordRequest;
 import com.rtms.backend.medical.dto.CreatePrescriptionRequest;
@@ -11,7 +14,6 @@ import com.rtms.backend.medical.dto.CreateTreatmentPlanRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
-import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
@@ -28,7 +30,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -72,9 +73,9 @@ class MedicalServicesIntegrityTest {
                 horseRepository,
                 healthRecordRepository,
                 careScheduleRepository,
-                auditLogRepository, org.mockito.Mockito.mock(com.rtms.backend.identity.repository.UserRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.incident.repository.HorseIncidentReportRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.admission.repository.AdmissionApplicationRepository.class)
+                auditLogRepository, mock(UserRepository.class),
+                mock(HorseIncidentReportRepository.class),
+                mock(AdmissionApplicationRepository.class)
         );
 
         healthRecordService = new HealthRecordService(

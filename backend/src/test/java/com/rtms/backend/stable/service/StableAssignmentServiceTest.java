@@ -1,5 +1,6 @@
 package com.rtms.backend.stable.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.admission.service.GroomAssignmentTriggers;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -248,7 +249,7 @@ class StableAssignmentServiceTest {
         status(HttpStatus.BAD_REQUEST, () -> service.applyAssignments(new BatchStableAssignmentRequest(null, Arrays.asList((BlockGroomAssignmentDto) null))));
     }
     @Test void nullBaselineEntriesDeserializeAndInternalFlagCannotDisableChecking() throws Exception {
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var mapper = new ObjectMapper();
         var t = mapper.readValue("{\"areaId\":1,\"trainerId\":101,\"expectedTrainerId\":null,\"expectedTrainerIdSet\":false}", AreaTrainerAssignmentDto.class);
         assertTrue(t.isExpectedTrainerIdSet());
         status(HttpStatus.CONFLICT, () -> service.applyAssignments(new BatchStableAssignmentRequest(List.of(t), null)));

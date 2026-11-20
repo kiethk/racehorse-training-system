@@ -2,6 +2,7 @@ package com.rtms.backend.stable.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.stable.dto.BlockGroomAssignmentDto;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
@@ -103,7 +104,7 @@ public class StableStallController {
     @PreAuthorize("hasAuthority('STALL_GROOM_ASSIGN')")
     public ApiResponse<StableStall> assignGroom(
             @PathVariable Long id,
-            @RequestBody com.rtms.backend.stable.dto.BlockGroomAssignmentDto request) {
+            @RequestBody BlockGroomAssignmentDto request) {
         return ApiResponse.success(stableStallService.assignGroom(id, request));
     }
 

@@ -1,5 +1,6 @@
 package com.rtms.backend.identity.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtms.backend.identity.dto.*;
 import com.rtms.backend.identity.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -173,7 +174,7 @@ class StaffCreationPostgresTest {
     }
     @ParameterizedTest @ValueSource(strings={"{\"email\":\"invalid\"}","{\"phone\":\"123456789012345678901\"}","{\"fullName\":\" \"}","{\"password\":\" \"}","{\"role\":\"HEAD_TRAINER\"}","{\"licenseIssuedDate\":\"2999-01-01\"}"})
     void invalidApiInputNeverCreatesStaff(String override) throws Exception {
-        var mapper=new com.fasterxml.jackson.databind.ObjectMapper();
+        var mapper=new ObjectMapper();
         var body=mapper.createObjectNode().put("role","VETERINARIAN").put("fullName","Test").put("email",tag+"@test.invalid").put("password","Test@2026").put("licenseNumber","VT-TEST");
         mapper.readTree(override).properties().forEach(entry->body.set(entry.getKey(),entry.getValue()));
         var actor=new UsernamePasswordAuthenticationToken(new AuthenticatedUser(1L,"manager@test.invalid","CLUB_MANAGER"),null,List.of(new SimpleGrantedAuthority("USER_MANAGE")));

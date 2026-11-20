@@ -25,14 +25,12 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.service.TrainerAssignmentService;
 import com.rtms.backend.audit.dto.DomainAuditEvent;
 import com.rtms.backend.audit.service.AuditLogService;
-import com.rtms.backend.identity.entity.GroomProfile;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.notification.service.EmailService;
-import com.rtms.backend.stable.entity.Area;
-import com.rtms.backend.stable.entity.StableStall;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -50,7 +48,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -391,8 +389,8 @@ public class StaffManagementService {
         if (request.getEmail() != null) request.setEmail(request.getEmail().trim().toLowerCase(Locale.ROOT));
         var errors = validator.validate(request);
         if (!errors.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                errors.stream().sorted(java.util.Comparator.comparing(e -> e.getPropertyPath().toString())).findFirst().orElseThrow().getMessage());
-        if (request.getPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
+                errors.stream().sorted(Comparator.comparing(e -> e.getPropertyPath().toString())).findFirst().orElseThrow().getMessage());
+        if (request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes");
         // Take the same lock as Manager Stable BEFORE reading allocation candidates.
         // Concurrent creations then see the previous committed assignment, not the same free block.
@@ -419,7 +417,7 @@ public class StaffManagementService {
         try { user = userRepository.saveAndFlush(user); }
         catch (DataIntegrityViolationException ex) {
             for (Throwable cause=ex; cause!=null; cause=cause.getCause()) {
-                if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint
+                if (cause instanceof ConstraintViolationException constraint
                         && "users_email_key".equals(constraint.getConstraintName()))
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Email already in use",ex);
             }
@@ -727,12 +725,12 @@ public class StaffManagementService {
         quarantineAreas.sort((a,b) -> AreaCodeGenerator.compareCodes(a.getCode(),b.getCode()));
         for (Area area : quarantineAreas) {
             var rows = stableStallRepository.findByAreaId(area.getId());
-            long load = rows.stream().map(StableStall::getGroomId).filter(java.util.Objects::nonNull).distinct().count();
+            long load = rows.stream().map(StableStall::getGroomId).filter(Objects::nonNull).distinct().count();
             var free = new ArrayList<List<StableStall>>();
             for (int start : BLOCK_STARTS) {
                 int end = start + 2;
                 var block = rows.stream().filter(s -> s.getStallNumber() >= start && s.getStallNumber() <= end)
-                        .sorted(java.util.Comparator.comparing(StableStall::getStallNumber)).toList();
+                        .sorted(Comparator.comparing(StableStall::getStallNumber)).toList();
                 if (block.size()==3 && block.stream().allMatch(s -> s.getGroomId()==null)) free.add(block);
             }
             for (var block : free) {

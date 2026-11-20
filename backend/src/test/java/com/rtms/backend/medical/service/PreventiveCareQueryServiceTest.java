@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 
 import java.time.Clock;
@@ -146,7 +147,7 @@ class PreventiveCareQueryServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
     }
 
-    private static List<String> names(org.springframework.data.domain.Page<PreventiveDueHorse> page) {
+    private static List<String> names(Page<PreventiveDueHorse> page) {
         return page.getContent().stream().map(PreventiveDueHorse::horseName).toList();
     }
 

@@ -2,6 +2,7 @@ package com.rtms.backend.identity.service;
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.dto.AccessControlMatrixResponse;
+import com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest;
 import com.rtms.backend.identity.dto.RolePermissionUpdateRequest;
 import com.rtms.backend.identity.entity.Permission;
 import com.rtms.backend.identity.entity.Role;
@@ -239,8 +240,8 @@ class AccessControlServiceTest {
         when(roleRepository.save(any(Role.class))).thenAnswer(i -> i.getArgument(0));
 
         var reqs = List.of(
-                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(1L, List.of("USER_MANAGE")),
-                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(2L, List.of("AREA_VIEW"))
+                new BulkRolePermissionUpdateRequest(1L, List.of("USER_MANAGE")),
+                new BulkRolePermissionUpdateRequest(2L, List.of("AREA_VIEW"))
         );
 
         List<AccessControlMatrixResponse.RolePermissionSummary> res = accessControlService.updateBulkRolePermissions(reqs);
@@ -268,8 +269,8 @@ class AccessControlServiceTest {
 
         // Groom illegally tries to get USER_MANAGE
         var reqs = List.of(
-                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(1L, List.of("USER_MANAGE")),
-                new com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest(2L, List.of("USER_MANAGE"))
+                new BulkRolePermissionUpdateRequest(1L, List.of("USER_MANAGE")),
+                new BulkRolePermissionUpdateRequest(2L, List.of("USER_MANAGE"))
         );
 
         ApiException ex = assertThrows(ApiException.class, () -> accessControlService.updateBulkRolePermissions(reqs));

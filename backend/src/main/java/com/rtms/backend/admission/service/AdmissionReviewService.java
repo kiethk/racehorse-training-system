@@ -31,7 +31,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -114,8 +113,8 @@ public class AdmissionReviewService {
                             admissionId, CareType.INITIAL)
                             .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "No active examination found")));
         }
-        if (!java.util.Objects.equals(schedule.getAdmissionId(), admissionId)
-                || !java.util.Objects.equals(schedule.getHorseId(), before.getHorseId())
+        if (!Objects.equals(schedule.getAdmissionId(), admissionId)
+                || !Objects.equals(schedule.getHorseId(), before.getHorseId())
                 || (before.getStatus() == AdmissionStatus.VET_REVIEW && schedule.getCareType() != CareType.INITIAL)) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "Examination does not belong to this admission review");
         }
@@ -124,10 +123,10 @@ public class AdmissionReviewService {
                     ? schedule.getVeterinarianId()
                     : before.getVeterinarianId();
 
-            if (assignedVetId == null || java.util.Objects.equals(assignedVetId, actorId)) {
+            if (assignedVetId == null || Objects.equals(assignedVetId, actorId)) {
                 schedule.setVeterinarianId(actorId);
                 if (schedule.getScheduledAt() == null) {
-                    schedule.setScheduledAt(java.time.LocalDateTime.now());
+                    schedule.setScheduledAt(LocalDateTime.now());
                 }
                 careSchedules.save(schedule);
                 careScheduleService.startCareSchedule(schedule.getId(), actorId);

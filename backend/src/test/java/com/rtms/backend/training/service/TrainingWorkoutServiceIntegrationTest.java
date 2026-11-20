@@ -1,5 +1,7 @@
 package com.rtms.backend.training.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.rtms.backend.training.util.WorkoutPerformanceCalculator;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.entity.User;
@@ -36,7 +38,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -68,7 +73,7 @@ class TrainingWorkoutServiceIntegrationTest {
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private JdbcTemplate jdbc;
-    @Autowired private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    @Autowired private ObjectMapper objectMapper;
 
     private AuthenticatedUser trainer;
     private CourseRunDetailResponse courseRun;
@@ -208,7 +213,7 @@ class TrainingWorkoutServiceIntegrationTest {
     void everyMissingReadingIsRefusedWithAMessageNamingThatField() {
         clock.set(monday.atTime(12, 0));
         Long workoutId = firstWorkoutOfSession(0).getId();
-        java.util.Map<String, java.util.function.Consumer<CompleteWorkoutRequest>> clears = new java.util.LinkedHashMap<>();
+        Map<String, Consumer<CompleteWorkoutRequest>> clears = new LinkedHashMap<>();
         clears.put("Actual distance", r -> r.setActualDistanceMeters(null));
         clears.put("Actual duration", r -> r.setActualDurationMinutes(null));
         clears.put("Top speed", r -> r.setTopSpeedKmh(null));
@@ -262,7 +267,7 @@ class TrainingWorkoutServiceIntegrationTest {
                 {"actualDistanceMeters":800,"actualDurationMinutes":30,"topSpeedKmh":55,"averageSpeedKmh":48,
                  "averageHeartRate":150,"maxHeartRate":200,"recoveryHeartRate":80,"performanceRating":1}""";
 
-        assertThrows(com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.class,
+        assertThrows(UnrecognizedPropertyException.class,
                 () -> objectMapper.readValue(json, CompleteWorkoutRequest.class));
     }
 

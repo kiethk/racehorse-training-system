@@ -2,7 +2,6 @@ package com.rtms.backend.analytics.calculator;
 
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
-import com.rtms.backend.analytics.dto.manager.ManagerEdaOverviewResponse;
 import com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.RescheduleReason;

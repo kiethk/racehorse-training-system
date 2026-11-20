@@ -4,9 +4,13 @@ import com.rtms.backend.identity.entity.VeterinarianProfile;
 
 import com.rtms.backend.identity.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.Query;
 
@@ -17,13 +21,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByIdAndIsActiveTrue(Long id);
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.id = :id")
-    Optional<User> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+    Optional<User> findByIdForUpdate(@Param("id") Long id);
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.id IN :ids ORDER BY u.id")
-    List<User> findByIdsForUpdate(@org.springframework.data.repository.query.Param("ids") java.util.Collection<Long> ids);
+    List<User> findByIdsForUpdate(@Param("ids") Collection<Long> ids);
 
     @Query("SELECT u FROM User u JOIN VeterinarianProfile vp ON vp.userId = u.id "
             + "WHERE u.isActive = true AND u.role.name = 'VETERINARIAN' "

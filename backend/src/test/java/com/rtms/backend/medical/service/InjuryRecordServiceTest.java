@@ -1,12 +1,16 @@
 package com.rtms.backend.medical.service;
 
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.medical.dto.CorrectInjuryRecordRequest;
 import com.rtms.backend.medical.dto.HorseHealthSummaryResponse;
+import com.rtms.backend.medical.dto.MarkerPlacementRequest;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
@@ -17,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -34,7 +39,7 @@ class InjuryRecordServiceTest {
     @Mock private HealthRecordRepository healthRecordRepository;
     @Mock private CareScheduleRepository careScheduleRepository;
     @Mock private AuditLogRepository auditLogRepository;
-    @Mock private com.rtms.backend.identity.repository.UserRepository userRepository;
+    @Mock private UserRepository userRepository;
 
     private InjuryRecordService injuryRecordService;
     private Horse horse;
@@ -45,8 +50,8 @@ class InjuryRecordServiceTest {
         injuryRecordService = new InjuryRecordService(
                 injuryRecordRepository, horseRepository, healthRecordRepository,
                 careScheduleRepository, auditLogRepository, userRepository,
-                org.mockito.Mockito.mock(com.rtms.backend.incident.repository.HorseIncidentReportRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.admission.repository.AdmissionApplicationRepository.class));
+                mock(HorseIncidentReportRepository.class),
+                mock(AdmissionApplicationRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -100,20 +105,20 @@ class InjuryRecordServiceTest {
     @Test
     @DisplayName("correctInjuryRecord: marker không null ghi đè tọa độ 3D")
     void correctInjuryRecord_appliesMarkerOverrideWhenPresent() {
-        injury.setPositionX(java.math.BigDecimal.valueOf(1.1));
+        injury.setPositionX(BigDecimal.valueOf(1.1));
         injury.setZoneId("foreleg");
         when(injuryRecordRepository.findById(100L)).thenReturn(Optional.of(injury));
         when(injuryRecordRepository.save(any(InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
 
         CorrectInjuryRecordRequest req = new CorrectInjuryRecordRequest(
                 "Repositioned marker after re-examination", null, null, null, null,
-                new com.rtms.backend.medical.dto.MarkerPlacementRequest(
-                        java.math.BigDecimal.valueOf(2.5), java.math.BigDecimal.valueOf(1.2), java.math.BigDecimal.valueOf(-0.4),
+                new MarkerPlacementRequest(
+                        BigDecimal.valueOf(2.5), BigDecimal.valueOf(1.2), BigDecimal.valueOf(-0.4),
                         "hindquarters", null, null, null, null, null, null, null));
 
         InjuryRecord corrected = injuryRecordService.correctInjuryRecord(10L, 100L, req, 20L);
 
-        assertEquals(java.math.BigDecimal.valueOf(2.5), corrected.getPositionX());
+        assertEquals(BigDecimal.valueOf(2.5), corrected.getPositionX());
         assertEquals("hindquarters", corrected.getZoneId());
         assertEquals("SEVERE", corrected.getSeverity());
     }
@@ -121,7 +126,7 @@ class InjuryRecordServiceTest {
     @Test
     @DisplayName("correctInjuryRecord: không có marker thì giữ nguyên tọa độ đã lưu")
     void correctInjuryRecord_withoutMarkerKeepsStoredCoordinates() {
-        injury.setPositionX(java.math.BigDecimal.valueOf(1.1));
+        injury.setPositionX(BigDecimal.valueOf(1.1));
         injury.setZoneId("foreleg");
         when(injuryRecordRepository.findById(100L)).thenReturn(Optional.of(injury));
         when(injuryRecordRepository.save(any(InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
@@ -131,7 +136,7 @@ class InjuryRecordServiceTest {
 
         InjuryRecord corrected = injuryRecordService.correctInjuryRecord(10L, 100L, req, 20L);
 
-        assertEquals(java.math.BigDecimal.valueOf(1.1), corrected.getPositionX());
+        assertEquals(BigDecimal.valueOf(1.1), corrected.getPositionX());
         assertEquals("foreleg", corrected.getZoneId());
         assertEquals("MODERATE", corrected.getSeverity());
     }

@@ -27,11 +27,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -167,7 +167,7 @@ public class PreventiveCareQueryService {
     public List<PreventiveCoverageResponse> coverage() {
         List<Long> horseIds = horses.findByCurrentStatusInOrderByNameAsc(HORSES_IN_SCOPE).stream()
                 .map(Horse::getId).toList();
-        Map<Long, Map<PreventiveDueStatus, Integer>> counts = new java.util.HashMap<>();
+        Map<Long, Map<PreventiveDueStatus, Integer>> counts = new HashMap<>();
         preventiveStatus.statusFor(horseIds).values().stream().flatMap(List::stream).forEach(status ->
                 counts.computeIfAbsent(status.protocolId(), id -> new EnumMap<>(PreventiveDueStatus.class))
                         .merge(status.status(), 1, Integer::sum));

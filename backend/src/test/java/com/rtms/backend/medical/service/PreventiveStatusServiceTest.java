@@ -1,5 +1,8 @@
 package com.rtms.backend.medical.service;
 
+import com.rtms.backend.admission.entity.AdmissionApplication;
+import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -21,7 +24,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -32,6 +34,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +56,7 @@ class PreventiveStatusServiceTest {
     @Mock PrescriptionRepository prescriptions;
     @Mock CareScheduleRepository schedules;
     @Mock HorseRepository horses;
-    @Mock com.rtms.backend.admission.repository.AdmissionApplicationRepository admissions;
+    @Mock AdmissionApplicationRepository admissions;
 
     private final PreventiveProtocol ei = protocol(1L, "EI", 180, 14, true);
     private final PreventiveProtocol tetanus = protocol(2L, "TETANUS", 365, 30, true);
@@ -284,14 +287,14 @@ class PreventiveStatusServiceTest {
 
     @Test
     void newMilestoneIsLinkedToTheHorsesLatestLiveAdmissionSoTheVetQueueCanOpenIt() {
-        var rejected = new com.rtms.backend.admission.entity.AdmissionApplication();
+        var rejected = new AdmissionApplication();
         rejected.setId(8L);
-        rejected.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.REJECTED);
+        rejected.setStatus(AdmissionStatus.REJECTED);
         // U6 (112e7d37): admission APPROVED không còn là nguồn link cho milestone mới —
         // "live" ở đây là đơn đang trong pipeline review.
-        var inReview = new com.rtms.backend.admission.entity.AdmissionApplication();
+        var inReview = new AdmissionApplication();
         inReview.setId(5L);
-        inReview.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW);
+        inReview.setStatus(AdmissionStatus.TRAINER_REVIEW);
         when(admissions.findByHorseIdOrderBySubmittedAtDesc(HORSE)).thenReturn(List.of(rejected, inReview));
         dose(1L, TODAY);
         dose(2L, TODAY);
@@ -311,7 +314,7 @@ class PreventiveStatusServiceTest {
         CareSchedule milestone = service.deferMilestone(HORSE, "preventive:30", ACTOR, TODAY.plusDays(8)).orElseThrow();
 
         assertEquals(TODAY.plusDays(8).atTime(14, 0), milestone.getRequestedAt());
-        assertEquals(com.rtms.backend.medical.enums.RescheduleReason.UNDER_TREATMENT, milestone.getRescheduleReason());
+        assertEquals(RescheduleReason.UNDER_TREATMENT, milestone.getRescheduleReason());
         assertEquals(CareScheduleStatus.SCHEDULED, milestone.getStatus());
     }
 
@@ -340,7 +343,7 @@ class PreventiveStatusServiceTest {
     }
 
     private static Map<Long, PreventiveDueStatus> byProtocol(List<PreventiveProtocolStatus> statuses) {
-        Map<Long, PreventiveDueStatus> map = new java.util.HashMap<>();
+        Map<Long, PreventiveDueStatus> map = new HashMap<>();
         statuses.forEach(status -> map.put(status.protocolId(), status.status()));
         return map;
     }

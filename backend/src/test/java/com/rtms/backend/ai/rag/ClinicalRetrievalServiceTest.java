@@ -60,7 +60,7 @@ class ClinicalRetrievalServiceTest {
                 "CLINICAL_RECORD",
                 "The horse shows signs of tendonitis and mild limping...",
                 0.88,
-                java.util.Map.of("horseId", 12L)
+                Map.of("horseId", 12L)
         );
 
         when(jdbcTemplate.query(anyString(), any(PreparedStatementSetter.class), any(RowMapper.class)))

@@ -2,9 +2,12 @@ package com.rtms.backend.identity.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.identity.dto.UserSummaryResponse;
+import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -51,9 +54,9 @@ public class UserDirectoryController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('USER_VIEW')")
     public ApiResponse<UserSummaryResponse> getUserById(@PathVariable Long id) {
-        com.rtms.backend.identity.entity.User user = userRepository.findById(id)
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        org.springframework.http.HttpStatus.NOT_FOUND, "User not found with id: " + id));
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found with id: " + id));
 
         return ApiResponse.success(new UserSummaryResponse(
                 user.getId(),
