@@ -11,6 +11,7 @@ public class StaffDetailResponse {
     private String address;
     private String role;
     private boolean active;
+    private boolean superAdmin;
     private LocalDateTime createdAt;
     private Object profile;
 
@@ -65,6 +66,9 @@ public class StaffDetailResponse {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public boolean isSuperAdmin() { return superAdmin; }
+    public void setSuperAdmin(boolean superAdmin) { this.superAdmin = superAdmin; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

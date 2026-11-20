@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ShieldCheck } from 'lucide-react';
 import { Button, FormField, Icon, Input, Modal, Notice, Pill, Select, Spinner, StatusBadge } from '@/components/ui';
 import { displayError, formatDateTime, formatEnumLabel } from '@/lib/display';
 import { getAccountDetail, updateAccount } from '../services/accountService';
@@ -193,9 +194,21 @@ export function AccountDetailModal({
               <Button variant="secondary" onClick={onClose}>
                 Close
               </Button>
-              <Button variant="primary" onClick={handleStartEdit}>
-                Edit Profile
-              </Button>
+              {detail.superAdmin ? (
+                <span
+                  className="inline-block"
+                  title="Protected system administrator cannot be modified from this view"
+                >
+                  <Button size="sm" variant="secondary" disabled className="opacity-80">
+                    <ShieldCheck className="mr-1 h-3.5 w-3.5 text-amber-600" />
+                    Protected
+                  </Button>
+                </span>
+              ) : (
+                <Button variant="primary" onClick={handleStartEdit}>
+                  Edit Profile
+                </Button>
+              )}
             </>
           )
         ) : undefined
@@ -246,10 +259,19 @@ export function AccountDetailModal({
 
                 <div>
                   <div className={labelCls}>Role</div>
-                  <div className="mt-0.5">
+                  <div className="mt-0.5 flex items-center gap-1.5">
                     <span className="text-sm font-medium text-[var(--color-text-primary)]">
                       {formatEnumLabel(detail.role)}
                     </span>
+                    {detail.superAdmin && (
+                      <span
+                        title="Protected System Administrator"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        Protected
+                      </span>
+                    )}
                   </div>
                 </div>
 
