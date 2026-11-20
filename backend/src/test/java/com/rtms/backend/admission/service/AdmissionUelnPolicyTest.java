@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Set;
@@ -41,9 +42,14 @@ class AdmissionUelnPolicyTest {
     }
 
     @Test
-    void availabilityCheckAcceptsIsoAlpha3Format() {
-        var res = policy.checkAvailability("VNM22SC00000001");
+    void availabilityCheckAcceptsStandardUelnFormat() {
+        var res = policy.checkAvailability("12300100987654A");
         assertTrue(res.available());
+    }
+
+    @Test
+    void availabilityCheckRejectsAlphaCountryCodeUelnFormat() {
+        assertThrows(ResponseStatusException.class, () -> policy.checkAvailability("VNM22SC00000001"));
     }
 
     @Test

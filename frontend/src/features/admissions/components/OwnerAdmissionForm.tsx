@@ -55,12 +55,12 @@ const FIELDS: { key: Exclude<keyof CreateOwnerAdmissionRequest, 'sex'>; label: s
   { key: 'name', label: 'Horse name', required: true },
   { key: 'breed', label: 'Breed' },
   { key: 'dateOfBirth', label: 'Date of birth', type: 'date' },
-  { key: 'registrationNumber', label: 'UELN / registration number', hint: '15 characters (e.g. 704001000000001 or VNM001000000001).' },
+  { key: 'registrationNumber', label: 'UELN / registration number', hint: '15 characters starting with 6 digits (e.g. 12300100987654A or 704001000000001).' },
   { key: 'registryName', label: 'Registry name' },
   { key: 'sireName', label: 'Sire name' },
-  { key: 'sireRegistrationNumber', label: 'Sire UELN', hint: '15 characters (e.g. 704001000000001 or VNM001000000001).' },
+  { key: 'sireRegistrationNumber', label: 'Sire UELN', hint: '15 characters starting with 6 digits (e.g. 12300100987654A or 704001000000001).' },
   { key: 'damName', label: 'Dam name' },
-  { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 characters (e.g. 704001000000001 or VNM001000000001).' },
+  { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 characters starting with 6 digits (e.g. 12300100987654A or 704001000000001).' },
 ];
 const SEX_FIELD = { key: 'sex', label: 'Sex', required: true } as const;
 const FORM_FIELDS = [...FIELDS.slice(0, 2), SEX_FIELD, ...FIELDS.slice(2)];
@@ -82,8 +82,8 @@ function validateField(key: keyof CreateOwnerAdmissionRequest, raw: string, inpu
   if (key === 'sex' && !isHorseSex(value)) return 'Select Male or Female.';
   if (key.toLowerCase().includes('registration') && value) {
     const normalized = value.replace(/[\s\-_.]/g, '').toUpperCase();
-    if (!/^([0-9]{3}|[A-Z]{3})[A-Z0-9]{12}$/.test(normalized)) {
-      return 'Enter a valid 15-character UELN (e.g. 704001000000001 or VNM001000000001), or leave this field empty.';
+    if (!/^[0-9]{6}[A-Z0-9]{9}$/.test(normalized)) {
+      return 'Enter a valid 15-character UELN starting with 6 digits (e.g. 12300100987654A or 704001000000001), or leave this field empty.';
     }
   }
   if (key === 'dateOfBirth' && input?.validity.badInput) return 'Enter a valid date of birth.';
