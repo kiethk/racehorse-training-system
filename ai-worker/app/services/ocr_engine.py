@@ -1,8 +1,20 @@
 import logging
 import warnings
-import numpy as np
-from app.config import settings
 from typing import List, Tuple
+import numpy as np
+
+# Top-level optional OCR engines
+try:
+    from paddleocr import PaddleOCR
+except ImportError:
+    PaddleOCR = None
+
+try:
+    import easyocr
+except ImportError:
+    easyocr = None
+
+from app.config import settings
 
 # Suppress PyTorch quantization deprecation warnings in EasyOCR
 warnings.filterwarnings("ignore", category=UserWarning, module="torch")
@@ -18,35 +30,35 @@ class OcrEngine:
 
     def _init_engine(self):
         # 1. Try PaddleOCR first (if supported on host OS/runtime)
-        try:
-            from paddleocr import PaddleOCR
+        if PaddleOCR is not None:
             try:
-                reader = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
-            except TypeError:
-                reader = PaddleOCR(lang='en')
-            # Verify C++ runtime compatibility (e.g. PIR / oneDNN on Windows)
-            test_img = np.zeros((32, 32, 3), dtype=np.uint8)
-            reader.ocr(test_img)
-            self.reader = reader
-            self.engine_type = "paddle"
-            logger.info("Initialized PaddleOCR engine successfully.")
-            return
-        except Exception as e:
-            logger.info(f"PaddleOCR is not available on this platform ({e}). Falling back to EasyOCR...")
+                try:
+                    reader = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
+                except TypeError:
+                    reader = PaddleOCR(lang='en')
+                # Verify C++ runtime compatibility (e.g. PIR / oneDNN on Windows)
+                test_img = np.zeros((32, 32, 3), dtype=np.uint8)
+                reader.ocr(test_img)
+                self.reader = reader
+                self.engine_type = "paddle"
+                logger.info("Initialized PaddleOCR engine successfully.")
+                return
+            except Exception as e:
+                logger.info(f"PaddleOCR is not available on this platform ({e}). Falling back to EasyOCR...")
 
         # 2. Fallback to EasyOCR
-        try:
-            import easyocr
-            self.reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-            self.engine_type = "easyocr"
-            logger.info("Initialized EasyOCR engine successfully.")
-            return
-        except Exception as e:
-            logger.warning(f"EasyOCR initialization failed: {e}. OCR text detection disabled.")
-            self.engine_type = "none"
+        if easyocr is not None:
+            try:
+                self.reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+                self.engine_type = "easyocr"
+                logger.info("Initialized EasyOCR engine successfully.")
+                return
+            except Exception as e:
+                logger.warning(f"EasyOCR initialization failed: {e}. OCR text detection disabled.")
+        self.engine_type = "none"
 
     def read_text(self, image: np.ndarray) -> List[Tuple[str, float]]:
-        """Nhận dạng text từ ảnh, trả về danh sách [(text, confidence)]."""
+        """Recognize text from image, returning list of [(text, confidence)]."""
         results = []
         if self.engine_type == "paddle" and self.reader is not None:
             ocr_res = self.reader.ocr(image, cls=True)

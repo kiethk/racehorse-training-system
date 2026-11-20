@@ -6,6 +6,7 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
+import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +57,7 @@ public class GetTrainerAreaDistributionTool implements AiToolHandler {
                 trainerName = userRepository.findById(area.getTrainerId()).map(User::getFullName).orElse("Trainer #" + area.getTrainerId());
             }
 
-            long occupiedCount = stalls.stream().filter(s -> s.getStatus() == com.rtms.backend.stable.enums.StallStatus.OCCUPIED).count();
+            long occupiedCount = stalls.stream().filter(s -> s.getStatus() == StallStatus.OCCUPIED).count();
             long vacantCount = stalls.size() - occupiedCount;
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("areaName", area.getName());

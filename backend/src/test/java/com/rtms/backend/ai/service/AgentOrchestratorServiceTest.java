@@ -14,6 +14,7 @@ import org.mockito.Mockito;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -120,30 +121,30 @@ class AgentOrchestratorServiceTest {
         );
 
         // English keys
-        org.junit.jupiter.api.Assertions.assertEquals("Horse Name", service.humanizeKey("horseName"));
-        org.junit.jupiter.api.Assertions.assertEquals("Registration Number", service.humanizeKey("registrationNumber"));
-        org.junit.jupiter.api.Assertions.assertEquals("Body Temperature (°C)", service.humanizeKey("temperature"));
-        org.junit.jupiter.api.Assertions.assertEquals("Heart Rate (bpm)", service.humanizeKey("heartRate"));
-        org.junit.jupiter.api.Assertions.assertEquals("Stall Location", service.humanizeKey("stallLocation"));
-        org.junit.jupiter.api.Assertions.assertEquals("Training Decision", service.humanizeKey("trainingDecision"));
-        org.junit.jupiter.api.Assertions.assertEquals("Total Staff", service.humanizeKey("totalStaff"));
-        org.junit.jupiter.api.Assertions.assertEquals("Role Breakdown", service.humanizeKey("roleBreakdown"));
-        org.junit.jupiter.api.Assertions.assertEquals("Total Applications", service.humanizeKey("totalApplications"));
-        org.junit.jupiter.api.Assertions.assertEquals("Specialties", service.humanizeKey("specialties"));
-        org.junit.jupiter.api.Assertions.assertEquals("Specialty Count", service.humanizeKey("specialtyCount"));
-        org.junit.jupiter.api.Assertions.assertEquals("Average Rating", service.humanizeKey("averageRating"));
-        org.junit.jupiter.api.Assertions.assertEquals("Best Rating", service.humanizeKey("bestRating"));
-        org.junit.jupiter.api.Assertions.assertEquals("Specialty Breakdown", service.humanizeKey("specialtyBreakdown"));
-        org.junit.jupiter.api.Assertions.assertEquals("Sort By", service.humanizeKey("sortBy"));
+        assertEquals("Horse Name", service.humanizeKey("horseName"));
+        assertEquals("Registration Number", service.humanizeKey("registrationNumber"));
+        assertEquals("Body Temperature (°C)", service.humanizeKey("temperature"));
+        assertEquals("Heart Rate (bpm)", service.humanizeKey("heartRate"));
+        assertEquals("Stall Location", service.humanizeKey("stallLocation"));
+        assertEquals("Training Decision", service.humanizeKey("trainingDecision"));
+        assertEquals("Total Staff", service.humanizeKey("totalStaff"));
+        assertEquals("Role Breakdown", service.humanizeKey("roleBreakdown"));
+        assertEquals("Total Applications", service.humanizeKey("totalApplications"));
+        assertEquals("Specialties", service.humanizeKey("specialties"));
+        assertEquals("Specialty Count", service.humanizeKey("specialtyCount"));
+        assertEquals("Average Rating", service.humanizeKey("averageRating"));
+        assertEquals("Best Rating", service.humanizeKey("bestRating"));
+        assertEquals("Specialty Breakdown", service.humanizeKey("specialtyBreakdown"));
+        assertEquals("Sort By", service.humanizeKey("sortBy"));
 
         // Legacy Vietnamese keys
-        org.junit.jupiter.api.Assertions.assertEquals("Horse Name", service.humanizeKey("tenNgua"));
-        org.junit.jupiter.api.Assertions.assertEquals("Body Temperature (°C)", service.humanizeKey("thanNhiet"));
-        org.junit.jupiter.api.Assertions.assertEquals("Heart Rate (bpm)", service.humanizeKey("nhipTim"));
-        org.junit.jupiter.api.Assertions.assertEquals("Weight (kg)", service.humanizeKey("canNang"));
+        assertEquals("Horse Name", service.humanizeKey("tenNgua"));
+        assertEquals("Body Temperature (°C)", service.humanizeKey("thanNhiet"));
+        assertEquals("Heart Rate (bpm)", service.humanizeKey("nhipTim"));
+        assertEquals("Weight (kg)", service.humanizeKey("canNang"));
 
         // Fallback for an unknown camelCase key
-        org.junit.jupiter.api.Assertions.assertEquals("Unknown Custom Field", service.humanizeKey("unknownCustomField"));
+        assertEquals("Unknown Custom Field", service.humanizeKey("unknownCustomField"));
     }
 
     @Test
@@ -185,20 +186,20 @@ class AgentOrchestratorServiceTest {
                 objectMapper
         );
 
-        org.junit.jupiter.api.Assertions.assertEquals("Horse Name", service.humanizeKeyEn("horseName"));
-        org.junit.jupiter.api.Assertions.assertEquals("Registration Number", service.humanizeKeyEn("registrationNumber"));
-        org.junit.jupiter.api.Assertions.assertEquals("Body Temperature (°C)", service.humanizeKeyEn("temperature"));
-        org.junit.jupiter.api.Assertions.assertEquals("Heart Rate (bpm)", service.humanizeKeyEn("heartRate"));
-        org.junit.jupiter.api.Assertions.assertEquals("Stall Location", service.humanizeKeyEn("stallLocation"));
-        org.junit.jupiter.api.Assertions.assertEquals("Training Decision", service.humanizeKeyEn("trainingDecision"));
-        org.junit.jupiter.api.Assertions.assertEquals("Total Staff", service.humanizeKeyEn("totalStaff"));
-        org.junit.jupiter.api.Assertions.assertEquals("Role Breakdown", service.humanizeKeyEn("roleBreakdown"));
-        org.junit.jupiter.api.Assertions.assertEquals("Total Applications", service.humanizeKeyEn("totalApplications"));
-        org.junit.jupiter.api.Assertions.assertEquals("Specialties", service.humanizeKeyEn("specialties"));
-        org.junit.jupiter.api.Assertions.assertEquals("Specialty Count", service.humanizeKeyEn("specialtyCount"));
-        org.junit.jupiter.api.Assertions.assertEquals("Average Rating", service.humanizeKeyEn("averageRating"));
-        org.junit.jupiter.api.Assertions.assertEquals("Best Rating", service.humanizeKeyEn("bestRating"));
-        org.junit.jupiter.api.Assertions.assertEquals("Specialty Breakdown", service.humanizeKeyEn("specialtyBreakdown"));
-        org.junit.jupiter.api.Assertions.assertEquals("Sort By", service.humanizeKeyEn("sortBy"));
+        assertEquals("Horse Name", service.humanizeKeyEn("horseName"));
+        assertEquals("Registration Number", service.humanizeKeyEn("registrationNumber"));
+        assertEquals("Body Temperature (°C)", service.humanizeKeyEn("temperature"));
+        assertEquals("Heart Rate (bpm)", service.humanizeKeyEn("heartRate"));
+        assertEquals("Stall Location", service.humanizeKeyEn("stallLocation"));
+        assertEquals("Training Decision", service.humanizeKeyEn("trainingDecision"));
+        assertEquals("Total Staff", service.humanizeKeyEn("totalStaff"));
+        assertEquals("Role Breakdown", service.humanizeKeyEn("roleBreakdown"));
+        assertEquals("Total Applications", service.humanizeKeyEn("totalApplications"));
+        assertEquals("Specialties", service.humanizeKeyEn("specialties"));
+        assertEquals("Specialty Count", service.humanizeKeyEn("specialtyCount"));
+        assertEquals("Average Rating", service.humanizeKeyEn("averageRating"));
+        assertEquals("Best Rating", service.humanizeKeyEn("bestRating"));
+        assertEquals("Specialty Breakdown", service.humanizeKeyEn("specialtyBreakdown"));
+        assertEquals("Sort By", service.humanizeKeyEn("sortBy"));
     }
 }
