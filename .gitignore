@@ -63,6 +63,7 @@ backend/src/main/resources/application-local.properties
 *.swp
 *.swo
 *~
+backend/src/main/resources/.env.cloud
 
 # AI & Agent Frameworks
 .codex/

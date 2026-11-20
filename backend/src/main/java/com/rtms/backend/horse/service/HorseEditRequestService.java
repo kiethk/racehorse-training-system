@@ -261,7 +261,8 @@ public class HorseEditRequestService {
         validate(horse, requested);
 
         apply(horse, original, requested);
-        deleteAfterCommit(promote(uploaded));
+        // Giữ file cũ để lịch sử yêu cầu và audit vẫn mở được (keep superseded files for request history and audit).
+        promote(uploaded);
         stampReview(request, groomId, HorseEditRequestStatus.APPROVED, feedback);
         notifyOwner(request, horse, "Your change request for " + horse.getName() + " was approved and applied.");
         return toResponse(request);

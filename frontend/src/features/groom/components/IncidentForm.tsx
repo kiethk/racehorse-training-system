@@ -180,7 +180,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
       {horses.length === 0 ? (
         <Panel padded>
           <div className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
-            Không tìm thấy ngựa nào trong hệ thống.
+No horses found in the system.
             <div className="mt-4">
               <Link href="/groom/incidents">
                 <Button variant="secondary">Back</Button>
