@@ -4,12 +4,12 @@
 --
 -- Luật đang giữ (GroomDailyTaskService / SopSlot):
 --   - Mỗi ngựa đang ở trong chuồng có Groom: 5 việc mỗi ngày — 05:00 cho ăn, 05:30 dọn chuồng, 10:00 tắm chải,
---     11:30 cho ăn, 16:30 cho ăn — giao cho Groom của chuồng ngựa đang ở lúc đó (chuồng Q khi cách ly, chuồng thường
---     sau khi được duyệt).
+--     11:30 cho ăn, 16:30 cho ăn. Job GroomDailyTaskScheduler sinh việc lúc 00:00 cho ngựa đang ở trong chuồng lúc đó và
+--     giao cho Groom của chuồng đó (chuồng Q khi cách ly, chuồng thường sau khi được duyệt), nên ngày ngựa tới hoặc ngày
+--     được chuyển chuồng chưa có việc mới cho tới nửa đêm.
 --   - Hoàn thành theo khối: cùng một việc cùng giờ của một Groom chung một groom_task_completions (ghi chú + tối đa 5 ảnh).
 --   - Việc chưa tới giờ thì chưa hoàn thành; vài việc trong quá khứ bị bỏ lỡ để màn hình có trường hợp "chưa làm".
--- (Rules kept: 5 routine tasks a day for each stabled horse, given to the groom of the stall the horse is in at that
--- time; completed in blocks sharing one completion row; nothing in the future is completed; a few past tasks missed.)
+-- (Rules kept: 5 routine tasks a day for each stabled horse, generated at 00:00 for the groom of the stall the horse is in then; completed in blocks sharing one completion row; nothing in the future is completed; a few past tasks missed.)
 -- =====================================================================
 
 -- Ngựa ở chuồng nào, từ lúc nào tới lúc nào. (Which stall each horse was in, and when.)
@@ -35,7 +35,7 @@ BEGIN
         SELECT ss.groom_id, st.horse_id, slot.task_type, v_day + slot.t, FALSE, NULL
           FROM (VALUES (TIME '05:00', 'FEEDING'), (TIME '05:30', 'MUCKING_OUT'), (TIME '10:00', 'GROOMING'),
                        (TIME '11:30', 'FEEDING'), (TIME '16:30', 'FEEDING')) slot(t, task_type)
-          JOIN seed_stay st ON st.from_ts <= v_day + slot.t AND (st.to_ts IS NULL OR st.to_ts > v_day + slot.t)
+          JOIN seed_stay st ON st.from_ts <= v_day AND (st.to_ts IS NULL OR st.to_ts > v_day)
           JOIN stable_stalls ss ON ss.id = st.stall_id
          WHERE ss.groom_id IS NOT NULL
          ORDER BY slot.t, ss.groom_id, st.horse_id;

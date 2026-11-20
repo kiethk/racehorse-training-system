@@ -135,6 +135,17 @@ CREATE FUNCTION pg_temp.audit(p_user BIGINT, p_action TEXT, p_entity TEXT, p_ent
     VALUES (p_user, p_action, p_entity, p_entity_id, p_at, p_method, p_path, CASE WHEN p_method IS NULL THEN NULL ELSE 200 END, p_details)
 $$ LANGUAGE sql;
 
+-- Sự kiện nghiệp vụ như AuditLogService.recordDomainEvent: http_method DOMAIN, request_path = targetUrl, chi tiết là JSON.
+-- (A domain event row like AuditLogService.recordDomainEvent: DOMAIN method, targetUrl as path, JSON details.)
+CREATE FUNCTION pg_temp.audit_domain(p_user BIGINT, p_action TEXT, p_entity TEXT, p_entity_id BIGINT, p_module TEXT,
+                                     p_summary TEXT, p_reason TEXT, p_target TEXT, p_before JSONB, p_after JSONB,
+                                     p_at TIMESTAMP) RETURNS VOID AS $$
+    INSERT INTO audit_logs (user_id, action, entity_name, entity_id, created_at, http_method, request_path, status_code, details)
+    VALUES (p_user, p_action, p_entity, p_entity_id, p_at, 'DOMAIN', p_target, 200,
+            jsonb_strip_nulls(jsonb_build_object('summary', p_summary, 'reason', p_reason, 'module', p_module,
+                                                 'targetUrl', p_target, 'before', p_before, 'after', p_after))::TEXT)
+$$ LANGUAGE sql;
+
 -- ---------------------------------------------------------------------
 -- Quyết định tập luyện (Training decision) — giống TrainingDecisionService.
 -- Mỗi lần chặn mở một "khoảng nghỉ" trong seed_block; phần training (50_training.sql) không xếp buổi tập nào rơi
@@ -203,7 +214,9 @@ DECLARE
     v_times TIME[];
     v_vet BIGINT;
     v_vets BIGINT[];
+    v_purpose TEXT;
 BEGIN
+    SELECT purpose INTO v_purpose FROM care_schedule WHERE id = p_except;
     v_times := ARRAY[TIME '13:30', TIME '14:00', TIME '14:30', TIME '15:00'];
     IF p_care_type = 'INITIAL' THEN
         v_times := ARRAY(SELECT t::TIME FROM generate_series(TIMESTAMP '2000-01-01 08:00',
@@ -215,10 +228,22 @@ BEGIN
      WHERE r.name = 'VETERINARIAN' AND u.is_active;
     FOR i IN 0..60 LOOP
         v_day := p_earliest::DATE + i;
+        -- Một ngựa tối đa một ca không khẩn mỗi ngày (assertHorseFreeOnDay). (One non-urgent visit per horse per day.)
+        CONTINUE WHEN p_care_type <> 'URGENT' AND EXISTS (
+            SELECT 1 FROM care_schedule o WHERE o.horse_id = p_horse AND o.care_type <> 'URGENT' AND o.veterinarian_id IS NOT NULL
+               AND o.scheduled_date = v_day AND o.id IS DISTINCT FROM p_except AND o.status <> 'CANCELLED');
         FOREACH v_time IN ARRAY v_times LOOP
             CONTINUE WHEN v_day + v_time < p_earliest;
             CONTINUE WHEN pg_temp.horse_busy(p_horse, v_day + v_time, 30, p_except);
             FOREACH v_vet IN ARRAY v_vets LOOP
+                -- Hạn mức mỗi Thú y mỗi ngày: Routine 3, Preventive 3, Initial 2 (rankVeterinarians).
+                -- (Daily quota per vet: routine 3, preventive 3, initial 2.)
+                CONTINUE WHEN p_care_type <> 'URGENT' AND (
+                    SELECT count(*) FROM care_schedule o
+                     WHERE o.veterinarian_id = v_vet AND o.scheduled_date = v_day AND o.status <> 'CANCELLED'
+                       AND o.id IS DISTINCT FROM p_except AND o.care_type = p_care_type
+                       AND (p_care_type <> 'ROUTINE' OR (o.purpose = 'PREVENTIVE') = (v_purpose = 'PREVENTIVE'))
+                ) >= CASE p_care_type WHEN 'INITIAL' THEN 2 ELSE 3 END;
                 IF NOT pg_temp.vet_busy(v_vet, v_day + v_time, 30, p_except) THEN
                     vet_id := v_vet; slot := v_day + v_time; RETURN;
                 END IF;
@@ -237,7 +262,7 @@ CREATE FUNCTION pg_temp.new_schedule(p_horse BIGINT, p_care_type TEXT, p_purpose
                                created_at, updated_at, requested_at, scheduled_date, source_schedule_id, requested_by_id, idempotency_key,
                                purpose)
     VALUES (p_horse, p_admission, p_incident, p_care_type, 'SCHEDULED', 30, p_desc, p_created_at, p_created_at,
-            p_requested_at, CAST(p_requested_at AS DATE), p_source, p_requested_by, p_key, p_purpose)
+            p_requested_at, NULL, p_source, p_requested_by, p_key, p_purpose)
     RETURNING id
 $$ LANGUAGE sql;
 
@@ -298,12 +323,6 @@ END $$ LANGUAGE plpgsql;
 CREATE FUNCTION pg_temp.start_care(p_schedule BIGINT) RETURNS VOID AS $$
     UPDATE care_schedule SET status = 'IN_PROGRESS', updated_at = COALESCE(scheduled_at, created_at, pg_temp.clock()) WHERE id = p_schedule
 $$ LANGUAGE sql;
-
--- AD-022 / AD-025: Xóa một lịch đã xếp chưa diễn ra (thay thế cho việc hủy ca).
-CREATE FUNCTION pg_temp.cancel_care(p_schedule BIGINT, p_reason TEXT, p_at TIMESTAMP) RETURNS VOID AS $$
-BEGIN
-    DELETE FROM care_schedule WHERE id = p_schedule;
-END $$ LANGUAGE plpgsql;
 
 -- Lịch tái khám sinh ra khi hoàn tất một ca (createNextSchedule): ROUTINE, một-một với ca nguồn qua source_schedule_id.
 -- (Follow-up created by completing a visit: ROUTINE, one-to-one with its source through source_schedule_id.)
@@ -409,7 +428,8 @@ CREATE FUNCTION pg_temp.complete_care(
     p_vaccines TEXT[] DEFAULT NULL, p_history_codes TEXT[] DEFAULT NULL, p_history_dates DATE[] DEFAULT NULL,
     p_temp NUMERIC DEFAULT NULL, p_hr NUMERIC DEFAULT NULL, p_rr NUMERIC DEFAULT NULL, p_weight NUMERIC DEFAULT NULL,
     p_bcs NUMERIC DEFAULT NULL, p_hydration TEXT DEFAULT 'NORMAL', p_metric_notes TEXT DEFAULT NULL,
-    p_defer_days INT DEFAULT NULL)
+    p_defer_days INT DEFAULT NULL, p_marker TEXT DEFAULT NULL, p_marker_xyz NUMERIC[] DEFAULT NULL,
+    p_resolve BOOLEAN DEFAULT FALSE)
 RETURNS BIGINT AS $$
 DECLARE
     c care_schedule;
@@ -423,17 +443,22 @@ DECLARE
     v_recipients BIGINT[] := '{}';
     v_r BIGINT;
     v_note TEXT;
+    v_before TEXT;
+    v_after RECORD;
+    v_label TEXT;
     v_has_vaccines BOOLEAN := COALESCE(array_length(p_vaccines, 1), 0) + COALESCE(array_length(p_history_codes, 1), 0) > 0;
 BEGIN
     SELECT * INTO c FROM care_schedule WHERE id = p_schedule;
     IF c.status = 'SCHEDULED' THEN PERFORM pg_temp.start_care(c.id); END IF;
-    IF p_decision = 'BLOCKED' AND p_next_at IS NULL THEN
-        RAISE EXCEPTION 'A follow-up examination is required when training is BLOCKED (schedule %)', c.id;
+    IF p_next_at IS NULL AND (p_decision = 'BLOCKED' OR c.care_type IN ('INITIAL', 'URGENT') OR c.source_incident_id IS NOT NULL) THEN
+        -- completeCareSchedule: FOLLOW_UP_REQUIRED. (A follow-up is mandatory for these visits.)
+        RAISE EXCEPTION 'A follow-up examination is required (schedule %)', c.id;
     END IF;
     IF c.purpose = 'PREVENTIVE' AND COALESCE(array_length(p_vaccines, 1), 0) = 0 AND p_defer_days IS NULL THEN
         RAISE EXCEPTION 'A preventive visit records vaccinations or a deferral (schedule %)', c.id;
     END IF;
     SELECT * INTO h FROM horses WHERE id = c.horse_id;
+    v_before := h.training_decision;
 
     -- Quyết định tập luyện. (Training decision.)
     IF c.care_type = 'URGENT' AND p_decision = 'ALLOWED' THEN
@@ -457,6 +482,22 @@ BEGIN
     VALUES (h.id, c.veterinarian_id, p_at, p_findings, p_diagnosis, p_notes, p_at, p_at, c.care_type,
             p_treatment, c.id, p_decision, p_restriction)
     RETURNING id INTO v_hr;
+
+    -- Vị trí chấn thương chọn trên mô hình 3D: marker tạo cùng giao dịch, mức MODERATE (InjuryRecordService).
+    -- Ca khám sau đó cho ngựa khỏi thì đóng các marker đang mở (resolvedConditionIds).
+    -- (An injury marker picked on the 3D model is created in the same transaction as MODERATE; a later visit that clears the
+    -- horse closes the open markers.)
+    IF p_resolve THEN
+        UPDATE health_conditions SET status = 'RECOVERED', recovered_at = p_at, updated_at = p_at
+         WHERE horse_id = h.id AND status IN ('ACTIVE', 'MONITORING') AND created_at < p_at;
+    END IF;
+    IF p_marker IS NOT NULL THEN
+        INSERT INTO health_conditions (horse_id, health_record_id, condition_type, body_region_id, severity, description,
+                                       status, position_x, position_y, position_z, created_at, updated_at)
+        SELECT h.id, v_hr, br.display_name, br.id, 'MODERATE', p_diagnosis, 'ACTIVE',
+               p_marker_xyz[1], p_marker_xyz[2], p_marker_xyz[3], p_at, p_at
+          FROM horse_body_regions br WHERE br.code = p_marker;
+    END IF;
 
     -- Mũi tiêm: một TreatmentPlan "Vaccination" + một Prescription cho mỗi phác đồ. (Doses: one plan + one row each.)
     IF v_has_vaccines THEN
@@ -530,11 +571,31 @@ BEGIN
         SELECT a.trainer_id INTO v_trainer FROM horses x JOIN stable_stalls s ON s.id = x.current_stall_id
           JOIN areas a ON a.id = s.area_id WHERE x.id = h.id;
         IF v_trainer IS NOT NULL THEN v_recipients := v_recipients || v_trainer; END IF;
+        SELECT training_decision, training_decision_reason INTO v_after FROM horses WHERE id = h.id;
+        v_label := CASE WHEN c.care_type = 'URGENT' THEN 'Urgent case' ELSE 'Incident case' END;
         FOREACH v_r IN ARRAY v_recipients LOOP
-            PERFORM pg_temp.notify(v_r, 'CARE_SCHEDULE', c.id, 'URGENT_CASE_CLOSED', 'Ca khám khẩn cấp hoàn tất: ' || h.name,
-                                   'Bác sĩ Thú y đã hoàn tất ca khám khẩn cấp cho ngựa ' || h.name || '. Quyết định tập luyện: '
-                                   || (SELECT training_decision FROM horses WHERE id = h.id), p_at);
+            PERFORM pg_temp.notify(v_r, 'CARE_SCHEDULE', c.id, 'URGENT_CASE_CLOSED', v_label || ' closed: ' || h.name,
+                                   v_label || ' closed for ' || h.name || '. Training decision: ' || v_after.training_decision
+                                   || CASE WHEN v_after.training_decision = 'BLOCKED' AND COALESCE(v_after.training_decision_reason, '') <> ''
+                                           THEN ' (' || v_after.training_decision_reason || ')' ELSE '' END, p_at);
         END LOOP;
+    END IF;
+
+    -- Ngựa được tập lại sau khi bị chặn và kết quả khám thường cho Trainer của khu. (Notifications to the area trainer.)
+    SELECT a.trainer_id INTO v_trainer FROM horses x JOIN stable_stalls s ON s.id = x.current_stall_id
+      JOIN areas a ON a.id = s.area_id WHERE x.id = h.id;
+    SELECT training_decision, training_decision_reason INTO v_after FROM horses WHERE id = h.id;
+    IF v_trainer IS NOT NULL AND v_before = 'BLOCKED' AND v_after.training_decision = 'ALLOWED' THEN
+        PERFORM pg_temp.notify(v_trainer, 'HORSE', h.id, 'HORSE_TRAINING_ALLOWED', 'Training resumed: ' || h.name,
+                               'Horse ' || h.name || ' has been cleared by the veterinarian and is now allowed to train.', p_at);
+    END IF;
+    IF v_trainer IS NOT NULL AND c.care_type = 'ROUTINE' THEN
+        PERFORM pg_temp.notify(v_trainer, 'CARE_SCHEDULE', c.id, 'CARE_SCHEDULE_ROUTINE_COMPLETED',
+                               'Routine Examination Completed: ' || h.name,
+                               'Veterinarian has completed routine examination for ' || h.name || '. Decision: '
+                               || CASE WHEN v_after.training_decision = 'ALLOWED' THEN 'Cleared for training (ALLOWED).'
+                                       ELSE 'Training on hold (BLOCKED).' || CASE WHEN COALESCE(v_after.training_decision_reason, '') <> ''
+                                                 THEN ' Note: ' || v_after.training_decision_reason ELSE '' END END, p_at);
     END IF;
 
     -- Lịch tái khám: theo ngày Thú y chọn, hoặc tự động +14 ngày sau một ca tái khám thường.

@@ -225,11 +225,12 @@ INSERT INTO seed_check VALUES
  $q$ SELECT cs.id FROM course_exercises cs JOIN courses c ON c.id = cs.course_id JOIN exercises s ON s.id = cs.exercise_id
      WHERE s.trainer_id <> c.trainer_id $q$),
 -- ---------------- Groom
-('Routine task not given to the groom of the stall the horse was in',
+('Routine task not given to the groom of the stall the horse was in at 00:00 (extra tasks: at their time)',
  $q$ SELECT t.id FROM groom_daily_tasks t
      WHERE NOT EXISTS (SELECT 1 FROM seed_stay st JOIN stable_stalls s ON s.id = st.stall_id
                         WHERE st.horse_id = t.horse_id AND s.groom_id = t.groom_id
-                          AND st.from_ts <= t.scheduled_time AND (st.to_ts IS NULL OR st.to_ts > t.scheduled_time)) $q$),
+                          AND st.from_ts <= CASE WHEN t.task_type IN ('FEEDING', 'MUCKING_OUT', 'GROOMING') THEN t.scheduled_time::DATE ELSE t.scheduled_time END
+                          AND (st.to_ts IS NULL OR st.to_ts > CASE WHEN t.task_type IN ('FEEDING', 'MUCKING_OUT', 'GROOMING') THEN t.scheduled_time::DATE ELSE t.scheduled_time END)) $q$),
 ('Task completed without a completion row of the same groom, or completed before its time',
  $q$ SELECT t.id FROM groom_daily_tasks t LEFT JOIN groom_task_completions c ON c.id = t.completion_id
      WHERE t.is_completed AND (c.id IS NULL OR c.groom_id <> t.groom_id OR t.completed_at < t.scheduled_time) $q$),
@@ -241,7 +242,7 @@ INSERT INTO seed_check VALUES
          = (SELECT array_agg(exercise_id ORDER BY order_index) FROM course_exercises WHERE course_id = b.id) $q$),
 ('Admission document whose file key is not a Cloudinary asset',
  $q$ SELECT id FROM admission_documents
-     WHERE file_url !~ '^https://res\.cloudinary\.com/[^/]+/image/authenticated/v[0-9]+/rtms/admissions/[0-9]+/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$' $q$),
+     WHERE file_url !~ '^https://res\.cloudinary\.com/[^/]+/image/authenticated/v[0-9]+/rtms/admissions/[0-9]+/(arrival/)?[0-9a-f-]{36}\.(pdf|jpg|png|webp)$' $q$),
 ('Completion photo key that is not a stored file',
  $q$ SELECT p.completion_id FROM groom_task_completion_photos p
      WHERE NOT EXISTS (SELECT 1 FROM admission_documents d WHERE d.file_url = p.image_key) $q$),
@@ -263,7 +264,81 @@ INSERT INTO seed_check VALUES
            OR UPPER(BTRIM(COALESCE(route, ''))) LIKE '%INTRAVENOUS%'
            OR UPPER(BTRIM(COALESCE(route, ''))) LIKE '%INTRAMUSCULAR%'
            OR UPPER(BTRIM(COALESCE(route, ''))) LIKE '%SUBCUTANEOUS%'
-       ) $q$);
+       ) $q$),
+-- ---------------- Nhập học: ai làm bước nào (Admissions: who does which step)
+('Groom review done by someone other than the assigned groom (AdmissionGroomReviewService.review)',
+ $q$ SELECT id FROM admission_applications
+     WHERE groom_reviewed_at IS NOT NULL AND groom_id IS DISTINCT FROM assigned_groom_id $q$),
+('Quarantine stall held by a groom other than the reviewer',
+ $q$ SELECT a.id FROM admission_applications a JOIN stable_stalls s ON s.id = a.quarantine_stall_id
+     WHERE s.groom_id IS DISTINCT FROM a.groom_id $q$),
+('Arrival confirmed without 1-5 arrival photos (confirmArrival)',
+ $q$ SELECT a.id FROM admission_applications a WHERE a.arrived_at IS NOT NULL
+       AND (SELECT count(*) FROM admission_documents d WHERE d.admission_id = a.id AND d.document_type = 'ARRIVAL_PHOTO') NOT BETWEEN 1 AND 5 $q$),
+('Admission without a groom assignment history row',
+ $q$ SELECT a.id FROM admission_applications a WHERE NOT EXISTS (SELECT 1 FROM admission_groom_assignments g WHERE g.admission_id = a.id) $q$),
+('Admission document dated after the application was submitted',
+ $q$ SELECT d.id FROM admission_documents d JOIN admission_applications a ON a.id = d.admission_id
+     WHERE d.document_type <> 'ARRIVAL_PHOTO' AND d.record_date > a.submitted_at::DATE $q$),
+-- ---------------- Huấn luyện: thứ tự các thao tác (Training: order of the operations)
+('Group member who joined before the admission was approved or while the horse was resting (TrainingGroupServiceImpl.join)',
+ $q$ SELECT m.id FROM training_group_members m
+     WHERE m.joined_at <= COALESCE((SELECT max(a.manager_reviewed_at) FROM admission_applications a
+                                     WHERE a.horse_id = m.horse_id AND a.status = 'APPROVED'), 'infinity')
+        OR COALESCE((SELECT r.training_decision FROM health_records r WHERE r.horse_id = m.horse_id AND r.examined_at <= m.joined_at
+                      AND r.training_decision IS NOT NULL ORDER BY r.examined_at DESC LIMIT 1), 'ALLOWED') = 'BLOCKED' $q$),
+('Horse in two training groups at the same time',
+ $q$ SELECT a.id FROM training_group_members a JOIN training_group_members b
+       ON b.horse_id = a.horse_id AND b.id > a.id
+      AND a.joined_at < COALESCE(b.left_at, 'infinity') AND b.joined_at < COALESCE(a.left_at, 'infinity') $q$),
+('Course run created before its course, one of its exercises or its group',
+ $q$ SELECT r.id FROM course_runs r JOIN courses c ON c.id = r.course_id JOIN training_groups g ON g.id = r.group_id
+     WHERE r.created_at < c.created_at OR r.created_at < g.created_at
+        OR EXISTS (SELECT 1 FROM course_exercises ce JOIN exercises e ON e.id = ce.exercise_id
+                    WHERE ce.course_id = c.id AND (r.created_at < e.created_at OR ce.created_at > c.updated_at)) $q$),
+('Course run created while its group had no member (GROUP_EMPTY)',
+ $q$ SELECT r.id FROM course_runs r WHERE NOT EXISTS (SELECT 1 FROM training_group_members m WHERE m.group_id = r.group_id
+        AND m.joined_at <= r.created_at AND (m.left_at IS NULL OR m.left_at > r.created_at)) $q$),
+('Session without any workout',
+ $q$ SELECT s.id FROM training_sessions s WHERE NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.session_id = s.id) $q$),
+('Member present when a session was still to come but with no workout in it (createFutureWorkouts)',
+ $q$ SELECT m.id FROM training_group_members m JOIN course_runs r ON r.group_id = m.group_id
+     JOIN training_sessions s ON s.course_run_id = r.id
+     WHERE s.status <> 'CANCELLED' AND s.session_date + s.start_time > m.joined_at
+       AND (m.left_at IS NULL OR m.left_at > s.session_date + s.end_time)
+       AND NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.session_id = s.id AND w.horse_id = m.horse_id) $q$),
+-- ---------------- Thú y: lịch khám đúng như scheduler tạo ra (Vet: visits as the scheduler produces them)
+('Completed intake / urgent visit without its mandatory follow-up (FOLLOW_UP_REQUIRED)',
+ $q$ SELECT c.id FROM care_schedule c
+     WHERE c.status = 'COMPLETED' AND c.care_type IN ('INITIAL', 'URGENT')
+       AND NOT EXISTS (SELECT 1 FROM care_schedule n WHERE n.source_schedule_id = c.id)
+       AND NOT EXISTS (SELECT 1 FROM admission_applications a WHERE a.id = c.admission_id AND a.status = 'REJECTED') $q$),
+('Completed urgent exam, or intake exam concluded BLOCKED, without an injury marker (INJURY_RECORD_REQUIRED)',
+ $q$ SELECT c.id FROM care_schedule c JOIN health_records r ON r.care_schedule_id = c.id
+     WHERE c.status = 'COMPLETED' AND (c.care_type = 'URGENT' OR (c.care_type = 'INITIAL' AND r.training_decision = 'BLOCKED'))
+       AND NOT EXISTS (SELECT 1 FROM health_conditions k WHERE k.health_record_id = r.id) $q$),
+('Injury marker created before the health record it belongs to',
+ $q$ SELECT k.id FROM health_conditions k JOIN health_records r ON r.id = k.health_record_id WHERE k.created_at < r.created_at $q$),
+('Visit dated before the day it was requested',
+ $q$ SELECT id FROM care_schedule WHERE scheduled_date < requested_at::DATE $q$),
+('Open routine / intake visit dated before today (rolled over every night)',
+ $q$ SELECT id FROM care_schedule WHERE status = 'SCHEDULED' AND care_type IN ('ROUTINE', 'INITIAL')
+       AND COALESCE(scheduled_date, requested_at::DATE) < pg_temp.today() $q$),
+('Unassigned visit with a scheduled date, or assigned urgent visit without one',
+ $q$ SELECT id FROM care_schedule WHERE (veterinarian_id IS NULL AND scheduled_date IS NOT NULL AND status = 'SCHEDULED')
+        OR (care_type = 'URGENT' AND veterinarian_id IS NOT NULL AND (scheduled_date IS NULL OR scheduled_at IS NULL)) $q$),
+('Two non-urgent visits of one horse on the same day (assertHorseFreeOnDay)',
+ $q$ SELECT a.id FROM care_schedule a JOIN care_schedule b ON b.horse_id = a.horse_id AND b.id > a.id AND b.scheduled_date = a.scheduled_date
+     WHERE a.care_type <> 'URGENT' AND b.care_type <> 'URGENT' AND a.status <> 'CANCELLED' AND b.status <> 'CANCELLED' $q$),
+('Vet over the daily quota (routine 3, preventive 3, intake 2)',
+ $q$ SELECT veterinarian_id FROM care_schedule WHERE status <> 'CANCELLED' AND care_type <> 'URGENT' AND veterinarian_id IS NOT NULL
+      GROUP BY veterinarian_id, scheduled_date, care_type, (purpose = 'PREVENTIVE')
+     HAVING count(*) > CASE care_type WHEN 'INITIAL' THEN 2 ELSE 3 END $q$),
+('Vital reading without a health record',
+ $q$ SELECT id FROM horse_health_metrics WHERE health_record_id IS NULL $q$),
+('Incident reported by a groom who does not look after the horse''s stall (assertCanReport)',
+ $q$ SELECT r.id FROM horse_incident_reports r JOIN horses h ON h.id = r.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
+     WHERE r.reported_by_id <> s.groom_id $q$);
 
 DO $$
 DECLARE
