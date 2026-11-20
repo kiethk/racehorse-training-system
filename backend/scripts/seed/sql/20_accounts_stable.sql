@@ -22,6 +22,11 @@ INSERT INTO seed_user (k, id) SELECT a.k, u.id FROM seed_account a JOIN users u 
 
 -- Tài khoản Groom đã nghỉ việc: bị khóa, không còn chuồng. (A former groom: deactivated, no stalls.)
 UPDATE users SET updated_at = pg_temp.at(-40, TIME '16:00') WHERE id = pg_temp.uid('GR25');
+-- Manager khóa tài khoản (StaffManagementService.updateStaffStatus ghi sự kiện STAFF_STATUS_UPDATE).
+-- (The manager locks the account; updateStaffStatus writes a STAFF_STATUS_UPDATE domain event.)
+SELECT pg_temp.audit_domain(pg_temp.uid('ADMIN'), 'STAFF_STATUS_UPDATE', 'STAFF', pg_temp.uid('GR25'), 'STAFF',
+                            'Club Manager deactivated a groom account', 'Staff member left the club', '/manager/staff/' || pg_temp.uid('GR25'),
+                            jsonb_build_object('isActive', TRUE), jsonb_build_object('isActive', FALSE), pg_temp.at(-40, TIME '16:00'));
 
 INSERT INTO trainer_profiles (user_id, certification_number, certification_issued_date)
 SELECT pg_temp.uid(k), credential, credential_issued FROM seed_account WHERE role = 'HEAD_TRAINER';
@@ -31,7 +36,7 @@ SELECT pg_temp.uid(k), credential, credential_issued, specialization FROM seed_a
 
 INSERT INTO areas (code, name, type, trainer_id, created_at, updated_at)
 SELECT code, name, type, CASE WHEN trainer_k IS NULL THEN NULL ELSE pg_temp.uid(trainer_k) END,
-       pg_temp.d(DATE '2026-02-20') + TIME '08:00', pg_temp.d(DATE '2026-02-20') + TIME '08:00'
+       pg_temp.d(DATE '2026-04-01') + TIME '08:00', pg_temp.d(DATE '2026-04-01') + TIME '08:00'
   FROM seed_area ORDER BY type DESC, code;
 
 INSERT INTO stable_stalls (area_id, stall_number, stall_code, status, groom_id, created_at, updated_at)

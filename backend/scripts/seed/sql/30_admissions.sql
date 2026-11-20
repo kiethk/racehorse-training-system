@@ -13,19 +13,22 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- Tái khám (Rechecks): xử lý các lịch tái khám FOLLOW_UP đang chờ của một ngựa tới thời điểm p_until.
---   - Lịch tái khám của ngựa đang tạm nghỉ: Thú y khám và cho tập lại (ALLOWED).
---   - Lịch tái khám tự động +14 ngày sau đó: Manager hủy vì ngựa đã ổn.
---   - Lịch nằm sau thời điểm hiện tại: để nguyên (đã xếp giờ nếu trong 14 ngày tới, còn lại REQUESTED).
--- (Pending follow-ups of a horse up to p_until: a recheck of a resting horse clears it; the automatic +14-day recheck
--- after it is cancelled by the manager; anything after now stays pending.)
+-- Tái khám (Rechecks): lịch tái khám FOLLOW_UP của một ngựa được Thú y khám dần tới thời điểm p_until, như app làm.
+--   - Mỗi ca tái khám xong thì app tự đặt ca kế tiếp sau 14 ngày (createRoutineCadenceSchedule), nên chuỗi này chạy tới
+--     khi ca kế tiếp nằm sau thời điểm hiện tại. App không có cách hủy riêng một lịch tái khám.
+--   - Ngựa đang tạm nghỉ: khám xong cho tập lại (ALLOWED), trừ khi p_resting (ngựa vẫn phải nghỉ: ca sau hẹn 3 ngày tới).
+--   - Ca khám cho ngựa tập lại đóng các chấn thương đang mở.
+-- (Follow-up visits of a horse are done one after another up to p_until, like the app: every completed follow-up creates the
+-- next one 14 days later, so the chain runs until the next visit is in the future. The app cannot cancel a single follow-up.
+-- A resting horse is cleared at the recheck unless p_resting keeps it blocked, with the next visit 3 days ahead.)
 -- ---------------------------------------------------------------------
-CREATE FUNCTION pg_temp.run_rechecks(p_horse BIGINT, p_vet BIGINT, p_until TIMESTAMP) RETURNS VOID AS $$
+CREATE FUNCTION pg_temp.run_rechecks(p_horse BIGINT, p_vet BIGINT, p_until TIMESTAMP, p_resting BOOLEAN DEFAULT FALSE) RETURNS VOID AS $$
 DECLARE
     c care_schedule;
     v_slot TIMESTAMP;
     v_assign TIMESTAMP;
     v_limit TIMESTAMP := LEAST(p_until, pg_temp.clock());
+    v_blocked BOOLEAN;
 BEGIN
     LOOP
         SELECT * INTO c FROM care_schedule
@@ -38,21 +41,25 @@ BEGIN
             PERFORM pg_temp.book(c.id, p_vet);
             SELECT * INTO c FROM care_schedule WHERE id = c.id;
         END IF;
-        IF (SELECT training_decision FROM horses WHERE id = p_horse) = 'BLOCKED' THEN
-            v_slot := COALESCE(c.scheduled_at, c.scheduled_date::timestamp + time '14:00');
-            EXIT WHEN v_slot + INTERVAL '25 minutes' > v_limit;
+        v_slot := COALESCE(c.scheduled_at, c.scheduled_date::timestamp + time '14:00');
+        EXIT WHEN v_slot + INTERVAL '25 minutes' > v_limit;
+        v_blocked := (SELECT training_decision FROM horses WHERE id = p_horse) = 'BLOCKED';
+        IF v_blocked AND p_resting THEN
             PERFORM pg_temp.complete_care(c.id, v_slot + INTERVAL '25 minutes',
-                p_findings => 'Recheck: the problem noted at the last visit has resolved, gait, temperature and appetite normal.',
-                p_diagnosis => 'Recovered, fit to resume training', p_decision => 'ALLOWED',
-                p_notes => 'Cleared to return to normal work.',
+                p_findings => 'Recheck: improving but still not sound enough for work.',
+                p_diagnosis => 'Recovering, keep resting', p_decision => 'BLOCKED',
+                p_restriction => 'Keep resting until the next recheck.', p_notes => 'Continue the treatment plan.',
+                p_next_at => date_trunc('day', pg_temp.clock()) + INTERVAL '3 days 14 hours',
                 p_temp => 37.8, p_hr => 36, p_rr => 12, p_weight => round(pg_temp.rnd('rw' || c.id, 400, 470), 1), p_bcs => 5.5);
         ELSE
-            v_assign := c.updated_at + INTERVAL '1 day';
-            EXIT WHEN v_assign > v_limit OR v_assign >= c.scheduled_at;
-            PERFORM pg_temp.cancel_care(c.id, 'Horse recovered at the previous recheck, no further rechecks needed.', v_assign);
-            -- AD-022: ngua da khoi (ALLOWED) -> ket thuc chuoi tai kham dot ngot;
-            -- ca hen ke tiep (c) da duoc xep gio va giu nguyen lam lich dinh ky.
-            EXIT;
+            PERFORM pg_temp.complete_care(c.id, v_slot + INTERVAL '25 minutes',
+                p_findings => CASE WHEN v_blocked THEN 'Recheck: the problem noted at the last visit has resolved, gait, temperature and appetite normal.'
+                                   ELSE 'Routine recheck: sound at walk and trot, heart, lungs and temperature normal.' END,
+                p_diagnosis => CASE WHEN v_blocked THEN 'Recovered, fit to resume training' ELSE 'Healthy, fit for training' END,
+                p_decision => 'ALLOWED',
+                p_notes => CASE WHEN v_blocked THEN 'Cleared to return to normal work.' ELSE 'No concerns.' END,
+                p_temp => 37.8, p_hr => 36, p_rr => 12, p_weight => round(pg_temp.rnd('rw' || c.id, 400, 470), 1), p_bcs => 5.5,
+                p_resolve => TRUE);
         END IF;
     END LOOP;
 END $$ LANGUAGE plpgsql;
@@ -61,14 +68,12 @@ END $$ LANGUAGE plpgsql;
 -- Tiêm phòng (Preventive visits): xếp và hoàn tất các mốc PREVENTIVE của một ngựa tới thời điểm p_until.
 -- Ở mỗi lần khám, Thú y tiêm mọi phác đồ bắt buộc tới hạn trong 7 ngày (kể cả phác đồ chưa từng tiêm), rồi app tự đặt
 -- mốc kế tiếp. Ngựa đang tạm nghỉ thì hoãn tiêm tới khi hết nghỉ.
--- p_defer: hoãn tiêm lần đầu 7 ngày; p_hub: lần thứ hai tiêm từ màn hình "To do" thay vì chờ lịch;
--- p_leave_overdue: để lại một lịch đã quá giờ chưa khám (Thú y lỡ hẹn).
+-- p_defer: hoãn tiêm lần đầu 7 ngày; p_hub: lần thứ hai tiêm từ màn hình "To do" thay vì chờ lịch.
 -- (Books and completes a horse's PREVENTIVE milestones up to p_until. At each visit the vet gives every mandatory
 -- protocol due within 7 days; the app then sets the next milestone. A resting horse is vaccinated after the rest.)
 -- ---------------------------------------------------------------------
 CREATE FUNCTION pg_temp.run_preventive(p_horse BIGINT, p_vet BIGINT, p_until TIMESTAMP,
-                                       p_defer BOOLEAN DEFAULT FALSE, p_hub BOOLEAN DEFAULT FALSE,
-                                       p_leave_overdue BOOLEAN DEFAULT FALSE) RETURNS VOID AS $$
+                                       p_defer BOOLEAN DEFAULT FALSE, p_hub BOOLEAN DEFAULT FALSE) RETURNS VOID AS $$
 DECLARE
     m care_schedule;
     v_limit TIMESTAMP := LEAST(p_until, pg_temp.clock());
@@ -133,7 +138,6 @@ BEGIN
         v_slot := COALESCE(m.scheduled_at, m.scheduled_date::timestamp + time '14:00');
         v_done := v_slot + make_interval(mins => pg_temp.rndi('pv' || m.id, 18, 28));
         EXIT WHEN v_done > v_limit;
-        EXIT WHEN p_leave_overdue AND v_slot > pg_temp.clock() - INTERVAL '4 days';
         IF pg_temp.blocked_at(p_horse, v_slot) THEN
             -- Ngựa bị chặn sau khi lịch đã xếp: Manager dời ca tiêm tới sau đợt nghỉ (CareRescheduleService: lịch về
             -- REQUESTED ở ngày mới). (Blocked after booking: the manager moves the visit after the rest period.)
@@ -200,6 +204,7 @@ DECLARE
     v_sire RECORD;
     v_dam RECORD;
     v_remarks TEXT;
+    v_assigned TIMESTAMP;
 BEGIN
     FOR a IN SELECT * FROM seed_admission ORDER BY submitted, k LOOP
         SELECT * INTO hs FROM seed_horse WHERE k = a.horse_k;
@@ -207,9 +212,24 @@ BEGIN
 
         -- 1. Chủ ngựa nộp đơn: đơn + ảnh chụp hồ sơ ngựa + file đính kèm. (Owner submits: admission, snapshot, files.)
         v_t := pg_temp.ts(a.submitted);
-        INSERT INTO admission_applications (owner_id, status, submitted_at, created_at, updated_at)
-        VALUES (v_owner, 'GROOM_REVIEW', v_t, v_t, v_t) RETURNING id INTO v_adm;
+        -- Groom duyệt hồ sơ do 25_assign.sql chọn đúng như GroomWorkloadService; lịch sử phân công (gồm cả lần giao lại
+        -- vì hết chuồng) nằm trong seed_groom_assignment. (The reviewing groom comes from 25_assign.sql; the assignment
+        -- history, reassignments included, is in seed_groom_assignment.)
+        v_groom := pg_temp.uid(a.groom_k);
+        SELECT h.assigned_at INTO v_assigned FROM seed_groom_assignment h WHERE h.adm = a.k ORDER BY h.assigned_at DESC LIMIT 1;
+        INSERT INTO admission_applications (owner_id, status, submitted_at, created_at, updated_at,
+                                            assigned_groom_id, groom_assigned_at, groom_review_due_at)
+        VALUES (v_owner, 'GROOM_REVIEW', v_t, v_t, v_t, v_groom, v_assigned, v_assigned + INTERVAL '72 hours')
+        RETURNING id INTO v_adm;
         INSERT INTO seed_admission_id VALUES (a.k, v_adm);
+        INSERT INTO admission_groom_assignments (admission_id, groom_id, assigned_at, ended_at, end_reason, assigned_by_id)
+        SELECT v_adm, pg_temp.uid(h.groom_k), h.assigned_at, h.ended_at, h.end_reason,
+               CASE WHEN h.by_manager THEN v_manager END
+          FROM seed_groom_assignment h WHERE h.adm = a.k ORDER BY h.assigned_at;
+        PERFORM pg_temp.notify(pg_temp.uid(h.groom_k), 'ADMISSION', v_adm, 'ADMISSION_GROOM_REVIEW_ASSIGNED', 'New admission to review',
+                               hs.name || ' is assigned to you. Review due: ' || to_char(h.assigned_at + INTERVAL '72 hours', 'YYYY-MM-DD"T"HH24:MI'),
+                               h.assigned_at)
+          FROM seed_groom_assignment h WHERE h.adm = a.k;
         INSERT INTO candidate_horse_profiles (admission_id, name, breed, date_of_birth, registration_number, registry_name,
                                               sire_name, sire_registration_number, dam_name, dam_registration_number,
                                               pedigree_notes, created_at, updated_at, sex)
@@ -217,7 +237,8 @@ BEGIN
                 hs.pedigree_notes, v_t, v_t, hs.sex);
         INSERT INTO admission_documents (admission_id, document_type, file_url, record_date, note, uploaded_at, original_file_name)
         SELECT v_adm, doc.doc_type, doc.file_url, doc.record_date, doc.note, v_t, doc.file_name
-          FROM seed_doc doc WHERE doc.horse_k = a.horse_k ORDER BY doc.ord;
+          FROM seed_doc doc WHERE doc.horse_k = a.horse_k AND (doc.record_date IS NULL OR doc.record_date <= v_t::DATE)
+         ORDER BY doc.ord;
         PERFORM pg_temp.audit(v_owner, 'Submit Admission Application', 'AdmissionApplication', NULL,
                               'Horse owner submitted a new admission application dossier', v_t, 'POST', '/api/owner/admissions');
 
@@ -226,7 +247,7 @@ BEGIN
             v_groom := pg_temp.uid(a.groom_k);
             v_t := pg_temp.ts(a.groom_at);
             UPDATE admission_applications
-               SET groom_id = v_groom, groom_decision = a.groom_decision, groom_reviewed_at = v_t, updated_at = v_t,
+               SET groom_id = v_groom, assigned_groom_id = v_groom, groom_decision = a.groom_decision, groom_reviewed_at = v_t, updated_at = v_t,
                    groom_feedback = CASE WHEN a.groom_decision = 'REJECTED'
                        THEN 'The vaccination record is out of date: the last influenza / tetanus dose was given in November 2024. Please resubmit with a current vaccination record.'
                        ELSE (ARRAY['Identity, UELN and pedigree match the registry, the required documents are complete and legible.',
@@ -236,12 +257,18 @@ BEGIN
              WHERE id = v_adm;
             IF a.groom_decision = 'REJECTED' THEN
                 UPDATE admission_applications SET status = 'REJECTED' WHERE id = v_adm;
+                PERFORM pg_temp.notify(v_owner, 'ADMISSION', v_adm, 'ADMISSION_REJECTED', 'Admission application rejected',
+                                       'Your application for ' || hs.name || ' was not accepted at Quarantine Groom Review. Reason: '
+                                       || (SELECT groom_feedback FROM admission_applications WHERE id = v_adm), v_t);
             ELSE
                 v_q := pg_temp.stall(a.q_stall);
                 UPDATE stable_stalls SET status = 'RESERVED', updated_at = v_t WHERE id = v_q;
                 UPDATE admission_applications SET status = 'WAITING_FOR_ARRIVAL', quarantine_stall_id = v_q,
                        arrival_deadline_at = v_t + INTERVAL '14 days'
                  WHERE id = v_adm;
+                PERFORM pg_temp.notify(v_owner, 'ADMISSION', v_adm, 'ADMISSION_WAITING_FOR_ARRIVAL', 'Admission accepted - Bring horse to facility',
+                                       'Quarantine stall ' || a.q_stall || ' is reserved for ' || hs.name
+                                       || '. Please deliver your horse to Riverside before ' || (v_t + INTERVAL '14 days')::DATE || '.', v_t);
             END IF;
             PERFORM pg_temp.audit(v_groom, 'Groom Admission Review', 'AdmissionApplication', v_adm,
                                   'Groom reviewed intake dossier and verified arrival schedule for application #' || v_adm,
@@ -254,6 +281,8 @@ BEGIN
             UPDATE stable_stalls SET status = 'AVAILABLE', updated_at = v_t WHERE id = v_q;
             UPDATE admission_applications SET status = 'ARRIVAL_EXPIRED', quarantine_stall_id = NULL, updated_at = v_t
              WHERE id = v_adm;
+            PERFORM pg_temp.notify(v_owner, 'ADMISSION', v_adm, 'ADMISSION_ARRIVAL_EXPIRED', 'Quarantine reservation expired',
+                                   'The 14-day arrival window for ' || hs.name || ' has expired. The quarantine stall has been released.', v_t);
         END IF;
 
         -- 3. Ngựa tới trại: tạo (hoặc dùng lại ngựa từng bị từ chối) Horse CANDIDATE trong chuồng Q, phả hệ, ca khám INITIAL.
@@ -282,6 +311,11 @@ BEGIN
                     COALESCE(v_dam.name, hs.dam_name), hs.dam_ueln);
             UPDATE admission_applications SET horse_id = v_horse, arrived_at = v_t, status = 'VET_REVIEW', updated_at = v_t
              WHERE id = v_adm;
+            -- confirmArrival bắt buộc 1-5 ảnh, lưu ở rtms/admissions/<id>/arrival/<uuid>. (1-5 arrival photos are required.)
+            INSERT INTO admission_documents (admission_id, document_type, file_url, original_file_name, uploaded_at, record_date)
+            VALUES (v_adm, 'ARRIVAL_PHOTO',
+                    'https://res.cloudinary.com/zk0ncjb1/image/authenticated/v1792232221/rtms/admissions/' || v_adm || '/arrival/' || gen_random_uuid() || '.jpg',
+                    'arrival.jpg', v_t, v_t::DATE);
             PERFORM pg_temp.audit(v_groom, 'Confirm Horse Arrival', 'AdmissionApplication', v_adm,
                                   'Confirmed physical arrival of horse into quarantine for application #' || v_adm,
                                   v_t, 'POST', '/api/admissions/' || v_adm || '/arrival-confirmation');
@@ -320,13 +354,18 @@ BEGIN
                 p_notes => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Recheck booked before the horse starts training.'
                      ELSE 'Calm, alert and responsive after transport, supplied certificates checked.' END,
                 p_symptoms => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Noted on arrival by the quarantine groom' ELSE 'No symptoms observed' END,
-                p_next_at => CASE WHEN a.vet_decision = 'BLOCKED' THEN date_trunc('day', v_done) + INTERVAL '7 days 14 hours' END,
-                p_next_desc => 'Recheck before training', p_history_codes => v_codes, p_history_dates => v_dates,
+                p_next_at => date_trunc('day', v_done) + CASE WHEN a.vet_decision = 'BLOCKED' THEN INTERVAL '7 days 14 hours' ELSE INTERVAL '14 days 14 hours' END,
+                p_next_desc => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Recheck before training' ELSE 'Routine follow-up recheck examination' END,
+                p_marker => CASE WHEN a.vet_decision = 'BLOCKED' THEN CASE a.horse_k WHEN 'H012' THEN 'FORELEG_LEFT' WHEN 'H048' THEN 'FORELEG_LEFT' WHEN 'H027' THEN 'HEAD' ELSE 'ABDOMEN' END END, p_marker_xyz => ARRAY[0.46, 0.18, 0.52], p_history_codes => v_codes, p_history_dates => v_dates,
                 p_temp => hs.exam_temp, p_hr => hs.exam_hr, p_rr => hs.exam_rr,
                 p_weight => round(pg_temp.rnd('iw' || a.k, 395, 470), 1), p_bcs => 5.5);
-            PERFORM pg_temp.audit(v_vet, 'Veterinarian Intake Exam', 'AdmissionApplication', v_adm,
-                                  'Veterinarian performed initial clinical examination for application #' || v_adm,
-                                  v_done, 'POST', '/api/admissions/' || v_adm || '/vet-review');
+            PERFORM pg_temp.audit_domain(v_vet, 'VET_INTAKE_EXAM', 'AdmissionApplication', v_adm, 'MEDICAL',
+                                         'Veterinarian completed intake exam and evaluated training eligibility as ' || a.vet_decision,
+                                         COALESCE(NULLIF(a.restriction, ''), 'No medical treatment required.'),
+                                         '/manager/admissions/' || v_adm,
+                                         jsonb_build_object('admissionStatus', 'VET_REVIEW', 'horseStatus', 'CANDIDATE'),
+                                         jsonb_build_object('admissionStatus', 'TRAINER_REVIEW', 'trainingDecision', a.vet_decision),
+                                         v_done);
 
             -- Gán Head Trainer ngay sau ca khám. (A head trainer is assigned right after the exam.)
             v_trainer := pg_temp.uid(a.trainer_k);
@@ -383,9 +422,16 @@ BEGIN
                                           [pg_temp.rndi('mf' || a.k, 1, 3)]
                  WHERE id = v_adm;
                 PERFORM pg_temp.upsert_milestone(v_horse, 'preventive:approval:' || v_adm, v_manager, v_t::DATE + 1, v_t);
-                PERFORM pg_temp.audit(v_manager, 'Manager Admission Approval', 'AdmissionApplication', v_adm,
-                                      'Club Manager approved application #' || v_adm || ' and allocated regular stable stall',
-                                      v_t, 'POST', '/api/admissions/' || v_adm || '/manager-review');
+                PERFORM pg_temp.audit_domain(v_manager, 'MANAGER_ADMISSION_APPROVAL', 'AdmissionApplication', v_adm, 'ADMISSIONS',
+                                             'Club Manager approved admission application and allocated stall ' || a.regular_stall,
+                                             (SELECT manager_feedback FROM admission_applications WHERE id = v_adm),
+                                             '/manager/admissions/' || v_adm,
+                                             jsonb_build_object('admissionStatus', 'MANAGER_REVIEW', 'horseStatus', 'CANDIDATE', 'regularStall', 'None'),
+                                             jsonb_build_object('admissionStatus', 'APPROVED', 'horseStatus', 'ELIGIBLE', 'regularStall', a.regular_stall),
+                                             v_t);
+                PERFORM pg_temp.notify(v_owner, 'ADMISSION', v_adm, 'ADMISSION_APPROVED', 'Horse admission approved - Welcome to Riverside',
+                                       hs.name || ' has passed clinical and conditioning assessments and is now assigned to stall '
+                                       || a.regular_stall || ' as an active racehorse.', v_t);
             ELSE
                 IF EXISTS (SELECT 1 FROM care_schedule WHERE horse_id = v_horse AND status = 'IN_PROGRESS') THEN
                     RAISE EXCEPTION 'Admission % cannot be rejected while veterinary care is IN_PROGRESS', a.k;
@@ -399,10 +445,29 @@ BEGIN
                        updated_at = v_t,
                        manager_feedback = 'Rejected: the trainer assessed the horse as unsuitable for racing (temperament and an irregular hind stride). The owner may apply again after a period of schooling.'
                  WHERE id = v_adm;
-                PERFORM pg_temp.audit(v_manager, 'Manager Admission Approval', 'AdmissionApplication', v_adm,
-                                      'Club Manager approved application #' || v_adm || ' and allocated regular stable stall',
-                                      v_t, 'POST', '/api/admissions/' || v_adm || '/manager-review');
+                PERFORM pg_temp.audit_domain(v_manager, 'MANAGER_ADMISSION_REJECTION', 'AdmissionApplication', v_adm, 'ADMISSIONS',
+                                             'Club Manager rejected admission application',
+                                             (SELECT manager_feedback FROM admission_applications WHERE id = v_adm),
+                                             '/manager/admissions/' || v_adm,
+                                             jsonb_build_object('admissionStatus', 'MANAGER_REVIEW', 'horseStatus', 'CANDIDATE'),
+                                             jsonb_build_object('admissionStatus', 'REJECTED', 'horseStatus', 'REJECTED'), v_t);
+                PERFORM pg_temp.notify(v_owner, 'ADMISSION', v_adm, 'ADMISSION_REJECTED', 'Admission application rejected',
+                                       'Your application for ' || hs.name || ' was not accepted at Club Manager Final Review. Reason: '
+                                       || (SELECT manager_feedback FROM admission_applications WHERE id = v_adm), v_t);
             END IF;
         END IF;
     END LOOP;
 END $$;
+
+-- groom_profiles: lần nhận ngựa / xác nhận ngựa tới gần nhất, app cập nhật ở reserve(), confirmArrival() và khi Manager duyệt.
+-- (Latest horse assigned / arrival confirmed per groom, kept by reserve(), confirmArrival() and the manager approval.)
+UPDATE groom_profiles g SET last_arrival_confirmed_at = x.t
+  FROM (SELECT groom_id, max(arrived_at) t FROM admission_applications WHERE arrived_at IS NOT NULL GROUP BY groom_id) x
+ WHERE g.user_id = x.groom_id;
+UPDATE groom_profiles g SET last_horse_assigned_at = x.t
+  FROM (SELECT groom_id, max(t) t FROM (
+            SELECT groom_id, groom_reviewed_at t FROM admission_applications WHERE groom_decision = 'APPROVED'
+            UNION ALL
+            SELECT ss.groom_id, a.manager_reviewed_at FROM admission_applications a JOIN horses h ON h.id = a.horse_id
+              JOIN stable_stalls ss ON ss.id = h.current_stall_id WHERE a.manager_decision = 'APPROVED') y GROUP BY groom_id) x
+ WHERE g.user_id = x.groom_id;

@@ -28,7 +28,7 @@ export function Sidebar({
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[3px] bg-[var(--color-primary)] transition-colors duration-[var(--duration-base)]"
+        className="pointer-events-none absolute left-0 -right-px top-0 z-10 h-[3px] bg-[var(--color-primary)] transition-colors duration-[var(--duration-base)]"
       />
       <Link
         href={getRoleRoute(role)}

@@ -42,10 +42,10 @@ export function CalendarSessionCell({
         'cursor-pointer hover:border-[var(--color-primary)] hover:shadow-sm',
     )}
   >
-    <div className="flex items-center justify-between gap-1 text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-0.5 text-xs">
       <span
         className={cn(
-          'font-semibold text-[var(--color-text-primary)]',
+          'whitespace-nowrap font-semibold text-[var(--color-text-primary)]',
           isCancelled && 'text-[var(--color-text-muted)] line-through',
         )}
       >
@@ -80,9 +80,9 @@ export function CalendarSessionCell({
 
     {(session.horseCount !== undefined ||
       (session.needsResultCount !== undefined && session.needsResultCount > 0)) && (
-      <div className="flex items-center justify-between pt-0.5 text-xs text-[var(--color-text-muted)]">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5 text-xs text-[var(--color-text-muted)]">
         {session.horseCount !== undefined && (
-          <span>
+          <span className="whitespace-nowrap">
             {session.horseCount} {session.horseCount === 1 ? 'horse' : 'horses'}
           </span>
         )}
