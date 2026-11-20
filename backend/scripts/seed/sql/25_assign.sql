@@ -30,7 +30,6 @@ CREATE TEMP TABLE seed_groom_assignment (adm TEXT NOT NULL, groom_k TEXT NOT NUL
 CREATE TEMP TABLE sim_manual (adm TEXT PRIMARY KEY, groom TEXT NOT NULL, after_submit INTERVAL NOT NULL);
 INSERT INTO sim_manual VALUES ('AP049', 'GR01', INTERVAL '4 hours');
 CREATE TEMP TABLE sim_event (t TIMESTAMP NOT NULL, rank INT NOT NULL, kind TEXT NOT NULL, adm TEXT NOT NULL);
-
 INSERT INTO sim_stall
 SELECT ar.code || lpad(n::TEXT, 2, '0'), ar.code, ar.type, n,
        (SELECT b.groom_k FROM seed_groom_block b WHERE b.area_code = ar.code AND n BETWEEN b.first_stall AND b.first_stall + 2)
