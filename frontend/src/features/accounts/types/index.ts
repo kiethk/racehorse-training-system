@@ -8,6 +8,7 @@ export interface AccountSummary {
   address?: string;
   role: Role | string;
   active: boolean;
+  superAdmin?: boolean;
   createdAt: string;
   profileSummary?: string;
   ownedHorsesCount?: number;
@@ -46,6 +47,7 @@ export interface AccountCreationResponse {
   address?: string;
   role: string;
   active: boolean;
+  superAdmin?: boolean;
   createdAt: string;
   profileSummary?: string;
   // HEAD_TRAINER assignment
@@ -79,6 +81,7 @@ export interface AccountDetailResponse {
   address?: string;
   role: string;
   active: boolean;
+  superAdmin?: boolean;
   createdAt: string;
   profile?: Record<string, unknown>;
   ownedHorses?: OwnedHorseSummary[];

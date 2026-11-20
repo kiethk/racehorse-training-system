@@ -11,6 +11,7 @@ public class StaffSummaryResponse {
     private String address;
     private String role;
     private boolean isActive;
+    private boolean superAdmin;
     private LocalDateTime createdAt;
 
     // Optional straightforward profile summary
@@ -37,6 +38,9 @@ public class StaffSummaryResponse {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+
+    public boolean isSuperAdmin() { return superAdmin; }
+    public void setSuperAdmin(boolean superAdmin) { this.superAdmin = superAdmin; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
