@@ -1,4 +1,4 @@
-package com.rtms.backend.analytics.util;
+package com.rtms.backend.analytics.calculator;
 
 import com.rtms.backend.analytics.dto.manager.TrainerEvaluationEdaDto;
 import com.rtms.backend.analytics.dto.manager.TrainerPerformanceDto;

@@ -1,4 +1,4 @@
-package com.rtms.backend.analytics.dto;
+package com.rtms.backend.analytics.dto.horse;
 
 public record FleetWorkoutSummaryRow(
         Long horseId,

@@ -1,8 +1,8 @@
 package com.rtms.backend.analytics.service;
 
-import com.rtms.backend.analytics.dto.FleetEdaResponse;
-import com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow;
-import com.rtms.backend.analytics.dto.IndividualHorseEdaResponse;
+import com.rtms.backend.analytics.dto.horse.FleetEdaResponse;
+import com.rtms.backend.analytics.dto.horse.FleetWorkoutSummaryRow;
+import com.rtms.backend.analytics.dto.horse.IndividualHorseEdaResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;

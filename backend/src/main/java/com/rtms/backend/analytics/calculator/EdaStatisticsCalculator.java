@@ -1,4 +1,4 @@
-package com.rtms.backend.analytics.util;
+package com.rtms.backend.analytics.calculator;
 
 import java.util.ArrayList;
 import java.util.Collections;

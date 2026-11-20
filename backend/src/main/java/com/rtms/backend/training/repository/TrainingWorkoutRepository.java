@@ -269,7 +269,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                                                  @Param("today") LocalDate today, @Param("time") LocalTime time);
 
     @Query("""
-           SELECT new com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow(
+           SELECT new com.rtms.backend.analytics.dto.horse.FleetWorkoutSummaryRow(
                w.horseId,
                AVG(w.averageSpeedKmh),
                AVG(w.recoveryHeartRate),
@@ -284,7 +284,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
              AND s.sessionDate >= :since
            GROUP BY w.horseId
            """)
-    List<com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow> findFleetWorkoutSummaries(
+    List<com.rtms.backend.analytics.dto.horse.FleetWorkoutSummaryRow> findFleetWorkoutSummaries(
             @Param("horseIds") java.util.Collection<Long> horseIds,
             @Param("since") java.time.LocalDate since);
     @Query("""

@@ -1,4 +1,7 @@
-package com.rtms.backend.ai.tool;
+package com.rtms.backend.ai.tool.definition;
+
+import com.rtms.backend.ai.tool.AiToolDefinition;
+import com.rtms.backend.ai.tool.ToolDefinitionSchema;
 
 import java.util.List;
 import java.util.Map;
@@ -6,11 +9,11 @@ import java.util.Map;
 import com.rtms.backend.ai.tool.handler.eda.EdaAnalysisType;
 
 /** Role-scoped AI tool definitions for CLUB MANAGER. */
-final class ManagerToolDefinitions {
+public final class ManagerToolDefinitions {
     private ManagerToolDefinitions() {
     }
 
-    static List<AiToolDefinition> create() {
+    public static List<AiToolDefinition> create() {
         return List.of(
                 new AiToolDefinition(
                                         "getStableOccupancyMetrics",
