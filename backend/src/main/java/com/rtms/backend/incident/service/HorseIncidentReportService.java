@@ -28,11 +28,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class HorseIncidentReportService {
@@ -307,7 +309,7 @@ public class HorseIncidentReportService {
                         .filter(schedule -> schedule.getVeterinarianId() != null)
                         .collect(Collectors.toMap(CareSchedule::getId, CareSchedule::getVeterinarianId, (a, b) -> a));
 
-        Map<HorseIncidentReport, Long> vetByReport = new java.util.IdentityHashMap<>();
+        Map<HorseIncidentReport, Long> vetByReport = new IdentityHashMap<>();
         for (HorseIncidentReport report : reports) {
             Long vetId = report.getHandledById() != null ? report.getHandledById()
                     : report.getCareScheduleId() != null ? vetBySchedule.get(report.getCareScheduleId())
@@ -315,7 +317,7 @@ public class HorseIncidentReportService {
             if (vetId != null) vetByReport.put(report, vetId);
         }
 
-        List<Long> userIds = java.util.stream.Stream.concat(
+        List<Long> userIds = Stream.concat(
                         vetByReport.values().stream(),
                         reports.stream().map(HorseIncidentReport::getReportedById).filter(Objects::nonNull))
                 .distinct()

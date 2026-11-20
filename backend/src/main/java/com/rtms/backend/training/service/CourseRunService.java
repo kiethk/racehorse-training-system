@@ -4,8 +4,6 @@ import com.rtms.backend.training.util.ScheduleLocks;
 import com.rtms.backend.training.util.TrainingCalendar;
 import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.config.FarmSchedulePolicy;
-import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -27,7 +25,6 @@ import com.rtms.backend.training.entity.TrainingGroupMember;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.TrainingDay;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
@@ -35,7 +32,6 @@ import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
-import com.rtms.backend.training.util.SessionSlotFinder.Busy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,15 +40,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -336,8 +332,8 @@ public class CourseRunService {
         }
         List<Long> courseRunIds = courseRuns.stream().map(CourseRun::getId).toList();
         Map<Long, TrainingGroup> groupsById = groupRepository
-                .findAllById(courseRuns.stream().map(CourseRun::getGroupId).filter(java.util.Objects::nonNull).collect(Collectors.toSet()))
-                .stream().collect(Collectors.toMap(TrainingGroup::getId, java.util.function.Function.identity()));
+                .findAllById(courseRuns.stream().map(CourseRun::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(TrainingGroup::getId, Function.identity()));
         Map<Long, String> courseNames = courseNames(courseRuns.stream().map(CourseRun::getCourseId).toList());
         Map<Long, Map<SessionStatus, Long>> counts = sessionRepository.countByCourseRunAndStatus(courseRunIds).stream()
                 .collect(Collectors.groupingBy(CourseRunSessionCountRow::courseRunId,

@@ -121,7 +121,7 @@ class AdmissionUelnPolicyTest {
 
     @Test
     void availabilityCheckRejectsInvalidFormatBeforeReadingDatabase() {
-        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        var error = assertThrows(ResponseStatusException.class,
                 () -> policy.checkAvailability("INVALID_UELN_123"));
         assertEquals(400, error.getStatusCode().value());
         verifyNoInteractions(entityManager, admissions, horses);

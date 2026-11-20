@@ -93,7 +93,7 @@ class SessionSummaryAssembler {
         TrainingGroup group = !showGroup || courseRun.getGroupId() == null ? null : lookups.groups().get(courseRun.getGroupId());
         List<String> horseNames = mine.stream().filter(workout -> workout.getStatus() != WorkoutStatus.CANCELLED)
                 .map(workout -> lookups.horseNames().get(workout.getHorseId()))
-                .filter(java.util.Objects::nonNull).distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+                .filter(Objects::nonNull).distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
         return new SessionSummaryResponse(session.getId(), courseRun.getId(), showGroup ? courseRun.getGroupId() : null,
                 group == null ? null : group.getName(), group != null && group.isDisbanded(),
                 lookups.courseNames().get(courseRun.getCourseId()), lookups.exerciseNames().get(session.getExerciseId()),

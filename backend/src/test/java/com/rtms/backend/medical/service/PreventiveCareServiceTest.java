@@ -1,8 +1,12 @@
 package com.rtms.backend.medical.service;
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompletePreventiveCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreatePreventiveCareScheduleRequest;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -16,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import java.time.LocalDate;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,8 +30,8 @@ class PreventiveCareServiceTest {
     @Mock CareScheduleRepository schedules;
     @Mock HorseRepository horses;
     @Mock CareScheduleService care;
-    @Mock com.rtms.backend.admission.repository.AdmissionApplicationRepository admissions;
-    @Mock com.rtms.backend.identity.repository.UserRepository users;
+    @Mock AdmissionApplicationRepository admissions;
+    @Mock UserRepository users;
     private final AuthenticatedUser vet = new AuthenticatedUser(7L, "vet@example.com", "VETERINARIAN");
 
     @Test
@@ -81,19 +86,19 @@ class PreventiveCareServiceTest {
         milestone.setId(5L);
         milestone.setHorseId(2L);
         milestone.setCareType(CareType.ROUTINE);
-        milestone.setPurpose(com.rtms.backend.medical.enums.CareSchedulePurpose.PREVENTIVE);
+        milestone.setPurpose(CareSchedulePurpose.PREVENTIVE);
         milestone.setStatus(CareScheduleStatus.SCHEDULED);
         when(schedules.findFirstByHorseIdAndPurposeAndStatusIn(eq(2L),
-                eq(com.rtms.backend.medical.enums.CareSchedulePurpose.PREVENTIVE), anyList()))
+                eq(CareSchedulePurpose.PREVENTIVE), anyList()))
                 .thenReturn(Optional.of(milestone));
-        when(horses.findById(2L)).thenReturn(Optional.of(new com.rtms.backend.horse.entity.Horse()));
+        when(horses.findById(2L)).thenReturn(Optional.of(new Horse()));
         doThrow(new ApiException(HttpStatus.CONFLICT, "HORSE_BUSY_THAT_DAY", "busy"))
                 .when(care).assertHorseFreeOnDay(eq(2L), any(), eq(5L));
 
         CreatePreventiveCareScheduleRequest request = new CreatePreventiveCareScheduleRequest();
         request.setHorseId(2L);
         request.setCareType("VACCINATION");
-        request.setScheduledDate(java.time.LocalDate.now().plusDays(3));
+        request.setScheduledDate(LocalDate.now().plusDays(3));
 
         ApiException error = assertThrows(ApiException.class, () ->
                 new PreventiveCareService(schedules, horses, care, admissions, users).createSchedule(request, vet));

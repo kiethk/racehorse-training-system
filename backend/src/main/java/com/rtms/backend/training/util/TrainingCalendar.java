@@ -4,6 +4,7 @@ import com.rtms.backend.training.repository.projection.RunningCourseRunRow;
 import com.rtms.backend.training.enums.TrainingDay;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -33,7 +34,7 @@ public final class TrainingCalendar {
      * (empty, or only null) the loop never ends.)
      */
     public static Set<TrainingDay> requireWeekdays(Set<TrainingDay> trainingDays) {
-        Set<TrainingDay> days = new java.util.LinkedHashSet<>();
+        Set<TrainingDay> days = new LinkedHashSet<>();
         if (trainingDays != null) {
             days.addAll(trainingDays);
         }

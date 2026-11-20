@@ -1,6 +1,10 @@
 package com.rtms.backend.analytics.controller;
 
+import com.rtms.backend.analytics.dto.manager.AdmissionFunnelEdaDto;
+import com.rtms.backend.analytics.dto.manager.BarnOccupancyBreakdownDto;
 import com.rtms.backend.analytics.dto.manager.ManagerEdaOverviewResponse;
+import com.rtms.backend.analytics.dto.manager.TrainerPerformanceDto;
+import com.rtms.backend.analytics.dto.manager.VeterinarianDelayDto;
 import com.rtms.backend.analytics.service.ManagerEdaAnalyticsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -130,11 +134,11 @@ class ManagerEdaSecurityAuditTest {
     @DisplayName("OWASP API3 (BOPLA): DTOs do not expose sensitive security properties (password, hash, secret, token)")
     void testNoSensitivePropertiesExposedInDtos() {
         Class<?>[] managerDtos = new Class<?>[] {
-                com.rtms.backend.analytics.dto.manager.VeterinarianDelayDto.class,
-                com.rtms.backend.analytics.dto.manager.TrainerPerformanceDto.class,
-                com.rtms.backend.analytics.dto.manager.BarnOccupancyBreakdownDto.class,
-                com.rtms.backend.analytics.dto.manager.AdmissionFunnelEdaDto.class,
-                com.rtms.backend.analytics.dto.manager.ManagerEdaOverviewResponse.class
+                VeterinarianDelayDto.class,
+                TrainerPerformanceDto.class,
+                BarnOccupancyBreakdownDto.class,
+                AdmissionFunnelEdaDto.class,
+                ManagerEdaOverviewResponse.class
         };
 
         for (Class<?> dtoClass : managerDtos) {

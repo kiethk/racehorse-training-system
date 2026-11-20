@@ -4,14 +4,13 @@ import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompletePreventiveCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreatePreventiveCareScheduleRequest;
-import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.CareSchedule;
-import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.medical.service.PreventiveCareService;
 
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,7 +38,7 @@ public class PreventiveCareController {
     @PostMapping
     public ApiResponse<CareSchedule> createSchedule(
             @RequestBody CreatePreventiveCareScheduleRequest request,
-            @org.springframework.security.core.annotation.AuthenticationPrincipal AuthenticatedUser currentUser) {
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(preventiveCareService.createSchedule(request, currentUser));
     }
 

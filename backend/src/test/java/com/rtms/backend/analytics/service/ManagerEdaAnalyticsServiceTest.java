@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -115,7 +116,7 @@ class ManagerEdaAnalyticsServiceTest {
                 eq(LocalDate.now().minusDays(365))
         );
         verifyNoMoreInteractions(trainingWorkoutRepository);
-        verify(userRepository, org.mockito.Mockito.times(2)).findAll();
+        verify(userRepository, times(2)).findAll();
         verifyNoMoreInteractions(userRepository);
         verifyNoInteractions(
                 careScheduleRepository,

@@ -8,6 +8,7 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.service.AreaService;
 import com.rtms.backend.stable.service.AreaLifecycleService;
 import com.rtms.backend.stable.service.StableAssignmentService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -56,7 +57,7 @@ public class AreaController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('AREA_CREATE')")
-    public ApiResponse<Area> createArea(@Valid @RequestBody CreateAreaRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
+    public ApiResponse<Area> createArea(@Valid @RequestBody CreateAreaRequest request, HttpServletRequest httpRequest) {
         Area area = areaService.createArea(request.getType());
         if (httpRequest != null) {
             httpRequest.setAttribute("AUDIT_ENTITY_ID", area.getId());
@@ -102,7 +103,7 @@ public class AreaController {
     @RequestMapping(value = "/assignments", method = {RequestMethod.PUT, RequestMethod.POST})
     @PreAuthorize("hasAuthority('AREA_UPDATE') and hasAuthority('STALL_GROOM_ASSIGN')")
     public ApiResponse<StableAssignmentResponse> applyAssignments(
-            @Valid @RequestBody BatchStableAssignmentRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
+            @Valid @RequestBody BatchStableAssignmentRequest request, HttpServletRequest httpRequest) {
         if (httpRequest != null) {
             if (request.getTrainerAssignments() != null && !request.getTrainerAssignments().isEmpty()) {
                 httpRequest.setAttribute("AUDIT_ENTITY_ID", request.getTrainerAssignments().get(0).getAreaId());

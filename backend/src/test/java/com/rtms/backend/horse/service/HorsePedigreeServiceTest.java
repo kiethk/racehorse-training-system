@@ -4,6 +4,7 @@ import com.rtms.backend.horse.dto.CreateHorsePedigreeRequest;
 import com.rtms.backend.horse.dto.HorsePedigreeResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.entity.HorsePedigree;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorsePedigreeRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -361,20 +362,20 @@ class HorsePedigreeServiceTest {
         assertEquals("New External Sire", saved.getSireName());
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     void sireMustBeMaleAndDamFemaleWhenTheirSexIsKnown() {
-        com.rtms.backend.horse.entity.Horse mare = new com.rtms.backend.horse.entity.Horse();
-        mare.setSex(com.rtms.backend.horse.enums.HorseSex.FEMALE);
-        com.rtms.backend.horse.entity.Horse stallion = new com.rtms.backend.horse.entity.Horse();
-        stallion.setSex(com.rtms.backend.horse.enums.HorseSex.MALE);
-        com.rtms.backend.horse.entity.Horse unknown = new com.rtms.backend.horse.entity.Horse();
+        Horse mare = new Horse();
+        mare.setSex(HorseSex.FEMALE);
+        Horse stallion = new Horse();
+        stallion.setSex(HorseSex.MALE);
+        Horse unknown = new Horse();
 
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ResponseStatusException.class,
                 () -> pedigreeService.validateParentSexes(mare, null));
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ResponseStatusException.class,
                 () -> pedigreeService.validateParentSexes(null, stallion));
-        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> pedigreeService.validateParentSexes(stallion, mare));
-        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> pedigreeService.validateParentSexes(unknown, unknown));
-        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> pedigreeService.validateParentSexes(null, null));
+        assertDoesNotThrow(() -> pedigreeService.validateParentSexes(stallion, mare));
+        assertDoesNotThrow(() -> pedigreeService.validateParentSexes(unknown, unknown));
+        assertDoesNotThrow(() -> pedigreeService.validateParentSexes(null, null));
     }
 }

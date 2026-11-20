@@ -2,9 +2,9 @@ package com.rtms.backend.medical.service;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
-import com.rtms.backend.identity.entity.Role;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -139,11 +140,11 @@ class CareScheduleLifecycleTest {
         when(careScheduleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(source));
         when(horseRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(new Horse()));
         when(careScheduleRepository.findByRequestedByIdAndIdempotencyKey(assignedVet.getId(), "k1")).thenReturn(Optional.empty());
-        when(careScheduleRepository.findByHorseIdAndStatusIn(100L, java.util.List.of(CareScheduleStatus.SCHEDULED)))
-                .thenReturn(java.util.List.of(waiting));
+        when(careScheduleRepository.findByHorseIdAndStatusIn(100L, List.of(CareScheduleStatus.SCHEDULED)))
+                .thenReturn(List.of(waiting));
         when(careScheduleRepository.findByHorseIdAndStatusIn(100L, CareScheduleStatus.BOOKED_OR_ACTIVE))
-                .thenReturn(java.util.List.of(waiting, busy));
-        com.rtms.backend.medical.dto.CreateNextScheduleRequest request = new com.rtms.backend.medical.dto.CreateNextScheduleRequest();
+                .thenReturn(List.of(waiting, busy));
+        CreateNextScheduleRequest request = new CreateNextScheduleRequest();
         request.setSourceScheduleId(10L);
         request.setCareType(CareType.ROUTINE);
         request.setScheduledDate(chosen.toString());
@@ -167,7 +168,7 @@ class CareScheduleLifecycleTest {
         existing.setStatus(CareScheduleStatus.SCHEDULED);
         existing.setScheduledDate(LocalDate.of(2026, 11, 16));
         when(careScheduleRepository.findByHorseIdAndStatusIn(100L, CareScheduleStatus.BOOKED_OR_ACTIVE))
-                .thenReturn(java.util.List.of(existing));
+                .thenReturn(List.of(existing));
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> careScheduleService.assertHorseFreeOnDay(100L, LocalDate.of(2026, 11, 16), null));
@@ -194,7 +195,7 @@ class CareScheduleLifecycleTest {
         self.setScheduledDate(LocalDate.of(2026, 11, 16));
 
         when(careScheduleRepository.findByHorseIdAndStatusIn(100L, CareScheduleStatus.BOOKED_OR_ACTIVE))
-                .thenReturn(java.util.List.of(urgent, self));
+                .thenReturn(List.of(urgent, self));
 
         assertDoesNotThrow(() -> careScheduleService.assertHorseFreeOnDay(100L, LocalDate.of(2026, 11, 16), 13L));
     }

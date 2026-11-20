@@ -6,6 +6,7 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.medical.dto.VaccinationRequest;
 import com.rtms.backend.admission.dto.VetReviewRequest;
 import com.rtms.backend.admission.dto.VetReviewResponse;
 import com.rtms.backend.admission.entity.AdmissionApplication;
@@ -34,12 +35,12 @@ import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -161,7 +162,7 @@ class AdmissionReviewServiceTest {
         request.setFindings("Splint inflammation; horse blocked from training but admitted");
         request.setRestrictionDetails("No track work for 30 days");
         request.setNextSchedule(next);
-        var vaccinations = java.util.List.of(new com.rtms.backend.medical.dto.VaccinationRequest());
+        var vaccinations = List.of(new VaccinationRequest());
         request.setVaccinations(vaccinations);
         request.setGeneralCareInstructions("Cold hose BID and monitor temperature");
 

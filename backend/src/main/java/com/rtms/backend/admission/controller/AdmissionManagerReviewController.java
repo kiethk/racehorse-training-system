@@ -1,7 +1,6 @@
 package com.rtms.backend.admission.controller;
 import com.rtms.backend.admission.service.OwnerAdmissionService;
 
-import com.rtms.backend.admission.dto.AdmissionDetailResponse;
 import com.rtms.backend.admission.dto.AdmissionSummaryResponse;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.admission.dto.ManagerReviewRequest;
@@ -22,12 +21,12 @@ public class AdmissionManagerReviewController {
 
     private final AdmissionManagerReviewService admissionManagerReviewService;
     private final AdmissionQueryService admissionQueryService;
-    private final com.rtms.backend.admission.service.OwnerAdmissionService ownerAdmissionService;
+    private final OwnerAdmissionService ownerAdmissionService;
 
     public AdmissionManagerReviewController(
             AdmissionManagerReviewService admissionManagerReviewService,
             AdmissionQueryService admissionQueryService,
-            com.rtms.backend.admission.service.OwnerAdmissionService ownerAdmissionService) {
+            OwnerAdmissionService ownerAdmissionService) {
         this.admissionManagerReviewService = admissionManagerReviewService;
         this.admissionQueryService = admissionQueryService;
         this.ownerAdmissionService = ownerAdmissionService;

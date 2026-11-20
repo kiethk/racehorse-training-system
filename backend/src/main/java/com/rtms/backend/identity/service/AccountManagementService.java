@@ -19,6 +19,9 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.service.TrainerAssignmentService;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
+import com.rtms.backend.config.SuperAdminProperties;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.identity.entity.GroomProfile;
 import com.rtms.backend.medical.entity.CareSchedule;
@@ -36,6 +39,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -58,16 +62,16 @@ public class AccountManagementService {
     private final CareScheduleRepository careScheduleRepository;
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final NotificationService notificationService;
-    private final com.rtms.backend.notification.service.EmailService emailService;
+    private final EmailService emailService;
     private final TrainerAssignmentService trainerAssignmentService;
     private final CareScheduleService careScheduleService;
     private final TrainerHandoverService trainerHandoverService;
 
     @Autowired(required = false)
-    private com.rtms.backend.config.SuperAdminProperties superAdminProperties;
+    private SuperAdminProperties superAdminProperties;
 
     @Autowired(required = false)
-    private com.rtms.backend.audit.service.AuditLogService auditLogService;
+    private AuditLogService auditLogService;
 
     public AccountManagementService(
             UserRepository userRepository,
@@ -203,11 +207,11 @@ public class AccountManagementService {
         this.trainerHandoverService = trainerHandoverService;
     }
 
-    public void setSuperAdminProperties(com.rtms.backend.config.SuperAdminProperties superAdminProperties) {
+    public void setSuperAdminProperties(SuperAdminProperties superAdminProperties) {
         this.superAdminProperties = superAdminProperties;
     }
 
-    public void setAuditLogService(com.rtms.backend.audit.service.AuditLogService auditLogService) {
+    public void setAuditLogService(AuditLogService auditLogService) {
         this.auditLogService = auditLogService;
     }
 
@@ -412,7 +416,7 @@ public class AccountManagementService {
                     violations.stream().sorted(Comparator.comparing(v -> v.getPropertyPath().toString())).findFirst().orElseThrow().getMessage());
         }
 
-        if (request.getPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+        if (request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes");
         }
 
@@ -478,7 +482,7 @@ public class AccountManagementService {
 
         if (isSuperAdmin(userId) && (currentUserId == null || !currentUserId.equals(userId))) {
             if (auditLogService != null) {
-                auditLogService.recordDomainEvent(com.rtms.backend.audit.dto.DomainAuditEvent.builder()
+                auditLogService.recordDomainEvent(DomainAuditEvent.builder()
                         .userId(currentUserId)
                         .action("SUPER_ADMIN_EDIT_BLOCKED")
                         .entityName("USER")
@@ -593,7 +597,7 @@ public class AccountManagementService {
         // 0. Super Admin protection guard
         if (isSuperAdmin(targetUserId)) {
             if (auditLogService != null) {
-                auditLogService.recordDomainEvent(com.rtms.backend.audit.dto.DomainAuditEvent.builder()
+                auditLogService.recordDomainEvent(DomainAuditEvent.builder()
                         .userId(currentUserId)
                         .action("SUPER_ADMIN_DEACTIVATE_BLOCKED")
                         .entityName("USER")

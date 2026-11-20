@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -64,7 +65,7 @@ class JwtAuthenticationFilterTest {
         when(userRepository.existsByIdAndIsActiveTrue(10L)).thenReturn(true);
         Role role = new Role();
         role.setName("GROOM");
-        role.setPermissions(java.util.Set.of());
+        role.setPermissions(Set.of());
         when(roleRepository.findByName("GROOM")).thenReturn(Optional.of(role));
 
         filter.doFilterInternal(request, response, filterChain);

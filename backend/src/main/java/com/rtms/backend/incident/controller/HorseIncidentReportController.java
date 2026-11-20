@@ -2,6 +2,7 @@ package com.rtms.backend.incident.controller;
 
 import com.rtms.backend.common.storage.FileVariant;
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.incident.dto.CreateIncidentReportRequest;
 import com.rtms.backend.incident.dto.HandleIncidentRequest;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
@@ -10,6 +11,7 @@ import com.rtms.backend.incident.service.HorseIncidentReportService;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -59,8 +61,8 @@ public class HorseIncidentReportController {
             @PathVariable Long id,
             @RequestBody HandleIncidentRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        throw new com.rtms.backend.config.ApiException(
-                org.springframework.http.HttpStatus.CONFLICT,
+        throw new ApiException(
+                HttpStatus.CONFLICT,
                 "INCIDENT_CLOSE_VIA_CARE_SCHEDULE",
                 "Incident reports are resolved only by completing the urgent care schedule");
     }

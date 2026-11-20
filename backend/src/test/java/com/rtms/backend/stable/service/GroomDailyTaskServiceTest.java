@@ -1,13 +1,14 @@
 package com.rtms.backend.stable.service;
+import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.enums.TaskSource;
-import com.rtms.backend.training.entity.Exercise;
-import com.rtms.backend.training.entity.TrainingWorkout;
+import com.rtms.backend.stable.repository.GroomTaskCompletionRepository;
 import com.rtms.backend.training.enums.WorkoutStatus;
+import com.rtms.backend.training.repository.projection.GroomWorkoutRow;
 
 
 import com.rtms.backend.config.FarmSchedulePolicy;
@@ -29,9 +30,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -62,10 +67,10 @@ class GroomDailyTaskServiceTest {
     private CareScheduleRepository careScheduleRepository;
 
     @Mock
-    private com.rtms.backend.common.storage.FileStorageService fileStorage;
+    private FileStorageService fileStorage;
 
     @Mock
-    private com.rtms.backend.stable.repository.GroomTaskCompletionRepository completionRepository;
+    private GroomTaskCompletionRepository completionRepository;
 
     private GroomDailyTaskService taskService;
 
@@ -218,8 +223,8 @@ class GroomDailyTaskServiceTest {
     @DisplayName("5. Aggregator: Gom việc từ 3 nguồn (SOP, Workout, Thú y) và sắp xếp đúng thứ tự thời gian")
     void testTodayAggregatedTasks_ThreeSourcesSortedChronologically() {
         LocalDate targetDate = LocalDate.of(2026, 10, 5);
-        com.rtms.backend.security.AuthenticatedUser groomUser =
-                new com.rtms.backend.security.AuthenticatedUser(4L, "groom@example.com", "GROOM");
+        AuthenticatedUser groomUser =
+                new AuthenticatedUser(4L, "groom@example.com", "GROOM");
 
         // Nguồn 1: SOP task lúc 05:00
         GroomDailyTask sopTask = new GroomDailyTask(4L, 1L, GroomTaskType.FEEDING,
@@ -231,9 +236,9 @@ class GroomDailyTaskServiceTest {
                 .thenReturn(List.of(sopTask));
 
         // Source 2: a workout joined with its session at 06:00 (horse and exercise names come in the same row)
-        com.rtms.backend.training.repository.projection.GroomWorkoutRow workoutRow = new com.rtms.backend.training.repository.projection.GroomWorkoutRow(
-                201L, 1L, "Silver Moon", com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED,
-                java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 30), "Steady 1200m run");
+        GroomWorkoutRow workoutRow = new GroomWorkoutRow(
+                201L, 1L, "Silver Moon", WorkoutStatus.SCHEDULED,
+                LocalTime.of(6, 0), LocalTime.of(7, 30), "Steady 1200m run");
 
         when(workoutRepository.findGroomWorkoutRows(4L, targetDate)).thenReturn(List.of(workoutRow));
 
@@ -249,39 +254,39 @@ class GroomDailyTaskServiceTest {
         horse1.setCurrentStallId(10L);
         when(horseRepository.findByCurrentStallIdIn(List.of(10L))).thenReturn(List.of(horse1));
 
-        com.rtms.backend.medical.entity.CareSchedule schedule = new com.rtms.backend.medical.entity.CareSchedule();
+        CareSchedule schedule = new CareSchedule();
         schedule.setId(301L);
         schedule.setHorseId(1L);
-        schedule.setCareType(com.rtms.backend.medical.enums.CareType.ROUTINE);
+        schedule.setCareType(CareType.ROUTINE);
         schedule.setScheduledAt(targetDate.atTime(FarmSchedulePolicy.VET_WINDOW_START));
         schedule.setDescription("Tiêm định kỳ 6 tháng");
-        schedule.setStatus(com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
 
         when(careScheduleRepository.findByHorseIdInAndScheduledAtBetweenAndStatusIn(eq(List.of(1L)), any(), any(), any()))
                 .thenReturn(List.of(schedule));
 
         // Act
-        List<com.rtms.backend.stable.dto.TodayTaskItemResponse> items =
+        List<TodayTaskItemResponse> items =
                 taskService.getTodayAggregatedTasks(null, targetDate, groomUser);
 
         // Assert
         assertEquals(3, items.size());
 
         // Item 1: SOP 05:00
-        assertEquals(com.rtms.backend.stable.enums.TaskSource.SOP, items.get(0).getSource());
-        assertEquals(java.time.LocalTime.of(5, 0), items.get(0).getStartTime());
+        assertEquals(TaskSource.SOP, items.get(0).getSource());
+        assertEquals(LocalTime.of(5, 0), items.get(0).getStartTime());
         assertEquals("Silver Moon", items.get(0).getHorseName());
         assertTrue(items.get(0).isActionable());
 
         // Item 2: WORKOUT 06:00
-        assertEquals(com.rtms.backend.stable.enums.TaskSource.WORKOUT, items.get(1).getSource());
-        assertEquals(java.time.LocalTime.of(6, 0), items.get(1).getStartTime());
-        assertEquals(java.time.LocalTime.of(7, 30), items.get(1).getEndTime());
+        assertEquals(TaskSource.WORKOUT, items.get(1).getSource());
+        assertEquals(LocalTime.of(6, 0), items.get(1).getStartTime());
+        assertEquals(LocalTime.of(7, 30), items.get(1).getEndTime());
         assertTrue(items.get(1).getTitle().contains("Steady 1200m run"));
         assertFalse(items.get(1).isActionable());
 
         // Item 3: PREVENTIVE_CARE 13:30
-        assertEquals(com.rtms.backend.stable.enums.TaskSource.PREVENTIVE_CARE, items.get(2).getSource());
+        assertEquals(TaskSource.PREVENTIVE_CARE, items.get(2).getSource());
         assertEquals(FarmSchedulePolicy.VET_WINDOW_START, items.get(2).getStartTime());
         assertFalse(items.get(2).isActionable());
     }
@@ -290,8 +295,8 @@ class GroomDailyTaskServiceTest {
     @DisplayName("6. Groom hoàn thành nhiệm vụ được giao thành công")
     void testCompleteTask_Success() {
         Long taskId = 50L;
-        com.rtms.backend.security.AuthenticatedUser groom =
-                new com.rtms.backend.security.AuthenticatedUser(4L, "groom@example.com", "GROOM");
+        AuthenticatedUser groom =
+                new AuthenticatedUser(4L, "groom@example.com", "GROOM");
 
         GroomDailyTask task = new GroomDailyTask();
         task.setId(taskId);
@@ -313,8 +318,8 @@ class GroomDailyTaskServiceTest {
     @DisplayName("7. Groom khác không được phép xác nhận hoàn thành nhiệm vụ của Groom phụ trách")
     void testCompleteTask_WrongGroom_ThrowsAccessDenied() {
         Long taskId = 50L;
-        com.rtms.backend.security.AuthenticatedUser otherGroom =
-                new com.rtms.backend.security.AuthenticatedUser(99L, "other@example.com", "GROOM");
+        AuthenticatedUser otherGroom =
+                new AuthenticatedUser(99L, "other@example.com", "GROOM");
 
         GroomDailyTask task = new GroomDailyTask();
         task.setId(taskId);
@@ -322,7 +327,7 @@ class GroomDailyTaskServiceTest {
 
         when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
 
-        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+        assertThrows(AccessDeniedException.class,
                 () -> taskService.completeTask(taskId, otherGroom));
         verify(taskRepository, never()).save(any());
     }
@@ -331,8 +336,8 @@ class GroomDailyTaskServiceTest {
     @DisplayName("8. Không tìm thấy nhiệm vụ theo ID -> Ném RuntimeException")
     void testCompleteTask_NotFound_ThrowsRuntimeException() {
         Long taskId = 999L;
-        com.rtms.backend.security.AuthenticatedUser groom =
-                new com.rtms.backend.security.AuthenticatedUser(4L, "groom@example.com", "GROOM");
+        AuthenticatedUser groom =
+                new AuthenticatedUser(4L, "groom@example.com", "GROOM");
 
         when(taskRepository.findById(taskId)).thenReturn(Optional.empty());
 
@@ -350,8 +355,8 @@ class GroomDailyTaskServiceTest {
             completion.setId(7L);
             return completion;
         });
-        var photoA = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
-        var photoB = new org.springframework.mock.web.MockMultipartFile("files", "b.png", "image/png", new byte[]{2});
+        var photoA = new MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        var photoB = new MockMultipartFile("files", "b.png", "image/png", new byte[]{2});
         when(fileStorage.store(photoA, "rtms/task-completions/7")).thenReturn("local:a.jpg");
         when(fileStorage.store(photoB, "rtms/task-completions/7")).thenReturn("local:b.png");
 
@@ -389,20 +394,20 @@ class GroomDailyTaskServiceTest {
         GroomDailyTask mine = task(23L, 4L);
         GroomDailyTask other = task(24L, 9L);
         when(taskRepository.findAllById(List.of(23L, 24L))).thenReturn(List.of(mine, other));
-        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+        assertThrows(AccessDeniedException.class,
                 () -> taskService.completeTasks(List.of(23L, 24L), null, null, groom()));
 
         when(taskRepository.findAllById(List.of(23L))).thenReturn(List.of(mine));
-        var pdf = new org.springframework.mock.web.MockMultipartFile("files", "a.pdf", "application/pdf", new byte[]{1});
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        var pdf = new MockMultipartFile("files", "a.pdf", "application/pdf", new byte[]{1});
+        assertThrows(ResponseStatusException.class,
                 () -> taskService.completeTasks(List.of(23L), null, List.of(pdf), groom()));
 
-        var photo = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        var photo = new MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        assertThrows(ResponseStatusException.class,
                 () -> taskService.completeTasks(List.of(23L), null, List.of(photo, photo, photo, photo, photo, photo), groom()));
 
         mine.setIsCompleted(true);
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ResponseStatusException.class,
                 () -> taskService.completeTasks(List.of(23L), "again", null, groom()));
 
         verify(fileStorage, never()).store(any(), any());
@@ -420,7 +425,7 @@ class GroomDailyTaskServiceTest {
             completion.setId(8L);
             return completion;
         });
-        var photo = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        var photo = new MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
         when(fileStorage.store(photo, "rtms/task-completions/8")).thenReturn("local:a.jpg");
         when(taskRepository.saveAll(any())).thenThrow(new RuntimeException("database down"));
 
@@ -436,7 +441,7 @@ class GroomDailyTaskServiceTest {
         completion.getPhotoKeys().add("local:a.jpg");
         when(completionRepository.findById(9L)).thenReturn(Optional.of(completion));
 
-        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+        assertThrows(AccessDeniedException.class,
                 () -> taskService.loadCompletionPhoto(9L, 0, new AuthenticatedUser(9L, "other@example.com", "GROOM"), null));
         verify(fileStorage, never()).load(any());
     }

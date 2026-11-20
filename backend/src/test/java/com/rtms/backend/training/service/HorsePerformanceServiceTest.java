@@ -6,6 +6,7 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.security.Roles;
+import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.repository.projection.DashboardHorseRow;
 import com.rtms.backend.training.repository.projection.DashboardCourseRunRow;
@@ -28,7 +29,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,7 +57,7 @@ class HorsePerformanceServiceTest {
     private HorseSpecialtyService specialtyService;
 
     @Mock
-    private com.rtms.backend.stable.repository.StableStallRepository stallRepository;
+    private StableStallRepository stallRepository;
 
     private HorsePerformanceService service;
 
@@ -180,7 +183,7 @@ class HorsePerformanceServiceTest {
         LocalDate from = LocalDate.of(2026, 10, 27);
         LocalDate to = LocalDate.of(2026, 11, 2);
         List<HorseScheduleItemResponse> rows = List.of(new HorseScheduleItemResponse(
-                7L, from, java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 0), "Gallop",
+                7L, from, LocalTime.of(6, 0), LocalTime.of(7, 0), "Gallop",
                 WorkoutStatus.SCHEDULED));
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 5L)));
         when(workoutRepository.findHorseSchedule(1L, from, to)).thenReturn(rows);
@@ -301,7 +304,7 @@ class HorsePerformanceServiceTest {
                 .thenReturn(List.of(
                         workout(50L, today, null, null, 8),
                         workout(50L, today.minusDays(2), null, null, 6)));
-        HorseSpecialtyResponse noData = new HorseSpecialtyResponse(3, new java.math.BigDecimal("7.0"), List.of(), null, List.of());
+        HorseSpecialtyResponse noData = new HorseSpecialtyResponse(3, new BigDecimal("7.0"), List.of(), null, List.of());
         when(specialtyService.getSpecialties(List.of(50L, 51L))).thenReturn(Map.of(50L, noData, 51L, noData));
 
         List<DashboardHorseResponse> dashboard = service.getDashboard(trainer);

@@ -2,7 +2,6 @@ package com.rtms.backend.admission.dto;
 import com.rtms.backend.admission.service.OwnerAdmissionService;
 
 import com.rtms.backend.admission.enums.AdmissionStatus;
-import jakarta.persistence.Column;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

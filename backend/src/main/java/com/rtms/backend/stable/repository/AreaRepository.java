@@ -2,7 +2,9 @@ package com.rtms.backend.stable.repository;
 
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.enums.AreaType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -24,7 +26,7 @@ public interface AreaRepository extends JpaRepository<Area, Long> {
     List<Area> findByType(AreaType type);
 
     /** Unassigned REGULAR areas in generated order: A..Z, AA.., excluding soft-deleted rows. */
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Area a WHERE a.type = 'REGULAR' AND a.trainerId IS NULL ORDER BY LENGTH(a.code), a.code ASC")
     List<Area> findUnassignedRegularAreasOrdered();
 

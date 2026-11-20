@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtms.backend.admission.dto.OcrExtractionResponse;
 import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.common.storage.FileStorageService;
-import com.rtms.backend.horse.enums.HorseSex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

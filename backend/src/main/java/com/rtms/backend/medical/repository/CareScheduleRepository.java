@@ -117,7 +117,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             + "AND NOT EXISTS (SELECT hr.id FROM HealthRecord hr WHERE hr.careScheduleId = cs.id) "
             + "AND NOT EXISTS (SELECT ir.id FROM HorseIncidentReport ir WHERE ir.careScheduleId = cs.id)")
     int cancelOpenSchedulesIfUnreferenced(@Param("horseId") Long horseId,
-            @Param("statuses") java.util.Collection<CareScheduleStatus> statuses,
+            @Param("statuses") Collection<CareScheduleStatus> statuses,
             @Param("cancelReason") String cancelReason,
             @Param("now") LocalDateTime now);
 
@@ -425,6 +425,6 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             ORDER BY cs.scheduledDate ASC, cs.id ASC
             """)
     List<CareSchedule> findAssignedSchedulesSince(
-            @Param("sinceDate") java.time.LocalDate sinceDate,
-            @Param("sinceDateTime") java.time.LocalDateTime sinceDateTime);
+            @Param("sinceDate") LocalDate sinceDate,
+            @Param("sinceDateTime") LocalDateTime sinceDateTime);
 }

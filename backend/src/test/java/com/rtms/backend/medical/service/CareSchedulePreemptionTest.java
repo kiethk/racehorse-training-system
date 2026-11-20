@@ -19,6 +19,9 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
@@ -30,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
 import com.rtms.backend.notification.service.NotificationTypes;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -78,9 +82,9 @@ class CareSchedulePreemptionTest {
                 notifications,
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
-                mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
 
         when(schedules.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -215,9 +219,9 @@ class CareSchedulePreemptionTest {
         when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
         when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(vet));
         CareSchedule later1 = activeExam(10L, 1L, 101L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
-        later1.setScheduledDate(java.time.LocalDate.now().plusDays(3));
+        later1.setScheduledDate(LocalDate.now().plusDays(3));
         CareSchedule later2 = activeExam(11L, 1L, 102L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
-        later2.setScheduledDate(java.time.LocalDate.now().plusDays(4));
+        later2.setScheduledDate(LocalDate.now().plusDays(4));
         when(schedules.findByVeterinarianIdAndCareTypeAndStatusIn(1L, CareType.INITIAL, CareScheduleStatus.BOOKED_OR_ACTIVE))
                 .thenReturn(List.of(later1, later2));
         CareSchedule initial = new CareSchedule();

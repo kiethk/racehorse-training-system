@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -153,7 +154,7 @@ public class InjuryRecordService {
                 .findByHorseIdAndStatusIn(horseId, CareScheduleStatus.OPEN)
                 .stream()
                 .filter(s -> s.getCareType() == CareType.URGENT)
-                .min(java.util.Comparator.comparing(CareSchedule::getId))
+                .min(Comparator.comparing(CareSchedule::getId))
                 .orElse(null);
         String urgentReporter = null;
         if (pendingUrgent != null && pendingUrgent.getSourceIncidentId() != null) {
@@ -171,7 +172,7 @@ public class InjuryRecordService {
         if (pendingUrgent == null && horse.getTrainingDecision() == TrainingDecision.BLOCKED) {
             AdmissionApplication admission = admissionApplicationRepository.findByHorseId(horseId).stream()
                     .filter(a -> a.getStatus() != AdmissionStatus.APPROVED && a.getStatus() != AdmissionStatus.REJECTED)
-                    .max(java.util.Comparator.comparing(AdmissionApplication::getId))
+                    .max(Comparator.comparing(AdmissionApplication::getId))
                     .orElse(null);
             if (admission != null) {
                 pendingAdmissionId = admission.getId();

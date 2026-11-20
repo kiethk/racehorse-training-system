@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Period;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -153,7 +154,7 @@ class TrainingGroupSchemaIntegrationTest {
     @Test
     void unfinishedCourseRunsOfOneGroupCannotOverlapInDates() {
         LocalDate start = LocalDate.now().plusDays(10);
-        courseRun(group, start, start.plus(java.time.Period.ofDays(12)), CourseRunStatus.UPCOMING);
+        courseRun(group, start, start.plus(Period.ofDays(12)), CourseRunStatus.UPCOMING);
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> courseRun(group, start.plusDays(5), start.plusDays(20), CourseRunStatus.UPCOMING));

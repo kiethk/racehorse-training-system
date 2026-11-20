@@ -13,23 +13,29 @@ import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.identity.repository.GroomProfileRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,10 +57,10 @@ class AdmissionManagerReviewServiceTest {
     private AdmissionGroomReviewService admissionGroomReviewService;
 
     @Mock
-    private com.rtms.backend.medical.service.PreventiveStatusService preventiveStatusService;
+    private PreventiveStatusService preventiveStatusService;
 
     @Mock
-    private com.rtms.backend.identity.repository.GroomProfileRepository groomProfileRepository;
+    private GroomProfileRepository groomProfileRepository;
 
     @Mock
     private AdmissionNotificationService admissionNotificationService;
@@ -154,7 +160,7 @@ class AdmissionManagerReviewServiceTest {
 
         // PhÃ¡c Ä‘á»“ báº¯t buá»™c cÃ²n MISSING sau khÃ¡m nháº­p tráº¡i Ä‘Æ°á»£c háº¹n tiÃªm ngÃ y hÃ´m sau.
         verify(preventiveStatusService).upsertMilestone(10L, "preventive:approval:1", 5L,
-                java.time.LocalDate.now().plusDays(1));
+                LocalDate.now().plusDays(1));
     }
 
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -433,7 +439,7 @@ class AdmissionManagerReviewServiceTest {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.empty());
 
-        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        var error = assertThrows(ResponseStatusException.class,
                 () -> service.review(1L, 5L, approveRequest(null)));
         assertEquals(409, error.getStatusCode().value());
 
@@ -451,7 +457,7 @@ class AdmissionManagerReviewServiceTest {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.empty());
 
-        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        var error = assertThrows(ResponseStatusException.class,
                 () -> service.review(1L, 5L, approveRequest(null)));
         assertEquals(409, error.getStatusCode().value());
 
@@ -612,9 +618,9 @@ class AdmissionManagerReviewServiceTest {
         var order = inOrder(stableStallRepository);
         order.verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
         order.verify(stableStallRepository).findFairAvailableStallForUpdate("REGULAR");
-        verify(groomProfileRepository).touchLastHorseAssignedAt(org.mockito.ArgumentMatchers.eq(33L), any());
-        verify(admissionGroomReviewService).notifyGroomAssigned(org.mockito.ArgumentMatchers.same(admission),
-                org.mockito.ArgumentMatchers.same(regularStall), org.mockito.ArgumentMatchers.anyString());
+        verify(groomProfileRepository).touchLastHorseAssignedAt(eq(33L), any());
+        verify(admissionGroomReviewService).notifyGroomAssigned(same(admission),
+                same(regularStall), anyString());
     }
 
     @Test

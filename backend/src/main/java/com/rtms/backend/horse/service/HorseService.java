@@ -15,6 +15,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
 
@@ -22,13 +23,11 @@ import com.rtms.backend.audit.dto.DomainAuditEvent;
 import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.dto.HorseStatusChangeRequest;
-import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.entity.GroomDailyTask;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
-import com.rtms.backend.training.enums.TrainingDecision;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
@@ -194,8 +193,8 @@ public class HorseService {
 
     public Horse createHorse(CreateHorseRequest request) {
         if (request.getSex() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "Sex is required (MALE or FEMALE)");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Sex is required (MALE or FEMALE)");
         }
         Horse horse = new Horse();
         horse.setName(request.getName());

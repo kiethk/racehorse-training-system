@@ -15,6 +15,7 @@ import com.rtms.backend.medical.dto.InjuryMarkerRequest;
 import com.rtms.backend.medical.dto.PrescriptionItemRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
+import com.rtms.backend.medical.entity.HorseBodyRegion;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.medical.entity.Prescription;
 import com.rtms.backend.medical.entity.TreatmentPlan;
@@ -336,14 +337,14 @@ class CareSchedulePrescriptionFlowTest {
     void injuryMarkerWithPositionAndNoteOnly_persistsNoteDirectly() {
         stubCompletion();
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
-        com.rtms.backend.medical.entity.HorseBodyRegion region = new com.rtms.backend.medical.entity.HorseBodyRegion();
+        HorseBodyRegion region = new HorseBodyRegion();
         region.setId(5L);
         region.setCode("foreleg_left");
         region.setDisplayName("Left forelimb");
-        when(entityManager.find(com.rtms.backend.medical.entity.HorseBodyRegion.class, 5L)).thenReturn(region);
+        when(entityManager.find(HorseBodyRegion.class, 5L)).thenReturn(region);
 
         CompleteCareScheduleRequest req = baseRequest();
-        com.rtms.backend.medical.dto.InjuryMarkerRequest marker = new com.rtms.backend.medical.dto.InjuryMarkerRequest();
+        InjuryMarkerRequest marker = new InjuryMarkerRequest();
         marker.setBodyRegionId(5L);
         marker.setZoneId("foreleg_left");
         marker.setDescription("Swelling and heat over left superficial digital flexor tendon");

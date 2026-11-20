@@ -1,11 +1,14 @@
 package com.rtms.backend.identity.controller;
 
 import com.rtms.backend.identity.dto.AccessControlMatrixResponse;
+import com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.identity.dto.RolePermissionUpdateRequest;
 import com.rtms.backend.identity.service.AccessControlService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/access-control")
@@ -33,8 +36,8 @@ public class AccessControlController {
 
     @PutMapping("/roles/permissions/bulk")
     @PreAuthorize("hasAuthority('USER_MANAGE')")
-    public ApiResponse<java.util.List<AccessControlMatrixResponse.RolePermissionSummary>> updateBulkRolePermissions(
-            @RequestBody java.util.List<com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest> requests) {
+    public ApiResponse<List<AccessControlMatrixResponse.RolePermissionSummary>> updateBulkRolePermissions(
+            @RequestBody List<BulkRolePermissionUpdateRequest> requests) {
         return ApiResponse.success(accessControlService.updateBulkRolePermissions(requests));
     }
 }

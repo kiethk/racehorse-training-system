@@ -10,12 +10,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -156,12 +154,12 @@ class NotificationServiceTest {
 
         assertEquals(1L, notificationService.getUnreadCount(userId));
 
-        com.rtms.backend.notification.dto.NotificationResponse updated = notificationService.markAsRead(5L, userId);
+        NotificationResponse updated = notificationService.markAsRead(5L, userId);
         assertTrue(updated.isRead());
         assertTrue(n.isRead());
         verify(notificationRepository).save(n);
 
         // User khác không mark được notification của người này
-        assertThrows(com.rtms.backend.config.ApiException.class, () -> notificationService.markAsRead(5L, 999L));
+        assertThrows(ApiException.class, () -> notificationService.markAsRead(5L, 999L));
     }
 }

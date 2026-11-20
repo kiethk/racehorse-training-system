@@ -449,8 +449,8 @@ class RoutineCadenceTest {
         exam.setSourceIncidentId(700L);
         stubCompletion(exam);
         when(schedules.existsByHorseIdAndPurposeAndStatusInAndIdNot(
-                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(CareSchedulePurpose.FOLLOW_UP),
-                any(), org.mockito.ArgumentMatchers.eq(100L))).thenReturn(true);
+                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP),
+                any(), eq(100L))).thenReturn(true);
 
         horse.setTrainingDecisionReason("Box rest");
 
@@ -460,7 +460,7 @@ class RoutineCadenceTest {
         service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        org.mockito.ArgumentCaptor<HealthRecord> record = org.mockito.ArgumentCaptor.forClass(HealthRecord.class);
+        ArgumentCaptor<HealthRecord> record = ArgumentCaptor.forClass(HealthRecord.class);
         verify(healthRecords).save(record.capture());
         assertEquals(TrainingDecision.BLOCKED, record.getValue().getTrainingDecision());
         assertEquals("Box rest", record.getValue().getRestrictionDetails());
@@ -487,8 +487,8 @@ class RoutineCadenceTest {
     void aWaitingFollowUpStopsTheAutoChain() {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
         stubCompletion(exam);
-        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
-                .thenReturn(java.util.List.of(waitingFollowUp(LocalDateTime.now().plusDays(5))));
+        when(schedules.findByHorseIdAndStatusIn(eq(10L), any()))
+                .thenReturn(List.of(waitingFollowUp(LocalDateTime.now().plusDays(5))));
 
         service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
 
@@ -501,8 +501,8 @@ class RoutineCadenceTest {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
         stubCompletion(exam);
         CareSchedule waiting = waitingFollowUp(LocalDateTime.now().plusDays(20));
-        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
-                .thenReturn(java.util.List.of(waiting));
+        when(schedules.findByHorseIdAndStatusIn(eq(10L), any()))
+                .thenReturn(List.of(waiting));
         LocalDateTime earlier = LocalDateTime.now().plusDays(5).withSecond(0).withNano(0);
         CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
         req.setNextSchedule(nextAt(earlier));
@@ -521,8 +521,8 @@ class RoutineCadenceTest {
         stubCompletion(exam);
         LocalDateTime kept = LocalDateTime.now().plusDays(5);
         CareSchedule waiting = waitingFollowUp(kept);
-        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
-                .thenReturn(java.util.List.of(waiting));
+        when(schedules.findByHorseIdAndStatusIn(eq(10L), any()))
+                .thenReturn(List.of(waiting));
         CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
         req.setNextSchedule(nextAt(LocalDateTime.now().plusDays(20)));
 
@@ -559,8 +559,8 @@ class RoutineCadenceTest {
         LocalDateTime at = LocalDateTime.now().plusDays(5);
         CareSchedule waiting = waitingFollowUp(at);
         waiting.setVeterinarianId(vet.getId());
-        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
-                .thenReturn(java.util.List.of(waiting));
+        when(schedules.findByHorseIdAndStatusIn(eq(10L), any()))
+                .thenReturn(List.of(waiting));
         when(users.findById(vet.getId())).thenReturn(Optional.of(vet));
 
         var detail = service.getScheduleDetail(exam.getId());
@@ -569,8 +569,8 @@ class RoutineCadenceTest {
         assertEquals("Dr. Smith", detail.waitingFollowUp().veterinarianName());
     }
 
-    private static com.rtms.backend.medical.dto.CreateNextScheduleRequest nextAt(LocalDateTime at) {
-        com.rtms.backend.medical.dto.CreateNextScheduleRequest next = new com.rtms.backend.medical.dto.CreateNextScheduleRequest();
+    private static CreateNextScheduleRequest nextAt(LocalDateTime at) {
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
         next.setScheduledAt(at);
         next.setDescription("Check the left leg");

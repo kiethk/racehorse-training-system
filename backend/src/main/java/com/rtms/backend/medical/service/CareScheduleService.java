@@ -33,6 +33,7 @@ import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
+import com.rtms.backend.medical.enums.ClinicalDiagnosis;
 import com.rtms.backend.medical.enums.RescheduleReason;
 import com.rtms.backend.medical.event.PrescriptionCreatedEvent;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -595,7 +596,7 @@ public class CareScheduleService {
         record.setRecordType(schedule.getCareType().name());
         record.setExaminedAt(now);
         record.setFindings(request.getFindings().trim());
-        com.rtms.backend.medical.enums.ClinicalDiagnosis cd = com.rtms.backend.medical.enums.ClinicalDiagnosis.fromString(request.getDiagnosis());
+        ClinicalDiagnosis cd = ClinicalDiagnosis.fromString(request.getDiagnosis());
         record.setDiagnosis(cd != null ? cd.getDisplayName() : request.getDiagnosis().trim());
         record.setTreatment(request.getTreatment() != null ? request.getTreatment().trim() : null);
         // Bệnh án ghi kết quả thực tế: ca bị giữ chặn thì ngựa vẫn BLOCKED dù Vet chọn ALLOWED.

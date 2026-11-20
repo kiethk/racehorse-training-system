@@ -14,6 +14,7 @@ import com.rtms.backend.identity.service.AuthService.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -88,7 +89,7 @@ public class AuthController {
 
     @PostMapping("/change-password")
     public ApiResponse<ChangePasswordResponse> changePassword(
-            @jakarta.validation.Valid @RequestBody ChangePasswordRequest request,
+            @Valid @RequestBody ChangePasswordRequest request,
             HttpServletResponse response) {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();

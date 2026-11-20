@@ -1,6 +1,10 @@
 package com.rtms.backend.audit.dto;
 
+import com.rtms.backend.audit.entity.AuditLog;
+
 import java.time.LocalDateTime;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class AuditLogResponse {
 
@@ -67,7 +71,7 @@ public class AuditLogResponse {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public static AuditLogResponse from(com.rtms.backend.audit.entity.AuditLog log) {
+    public static AuditLogResponse from(AuditLog log) {
         AuditLogResponse dto = new AuditLogResponse();
         dto.setId(log.getId());
         dto.setHttpMethod(log.getHttpMethod());
@@ -77,7 +81,7 @@ public class AuditLogResponse {
         Long entityId = log.getEntityId();
         String entityName = log.getEntityName();
         if (entityId == null && log.getRequestPath() != null) {
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("/(?:areas|stalls|horses|admissions|accounts|staff|users)/(\\d+)").matcher(log.getRequestPath());
+            Matcher m = Pattern.compile("/(?:areas|stalls|horses|admissions|accounts|staff|users)/(\\d+)").matcher(log.getRequestPath());
             if (m.find()) {
                 entityId = Long.parseLong(m.group(1));
             }

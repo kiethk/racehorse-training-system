@@ -7,8 +7,6 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.enums.ReviewDecision;
-import com.rtms.backend.admission.service.AdmissionGroomReviewService;
-import com.rtms.backend.admission.service.AdmissionNotificationService;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
@@ -33,6 +31,7 @@ import com.rtms.backend.medical.dto.InjuryMarkerRequest;
 import com.rtms.backend.medical.enums.HydrationStatus;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
+import com.rtms.backend.medical.entity.HorseBodyRegion;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -835,11 +834,11 @@ class AdmissionVetReviewWorkflowTest {
         when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
         when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
 
-        com.rtms.backend.medical.entity.HorseBodyRegion bodyRegion = new com.rtms.backend.medical.entity.HorseBodyRegion();
+        HorseBodyRegion bodyRegion = new HorseBodyRegion();
         bodyRegion.setId(1L);
         bodyRegion.setCode("foreleg_right");
         bodyRegion.setDisplayName("Right forelimb");
-        when(entityManager.find(com.rtms.backend.medical.entity.HorseBodyRegion.class, 1L))
+        when(entityManager.find(HorseBodyRegion.class, 1L))
                 .thenReturn(bodyRegion);
 
         CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();

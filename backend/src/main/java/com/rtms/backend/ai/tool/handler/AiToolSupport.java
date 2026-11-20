@@ -20,7 +20,6 @@ import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.repository.projection.PastWorkoutRow;
 import com.rtms.backend.identity.entity.VeterinarianProfile;
-import com.rtms.backend.identity.repository.TrainerProfileRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.stable.entity.GroomDailyTask;
 import com.rtms.backend.stable.enums.GroomTaskType;

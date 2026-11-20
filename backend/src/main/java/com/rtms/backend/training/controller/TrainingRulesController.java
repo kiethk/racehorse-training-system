@@ -4,7 +4,6 @@ import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.dto.TrainingRulesResponse;
-import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.ExerciseService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;

@@ -5,7 +5,6 @@ import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.TrainingGroupMember;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
-import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRunRepository;

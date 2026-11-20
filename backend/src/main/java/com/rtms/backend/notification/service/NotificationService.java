@@ -8,6 +8,7 @@ import com.rtms.backend.notification.entity.Notification;
 import com.rtms.backend.notification.repository.NotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -79,7 +80,7 @@ public class NotificationService {
 
         try {
             return Optional.of(notificationRepository.save(notification));
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent insert collision for key {}. Retrieving existing notification.", deduplicationKey);
             if (deduplicationKey != null) {
                 Optional<Notification> existing = notificationRepository.findByDeduplicationKey(deduplicationKey);

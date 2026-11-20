@@ -13,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.rtms.backend.audit.dto.DomainAuditEvent;
 import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.config.SuperAdminProperties;
 

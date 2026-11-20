@@ -2,6 +2,7 @@ package com.rtms.backend.medical.repository;
 
 import com.rtms.backend.medical.entity.HealthRecord;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,5 +24,5 @@ public interface HealthRecordRepository extends JpaRepository<HealthRecord, Long
 
     /** The latest clinical training decision recorded strictly before the given time (state prior to an urgent case). */
     Optional<HealthRecord> findTopByHorseIdAndTrainingDecisionIsNotNullAndExaminedAtBeforeOrderByExaminedAtDesc(
-            Long horseId, java.time.LocalDateTime cutoff);
+            Long horseId, LocalDateTime cutoff);
 }

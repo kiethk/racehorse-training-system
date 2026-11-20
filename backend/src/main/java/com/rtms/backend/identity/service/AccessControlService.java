@@ -2,6 +2,7 @@ package com.rtms.backend.identity.service;
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.dto.AccessControlMatrixResponse;
+import com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest;
 import com.rtms.backend.identity.dto.RolePermissionUpdateRequest;
 import com.rtms.backend.identity.entity.Permission;
 import com.rtms.backend.identity.entity.Role;
@@ -84,7 +85,7 @@ public class AccessControlService {
 
     @Transactional
     public List<AccessControlMatrixResponse.RolePermissionSummary> updateBulkRolePermissions(
-            List<com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest> requests) {
+            List<BulkRolePermissionUpdateRequest> requests) {
         if (requests == null || requests.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Requests list cannot be empty");
         }
@@ -92,7 +93,7 @@ public class AccessControlService {
         // Phase 1: Validate all requested roles and permissions before mutating ANY state
         Map<Role, Set<Permission>> plan = new LinkedHashMap<>();
 
-        for (com.rtms.backend.identity.dto.BulkRolePermissionUpdateRequest req : requests) {
+        for (BulkRolePermissionUpdateRequest req : requests) {
             if (req.getRoleId() == null) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Role ID is required");
             }
