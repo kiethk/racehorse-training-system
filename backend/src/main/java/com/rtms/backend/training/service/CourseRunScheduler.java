@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.training.util.TrainingCalendar;
 import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
@@ -36,7 +37,8 @@ import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
-import com.rtms.backend.training.service.SessionSlotFinder.Busy;
+import com.rtms.backend.training.util.SessionSlotFinder;
+import com.rtms.backend.training.util.SessionSlotFinder.Busy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;

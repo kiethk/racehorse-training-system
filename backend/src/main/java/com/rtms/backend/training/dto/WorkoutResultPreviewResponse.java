@@ -1,6 +1,6 @@
 package com.rtms.backend.training.dto;
 
-import com.rtms.backend.training.service.WorkoutPerformanceCalculator;
+import com.rtms.backend.training.util.WorkoutPerformanceCalculator;
 
 import java.math.BigDecimal;
 
