@@ -1,12 +1,19 @@
 import numpy as np
+import os
 from app.config import settings
 from ultralytics import YOLO
 
+AI_WORKER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 class LayoutDetector:
     def __init__(self):
         try:
-            self.model = YOLO(settings.YOLO_MODEL_PATH)
+            model_path = settings.YOLO_MODEL_PATH
+            if not os.path.isabs(model_path):
+                candidate = os.path.join(AI_WORKER_DIR, model_path)
+                if os.path.exists(candidate):
+                    model_path = candidate
+            self.model = YOLO(model_path)
         except Exception:
             self.model = None
 
