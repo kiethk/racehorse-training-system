@@ -18,7 +18,7 @@ class LayoutDetector:
             self.model = None
 
     def detect_regions(self, image: np.ndarray):
-        """Dùng YOLOv8 để detect các vùng (header, table, field blocks)."""
+        """Use YOLOv8 to detect document layout regions (header, table, field blocks)."""
         if self.model is None:
             return []
         try:
@@ -36,7 +36,7 @@ class LayoutDetector:
                         "cls": cls_id,
                         "label": label
                     })
-            # Sắp xếp thứ tự đọc tự nhiên: ưu tiên từ trên xuống dưới (y1), sau đó từ trái sang phải (x1)
+            # Natural reading order: top-to-bottom (y1), then left-to-right (x1)
             boxes.sort(key=lambda item: (item["bbox"][1], item["bbox"][0]))
             return boxes
         except Exception:

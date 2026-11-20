@@ -1,16 +1,20 @@
+from typing import Optional, List
+import numpy as np
+import uvicorn
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 try:
     import pymupdf as fitz
 except ImportError:
     import fitz
-import numpy as np
+
+from app.config import settings
 from app.schemas import OcrResponse, ExtractedData
 from app.services.layout_detector import layout_detector
 from app.services.ocr_engine import ocr_engine
 from app.services.parser import extract_structured_fields
 from app.services.preprocessor import pdf_to_cv2_images, bytes_to_cv2_image, preprocess_image
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, List
 
 app = FastAPI(title="RTMS AI OCR Worker", version="1.0.0")
 
@@ -23,7 +27,7 @@ app.add_middleware(
 )
 
 def extract_direct_pdf_lines(file_bytes: bytes) -> List[str]:
-    """Trích xuất text layer trực tiếp từ file PDF nếu có."""
+    """Extract direct digital text layer from PDF file if present."""
     lines = []
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -55,18 +59,18 @@ async def extract_document_info(
         if is_pdf:
             direct_lines = extract_direct_pdf_lines(file_bytes)
 
-        # Nếu PDF có digital text layer chất lượng cao (> 5 dòng và chứa từ khóa định danh)
+        # High-quality digital text layer detected (> 5 lines with identity keywords)
         has_rich_text_layer = (
             len(direct_lines) >= 5 and
             any(k in " ".join(direct_lines).lower() for k in ["horse", "ueln", "registration", "certificate", "pedigree"])
         )
 
         if has_rich_text_layer:
-            # Ưu tiên digital text layer: tốc độ cực nhanh, chính xác 100%, không bị nhiễu OCR
+            # Prioritize digital text layer: near-instant speed, 100% precision, zero OCR noise
             parsed = extract_structured_fields(direct_lines)
             avg_conf = 0.98
         else:
-            # 1. Chuyển đổi thành ma trận ảnh
+            # 1. Convert to image matrix
             if is_pdf:
                 cv_images = pdf_to_cv2_images(file_bytes, dpi=300)
                 target_image = cv_images[0] if cv_images else None
@@ -76,13 +80,13 @@ async def extract_document_info(
             if target_image is None:
                 raise HTTPException(status_code=400, detail="Cannot read image from uploaded file")
 
-            # 2. Tiền xử lý (Deskew, tăng độ nét)
+            # 2. Preprocessing (deskew, enhance contrast)
             processed_image = preprocess_image(target_image)
 
             # 3. Layout Detection (YOLOv8 DocLayNet)
             boxes = layout_detector.detect_regions(processed_image)
 
-            # 4. OCR nhận dạng chữ (Ưu tiên Region-based OCR theo layout, lọc bỏ Picture)
+            # 4. OCR text recognition (Region-based OCR following layout, filtering Pictures)
             all_lines = []
             all_confidences = []
 
@@ -103,7 +107,7 @@ async def extract_document_info(
                             all_lines.append(text)
                             all_confidences.append(conf)
 
-            # Fallback nếu layout detector không bắt được box nào hoặc không có text
+            # Fallback if layout detector caught no bounding boxes or text
             if not all_lines:
                 ocr_results = ocr_engine.read_text(processed_image)
                 all_lines = [text for text, _ in ocr_results]
@@ -112,7 +116,7 @@ async def extract_document_info(
             lines = all_lines
             avg_conf = float(np.mean(all_confidences)) if all_confidences else 0.0
 
-            # 5. Parsing & Regex chuẩn hóa trường dữ liệu
+            # 5. Parsing & regex field normalization
             parsed = extract_structured_fields(lines)
 
         extracted = ExtractedData(
@@ -144,6 +148,4 @@ async def extract_document_info(
         raise HTTPException(status_code=500, detail=f"OCR extraction failed: {str(e)}")
 
 if __name__ == "__main__":
-    import uvicorn
-    from app.config import settings
     uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=True)

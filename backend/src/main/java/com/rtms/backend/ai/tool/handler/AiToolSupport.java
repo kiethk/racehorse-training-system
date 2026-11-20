@@ -24,6 +24,7 @@ import com.rtms.backend.identity.repository.TrainerProfileRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.stable.entity.GroomDailyTask;
 import com.rtms.backend.stable.enums.GroomTaskType;
+import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.repository.CourseRunRepository;
@@ -257,7 +258,7 @@ public class AiToolSupport {
             List<String> specialtyBreakdown
     ) {}
 
-    public SpecialtyMetrics computeSpecialtyMetrics(com.rtms.backend.training.dto.HorseSpecialtyResponse resp) {
+    public SpecialtyMetrics computeSpecialtyMetrics(HorseSpecialtyResponse resp) {
         return SpecialtyMetricsCalculator.compute(this, resp);
     }
 
