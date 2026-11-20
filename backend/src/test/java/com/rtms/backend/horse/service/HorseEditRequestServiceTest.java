@@ -264,7 +264,7 @@ class HorseEditRequestServiceTest {
     }
 
     @Test
-    @DisplayName("Approve applies the change, promotes the new file and deletes the replaced one after commit")
+    @DisplayName("Approve applies the change, promotes the new file and keeps the replaced one for history")
     void approveAppliesChangesAndReplacesDocumentAfterCommit() {
         HorseEditRequest r = pending("Mercury Star");
         r.setRequestedSireRegistrationNumber("999999SIR000001");
@@ -294,10 +294,10 @@ class HorseEditRequestServiceTest {
         assertTrue(incoming.isCurrent());
         assertFalse(previous.isCurrent());
         assertNotNull(previous.getSupersededAt());
+        assertEquals("local:old.png", previous.getFileUrl());
         verify(storage, never()).delete(anyString());
         complete(TransactionSynchronization.STATUS_COMMITTED);
-        verify(storage).delete("local:old.png");
-        verify(storage, never()).delete("local:new.png");
+        verify(storage, never()).delete(anyString());
         verify(notifications).createNotification(eq(OWNER), anyString(), anyString(),
                 eq(NotificationTypes.HORSE_EDIT_REVIEWED), eq(NotificationTypes.REFERENCE_HORSE), eq(HORSE), anyString());
     }
