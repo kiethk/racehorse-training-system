@@ -1,4 +1,4 @@
-package com.rtms.backend.training.service;
+package com.rtms.backend.training.util;
 
 import java.math.BigDecimal;
 

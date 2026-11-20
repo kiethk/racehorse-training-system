@@ -4,8 +4,8 @@ Spring Boot service under `com.rtms.backend`. Domain vocabulary lives in `../GLO
 
 ## Structure
 
-- One package per module (`training`, `stable`, `horse`, `admission`, ...). Inside each, layered subpackages: `controller`, `dto`, `entity`, `repository`, `service`.
-- A service called by a controller or by another module has an interface plus a `...Impl` class. Internal helpers are package-private classes with no interface.
+- One package per module (`training`, `stable`, `horse`, `admission`, ...). Inside each, layered subpackages: `controller`, `dto`, `entity`, `repository`, `service`, and `util` when the module has pure static helpers.
+- Services are plain `@Service` / `@Component` classes: no interface and no `...Impl`. Stateless static helpers (calculators, calendars, slot finders) are `final` classes with a private constructor in the module's `util` package, not in `service`.
 - Controllers stay thin: bind the request, check authority, call one service, wrap the result.
 - Entities have **no JPA relations** (`@ManyToOne`, `@OneToMany`): reference other rows by plain id columns and load them with repositories.
 - DTOs are Java `record`s. Do not return entities from controllers.
