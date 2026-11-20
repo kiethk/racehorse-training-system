@@ -111,5 +111,33 @@ class TestParser(unittest.TestCase):
                         f"Failed Dam UELN in {folder}"
                     )
 
+    def test_ocr_noisy_pedigree_parsing(self):
+        sample_b_lines = [
+            "RTMS", "ADMISSION DOCUMENTS", "Pedigree reference", "DEMO-APO4g-PED",
+            "FAST GTA",
+            "UELN 380005271522021",
+            "Born 2021-03-26",
+            "Arabiar",
+            "Sire",
+            "Redistered nunie",
+            "AMERETTO",
+            "LfLN",
+            "25000106786122E",
+            "Dam",
+            "REgisteres nanie",
+            "PERLA DORADA",
+            "LELN",
+            "not published"
+        ]
+        res = extract_structured_fields(sample_b_lines)
+        self.assertEqual(res.get("name"), "FAST GTA")
+        self.assertEqual(res.get("registrationNumber"), "380005271522021")
+        self.assertEqual(res.get("dateOfBirth"), "2021-03-26")
+        self.assertEqual(res.get("breed"), "Arabian")
+        self.assertEqual(res.get("sireName"), "AMERETTO")
+        self.assertEqual(res.get("sireRegistrationNumber"), "25000106786122E")
+        self.assertEqual(res.get("damName"), "PERLA DORADA")
+        self.assertIsNone(res.get("damRegistrationNumber"))
+
 if __name__ == "__main__":
     unittest.main()

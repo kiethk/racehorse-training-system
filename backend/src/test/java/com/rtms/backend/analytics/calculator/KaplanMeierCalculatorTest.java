@@ -1,8 +1,8 @@
-package com.rtms.backend.analytics.util;
+package com.rtms.backend.analytics.calculator;
 
-import com.rtms.backend.analytics.dto.SurvivalEdaResponse.KaplanMeierStepDto;
-import com.rtms.backend.analytics.util.KaplanMeierCalculator.KmAnalysisResult;
-import com.rtms.backend.analytics.util.KaplanMeierCalculator.SurvivalObservation;
+import com.rtms.backend.analytics.dto.medical.SurvivalEdaResponse.KaplanMeierStepDto;
+import com.rtms.backend.analytics.calculator.KaplanMeierCalculator.KmAnalysisResult;
+import com.rtms.backend.analytics.calculator.KaplanMeierCalculator.SurvivalObservation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

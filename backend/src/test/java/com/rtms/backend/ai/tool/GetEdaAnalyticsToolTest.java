@@ -1,9 +1,9 @@
 package com.rtms.backend.ai.tool;
 
-import com.rtms.backend.analytics.dto.BioSpcSeriesResponse;
-import com.rtms.backend.analytics.dto.FleetEdaResponse;
-import com.rtms.backend.analytics.dto.IndividualHorseEdaResponse;
-import com.rtms.backend.analytics.dto.SurvivalEdaResponse;
+import com.rtms.backend.analytics.dto.medical.BioSpcSeriesResponse;
+import com.rtms.backend.analytics.dto.horse.FleetEdaResponse;
+import com.rtms.backend.analytics.dto.horse.IndividualHorseEdaResponse;
+import com.rtms.backend.analytics.dto.medical.SurvivalEdaResponse;
 import com.rtms.backend.analytics.dto.manager.AdmissionFunnelEdaDto;
 import com.rtms.backend.analytics.dto.manager.ManagerEdaOverviewResponse;
 import com.rtms.backend.analytics.dto.manager.TrainerEvaluationEdaDto;

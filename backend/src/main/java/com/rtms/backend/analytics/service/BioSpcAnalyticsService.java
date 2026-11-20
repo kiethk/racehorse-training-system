@@ -1,10 +1,10 @@
 package com.rtms.backend.analytics.service;
 
-import com.rtms.backend.analytics.dto.BioSpcSeriesResponse;
-import com.rtms.backend.analytics.dto.BioSpcSeriesResponse.BioSpcPointDto;
-import com.rtms.backend.analytics.util.BioSpcCalculator;
-import com.rtms.backend.analytics.util.BioSpcCalculator.RawPoint;
-import com.rtms.backend.analytics.util.BioSpcCalculator.SpcAnalysisResult;
+import com.rtms.backend.analytics.dto.medical.BioSpcSeriesResponse;
+import com.rtms.backend.analytics.dto.medical.BioSpcSeriesResponse.BioSpcPointDto;
+import com.rtms.backend.analytics.calculator.BioSpcCalculator;
+import com.rtms.backend.analytics.calculator.BioSpcCalculator.RawPoint;
+import com.rtms.backend.analytics.calculator.BioSpcCalculator.SpcAnalysisResult;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;

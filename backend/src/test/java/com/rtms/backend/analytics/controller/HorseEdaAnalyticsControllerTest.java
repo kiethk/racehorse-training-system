@@ -1,6 +1,7 @@
 package com.rtms.backend.analytics.controller;
 
-import com.rtms.backend.analytics.dto.*;
+import com.rtms.backend.analytics.dto.horse.*;
+import com.rtms.backend.analytics.dto.common.*;
 import com.rtms.backend.analytics.service.HorseEdaAnalyticsService;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.junit.jupiter.api.DisplayName;

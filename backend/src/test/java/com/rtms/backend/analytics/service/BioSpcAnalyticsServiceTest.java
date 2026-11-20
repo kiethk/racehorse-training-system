@@ -1,6 +1,6 @@
 package com.rtms.backend.analytics.service;
 
-import com.rtms.backend.analytics.dto.BioSpcSeriesResponse;
+import com.rtms.backend.analytics.dto.medical.BioSpcSeriesResponse;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;

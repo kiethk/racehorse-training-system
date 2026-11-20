@@ -79,14 +79,38 @@ async def extract_document_info(
             # 2. Tiền xử lý (Deskew, tăng độ nét)
             processed_image = preprocess_image(target_image)
 
-            # 3. Layout Detection (YOLOv8)
-            _ = layout_detector.detect_regions(processed_image)
+            # 3. Layout Detection (YOLOv8 DocLayNet)
+            boxes = layout_detector.detect_regions(processed_image)
 
-            # 4. OCR nhận dạng chữ
-            ocr_results = ocr_engine.read_text(processed_image)
-            lines = [text for text, _ in ocr_results]
-            confidences = [conf for _, conf in ocr_results]
-            avg_conf = float(np.mean(confidences)) if confidences else 0.0
+            # 4. OCR nhận dạng chữ (Ưu tiên Region-based OCR theo layout, lọc bỏ Picture)
+            all_lines = []
+            all_confidences = []
+
+            if boxes:
+                h_img, w_img = processed_image.shape[:2]
+                valid_boxes = [b for b in boxes if b.get("label") not in ["Picture", "Formula"]]
+                for box in valid_boxes:
+                    bx = box["bbox"]
+                    pad = 4
+                    x1 = max(0, bx[0] - pad)
+                    y1 = max(0, bx[1] - pad)
+                    x2 = min(w_img, bx[2] + pad)
+                    y2 = min(h_img, bx[3] + pad)
+                    crop = processed_image[y1:y2, x1:x2]
+                    if crop.size > 0:
+                        crop_ocr = ocr_engine.read_text(crop)
+                        for text, conf in crop_ocr:
+                            all_lines.append(text)
+                            all_confidences.append(conf)
+
+            # Fallback nếu layout detector không bắt được box nào hoặc không có text
+            if not all_lines:
+                ocr_results = ocr_engine.read_text(processed_image)
+                all_lines = [text for text, _ in ocr_results]
+                all_confidences = [conf for _, conf in ocr_results]
+
+            lines = all_lines
+            avg_conf = float(np.mean(all_confidences)) if all_confidences else 0.0
 
             # 5. Parsing & Regex chuẩn hóa trường dữ liệu
             parsed = extract_structured_fields(lines)

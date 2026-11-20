@@ -1,4 +1,8 @@
-package com.rtms.backend.analytics.dto;
+package com.rtms.backend.analytics.dto.horse;
+
+import com.rtms.backend.analytics.dto.common.EdaCorrelationSummary;
+
+import com.rtms.backend.analytics.dto.common.EdaDistributionStats;
 
 import java.util.List;
 
