@@ -86,11 +86,11 @@ export function diffFields(original: HorseEditFields, requested: HorseEditFields
     .map((field) => ({ field, label: HORSE_EDIT_FIELD_LABELS[field], from: a[field], to: b[field] }));
 }
 
-/** UELN: 15 characters, numeric ISO country code (3 digits + 12 alphanumeric) or alpha-3 ISO country code (3 letters + 12 alphanumeric). */
+/** UELN: 15 characters, 3 digits country + 3 digits database + 9 alphanumeric horse number (e.g. 12300100987654A or 704001000000001). */
 export function uelnFormatError(value: string | null): string | null {
   const v = clean(value)?.toUpperCase();
   if (!v) return null;
-  return /^([0-9]{3}|[A-Z]{3})[A-Z0-9]{12}$/.test(v)
+  return /^[0-9]{6}[A-Z0-9]{9}$/.test(v)
     ? null
-    : 'Enter a valid 15-character UELN (e.g. 704001000000001 or VNM001000000001).';
+    : 'Enter a valid 15-character UELN starting with 6 digits (e.g. 12300100987654A or 704001000000001).';
 }

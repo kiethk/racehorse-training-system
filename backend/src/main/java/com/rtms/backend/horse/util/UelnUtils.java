@@ -9,14 +9,15 @@ import java.util.regex.Pattern;
 /**
  * Utility for strict UELN (Universal Equine Life Number) normalization and validation.
  *
- * Supports standardized 15-character alphanumeric lifetime codes:
- * 1. Numeric ISO country code prefix: 3 digits + 12 alphanumeric characters (e.g. 704001000000001)
- * 2. Alpha-3 ISO country code prefix: 3 letters + 12 alphanumeric characters (e.g. VNM001000000001)
- * Format: ^([0-9]{3}|[A-Z]{3})[A-Z0-9]{12}$
+ * Strict 15-character standard:
+ * 1. First 3 digits: ISO numeric country code where database exists (e.g. 123, 704)
+ * 2. Next 3 digits: Database code within the country (e.g. 001)
+ * 3. Final 9 digits: Alphanumeric horse number assigned by breed organization (e.g. 00987654A)
+ * Format: ^[0-9]{6}[A-Z0-9]{9}$
  */
 public final class UelnUtils {
 
-    public static final String UELN_REGEX = "^([0-9]{3}|[A-Z]{3})[A-Z0-9]{12}$";
+    public static final String UELN_REGEX = "^[0-9]{6}[A-Z0-9]{9}$";
     public static final Pattern UELN_PATTERN = Pattern.compile(UELN_REGEX);
 
     private UelnUtils() {
@@ -55,7 +56,7 @@ public final class UelnUtils {
         if (normalized != null && !isValid(normalized)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    fieldLabel + " must be a valid 15-character UELN (e.g. 704001000000001 or VNM001000000001)"
+                    fieldLabel + " must be a valid 15-character UELN with 6 digits followed by 9 alphanumeric characters (e.g. 12300100987654A or 704001000000001)"
             );
         }
         return normalized;
