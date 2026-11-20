@@ -1,4 +1,4 @@
-package com.rtms.backend.training.service;
+package com.rtms.backend.training.util;
 
 import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceWeekResponse;
@@ -24,17 +24,17 @@ import java.util.stream.Collectors;
  * more about "which horses trained that day" than about the herd form. Within a week almost every horse with a course run
  * trains, and averaging each horse first and then the horses means a horse with more sessions does not weigh more.)
  */
-final class PerformanceTrendCalculator {
+public final class PerformanceTrendCalculator {
 
     private PerformanceTrendCalculator() {
     }
 
     /** Thứ Hai của tuần chứa ngày này. (The Monday of the week containing the date.) */
-    static LocalDate weekStartOf(LocalDate date) {
+    public static LocalDate weekStartOf(LocalDate date) {
         return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
-    static List<PerformanceWeekResponse> byWeek(List<PerformanceSessionRow> sessions) {
+    public static List<PerformanceWeekResponse> byWeek(List<PerformanceSessionRow> sessions) {
         Map<LocalDate, List<PerformanceSessionRow>> sessionsByWeek = new TreeMap<>(
                 sessions.stream().collect(Collectors.groupingBy(session -> weekStartOf(session.date()))));
 

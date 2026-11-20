@@ -32,14 +32,14 @@ class TrainingWorkoutWriteLockTest {
     private static final long TRAINER_ID = 3L;
 
     private TrainingWorkoutRepository workouts;
-    private TrainingWorkoutServiceImpl service;
+    private TrainingWorkoutService service;
     private AuthenticatedUser trainer;
 
     @BeforeEach
     void setUp() {
         workouts = mock(TrainingWorkoutRepository.class);
         TrainingSessionRepository sessions = mock(TrainingSessionRepository.class);
-        service = new TrainingWorkoutServiceImpl(workouts, sessions, mock(ExerciseRepository.class),
+        service = new TrainingWorkoutService(workouts, sessions, mock(ExerciseRepository.class),
                 mock(WorkoutResultSimulationService.class), mock(SessionSettlementService.class), mock(SessionRules.class));
 
         TrainingSession session = new TrainingSession();

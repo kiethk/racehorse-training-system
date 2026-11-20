@@ -1,4 +1,4 @@
-package com.rtms.backend.training.service;
+package com.rtms.backend.training.util;
 
 import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;

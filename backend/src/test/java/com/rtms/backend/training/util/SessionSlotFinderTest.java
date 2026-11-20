@@ -1,6 +1,6 @@
-package com.rtms.backend.training.service;
+package com.rtms.backend.training.util;
 
-import com.rtms.backend.training.service.SessionSlotFinder.Busy;
+import com.rtms.backend.training.util.SessionSlotFinder.Busy;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
