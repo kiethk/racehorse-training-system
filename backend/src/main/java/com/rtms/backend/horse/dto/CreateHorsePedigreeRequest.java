@@ -10,18 +10,18 @@ public class CreateHorsePedigreeRequest {
     @Size(max = 255)
     private String sireName;
 
-    @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Sire UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
+    @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Sire UELN must be 15 characters (e.g. 12300100987654A or 704001000000001)")
     @Size(max = 20)
     private String sireRegistrationNumber;
 
     @Size(max = 255)
     private String damName;
 
-    @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Dam UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
+    @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Dam UELN must be 15 characters (e.g. 12300100987654A or 704001000000001)")
     @Size(max = 20)
     private String damRegistrationNumber;
 
-    @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
+    @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "UELN must be 15 characters (e.g. 12300100987654A or 704001000000001)")
     @Size(max = 20)
     private String registrationNumber;
 
