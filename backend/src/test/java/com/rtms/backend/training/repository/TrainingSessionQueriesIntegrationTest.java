@@ -235,6 +235,7 @@ class TrainingSessionQueriesIntegrationTest {
 
         assertEquals(2, rows.size());
         assertTrue(rows.stream().allMatch(row -> row.totalSessions() == 4 && row.completedSessions() == 1 && row.cancelledSessions() == 1));
+        assertTrue(rows.stream().allMatch(row -> row.scheduledWorkouts() != null && row.scheduledWorkouts() >= 0));
     }
 
     @Test
