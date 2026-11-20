@@ -33,7 +33,7 @@ class AiGuardrailOrchestratorTest {
         service = new AgentOrchestratorService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -96,7 +96,7 @@ class AiGuardrailOrchestratorTest {
         AgentOrchestratorService serviceWithDecomposer = new AgentOrchestratorService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 mockDecomposer,
@@ -131,7 +131,7 @@ class AiGuardrailOrchestratorTest {
         AgentOrchestratorService serviceWithDecomposer = new AgentOrchestratorService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 mockDecomposer,
@@ -161,14 +161,14 @@ class AiGuardrailOrchestratorTest {
         DefaultIntentDecompositionService realDecomposer = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper
         );
 
         AgentOrchestratorService orchestrator = new AgentOrchestratorService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 realDecomposer,

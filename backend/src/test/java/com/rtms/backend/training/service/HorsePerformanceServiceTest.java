@@ -293,9 +293,9 @@ class HorsePerformanceServiceTest {
                 new DashboardHorseRow(51L, "Idle Horse", "Arabian", "A-02")));
         when(courseRunRepository.findDashboardCourseRuns(List.of(50L, 51L))).thenReturn(List.of(
                 new DashboardCourseRunRow(700L, 50L, CourseRunStatus.COMPLETED, today.minusDays(60), today.minusDays(30),
-                        "Old course", 10, 10L, 0L),
+                        "Old course", 10, 10L, 0L, 0L),
                 new DashboardCourseRunRow(701L, 50L, CourseRunStatus.ACTIVE, today.minusDays(5), today.plusDays(20),
-                        "Sprint course", 10, 1L, 0L)));
+                        "Sprint course", 10, 1L, 0L, 9L)));
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(50L, 51L)), any(LocalDate.class)))
                 .thenReturn(List.of(
                         workout(50L, today, null, null, 8),
@@ -340,21 +340,21 @@ class HorsePerformanceServiceTest {
         LocalDate today = LocalDate.now();
         // Created first (lower id) but starts later; created second but starts sooner.
         DashboardCourseRunRow later = new DashboardCourseRunRow(1L, 7L, CourseRunStatus.UPCOMING, today.plusDays(20),
-                today.plusDays(40), "Later course", 6, 0L, 0L);
+                today.plusDays(40), "Later course", 6, 0L, 0L, 6L);
         DashboardCourseRunRow sooner = new DashboardCourseRunRow(2L, 7L, CourseRunStatus.UPCOMING, today.plusDays(3),
-                today.plusDays(15), "Sooner course", 6, 0L, 0L);
+                today.plusDays(15), "Sooner course", 6, 0L, 0L, 6L);
         assertSame(sooner, HorsePerformanceService.pickCurrentCourseRun(List.of(later, sooner)),
                 "The upcoming course run that starts first wins");
 
         DashboardCourseRunRow active = new DashboardCourseRunRow(3L, 7L, CourseRunStatus.ACTIVE, today.minusDays(2),
-                today.plusDays(1), "Running course", 6, 2L, 0L);
+                today.plusDays(1), "Running course", 6, 2L, 0L, 4L);
         assertSame(active, HorsePerformanceService.pickCurrentCourseRun(List.of(later, sooner, active)),
                 "A running course run wins over upcoming ones");
 
         DashboardCourseRunRow olderDone = new DashboardCourseRunRow(4L, 7L, CourseRunStatus.COMPLETED, today.minusDays(60),
-                today.minusDays(40), "Older course", 6, 6L, 0L);
+                today.minusDays(40), "Older course", 6, 6L, 0L, 0L);
         DashboardCourseRunRow recentDone = new DashboardCourseRunRow(5L, 7L, CourseRunStatus.COMPLETED, today.minusDays(30),
-                today.minusDays(5), "Recent course", 6, 6L, 0L);
+                today.minusDays(5), "Recent course", 6, 6L, 0L, 0L);
         assertSame(recentDone, HorsePerformanceService.pickCurrentCourseRun(List.of(olderDone, recentDone)),
                 "Without running or upcoming course runs, the one that ended most recently wins");
 
@@ -406,7 +406,7 @@ class HorsePerformanceServiceTest {
         // 6-session course, 2 cancelled, 4 ran: the horse ran 4 of the 6 sessions the course needs.
         when(courseRunRepository.findDashboardCourseRuns(List.of(60L))).thenReturn(List.of(
                 new DashboardCourseRunRow(800L, 60L, CourseRunStatus.COMPLETED, today.minusDays(20), today.minusDays(2),
-                        "Six sessions", 6, 4L, 2L)));
+                        "Six sessions", 6, 4L, 2L, 0L)));
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
         when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
 
@@ -426,11 +426,51 @@ class HorsePerformanceServiceTest {
                 new DashboardHorseRow(60L, "Mine", "Arabian", null)));
         when(courseRunRepository.findDashboardCourseRuns(List.of(60L))).thenReturn(List.of(
                 new DashboardCourseRunRow(801L, 60L, CourseRunStatus.CANCELLED, today.minusDays(10), today.plusDays(5),
-                        "Six sessions", 6, 3L, 3L)));
+                        "Six sessions", 6, 3L, 3L, 0L)));
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
         when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
 
         assertEquals(50.0, service.getDashboard(owner).get(0).getProgressPercent());
+    }
+
+    @Test
+    @DisplayName("A horse that left a running course run shows its upcoming course run, not the running one it no longer trains in")
+    void testDashboardIgnoresRunningCourseRunTheHorseLeft() {
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
+        LocalDate today = LocalDate.now();
+        when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
+                new DashboardHorseRow(60L, "Mine", "Arabian", null)));
+        // Khóa đang chạy: ngựa đã tập 3 buổi rồi rời nhóm, không còn Workout chờ tập; khóa sắp tới còn 12 buổi.
+        // (Running course run: the horse ran 3 Sessions then left the group, nothing left to run; the upcoming one has 12.)
+        when(courseRunRepository.findDashboardCourseRuns(List.of(60L))).thenReturn(List.of(
+                new DashboardCourseRunRow(900L, 60L, CourseRunStatus.ACTIVE, today.minusDays(15), today.plusDays(5),
+                        "Left course", 10, 3L, 0L, 0L),
+                new DashboardCourseRunRow(901L, 60L, CourseRunStatus.UPCOMING, today.plusDays(2), today.plusDays(40),
+                        "Next course", 12, 0L, 0L, 12L)));
+        when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
+        when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
+
+        var row = service.getDashboard(owner).get(0);
+        assertEquals("UPCOMING", row.getCourseRunStatus());
+        assertEquals("Next course", row.getCourseName());
+    }
+
+    @Test
+    @DisplayName("A horse that left its only running course run shows it as finished, with the sessions it ran")
+    void testDashboardShowsLeftCourseRunAsFinished() {
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
+        LocalDate today = LocalDate.now();
+        when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
+                new DashboardHorseRow(60L, "Mine", "Arabian", null)));
+        when(courseRunRepository.findDashboardCourseRuns(List.of(60L))).thenReturn(List.of(
+                new DashboardCourseRunRow(900L, 60L, CourseRunStatus.ACTIVE, today.minusDays(15), today.plusDays(5),
+                        "Left course", 10, 3L, 0L, 0L)));
+        when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
+        when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
+
+        var row = service.getDashboard(owner).get(0);
+        assertEquals("COMPLETED", row.getCourseRunStatus());
+        assertEquals(30.0, row.getProgressPercent());
     }
 
     @Test

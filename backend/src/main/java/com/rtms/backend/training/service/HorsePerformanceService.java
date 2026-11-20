@@ -234,7 +234,8 @@ public class HorsePerformanceService {
         response.setBreed(horse.breed());
         response.setStallCode(horse.stallCode());
 
-        fillCourseRunProgress(response, pickCurrentCourseRun(courseRuns));
+        // Chọn khóa theo trạng thái đối với riêng con ngựa này (pick the course run by its status for this horse)
+        fillCourseRunProgress(response, pickCurrentCourseRun(courseRuns.stream().map(DashboardCourseRunRow::forHorse).toList()));
         fillRatingStats(response, recent);
 
         List<HorseAlertResponse> alerts = evaluateAlerts(recent);

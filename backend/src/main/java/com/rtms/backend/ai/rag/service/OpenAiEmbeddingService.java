@@ -43,8 +43,8 @@ public class OpenAiEmbeddingService implements EmbeddingService {
 
     @Autowired
     public OpenAiEmbeddingService(
-            @Value("${ai.api.base-url:${groq.api.base-url:https://api.openai.com/v1}}") String baseUrl,
-            @Value("${ai.api.key:${groq.api.key:}}") String apiKey,
+            @Value("${ai.api.base-url:https://api.openai.com/v1}") String baseUrl,
+            @Value("${ai.api.key:}") String apiKey,
             @Value("${ai.embedding.model:text-embedding-3-small}") String modelName,
             @Value("${ai.embedding.enabled:true}") boolean isEnabled,
             DefaultEmbeddingService fallbackService,

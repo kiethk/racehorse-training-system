@@ -137,7 +137,8 @@ public interface CourseRunRepository extends JpaRepository<CourseRun, Long> {
                       CAST((SELECT COUNT(a) FROM TrainingSession a WHERE a.courseRunId = p.id) AS integer),
                       COUNT(CASE WHEN w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN THEN 1 END),
                       (SELECT COUNT(b) FROM TrainingSession b
-                       WHERE b.courseRunId = p.id AND b.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED))
+                       WHERE b.courseRunId = p.id AND b.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED),
+                      COUNT(CASE WHEN w.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED THEN 1 END))
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN CourseRun p ON s.courseRunId = p.id
