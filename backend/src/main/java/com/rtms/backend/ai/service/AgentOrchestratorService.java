@@ -37,9 +37,9 @@ public class AgentOrchestratorService {
 
     @Autowired
     public AgentOrchestratorService(
-            @Value("${ai.api.base-url:${groq.api.base-url:https://api.openai.com/v1}}") String aiBaseUrl,
-            @Value("${ai.api.key:${groq.api.key:}}") String aiApiKey,
-            @Value("${ai.api.model:${groq.api.model:gpt-4o-mini}}") String aiModel,
+            @Value("${ai.api.base-url:https://api.openai.com/v1}") String aiBaseUrl,
+            @Value("${ai.api.key:}") String aiApiKey,
+            @Value("${ai.api.model:gpt-6-luna}") String aiModel,
             DynamicToolRegistryService toolRegistryService,
             AiToolExecutionService toolExecutionService,
             @Autowired(required = false) AiConversationService conversationService,

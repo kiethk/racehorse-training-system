@@ -37,7 +37,7 @@ class AgentOrchestratorServiceTest {
         AgentOrchestratorService service = new AgentOrchestratorService(
                 "https://api.openai.com/v1",
                 "", // No API key
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -63,7 +63,7 @@ class AgentOrchestratorServiceTest {
         AgentOrchestratorService service = new AgentOrchestratorService(
                 "https://api.openai.com/v1",
                 "sk-test_mock_key_12345",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -83,9 +83,9 @@ class AgentOrchestratorServiceTest {
     @DisplayName("System prompt includes the complete groundedness and zero-hallucination rules")
     void testBuildSystemPrompt_GroundednessAndAntiHallucinationRules() {
         AgentOrchestratorService service = new AgentOrchestratorService(
-                "https://api.groq.com/openai/v1",
+                "https://api.openai.com/v1",
                 "test-key",
-                "qwen/qwen3.8-27b",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -111,9 +111,9 @@ class AgentOrchestratorServiceTest {
     @DisplayName("humanizeKey maps English camelCase and legacy Vietnamese keys to professional English labels")
     void testHumanizeKey_EnglishAndVietnameseKeys() {
         AgentOrchestratorService service = new AgentOrchestratorService(
-                "https://api.groq.com/openai/v1",
+                "https://api.openai.com/v1",
                 "test-key",
-                "qwen/qwen3.8-27b",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -150,9 +150,9 @@ class AgentOrchestratorServiceTest {
     @DisplayName("AI Assistant uses English by default regardless of the user's message language")
     void testAdaptiveLanguageSupport() {
         AgentOrchestratorService service = new AgentOrchestratorService(
-                "https://api.groq.com/openai/v1",
+                "https://api.openai.com/v1",
                 "", // Empty API key to trigger fallback
-                "qwen/qwen3.8-27b",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -177,9 +177,9 @@ class AgentOrchestratorServiceTest {
     @DisplayName("humanizeKeyEn converts camelCase domain keys accurately into professional English labels")
     void testHumanizeKeyEn() {
         AgentOrchestratorService service = new AgentOrchestratorService(
-                "https://api.groq.com/openai/v1",
+                "https://api.openai.com/v1",
                 "test-key",
-                "qwen/qwen3.8-27b",
+                "gpt-6-luna",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
