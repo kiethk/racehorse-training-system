@@ -33,8 +33,10 @@ export function AiChatInputBar({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    const computedHeight = Math.max(el.scrollHeight, 48);
-    el.style.height = `${Math.min(computedHeight, 160)}px`;
+    const computedHeight = Math.max(el.scrollHeight, 56);
+    const finalHeight = Math.min(computedHeight, 160);
+    el.style.height = `${finalHeight}px`;
+    el.style.overflowY = computedHeight > 160 ? 'auto' : 'hidden';
   }, [input]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -68,7 +70,7 @@ export function AiChatInputBar({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about training schedule, horse health, stabling..."
-            className="max-h-[160px] min-h-[48px] flex-1 resize-none border-0 border-transparent bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] shadow-none rounded-none outline-none focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:outline-none leading-normal overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="max-h-[160px] min-h-[56px] flex-1 resize-none border-0 border-transparent bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] shadow-none rounded-none outline-none focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:outline-none leading-normal overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           />
         </FormField>
 

@@ -61,12 +61,12 @@ export function AiMessageList({
         ref={scrollContainerRef}
         onScroll={handleScroll}
         className={`flex-1 overflow-y-auto px-4 py-4 ${
-          messages.length === 0 ? 'flex flex-col justify-end' : 'space-y-6'
+          messages.length === 0 ? 'flex flex-col min-h-full' : 'space-y-6'
         }`}
       >
         {/* Empty state: New conversation ("Suggested Prompts") */}
         {messages.length === 0 && (
-          <div className="flex flex-col justify-end w-full space-y-3 pb-2">
+          <div className="mt-auto flex flex-col w-full space-y-3 pb-2">
             <p className="text-xs font-medium text-[var(--color-text-secondary)]">
               Suggested Prompts
             </p>
