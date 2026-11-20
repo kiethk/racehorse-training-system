@@ -40,7 +40,8 @@ public class AccountManagementController {
     public ApiResponse<AccountDetailResponse> updateAccount(
             @PathVariable Long id,
             @Valid @RequestBody StaffUpdateRequest request) {
-        return ApiResponse.success(accountManagementService.updateAccount(id, request));
+        Long currentUserId = getCurrentUserId();
+        return ApiResponse.success(accountManagementService.updateAccount(currentUserId, id, request));
     }
 
     @PostMapping
