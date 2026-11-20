@@ -7,7 +7,7 @@ import numpy as np
 from typing import List
 
 def pdf_to_cv2_images(file_bytes: bytes, dpi: int = 300) -> List[np.ndarray]:
-    """Chuyển đổi từng trang PDF sang ma trận ảnh OpenCV chuẩn 300 DPI."""
+    """Convert each PDF page to an OpenCV image matrix rendered at standard 300 DPI."""
     images = []
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -21,7 +21,7 @@ def pdf_to_cv2_images(file_bytes: bytes, dpi: int = 300) -> List[np.ndarray]:
             images.append(img_bgr)
         doc.close()
     except Exception:
-        # Fallback: cố gắng đọc như file ảnh trực tiếp
+        # Fallback: attempt to decode as a direct image file
         try:
             img = bytes_to_cv2_image(file_bytes)
             if img is not None:
@@ -31,7 +31,7 @@ def pdf_to_cv2_images(file_bytes: bytes, dpi: int = 300) -> List[np.ndarray]:
     return images
 
 def bytes_to_cv2_image(file_bytes: bytes) -> np.ndarray:
-    """Đọc ảnh từ raw bytes sang ma trận OpenCV."""
+    """Decode raw bytes into an OpenCV image matrix."""
     nparr = np.frombuffer(file_bytes, dtype=np.uint8)
     image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if image is None:
@@ -39,7 +39,7 @@ def bytes_to_cv2_image(file_bytes: bytes) -> np.ndarray:
     return image
 
 def deskew(image: np.ndarray) -> np.ndarray:
-    """Khử góc nghiêng (deskew) của văn bản scan."""
+    """Deskew scanned document text."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
     coords = np.column_stack(np.where(thresh > 0))
@@ -51,7 +51,7 @@ def deskew(image: np.ndarray) -> np.ndarray:
     else:
         angle = -angle
 
-    # Chỉ xoay nếu góc lệch đáng kể (> 0.2 độ)
+    # Only rotate if skew angle is significant (> 0.2 degrees)
     if 0.2 < abs(angle) < 45:
         (h, w) = image.shape[:2]
         center = (w // 2, h // 2)
@@ -60,7 +60,7 @@ def deskew(image: np.ndarray) -> np.ndarray:
     return image
 
 def enhance_contrast(image: np.ndarray) -> np.ndarray:
-    """Tăng độ tương phản chữ in tài liệu bằng CLAHE trên kênh Luminance."""
+    """Enhance text contrast using CLAHE on Luminance channel."""
     try:
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l_channel, a_channel, b_channel = cv2.split(lab)
@@ -72,7 +72,7 @@ def enhance_contrast(image: np.ndarray) -> np.ndarray:
         return image
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
-    """Chuẩn hóa ảnh: deskew và tăng tương phản CLAHE nhẹ."""
+    """Normalize image: deskew and apply gentle CLAHE contrast enhancement."""
     deskewed = deskew(image)
     enhanced = enhance_contrast(deskewed)
     return enhanced

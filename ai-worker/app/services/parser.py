@@ -16,7 +16,7 @@ UNPUBLISHED_UELN_KEYWORDS = [
 ]
 
 def normalize_date(text: str) -> Optional[str]:
-    """Chuẩn hóa các kiểu ngày về chuẩn YYYY-MM-DD."""
+    """Normalize date strings into standard YYYY-MM-DD format."""
     if not text:
         return None
     m_dmy = DATE_REGEX_DMY.search(text)
@@ -32,9 +32,9 @@ def normalize_date(text: str) -> Optional[str]:
 
 def clean_ocr_ueln_candidate(candidate: str) -> str:
     """
-    Sửa các lỗi nhận dạng ký tự phổ biến của OCR trong mã UELN:
-    - Chữ 'O' ở cụm số serial chuyển thành '0' (ví dụ VNM22SCOOOOOOO1 -> VNM22SC00000001)
-    - Chữ 'Z', 'I', 'L' ở vị trí năm sinh/số chuyển thành '2', '1'
+    Correct common OCR character recognition errors in UELN codes:
+    - Replace letter 'O' in numeric/serial parts with '0'
+    - Replace letters 'Z', 'I', 'L' in numeric positions with '2', '1'
     """
     c = candidate.strip().upper()
     if len(c) == 15 and c[:3].isalpha():
@@ -47,13 +47,13 @@ def clean_ocr_ueln_candidate(candidate: str) -> str:
 
 def normalize_ueln(text: str) -> Optional[str]:
     """
-    Trích xuất mã định danh UELN 15 ký tự hoặc mã đăng ký ngựa hợp lệ.
-    Bắt buộc chuỗi nguồn phải chứa ít nhất một chữ số để tránh nhận nhầm từ tiếng Anh thuần chữ cái.
+    Extract 15-character UELN or valid equine registration number.
+    The source string must contain digits to avoid matching purely alphabetic words.
     """
     if not text:
         return None
 
-    # Mọi UELN hợp lệ bắt buộc phải có sẵn chữ số trong chuỗi gốc
+    # Valid UELN must contain digits in the raw string
     if not any(c.isdigit() for c in text):
         return None
 
@@ -61,21 +61,21 @@ def normalize_ueln(text: str) -> Optional[str]:
     if any(k in lower_text for k in UNPUBLISHED_UELN_KEYWORDS):
         return None
 
-    # 1. Tìm trực tiếp mẫu UELN chuẩn có 3 chữ cái mã quốc gia
+    # 1. Search directly for standard UELN pattern with 3-letter country code
     m = UELN_STANDARD_REGEX.search(text)
     if m:
         val = m.group(1).upper()
         if any(c.isdigit() for c in val):
             return clean_ocr_ueln_candidate(val)
 
-    # 2. Tìm UELN có 3 số mã quốc gia (ISO 3166 numeric, ví dụ 380 Italy, 250 France, 724 Spain)
+    # 2. Search for UELN with numeric ISO country code (e.g. 704 Vietnam, 250 France)
     m = UELN_NUMERIC_REGEX.search(text)
     if m:
         val = m.group(1).upper()
         if any(c.isdigit() for c in val):
             return clean_ocr_ueln_candidate(val)
 
-    # 3. Tìm trong chuỗi sau khi bỏ các ký tự đặc biệt
+    # 3. Clean special characters and search in alphanumeric string
     clean = re.sub(r'[^A-Za-z0-9]', '', text)
     if len(clean) == 15 and any(c.isdigit() for c in clean):
         return clean_ocr_ueln_candidate(clean.upper())
@@ -86,7 +86,7 @@ def normalize_ueln(text: str) -> Optional[str]:
         if any(c.isdigit() for c in cand):
             return cand
 
-    # 4. Tìm kiếm linh hoạt với các mã độ dài từ 10 đến 20 ký tự (loại trừ từ thuần chữ cái)
+    # 4. Flexible length search (10-20 chars) excluding purely alphabetic tokens
     m_flex = UELN_FLEX_REGEX.search(text)
     if m_flex:
         val = m_flex.group(1).upper()
@@ -97,8 +97,8 @@ def normalize_ueln(text: str) -> Optional[str]:
 
 def parse_sex_and_gender(text: str) -> Dict[str, Optional[str]]:
     """
-    Phân loại giới tính (MALE/FEMALE) và enum chi tiết theo chuẩn HORSE_SEX.md.
-    Áp dụng quy tắc Sex Safeguard: không tự suy diễn nếu không chắc chắn 100%.
+    Classify sex (MALE/FEMALE) and detailed gender according to HORSE_SEX.md.
+    Applies Sex Safeguard rule: do not infer unless 100% certain.
     """
     if not text:
         return {"sex": None, "gender": None}
@@ -119,7 +119,7 @@ def parse_sex_and_gender(text: str) -> Dict[str, Optional[str]]:
     if re.search(r'\b(female|cái)\b', lower):
         return {"sex": "FEMALE", "gender": None}
 
-    # Cho phép M hoặc F nếu đứng trực tiếp sau nhãn sex/gender
+    # Allow M or F if positioned directly after sex/gender label
     m_mf = re.search(r'\b(?:sex|gender|giới tính)\s*[:\-]?>?\s*\b([mf])\b', lower)
     if m_mf:
         val = m_mf.group(1)
@@ -127,16 +127,6 @@ def parse_sex_and_gender(text: str) -> Dict[str, Optional[str]]:
 
     return {"sex": None, "gender": None}
 
-def extract_structured_fields(lines: list[str]) -> Dict[str, Any]:
-    """Rule-based regex parser bóc tách các trường từ danh sách chuỗi OCR/Text."""
-    data: Dict[str, Any] = {
-        "name": None, "sex": None, "gender": None, "breed": None,
-        "dateOfBirth": None, "registrationNumber": None, "registryName": None,
-        "sireName": None, "sireRegistrationNumber": None,
-        "damName": None, "damRegistrationNumber": None,
-    }
-
-    full_text = " \n ".join(lines)
 
 COMMON_BREEDS = [
     "Arabian", "Thoroughbred", "Quarter Horse", "Appaloosa", "Warmblood",
@@ -144,12 +134,12 @@ COMMON_BREEDS = [
 ]
 
 def clean_pedigree_name(candidate: str) -> Optional[str]:
-    """Loại bỏ nhãn rác OCR và chỉ lấy tên thật của ngựa bố/mẹ."""
+    """Clean OCR label noise and return real pedigree name for sire/dam."""
     if not candidate:
         return None
     c_clean = candidate.strip()
     c_lower = c_clean.lower()
-    # Danh sách các từ khóa nhãn (label) thường bị OCR đọc nhầm thành tên
+    # Label keywords commonly misidentified as names by OCR
     junk_labels = [
         "registered name", "registered", "redistered", "reyileteu", "registeres",
         "nunie", "nanie", "name", "ueln", "birth", "reference", "not published",
@@ -157,16 +147,16 @@ def clean_pedigree_name(candidate: str) -> Optional[str]:
     ]
     if any(c_lower == j or c_lower.startswith(j + " ") or c_lower.endswith(" " + j) for j in junk_labels):
         return None
-    # Nếu chỉ toàn ký tự số hoặc mã định danh
+    # If purely numeric or registration code
     if normalize_ueln(c_clean):
         return None
-    # Tên chuẩn phải có độ dài hợp lý
+    # Standard name length sanity check
     if len(c_clean) < 2 or len(c_clean) > 40:
         return None
     return c_clean
 
 def fuzzy_match_breed(text: str) -> Optional[str]:
-    """Nhận diện giống ngựa phổ biến kể cả khi OCR bị sai 1-2 ký tự (vd Arabiar -> Arabian)."""
+    """Recognize common horse breeds with 1-2 character OCR fault tolerance (e.g. Arabiar -> Arabian)."""
     if not text:
         return None
     t_clean = text.strip()
@@ -175,7 +165,7 @@ def fuzzy_match_breed(text: str) -> Optional[str]:
         b_lower = breed.lower()
         if b_lower in t_lower or t_lower in b_lower:
             return breed
-        # Sai lệch 1-2 ký tự
+        # 1-2 character tolerance
         if len(t_lower) >= 5 and len(b_lower) >= 5:
             diff = sum(1 for a, b in zip(t_lower[:len(b_lower)], b_lower) if a != b)
             if diff <= 2 and abs(len(t_lower) - len(b_lower)) <= 2:
@@ -183,7 +173,7 @@ def fuzzy_match_breed(text: str) -> Optional[str]:
     return t_clean if len(t_clean) >= 3 else None
 
 def extract_structured_fields(lines: list[str]) -> Dict[str, Any]:
-    """Rule-based regex parser bóc tách các trường từ danh sách chuỗi OCR/Text."""
+    """Rule-based regex parser extracting structured fields from OCR/text lines."""
     data: Dict[str, Any] = {
         "name": None, "sex": None, "gender": None, "breed": None,
         "dateOfBirth": None, "registrationNumber": None, "registryName": None,
@@ -224,15 +214,15 @@ def extract_structured_fields(lines: list[str]) -> Dict[str, Any]:
                     ueln = normalize_ueln(lines[i + 1])
                 if ueln and not data["registrationNumber"]:
                     data["registrationNumber"] = ueln
-                    # Heuristic tên ngựa: Dòng chữ in hoa đứng ngay phía trước UELN nếu chưa có tên
+                    # Heuristic for horse name: Uppercase line immediately preceding UELN if name is not yet found
                     if not data["name"] and i > 0:
                         prev_line = lines[i - 1].strip()
                         if prev_line and prev_line.isupper() and len(prev_line) >= 3 and not any(k in prev_line.lower() for k in ["rtms", "demo", "admission", "certificate", "document", "pedigree"]):
                             data["name"] = prev_line
 
-        # 3. Sire (Ngựa cha) & Sire UELN
+        # 3. Sire and Sire UELN
         if lower == "sire" or lower == "sire:" or any(k in lower for k in ["ngựa cha", "cha:"]) or lower.startswith("sire "):
-            # Tìm trong 4 dòng tiếp theo để bóc tách tên và UELN
+            # Look ahead up to 4 lines to extract sire name and UELN
             for offset in range(1, min(5, n_lines - i)):
                 cand_line = lines[i + offset].strip()
                 cand_ueln = normalize_ueln(cand_line)
@@ -243,9 +233,9 @@ def extract_structured_fields(lines: list[str]) -> Dict[str, Any]:
                 if cand_name and not data["sireName"]:
                     data["sireName"] = cand_name
 
-        # 4. Dam (Ngựa mẹ) & Dam UELN
+        # 4. Dam and Dam UELN
         if lower == "dam" or lower == "dam:" or any(k in lower for k in ["ngựa mẹ", "mẹ:"]) or lower.startswith("dam "):
-            # Tìm trong 4 dòng tiếp theo để bóc tách tên và UELN
+            # Look ahead up to 4 lines to extract dam name and UELN
             for offset in range(1, min(5, n_lines - i)):
                 cand_line = lines[i + offset].strip()
                 cand_ueln = normalize_ueln(cand_line)
@@ -302,7 +292,7 @@ def extract_structured_fields(lines: list[str]) -> Dict[str, Any]:
             if dob and not data["dateOfBirth"]:
                 data["dateOfBirth"] = dob
 
-        # 7. Registry / Tổ chức đăng ký
+        # 7. Registry organization
         if lower.startswith("registry") or "registry:" in lower or lower == "registry":
             if not any(k in lower for k in ["status", "number", "no.", "statement"]):
                 parts = re.split(r'[:\-]', line_clean, maxsplit=1)
@@ -311,13 +301,13 @@ def extract_structured_fields(lines: list[str]) -> Dict[str, Any]:
                     if not data["registryName"]:
                         data["registryName"] = val
 
-    # Global search nếu chưa thấy UELN hoặc DateOfBirth
+    # Fallback global search if UELN or DateOfBirth has not been identified
     if not data["registrationNumber"]:
         data["registrationNumber"] = normalize_ueln(full_text)
     if not data["dateOfBirth"]:
         data["dateOfBirth"] = normalize_date(full_text)
 
-    # Global search breed nếu chưa có
+    # Fallback global search for breed
     if not data["breed"]:
         for l in lines:
             matched_b = fuzzy_match_breed(l)

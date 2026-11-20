@@ -8,7 +8,7 @@ class ExtractedData(BaseModel):
     gender: Optional[str] = None                  # COLT / FILLY / STALLION / MARE / GELDING
     breed: Optional[str] = None
     dateOfBirth: Optional[str] = None            # YYYY-MM-DD
-    registrationNumber: Optional[str] = None     # Chuẩn UELN 15 ký tự
+    registrationNumber: Optional[str] = None     # Standard 15-character UELN
     registryName: Optional[str] = None
     sireName: Optional[str] = None
     sireRegistrationNumber: Optional[str] = None
