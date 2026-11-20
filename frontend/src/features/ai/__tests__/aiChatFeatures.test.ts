@@ -295,6 +295,16 @@ describe('AI Chat Upgraded Features & Logic Tests', () => {
       assert.ok(inputBarCode.includes('focus-visible:border-transparent'), 'Textarea must prevent inner focus border');
       assert.ok(inputBarCode.includes('focus-visible:ring-0'), 'Textarea must prevent inner focus ring');
       assert.ok(inputBarCode.includes('max-h-[160px]'), 'Textarea max height class must match 160px JS clamp');
+      assert.ok(inputBarCode.includes('min-h-[56px]'), 'Textarea minimum height must be at least 56px to fit multi-line placeholder without clipping');
+      assert.ok(inputBarCode.includes('overflow-y-hidden'), 'Textarea must hide vertical scrollbar when under height threshold');
+    });
+
+    it('AiMessageList pins suggested prompts to the bottom using mt-auto and min-h-full', () => {
+      const messageListPath = resolveSourcePath('src/features/ai/components/AiMessageList.tsx');
+      const messageListCode = readFileSync(messageListPath, 'utf-8');
+
+      assert.ok(messageListCode.includes('min-h-full'), 'Scroll container must have min-h-full when empty to stretch full height');
+      assert.ok(messageListCode.includes('mt-auto'), 'Suggested prompts container must use mt-auto to anchor to the bottom above input');
     });
   });
 });

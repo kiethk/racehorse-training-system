@@ -36,7 +36,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -60,7 +60,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -78,7 +78,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -116,7 +116,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -158,7 +158,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -184,7 +184,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -204,7 +204,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -238,7 +238,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -258,7 +258,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -285,7 +285,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -307,7 +307,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -354,7 +354,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "", // empty api key: test heuristic & domain keyword matching
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -414,7 +414,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -460,7 +460,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService serviceWithKey = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "test-api-key",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -482,7 +482,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
@@ -506,7 +506,7 @@ class IntentDecompositionServiceTest {
         DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
                 "https://api.openai.com/v1",
                 "",
-                "gpt-4o-mini",
+                "gpt-6-luna",
                 objectMapper,
                 httpClient
         );
