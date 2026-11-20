@@ -19,7 +19,7 @@ export interface TrainingDecisionSectionProps {
   followUpDate: string;
   setFollowUpDate: Dispatch<SetStateAction<string>>;
   businessDateFromToday: (offset: number) => string;
-  /** Markers placed in this exam session forced BLOCKED, so ALLOWED is locked. */
+  /** Markers or un-resolved active conditions forced BLOCKED, so ALLOWED is locked. */
   allowLocked?: boolean;
   markerNotice?: string | null;
   onLockedAllowAttempt?: () => void;
@@ -77,7 +77,8 @@ export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
                 </div>
                 {isLockedAllow && (
                   <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    Marked injuries on the 3D model &mdash; remove markers to allow training.
+                    Active injuries on record &mdash; mark each condition
+                    Resolved, or remove the new markers, to allow training.
                   </p>
                 )}
               </div>
