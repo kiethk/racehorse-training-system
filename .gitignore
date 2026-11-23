@@ -105,7 +105,9 @@ ui-reference/
 tutorials/
 uploads/
 backend/uploads/
-docs/
+!docs/
+docs/*
+!docs/RTMS_Software_Requirements_Specification.pdf
 docs/bmad/
 !backend/docs/
 backend/docs/*

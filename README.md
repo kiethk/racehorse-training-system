@@ -13,10 +13,17 @@ The system covers the full lifecycle of a horse:
 
 ---
 
+## Project documentation
+
+- **Software Requirements Specification (SRS):** [RTMS Software Requirements Specification (PDF)](./docs/RTMS_Software_Requirements_Specification.pdf) — Complete project specification including domain models, business rules, and 32 system use cases.
+
+---
+
 ## Repository layout
 
 | Path | Description |
 |---|---|
+| `docs/` | Project documentation and Software Requirements Specification (SRS PDF) |
 | `backend/` | Spring Boot REST API, domain services, JPA repositories, Flyway migrations, tests |
 | `frontend/` | Next.js App Router application for all user roles |
 | `ai-worker/` | Optional FastAPI service for document layout detection and OCR |
