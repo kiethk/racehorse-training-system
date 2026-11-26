@@ -491,6 +491,11 @@ public class CareScheduleService {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can complete this schedule");
         }
         validateRoutineScheduleDate(schedule);
+        // Window only applies when the exam hasn't been started yet (SCHEDULED).
+        // Once IN_PROGRESS or OVERDUE the vet may finish past 15:30.
+        if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
+            validateRoutineExamWindowForStart(schedule);
+        }
 
         validateMandatoryVitalsAndMarkers(request, schedule);
 
