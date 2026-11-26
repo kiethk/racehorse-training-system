@@ -492,20 +492,28 @@ export function VetScheduleTimeline() {
                             : (cs.careType === 'INITIAL' ? 'Admission' : 'Routine');
                           const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
 
+                          // Block ROUTINE SCHEDULED outside 13:30–15:30 window
+                          const _now = new Date();
+                          const _minNow = _now.getHours() * 60 + _now.getMinutes();
+                          const isRoutineBlocked =
+                            cs.careType === 'ROUTINE' &&
+                            cs.status === 'SCHEDULED' &&
+                            (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+
                           return (
                             <div
                               key={cs.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => handleOpenSchedule(cs)}
+                              role={isRoutineBlocked ? undefined : 'button'}
+                              tabIndex={isRoutineBlocked ? undefined : 0}
+                              onClick={() => { if (!isRoutineBlocked) handleOpenSchedule(cs); }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
+                                if (!isRoutineBlocked && (e.key === 'Enter' || e.key === ' ')) {
                                   e.preventDefault();
                                   handleOpenSchedule(cs);
                                 }
                               }}
-                              className={`p-2 rounded-[var(--radius-sm)] border cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text}`}
-                              title={`#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
+                              className={`p-2 rounded-[var(--radius-sm)] border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text} ${isRoutineBlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02] hover:shadow-xs'}`}
+                              title={isRoutineBlocked ? `Routine exam window: 13:30 – 15:30` : `#${cs.id} · ${horseName} (${timeStr}) · Click to open`}
                             >
                               <div className="flex items-center justify-between text-xs font-bold">
                                 <span>{timeStr}</span>
@@ -521,6 +529,11 @@ export function VetScheduleTimeline() {
                               <p className="text-xs truncate font-medium mt-1 text-[var(--color-text-primary)]">
                                 {horseName}
                               </p>
+                              {isRoutineBlocked && (
+                                <p className="text-[9px] mt-1 font-semibold text-[var(--color-text-muted)]">
+                                  Opens 13:30 – 15:30
+                                </p>
+                              )}
                             </div>
                           );
                         })
