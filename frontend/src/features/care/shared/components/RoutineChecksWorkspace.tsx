@@ -264,17 +264,14 @@ export function RoutineChecksWorkspace() {
             const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
             const isClosed = cs.status === 'COMPLETED';
             const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
-            const todayIso = new Date().toISOString().slice(0, 10);
+            const _d = new Date();
+            const todayIso = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
             const isFuture = Boolean(!isClosed && rawDate && rawDate > todayIso);
+            // For hint label only — does NOT disable the button (form handles enforcement)
+            const _minNow = _d.getHours() * 60 + _d.getMinutes();
+            const isOutsideRoutineWindow = rawDate === todayIso && (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
 
-            // Routine window check (13:30 - 15:30)
-            const now = new Date();
-            const currentHourMinutes = now.getHours() * 60 + now.getMinutes();
-            const windowStart = 13 * 60 + 30; // 13:30
-            const windowEnd = 15 * 60 + 30;   // 15:30
-            const isToday = rawDate === todayIso;
-            const isOutsideRoutineWindow = isToday && (currentHourMinutes < windowStart || currentHourMinutes > windowEnd);
-            const canExamine = cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
+            const canExamine = cs.status === 'IN_PROGRESS' || !isFuture;
 
             return (
               <Panel
