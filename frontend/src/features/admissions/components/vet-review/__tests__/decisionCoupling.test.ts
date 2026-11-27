@@ -1,62 +1,76 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { CareType } from '../../../types/index.ts';
-import { applyMarkerCoupling, markerCouplingEnabled } from '../decisionCoupling.ts';
+import type { CareType, TrainingDecision } from '../../../types/index.ts';
+import {
+  couplingDecision,
+  effectiveMarkerCount,
+  markerCouplingEnabled,
+} from '../decisionCoupling.ts';
 
 describe('markerCouplingEnabled', () => {
   it('applies to the INITIAL exam', () => {
     assert.equal(markerCouplingEnabled('INITIAL' as CareType), true);
   });
 
-  it('applies to the ROUTINE exam', () => {
-    assert.equal(markerCouplingEnabled('ROUTINE' as CareType), true);
+  it('applies to the ROUTINE follow-up exam', () => {
+    assert.equal(markerCouplingEnabled('ROUTINE' as CareType, 'FOLLOW_UP'), true);
   });
 
   it('never applies to the urgent exam', () => {
     assert.equal(markerCouplingEnabled('URGENT' as CareType), false);
   });
+
+  it('never applies to a preventive (vaccination) visit', () => {
+    assert.equal(markerCouplingEnabled('ROUTINE' as CareType, 'PREVENTIVE'), false);
+  });
 });
 
-describe('applyMarkerCoupling', () => {
-  it('placing a marker while ALLOWED switches the decision to BLOCKED', () => {
-    const result = applyMarkerCoupling(0, 1, 'ALLOWED', false);
+describe('effectiveMarkerCount', () => {
+  it('counts active conditions not yet marked recovered', () => {
+    assert.equal(effectiveMarkerCount([{ id: 4 }, { id: 5 }], [], []), 2);
+  });
+
+  it('drops a condition once the Vet marks it recovered', () => {
+    assert.equal(effectiveMarkerCount([{ id: 4 }, { id: 5 }], [4], []), 1);
+  });
+
+  it('adds markers placed in this session', () => {
+    assert.equal(effectiveMarkerCount([{ id: 4 }], [], ['new-marker']), 2);
+  });
+
+  it('returns zero when nothing is left', () => {
+    assert.equal(effectiveMarkerCount([{ id: 4 }], [4], []), 0);
+  });
+});
+
+describe('couplingDecision', () => {
+  it('blocks training when the follow-up still has an active condition', () => {
+    const result = couplingDecision(1, 'ALLOWED' as TrainingDecision, false);
     assert.equal(result.decision, 'BLOCKED');
     assert.equal(result.blockedByMarker, true);
-    assert.equal(result.autoSwitch, 'TO_BLOCKED');
   });
 
-  it('placing a marker while already BLOCKED manually keeps the manual block', () => {
-    const result = applyMarkerCoupling(0, 1, 'BLOCKED', false);
+  it('keeps the block while one of several conditions is still active', () => {
+    const result = couplingDecision(1, 'BLOCKED' as TrainingDecision, true);
     assert.equal(result.decision, 'BLOCKED');
-    assert.equal(result.blockedByMarker, false);
-    assert.equal(result.autoSwitch, null);
+    assert.equal(result.blockedByMarker, true);
   });
 
-  it('removing the last marker reverts a marker-caused block to ALLOWED', () => {
-    const result = applyMarkerCoupling(1, 0, 'BLOCKED', true);
+  it('allows training once the last condition is resolved', () => {
+    const result = couplingDecision(0, 'BLOCKED' as TrainingDecision, true);
     assert.equal(result.decision, 'ALLOWED');
     assert.equal(result.blockedByMarker, false);
-    assert.equal(result.autoSwitch, 'TO_ALLOWED');
   });
 
-  it('removing the last marker keeps a manually chosen BLOCKED decision', () => {
-    const result = applyMarkerCoupling(1, 0, 'BLOCKED', false);
+  it('keeps a manually chosen BLOCKED decision', () => {
+    const result = couplingDecision(0, 'BLOCKED' as TrainingDecision, false);
     assert.equal(result.decision, 'BLOCKED');
     assert.equal(result.blockedByMarker, false);
-    assert.equal(result.autoSwitch, null);
   });
 
-  it('removing one of several markers keeps the block', () => {
-    const result = applyMarkerCoupling(2, 1, 'BLOCKED', true);
-    assert.equal(result.decision, 'BLOCKED');
-    assert.equal(result.blockedByMarker, true);
-    assert.equal(result.autoSwitch, null);
-  });
-
-  it('adding a marker while BLOCKED by marker keeps the state', () => {
-    const result = applyMarkerCoupling(1, 2, 'BLOCKED', true);
-    assert.equal(result.decision, 'BLOCKED');
-    assert.equal(result.blockedByMarker, true);
-    assert.equal(result.autoSwitch, null);
+  it('leaves an allowed horse with no markers alone', () => {
+    const result = couplingDecision(0, 'ALLOWED' as TrainingDecision, false);
+    assert.equal(result.decision, 'ALLOWED');
+    assert.equal(result.blockedByMarker, false);
   });
 });

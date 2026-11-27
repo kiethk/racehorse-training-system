@@ -1,37 +1,51 @@
 import type { CareType, TrainingDecision } from '../../types';
 
 /**
- * Marker → decision coupling (user-approved 2026-11-12):
- * placing an injury marker while training is ALLOWED forces BLOCKED, and removing
- * the marker that caused it reverts to ALLOWED. Vet's own manual decisions are
- * never overridden, and URGENT exams (already hard-blocked) are out of scope.
+ * Marker → decision coupling (user-approved 2026-11-12, extended 2026-11-20):
+ * a new marker, or an active condition the Vet has not marked Recovered, forces BLOCKED.
+ * Once no marker source is left, a marker-caused block reverts to ALLOWED. The Vet's own
+ * manual BLOCKED is never released, and a vaccination visit never changes the decision.
  */
 export type MarkerCouplingResult = {
   decision: TrainingDecision;
   blockedByMarker: boolean;
-  autoSwitch: 'TO_BLOCKED' | 'TO_ALLOWED' | null;
 };
 
-/** The coupling only applies to the standard admission and routine exam forms. */
-export function markerCouplingEnabled(careType: CareType): boolean {
+/** The coupling only applies to the admission and routine exam forms, not to vaccination visits. */
+export function markerCouplingEnabled(
+  careType: CareType,
+  purpose?: 'FOLLOW_UP' | 'PREVENTIVE',
+): boolean {
+  if (purpose === 'PREVENTIVE') return false;
   return careType === 'INITIAL' || careType === 'ROUTINE';
 }
 
 /**
- * Pure state-machine step for a marker list change. Counts are compared so the
- * same function covers placement (first/extra marker) and removal (last marker).
+ * Markers still in force: active conditions not yet marked Recovered, plus markers placed in
+ * this session. Compared by count so placement, removal and resolution share one state machine.
  */
-export function applyMarkerCoupling(
-  prevCount: number,
-  nextCount: number,
+export function effectiveMarkerCount(
+  activeConditions: ReadonlyArray<{ id: number }>,
+  resolvedConditionIds: ReadonlyArray<number>,
+  newMarkers: ReadonlyArray<unknown>,
+): number {
+  return (
+    activeConditions.filter((condition) => !resolvedConditionIds.includes(condition.id)).length +
+    newMarkers.length
+  );
+}
+
+/** The decision implied by the markers still in force. */
+export function couplingDecision(
+  markersInForce: number,
   decision: TrainingDecision,
   blockedByMarker: boolean,
 ): MarkerCouplingResult {
-  if (nextCount > prevCount && decision === 'ALLOWED') {
-    return { decision: 'BLOCKED', blockedByMarker: true, autoSwitch: 'TO_BLOCKED' };
+  if (markersInForce > 0 && decision === 'ALLOWED') {
+    return { decision: 'BLOCKED', blockedByMarker: true };
   }
-  if (nextCount === 0 && prevCount > 0 && blockedByMarker && decision === 'BLOCKED') {
-    return { decision: 'ALLOWED', blockedByMarker: false, autoSwitch: 'TO_ALLOWED' };
+  if (markersInForce === 0 && blockedByMarker && decision === 'BLOCKED') {
+    return { decision: 'ALLOWED', blockedByMarker: false };
   }
-  return { decision, blockedByMarker, autoSwitch: null };
+  return { decision, blockedByMarker };
 }

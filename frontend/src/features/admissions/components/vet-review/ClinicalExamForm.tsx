@@ -37,7 +37,11 @@ import {
   type VaccinationDraft,
 } from "@/features/care/components/preventive/ExamVaccinationSection";
 import { randomizeUrgentVitals, pickFindingScenario } from "./urgentSimulation";
-import { applyMarkerCoupling, markerCouplingEnabled } from "./decisionCoupling";
+import {
+  couplingDecision,
+  effectiveMarkerCount,
+  markerCouplingEnabled,
+} from "./decisionCoupling";
 import { markerZoneLabel } from "@/features/vet/lib/injuryZones";
 import {
   emptyMetrics,
@@ -171,11 +175,10 @@ export const ClinicalExamForm = forwardRef<
   const [is3DOpen, setIs3DOpen] = useState(false);
   const [bodyRegions, setBodyRegions] = useState<HorseBodyRegion[]>([]);
   const [anatomyTab, setAnatomyTab] = useState<"form" | "anatomy3d">("form");
-  /** True when a marker placed in this session is the reason the decision is BLOCKED. */
+  /** True when markers/active conditions are the reason for BLOCKED, so clearing them releases it. */
   const [blockedByMarker, setBlockedByMarker] = useState(false);
   const [showMarkerBlockDialog, setShowMarkerBlockDialog] = useState(false);
-  const markerCoupling = markerCouplingEnabled(careType);
-  const allowLocked = markerCoupling && blockedByMarker && markers.length > 0;
+  const markerCoupling = markerCouplingEnabled(careType, schedulePurpose);
 
   const show3DTab = careType === "INITIAL" && trainingDecision === "BLOCKED";
 
@@ -199,36 +202,24 @@ export const ClinicalExamForm = forwardRef<
     markersRef.current = markers;
   }, [markers]);
 
-  /** setMarkers wrapper that runs the marker-to-decision coupling (see decisionCoupling.ts). */
+  /** setMarkers wrapper: pre-fills the report when a marker is placed. The decision follows in the effect below. */
   const setMarkersWithCoupling = useCallback(
     (action: SetStateAction<InjuryMarker[]>) => {
       const prev = markersRef.current;
       const next = typeof action === "function" ? action(prev) : action;
       markersRef.current = next;
       setMarkers(next);
-      if (!markerCoupling) return;
-      const result = applyMarkerCoupling(
-        prev.length,
-        next.length,
-        trainingDecision,
-        blockedByMarker,
-      );
-      if (result.autoSwitch === "TO_BLOCKED") {
-        setTrainingDecision("BLOCKED");
-        setBlockedByMarker(true);
-        if (!followUpDate) setFollowUpDate(businessDateFromToday(7));
-        if (examMode === "NORMAL") {
-          setExamMode("ABNORMAL");
-          setStructuredDiagnosis((prevD) =>
-            prevD === "Clinically healthy" ? "Minor clinical condition" : prevD,
-          );
-        }
-      } else if (result.autoSwitch === "TO_ALLOWED") {
-        setTrainingDecision("ALLOWED");
-        setBlockedByMarker(false);
+      if (!markerCoupling || next.length <= prev.length) return;
+      if (trainingDecision !== "ALLOWED") return;
+      if (!followUpDate) setFollowUpDate(businessDateFromToday(7));
+      if (examMode === "NORMAL") {
+        setExamMode("ABNORMAL");
+        setStructuredDiagnosis((prevD) =>
+          prevD === "Clinically healthy" ? "Minor clinical condition" : prevD,
+        );
       }
     },
-    [markerCoupling, trainingDecision, blockedByMarker, followUpDate, examMode],
+    [markerCoupling, trainingDecision, followUpDate, examMode],
   );
 
   const [metrics, setMetrics] =
@@ -238,6 +229,21 @@ export const ClinicalExamForm = forwardRef<
   const [resolvedConditionIds, setResolvedConditionIds] = useState<number[]>(
     [],
   );
+  const [conditionsError, setConditionsError] = useState(false);
+  /** Dirty-guard baseline: a coupling switch is not a Vet edit, so opening the exam stays clean. */
+  const decisionBaseline = useRef<TrainingDecision>(config.defaultDecision);
+  const unresolvedConditionCount = activeInjuries.filter(
+    (condition) => !resolvedConditionIds.includes(condition.id),
+  ).length;
+  const markerSources = effectiveMarkerCount(
+    activeInjuries,
+    resolvedConditionIds,
+    markers,
+  );
+  /** A failed conditions fetch counts as "still blocked", so training is never allowed blind. */
+  const markersInForce = conditionsError ? Math.max(markerSources, 1) : markerSources;
+  const allowLocked = markerCoupling && markersInForce > 0;
+
   const [generalCareInstructions, setGeneralCareInstructions] = useState("");
   const [vaccinationDrafts, setVaccinationDrafts] = useState<
     VaccinationDraft[]
@@ -335,11 +341,27 @@ export const ClinicalExamForm = forwardRef<
         if (!active) return;
         setActiveInjuries(injuries);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) setConditionsError(true);
+      });
     return () => {
       active = false;
     };
   }, [horseId]);
+
+  // Unresolved markers or active conditions hold training at BLOCKED; clearing both releases it.
+  // A block the Vet chose manually is never released automatically.
+  useEffect(() => {
+    if (!markerCoupling) return;
+    const next = couplingDecision(markersInForce, trainingDecision, blockedByMarker);
+    if (next.decision !== trainingDecision) {
+      decisionBaseline.current = next.decision;
+      setTrainingDecision(next.decision);
+    }
+    if (next.blockedByMarker !== blockedByMarker) {
+      setBlockedByMarker(next.blockedByMarker);
+    }
+  }, [markerCoupling, markersInForce, trainingDecision, blockedByMarker]);
 
   useEffect(() => {
     if (!show3DTab && anatomyTab === "anatomy3d") {
@@ -408,10 +430,11 @@ export const ClinicalExamForm = forwardRef<
         examMode !== "NORMAL" ||
         Object.values(systemFindings).some((f) => f !== "NORMAL") ||
         structuredDiagnosis !== "Clinically healthy" ||
-        trainingDecision !== config.defaultDecision ||
+        trainingDecision !== decisionBaseline.current ||
         restrictionDetails.trim() !== "" ||
         scheduleFollowUp ||
         followUpDate !== "" ||
+        resolvedConditionIds.length > 0 ||
         markers.length > 0;
 
   useEffect(() => {
@@ -1090,25 +1113,33 @@ export const ClinicalExamForm = forwardRef<
   const renderTrainingDecision = () => {
     if (config.decisionUi === "shared-section") {
       return (
-        <TrainingDecisionSection
-          isFormDisabled={isFormDisabled}
-          trainingDecision={trainingDecision}
-          setTrainingDecision={setTrainingDecision}
-          restrictionDetails={restrictionDetails}
-          setRestrictionDetails={setRestrictionDetails}
-          fieldErrors={fieldErrors}
-          setFieldErrors={setFieldErrors}
-          followUpDate={followUpDate}
-          setFollowUpDate={setFollowUpDate}
-          businessDateFromToday={businessDateFromToday}
-          allowLocked={allowLocked}
-          markerNotice={
-            allowLocked
-              ? "Injury marker placed — training decision set to BLOCKED."
-              : null
-          }
-          onLockedAllowAttempt={() => setShowMarkerBlockDialog(true)}
-        />
+        <>
+          {conditionsError && (
+            <Notice tone="warning">
+              Active conditions could not be loaded &mdash; training clearance
+              stays locked. Reload the page.
+            </Notice>
+          )}
+          <TrainingDecisionSection
+            isFormDisabled={isFormDisabled}
+            trainingDecision={trainingDecision}
+            setTrainingDecision={setTrainingDecision}
+            restrictionDetails={restrictionDetails}
+            setRestrictionDetails={setRestrictionDetails}
+            fieldErrors={fieldErrors}
+            setFieldErrors={setFieldErrors}
+            followUpDate={followUpDate}
+            setFollowUpDate={setFollowUpDate}
+            businessDateFromToday={businessDateFromToday}
+            allowLocked={allowLocked}
+            markerNotice={
+              allowLocked
+                ? `${unresolvedConditionCount} active condition${unresolvedConditionCount === 1 ? "" : "s"} · ${markers.length} new marker${markers.length === 1 ? "" : "s"} in force. Training decision is BLOCKED — mark each condition Resolved on the 3D model to release it.`
+                : null
+            }
+            onLockedAllowAttempt={() => setShowMarkerBlockDialog(true)}
+          />
+        </>
       );
     }
 
@@ -1733,16 +1764,22 @@ export const ClinicalExamForm = forwardRef<
           description={
             <div className="space-y-2 text-sm">
               <p>
-                {markers.length} marker{markers.length === 1 ? "" : "s"} placed:{" "}
-                {markers
-                  .map(
+                {[
+                  ...activeInjuries
+                    .filter(
+                      (condition) =>
+                        !resolvedConditionIds.includes(condition.id),
+                    )
+                    .map((condition) => condition.injuryType),
+                  ...markers.map(
                     (marker) =>
                       markerZoneLabel(bodyRegions, marker) ?? "Unspecified",
-                  )
-                  .join(", ")}
+                  ),
+                ].join(", ")}
               </p>
               <p className="text-xs font-medium text-[var(--color-warning)]">
-                Remove markers to allow training.
+                Mark each condition Resolved on the 3D model, or remove the new
+                markers, to allow training.
               </p>
             </div>
           }

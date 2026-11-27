@@ -377,8 +377,10 @@ function Marker({
       }
     }
 
-    tagWrapperRef.current.style.opacity = isOccluded ? '0.25' : '1';
-    tagWrapperRef.current.style.pointerEvents = isOccluded ? 'none' : 'auto';
+    // A tag on the far side of the body is dimmed, never disabled: the Vet must be able to open
+    // the marker and mark it Resolved without orbiting the model first.
+    tagWrapperRef.current.style.opacity = isOccluded ? '0.8' : '1';
+    tagWrapperRef.current.style.pointerEvents = 'auto';
   });
 
   const label =
