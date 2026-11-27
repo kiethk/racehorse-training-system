@@ -1535,7 +1535,11 @@ public class CareScheduleService {
         // AD-022: an OVERDUE exam still occupies the horse's calendar, so rollover must dodge it.
         List<CareSchedule> horseScheduled = careScheduleRepository.findByHorseIdAndStatusIn(
                 cs.getHorseId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
-        LocalDate day = now.toLocalDate().plusDays(1);
+        LocalDate startDay = cs.getScheduledDate() != null ? cs.getScheduledDate().plusDays(1) : now.toLocalDate();
+        if (startDay.isBefore(now.toLocalDate())) {
+            startDay = now.toLocalDate();
+        }
+        LocalDate day = startDay;
         for (int d = 0; d < 7; d++, day = day.plusDays(1)) {
             LocalDate currentDay = day;
             List<CareSchedule> assignedInDay = careScheduleRepository.findAssignedInDay(
