@@ -267,10 +267,11 @@ export function RoutineChecksWorkspace() {
             const _d = new Date();
             const todayIso = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
             const isFuture = Boolean(!isClosed && rawDate && rawDate > todayIso);
-            // Window: ALL ROUTINE SCHEDULED exams blocked outside 13:30–15:30, regardless of date
+            // Window: ALL ROUTINE SCHEDULED exams (except PREVENTIVE) blocked outside 13:30–15:30, regardless of date
             const _minNow = _d.getHours() * 60 + _d.getMinutes();
             const isOutsideRoutineWindow =
               cs.careType === 'ROUTINE' &&
+              cs.purpose !== 'PREVENTIVE' &&
               cs.status === 'SCHEDULED' &&
               (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
 
@@ -280,8 +281,16 @@ export function RoutineChecksWorkspace() {
               <Panel
                 key={cs.id}
                 padded
-                onClick={() => handleOpenSchedule(cs)}
-                className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                onClick={() => {
+                  if (isClosed || canExamine) {
+                    handleOpenSchedule(cs);
+                  }
+                }}
+                className={`border border-[var(--color-border)] transition-all duration-200 ease-out ${
+                  isClosed || canExamine
+                    ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]'
+                    : 'cursor-not-allowed opacity-80'
+                }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   {/* Left: Avatar + Details */}

@@ -895,7 +895,7 @@ public class CareScheduleService {
      * Sau 15:30, ca nào đã kịp IN_PROGRESS vẫn được phép hoàn tất (completeCareSchedule).
      */
     private void validateRoutineExamWindowForStart(CareSchedule schedule) {
-        if (schedule.getCareType() == CareType.ROUTINE) {
+        if (schedule.getCareType() == CareType.ROUTINE && schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE) {
             LocalTime now = LocalTime.now();
             if (now.isBefore(FarmSchedulePolicy.VET_WINDOW_START) || now.isAfter(FarmSchedulePolicy.VET_WINDOW_END)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTINE_EXAM_OUTSIDE_WINDOW",

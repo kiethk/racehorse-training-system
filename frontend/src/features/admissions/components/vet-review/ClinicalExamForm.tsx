@@ -399,6 +399,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const _minEnd   = VET_WINDOW_END_H   * 60 + VET_WINDOW_END_M;
     const isOutsideRoutineWindow =
       careType === 'ROUTINE' &&
+      schedulePurpose !== 'PREVENTIVE' &&
       scheduleStatus === 'SCHEDULED' &&
       (_minNow < _minStart || _minNow > _minEnd);
 

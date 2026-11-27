@@ -259,8 +259,8 @@ export function VetScheduleTimeline() {
                     <span className="text-xl font-bold text-[var(--color-text-primary)]">
                       {stats.preventive}/3
                     </span>
-                    <Pill tone={stats.preventive >= 3 ? 'warning' : 'primary'} size="sm">
-                      Window 13:30 – 15:30
+                    <Pill tone="neutral" size="sm">
+                      Daytime Intake
                     </Pill>
                   </div>
                 </div>
@@ -342,12 +342,33 @@ export function VetScheduleTimeline() {
                 const statusDisplay = getScheduleStatusDisplay(cs.status);
                 const examAction = getScheduleExamAction(cs.status);
 
+                // Routine window check (13:30 - 15:30) for ROUTINE non-preventive
+                const _now = new Date();
+                const todayIso = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+                const rawDate = cs.scheduledDate || (cs.scheduledAt ? cs.scheduledAt.slice(0, 10) : null);
+                const isFuture = Boolean(!isCompleted && rawDate && rawDate > todayIso);
+                const _minNow = _now.getHours() * 60 + _now.getMinutes();
+                const isOutsideRoutineWindow =
+                  cs.careType === 'ROUTINE' &&
+                  cs.purpose !== 'PREVENTIVE' &&
+                  cs.status === 'SCHEDULED' &&
+                  (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
+                const canExamine = cs.status === 'IN_PROGRESS' || (!isFuture && !isOutsideRoutineWindow);
+
                 return (
                   <Panel
                     key={cs.id}
                     padded
-                    onClick={() => handleOpenSchedule(cs)}
-                    className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                    onClick={() => {
+                      if (isCompleted || canExamine) {
+                        handleOpenSchedule(cs);
+                      }
+                    }}
+                    className={`border border-[var(--color-border)] transition-all duration-200 ease-out ${
+                      isCompleted || canExamine
+                        ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]'
+                        : 'cursor-not-allowed opacity-80'
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       {/* Left: Avatar + Details */}
@@ -396,19 +417,27 @@ export function VetScheduleTimeline() {
                       </div>
 
                       {/* Right: Action Button */}
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex flex-col items-end gap-1">
                         <Button
                           variant={isCompleted ? 'secondary' : 'primary'}
                           size="sm"
                           icon={examAction.icon}
+                          disabled={!isCompleted && !canExamine}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenSchedule(cs);
+                            if (isCompleted || canExamine) {
+                              handleOpenSchedule(cs);
+                            }
                           }}
                           className="transition-all active:scale-[0.97]"
                         >
                           {examAction.label}
                         </Button>
+                        {!isCompleted && isOutsideRoutineWindow && cs.status !== 'IN_PROGRESS' && (
+                          <span className="text-[11px] text-[var(--color-text-secondary)] font-medium">
+                            Opens 13:30 – 15:30
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Panel>
@@ -497,6 +526,7 @@ export function VetScheduleTimeline() {
                           const _minNow = _now.getHours() * 60 + _now.getMinutes();
                           const isRoutineBlocked =
                             cs.careType === 'ROUTINE' &&
+                            cs.purpose !== 'PREVENTIVE' &&
                             cs.status === 'SCHEDULED' &&
                             (_minNow < 13 * 60 + 30 || _minNow > 15 * 60 + 30);
 
